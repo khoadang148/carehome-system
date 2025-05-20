@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nursing Home Management System
+
+A comprehensive web-based system for managing nursing home operations, resident care, staff scheduling, and family communication.
+
+## Features
+
+### Resident Management
+- Electronic resident profiles with medical history
+- Digital care plan management and tracking
+- Medication administration and tracking
+- Daily activity and wellness monitoring
+- Personal details and preferences management
+
+### Staff Management
+- Staff scheduling and shift management
+- Time tracking and shift assignment
+- Staff qualifications and certification tracking
+- Task assignments and completion monitoring
+
+### Activity Management
+- Activity planning and scheduling
+- Resident participation tracking
+- Personalized activity recommendations
+- Group composition optimization
+
+### Family Portal
+- Secure family access to resident information
+- Communication tools with care staff
+- Photo and update sharing
+- Visit scheduling
+- Easy feedback submission
+
+### Administrative Features
+- Room and bed management
+- Inventory and supply monitoring
+- Regulatory compliance tools
+- Reporting and analytics
+
+## Technology Stack
+
+- **Frontend**: Next.js, React, Tailwind CSS
+- **Backend**: MockAPI (for demonstration purposes)
+- **UI Components**: Headless UI, Hero Icons
+- **Forms**: React Hook Form
+- **Date Handling**: date-fns
+- **Charts**: Chart.js, react-chartjs-2
+- **Data Fetching**: Axios
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18.0 or newer
+- npm or yarn
+
+### Installation
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/nursing-home-management.git
+cd nursing-home-management
+```
+
+2. Install dependencies
+
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Run the development server
 
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+nursing-home-management/
+├── public/              # Static files
+├── src/
+│   ├── app/             # App router pages
+│   ├── components/      # Reusable components
+│   │   ├── layout/      # Layout components
+│   │   ├── residents/   # Resident-related components
+│   │   ├── staff/       # Staff-related components
+│   │   ├── activities/  # Activity-related components
+│   │   └── ui/          # UI components
+│   ├── lib/             # Utility functions and API services
+│   └── styles/          # Global styles
+├── tailwind.config.ts   # Tailwind CSS configuration
+└── package.json         # Project dependencies
+```
 
-## Learn More
+## API Integration
 
-To learn more about Next.js, take a look at the following resources:
+This project uses MockAPI for demonstration purposes. In a production environment, you would replace the API endpoints with your actual backend service.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Deploy on Vercel
+## Acknowledgments
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Design inspired by modern healthcare management systems
+- Icons provided by Heroicons
