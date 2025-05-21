@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   UserIcon, 
   UsersIcon, 
@@ -12,6 +12,8 @@ import {
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/navigation';
 
 // Mock data for dashboard
 const stats = [
@@ -46,6 +48,22 @@ const systemStats = [
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('activities');
+  const { user } = useAuth();
+  const router = useRouter();
+  
+  // Redirect family members to the family portal
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+    } else if (user.role === 'family') {
+      router.push('/family');
+    }
+  }, [user, router]);
+  
+  // Hide dashboard if not staff or admin
+  if (!user || user.role === 'family') {
+    return null;
+  }
   
   return (
     <div style={{maxWidth: '1400px', margin: '0 auto'}}>
@@ -248,16 +266,13 @@ export default function Home() {
                         height: '1rem',
                         color: alert.type === 'urgent' ? '#dc2626' : 
                                alert.type === 'warning' ? '#d97706' : 
-                               '#0284c7'
+                               '#0369a1'
                       }} />
                     </div>
-                    <div style={{marginLeft: '0.75rem', flexGrow: 1}}>
-                      <p style={{fontSize: '0.875rem', fontWeight: 500, color: '#111827'}}>{alert.message}</p>
-                      <p style={{marginTop: '0.25rem', fontSize: '0.75rem', color: '#6b7280'}}>{alert.time}</p>
+                    <div style={{marginLeft: '0.75rem'}}>
+                      <p style={{fontSize: '0.875rem', fontWeight: 500, color: '#111827', marginBottom: '0.25rem'}}>{alert.message}</p>
+                      <p style={{fontSize: '0.75rem', color: '#6b7280'}}>{alert.time}</p>
                     </div>
-                    <button style={{marginLeft: '1rem', fontSize: '0.75rem', color: '#0284c7', fontWeight: 500}} className="hover:text-primary-900">
-                      Mark as read
-                    </button>
                   </div>
                 </div>
               ))}
