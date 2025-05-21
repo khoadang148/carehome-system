@@ -1,37 +1,21 @@
 "use client";
 
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { Menu, Transition } from '@headlessui/react';
-import { BellIcon, UserCircleIcon, LockClosedIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { BellIcon, UserCircleIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState({ name: 'Admin', role: 'admin' });
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Giả lập đăng nhập - trong thực tế sẽ gọi API
-    if (username === 'admin' && password === 'admin') {
-      setCurrentUser({ name: 'Admin User', role: 'admin' });
-      setIsLoggedIn(true);
-    } else if (username === 'staff' && password === 'staff') {
-      setCurrentUser({ name: 'Staff User', role: 'staff' });
-      setIsLoggedIn(true);
-    } else if (username === 'family' && password === 'family') {
-      setCurrentUser({ name: 'Family Member', role: 'family' });
-      setIsLoggedIn(true);
-    }
-    setShowLoginModal(false);
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  
+  const handleLogout = () => {
+    logout();
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentUser({ name: '', role: '' });
+  const handleLogin = () => {
+    router.push('/login');
   };
 
   return (
@@ -55,8 +39,6 @@ export default function Header() {
           <input
             type="text"
             placeholder="Tìm kiếm..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
               padding: '0.5rem 0.75rem 0.5rem 2.5rem',
@@ -84,9 +66,9 @@ export default function Header() {
           </span>
         </div>
 
-        {!isLoggedIn ? (
+        {!user ? (
           <button 
-            onClick={() => setShowLoginModal(true)}
+            onClick={handleLogin}
             style={{
               display: 'flex', 
               alignItems: 'center', 
@@ -100,7 +82,7 @@ export default function Header() {
               cursor: 'pointer'
             }}
           >
-            <LockClosedIcon style={{width: '1rem', height: '1rem'}} />
+            <UserCircleIcon style={{width: '1rem', height: '1rem'}} />
             Đăng nhập
           </button>
         ) : (
@@ -108,20 +90,20 @@ export default function Header() {
             {/* Role badge */}
             <div style={{
               backgroundColor: 
-                currentUser.role === 'admin' ? '#e0f2fe' : 
-                currentUser.role === 'staff' ? '#ccfbf1' :
+                user.role === 'admin' ? '#e0f2fe' : 
+                user.role === 'staff' ? '#ccfbf1' :
                 '#fdf4ff',
               color: 
-                currentUser.role === 'admin' ? '#0369a1' : 
-                currentUser.role === 'staff' ? '#0f766e' :
+                user.role === 'admin' ? '#0369a1' : 
+                user.role === 'staff' ? '#0f766e' :
                 '#a21caf',
               padding: '0.25rem 0.75rem',
               borderRadius: '9999px',
               fontSize: '0.75rem',
               fontWeight: 500,
             }}>
-              {currentUser.role === 'admin' ? 'Quản trị viên' : 
-               currentUser.role === 'staff' ? 'Nhân viên' : 'Thành viên gia đình'}
+              {user.role === 'admin' ? 'Quản trị viên' : 
+               user.role === 'staff' ? 'Nhân viên' : 'Thành viên gia đình'}
             </div>
             
             {/* Notification dropdown */}
@@ -238,7 +220,7 @@ export default function Header() {
                   color: 'white', 
                   fontWeight: 500
                 }}>
-                  {currentUser.name.substring(0, 2)}
+                  {user.name.substring(0, 2)}
                 </div>
               </Menu.Button>
               
@@ -261,18 +243,24 @@ export default function Header() {
                   boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.04), 0px 2px 6px rgba(0, 0, 0, 0.04), 0px 0px 1px rgba(0, 0, 0, 0.04)',
                   zIndex: 10
                 }}>
-                  <div style={{padding: '0.25rem'}}>
+                  <div style={{padding: '0.5rem'}}>
+                    <div style={{padding: '0.5rem 0.75rem', borderBottom: '1px solid #e5e7eb', marginBottom: '0.25rem'}}>
+                      <p style={{fontSize: '0.875rem', fontWeight: 500, color: '#111827'}}>{user.name}</p>
+                      <p style={{fontSize: '0.75rem', color: '#6b7280'}}>{user.email}</p>
+                    </div>
                     <Menu.Item>
                       {({ active }) => (
                         <a
                           href="#"
                           style={{
                             display: 'block',
-                            padding: '0.5rem 1rem',
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '0.5rem 0.75rem',
                             fontSize: '0.875rem',
-                            color: active ? '#0284c7' : '#374151',
-                            backgroundColor: active ? '#f0f9ff' : 'transparent',
-                            borderRadius: '0.375rem'
+                            borderRadius: '0.375rem',
+                            backgroundColor: active ? '#f9fafb' : 'transparent',
+                            color: '#111827'
                           }}
                         >
                           Hồ sơ cá nhân
@@ -285,17 +273,20 @@ export default function Header() {
                           href="#"
                           style={{
                             display: 'block',
-                            padding: '0.5rem 1rem',
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '0.5rem 0.75rem',
                             fontSize: '0.875rem',
-                            color: active ? '#0284c7' : '#374151',
-                            backgroundColor: active ? '#f0f9ff' : 'transparent',
-                            borderRadius: '0.375rem'
+                            borderRadius: '0.375rem',
+                            backgroundColor: active ? '#f9fafb' : 'transparent',
+                            color: '#111827'
                           }}
                         >
-                          Cài đặt
+                          Cài đặt tài khoản
                         </a>
                       )}
                     </Menu.Item>
+                    <div style={{borderTop: '1px solid #e5e7eb', margin: '0.25rem 0'}}></div>
                     <Menu.Item>
                       {({ active }) => (
                         <button
@@ -304,7 +295,7 @@ export default function Header() {
                             display: 'block',
                             width: '100%',
                             textAlign: 'left',
-                            padding: '0.5rem 1rem',
+                            padding: '0.5rem 0.75rem',
                             fontSize: '0.875rem',
                             backgroundColor: active ? '#fee2e2' : 'transparent',
                             color: active ? '#dc2626' : '#ef4444',
@@ -324,109 +315,6 @@ export default function Header() {
           </>
         )}
       </div>
-      
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.75rem',
-            padding: '1.5rem',
-            width: '100%',
-            maxWidth: '24rem',
-            boxShadow: '0px 10px 25px rgba(0,0,0,0.1)'
-          }}>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1.5rem'}}>Đăng nhập</h2>
-            <form onSubmit={handleLogin}>
-              <div style={{marginBottom: '1rem'}}>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Tên đăng nhập
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin / staff / family"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem'
-                  }}
-                  required
-                />
-              </div>
-              <div style={{marginBottom: '1.5rem'}}>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Mật khẩu
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem'
-                  }}
-                  required
-                />
-                <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem'}}>
-                  * Mật khẩu: giống với tên đăng nhập
-                </p>
-              </div>
-              <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'flex-end'}}>
-                <button
-                  type="button"
-                  onClick={() => setShowLoginModal(false)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: 'white',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#0ea5e9',
-                    border: 'none',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Đăng nhập
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </header>
   );
 } 

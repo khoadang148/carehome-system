@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
-import Header from "@/components/layout/Header";
+import ClientLayout from "@/components/layout/ClientLayout";
+import { AuthProvider } from "@/lib/auth-context";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -29,39 +29,11 @@ export default function RootLayout({
           height: '100%'
         }}
       >
-        <div style={{ 
-          display: 'flex', 
-          height: '100vh', 
-          overflow: 'hidden'
-        }}>
-          <Sidebar />
-          <div style={{
-            flexGrow: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-          }}>
-            <Header />
-            <main style={{
-              flexGrow: 1,
-              overflowY: 'auto',
-              padding: '1.5rem',
-              backgroundColor: '#f5f7fa'
-            }}>
-              {children}
-            </main>
-            <footer style={{
-              backgroundColor: 'white',
-              borderTop: '1px solid #e5e7eb',
-              padding: '0.75rem',
-              textAlign: 'center',
-              fontSize: '0.875rem',
-              color: '#6b7280'
-            }}>
-              <p style={{ margin: 0 }}>CareHome Management System © {new Date().getFullYear()}</p>
-            </footer>
-          </div>
-        </div>
+        <AuthProvider>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+        </AuthProvider>
       </body>
     </html>
   );

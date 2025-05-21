@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -17,13 +17,14 @@ import {
   BanknotesIcon,
   ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
+import { useAuth } from '@/lib/auth-context';
 
 // Phân loại menu theo nhóm chức năng
 const menuGroups = [
   {
     title: "Quản lý chính",
     items: [
-      { name: 'Tổng quan', href: '/', icon: HomeIcon, roles: ['admin', 'staff', 'family'] },
+      { name: 'Tổng quan', href: '/', icon: HomeIcon, roles: ['admin', 'staff'] },
       { name: 'Cư dân', href: '/residents', icon: UserIcon, roles: ['admin', 'staff'] },
       { name: 'Nhân viên', href: '/staff', icon: UsersIcon, roles: ['admin'] },
     ]
@@ -55,7 +56,13 @@ const menuGroups = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [userRole, setUserRole] = useState('admin'); // Giá trị mặc định, trong thực tế sẽ lấy từ context/API
+  const { user } = useAuth();
+  const userRole = user?.role || null; // Use null if no user is logged in
+  
+  // Hide sidebar completely if no user is logged in
+  if (!user) {
+    return null;
+  }
   
   return (
     <div style={{
@@ -107,7 +114,7 @@ export default function Sidebar() {
       <nav style={{flexGrow: 1, overflowY: 'auto', padding: '1rem 0.75rem'}}>
         {menuGroups.map((group, groupIndex) => {
           // Lọc các menu item theo role người dùng
-          const filteredItems = group.items.filter(item => item.roles.includes(userRole));
+          const filteredItems = group.items.filter(item => userRole && item.roles.includes(userRole));
           
           // Chỉ hiển thị nhóm nếu có ít nhất 1 menu item phù hợp với role
           if (filteredItems.length === 0) return null;
@@ -174,7 +181,7 @@ export default function Sidebar() {
         })}
       </nav>
       
-      {!collapsed && (
+      {!collapsed && user && (
         <div style={{padding: '1rem', borderTop: '1px solid #e5e7eb'}}>
           <div style={{
             backgroundColor: '#f0f9ff', 
@@ -183,8 +190,8 @@ export default function Sidebar() {
             padding: '0.75rem'
           }}>
             <div style={{fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.25rem'}}>
-              {userRole === 'admin' ? 'Quản trị viên' : 
-               userRole === 'staff' ? 'Nhân viên' : 'Thành viên gia đình'}
+              {user.role === 'admin' ? 'Quản trị viên' : 
+               user.role === 'staff' ? 'Nhân viên' : 'Thành viên gia đình'}
             </div>
             <p style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>
               Liên hệ hỗ trợ: 555-123-4567
