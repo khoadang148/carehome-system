@@ -8,7 +8,9 @@ import {
   PlusCircleIcon, 
   PencilIcon, 
   UserGroupIcon, 
-  CalendarIcon 
+  CalendarIcon,
+  EyeIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 
 // Mock activity data
@@ -95,25 +97,113 @@ export default function ActivitiesPage() {
   });
   
   return (
-    <div style={{maxWidth: '1400px', margin: '0 auto'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Quản lý hoạt động</h1>
-        <div style={{display: 'flex', gap: '1rem'}}>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      position: 'relative'
+    }}>
+      {/* Background decorations */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(16, 185, 129, 0.03) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none'
+      }} />
+      
+      <div style={{
+        maxWidth: '1400px', 
+        margin: '0 auto', 
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Header Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              <div style={{
+                width: '3.5rem',
+                height: '3.5rem',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+              }}>
+                <SparklesIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+              </div>
+              <div>
+                <h1 style={{
+                  fontSize: '2rem', 
+                  fontWeight: 700, 
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Quản lý hoạt động
+                </h1>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Tổng số: {activities.length} hoạt động
+                </p>
+              </div>
+            </div>
+            
+            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
           <Link 
             href="/activities/calendar" 
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: '#16a34a',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
               color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
               textDecoration: 'none',
-              fontWeight: 500,
-              fontSize: '0.875rem'
-            }}
-          >
-            <CalendarIcon style={{width: '1rem', height: '1rem', marginRight: '0.375rem'}} />
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(139, 92, 246, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                }}
+              >
+                <CalendarIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
             Lịch hoạt động
           </Link>
           <Link 
@@ -121,189 +211,438 @@ export default function ActivitiesPage() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: '#0284c7',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
               color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
               textDecoration: 'none',
-              fontWeight: 500,
-              fontSize: '0.875rem'
-            }}
-          >
-            <PlusCircleIcon style={{width: '1rem', height: '1rem', marginRight: '0.375rem'}} />
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+                }}
+              >
+                <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
             Thêm hoạt động
           </Link>
+            </div>
         </div>
       </div>
       
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '1.5rem'}}>
+        {/* Filters Card */}
         <div style={{
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1rem', 
-          marginBottom: '1.5rem'
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1rem',
+          padding: '1.5rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{
             display: 'flex',
             flexWrap: 'wrap', 
             alignItems: 'center', 
-            justifyContent: 'space-between',
-            gap: '1rem'
+            gap: '1.5rem'
           }}>
-            <div style={{position: 'relative', width: '100%', maxWidth: '20rem'}}>
-              <div style={{position: 'absolute', top: 0, bottom: 0, left: '0.75rem', display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
-                <MagnifyingGlassIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
+            <div style={{flex: '1', minWidth: '20rem'}}>
+              <div style={{position: 'relative'}}>
+                <div style={{
+                  position: 'absolute', 
+                  top: 0, 
+                  bottom: 0, 
+                  left: '1rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  pointerEvents: 'none'
+                }}>
+                  <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
               </div>
               <input
                 type="text"
                 placeholder="Tìm kiếm hoạt động..."
                 style={{
                   width: '100%',
-                  paddingLeft: '2.25rem',
-                  paddingRight: '0.75rem',
-                  paddingTop: '0.5rem',
-                  paddingBottom: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #e5e7eb',
-                  fontSize: '0.875rem'
+                    paddingLeft: '2.75rem',
+                    paddingRight: '1rem',
+                    paddingTop: '0.75rem',
+                    paddingBottom: '0.75rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem',
+                    background: 'white',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                 }}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-              />
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#f59e0b';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  }}
+                />
+              </div>
             </div>
           
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <FunnelIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
+            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'rgba(245, 158, 11, 0.1)',
+                borderRadius: '0.5rem'
+              }}>
+                <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#f59e0b'}} />
+                <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#f59e0b'}}>
+                  Lọc
+                </span>
+              </div>
                 <select
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.875rem'
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.875rem',
+                  background: 'white',
+                  fontWeight: 500,
+                  minWidth: '12rem',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.2s ease'
                   }}
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#f59e0b';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }}
                 >
                   {categories.map((category) => (
-                    <option key={category} value={category}>{category === 'Tất cả' ? 'Tất cả loại hoạt động' : `Hoạt động ${category}`}</option>
+                  <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
-              </div>
-              
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <FunnelIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
                 <select
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.875rem'
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.875rem',
+                  background: 'white',
+                  fontWeight: 500,
+                  minWidth: '10rem',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.2s ease'
                   }}
                   value={filterLocation}
                   onChange={(e) => setFilterLocation(e.target.value)}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#f59e0b';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }}
                 >
                   {locations.map((location) => (
-                    <option key={location} value={location}>{location === 'Tất cả' ? 'Tất cả địa điểm' : location}</option>
+                  <option key={location} value={location}>{location}</option>
                   ))}
                 </select>
-              </div>
             </div>
           </div>
         </div>
         
-        <div style={{overflowX: 'auto'}}>
-          <table style={{minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
-            <thead style={{backgroundColor: '#f9fafb'}}>
-              <tr>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Hoạt động</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Loại</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Địa điểm</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Thời gian</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Thời lượng</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Tham gia</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody style={{backgroundColor: 'white'}}>
+        {/* Activities Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+          gap: '1.5rem'
+        }}>
               {filteredActivities.map((activity) => (
-                <tr key={activity.id} style={{borderBottom: '1px solid #e5e7eb'}}>
-                  <td style={{padding: '1rem 1.5rem'}}>
-                    <div style={{fontWeight: 500, color: '#111827'}}>{activity.name}</div>
-                    <div style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem'}}>{activity.description}</div>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap'}}>
+            <div
+              key={activity.id}
+              style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              {/* Activity Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0,
+                    marginBottom: '0.25rem'
+                  }}>
+                    {activity.name}
+                  </h3>
                     <span style={{
                       display: 'inline-flex', 
                       padding: '0.25rem 0.75rem', 
                       fontSize: '0.75rem', 
-                      fontWeight: 500, 
+                    fontWeight: 600, 
                       borderRadius: '9999px',
-                      backgroundColor: 
-                        activity.category === 'Thể chất' ? '#dbeafe' : 
-                        activity.category === 'Sáng tạo' ? '#f3e8ff' :
-                        activity.category === 'Trị liệu' ? '#dcfce7' :
-                        activity.category === 'Nhận thức' ? '#fef3c7' : 
-                        '#e0e7ff',
+                    background: 
+                      activity.category === 'Thể chất' ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 
+                      activity.category === 'Sáng tạo' ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : 
+                      activity.category === 'Trị liệu' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' :
+                      activity.category === 'Nhận thức' ? 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)' :
+                      'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                       color: 
-                        activity.category === 'Thể chất' ? '#1e40af' : 
-                        activity.category === 'Sáng tạo' ? '#7e22ce' :
+                      activity.category === 'Thể chất' ? '#dc2626' : 
+                      activity.category === 'Sáng tạo' ? '#1d4ed8' : 
                         activity.category === 'Trị liệu' ? '#166534' :
-                        activity.category === 'Nhận thức' ? '#92400e' : 
-                        '#4338ca'
+                      activity.category === 'Nhận thức' ? '#7c3aed' :
+                      '#d97706',
+                    border: '1px solid',
+                    borderColor:
+                      activity.category === 'Thể chất' ? '#fca5a5' : 
+                      activity.category === 'Sáng tạo' ? '#93c5fd' : 
+                      activity.category === 'Trị liệu' ? '#86efac' :
+                      activity.category === 'Nhận thức' ? '#c4b5fd' :
+                      '#fbbf24'
+                  }}>
+                    {activity.category}
+                  </span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  fontWeight: 500
+                }}>
+                  <UserGroupIcon style={{width: '1rem', height: '1rem'}} />
+                  {activity.participants}/{activity.capacity}
+                </div>
+              </div>
+
+              {/* Activity Details */}
+              <div style={{marginBottom: '1rem'}}>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#374151',
+                  lineHeight: '1.5',
+                  margin: '0 0 1rem 0'
+                }}>
+                  {activity.description}
+                </p>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  <div>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 500,
+                      display: 'block'
                     }}>
-                      {activity.category}
+                      Thời gian
                     </span>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>{activity.location}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>{activity.scheduledTime}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>{activity.duration} phút</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap'}}>
-                    <div style={{display: 'flex', alignItems: 'center'}}>
-                      <div style={{marginRight: '0.5rem', fontSize: '0.875rem', color: '#6b7280'}}>
-                        {activity.participants}/{activity.capacity}
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      fontWeight: 600
+                    }}>
+                      {activity.scheduledTime}
+                    </span>
                       </div>
-                      <div style={{width: '6rem', backgroundColor: '#e5e7eb', borderRadius: '9999px', height: '0.625rem'}}>
-                        <div 
-                          style={{
-                            height: '0.625rem', 
-                            borderRadius: '9999px',
-                            backgroundColor: 
-                              (activity.participants / activity.capacity) > 0.8 
-                                ? '#16a34a' 
-                                : (activity.participants / activity.capacity) > 0.5 
-                                  ? '#2563eb' 
-                                  : '#d97706',
-                            width: `${(activity.participants / activity.capacity) * 100}%`
-                          }}
-                        ></div>
+                  <div>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 500,
+                      display: 'block'
+                    }}>
+                      Thời lượng
+                    </span>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      fontWeight: 600
+                    }}>
+                      {activity.duration} phút
+                    </span>
                       </div>
                     </div>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                      <Link href={`/activities/${activity.id}`} style={{color: '#2563eb', display: 'flex', alignItems: 'center'}}>
-                        <PencilIcon style={{width: '1rem', height: '1rem'}} />
-                      </Link>
-                      <Link href={`/activities/${activity.id}/participants`} style={{color: '#16a34a', display: 'flex', alignItems: 'center'}}>
-                        <UserGroupIcon style={{width: '1rem', height: '1rem'}} />
-                      </Link>
-                      <Link href={`/activities/${activity.id}/schedule`} style={{color: '#9333ea', display: 'flex', alignItems: 'center'}}>
-                        <CalendarIcon style={{width: '1rem', height: '1rem'}} />
-                      </Link>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.75rem'
+                }}>
+                  <div>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 500,
+                      display: 'block'
+                    }}>
+                      Địa điểm
+                    </span>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      fontWeight: 600
+                    }}>
+                      {activity.location}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 500,
+                      display: 'block'
+                    }}>
+                      Hướng dẫn viên
+                    </span>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      fontWeight: 600
+                    }}>
+                      {activity.facilitator}
+                    </span>
+                  </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
+
+              {/* Actions */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.5rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid #f1f5f9'
+              }}>
+                <button
+                  style={{
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                  }}
+                >
+                  <EyeIcon style={{width: '1rem', height: '1rem'}} />
+                </button>
+                <button
+                  style={{
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+                  }}
+                >
+                  <PencilIcon style={{width: '1rem', height: '1rem'}} />
+                </button>
+              </div>
+            </div>
+          ))}
         
         {filteredActivities.length === 0 && (
-          <div style={{textAlign: 'center', padding: '2rem 0'}}>
-            <p style={{color: '#6b7280'}}>Không tìm thấy hoạt động phù hợp với tìm kiếm của bạn.</p>
+            <div style={{
+              gridColumn: '1 / -1',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1rem',
+              padding: '3rem',
+              textAlign: 'center',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <SparklesIcon style={{width: '3rem', height: '3rem', color: '#d1d5db'}} />
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    margin: 0,
+                    marginBottom: '0.5rem'
+                  }}>
+                    Không tìm thấy hoạt động nào
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#9ca3af',
+                    margin: 0
+                  }}>
+                    Thử điều chỉnh bộ lọc hoặc tìm kiếm khác
+                  </p>
+                </div>
+              </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

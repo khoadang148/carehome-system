@@ -27,9 +27,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock users for demonstration
 const MOCK_USERS = [
-  { id: '1', name: 'Admin User', email: 'admin@example.com', password: 'admin', role: 'admin' },
-  { id: '2', name: 'Staff User', email: 'staff@example.com', password: 'staff', role: 'staff' },
-  { id: '3', name: 'Family Member', email: 'family@example.com', password: 'family', role: 'family' },
+  { id: '1', name: 'Quản trị viên', email: 'admin@example.com', password: 'admin', role: 'admin' },
+  { id: '2', name: 'Nhân viên', email: 'staff@example.com', password: 'staff', role: 'staff' },
+  { id: '3', name: 'Thành viên gia đình', email: 'family@example.com', password: 'family', role: 'family' },
 ];
 
 // Create auth provider component

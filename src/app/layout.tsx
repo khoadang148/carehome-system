@@ -10,8 +10,8 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "CareHome - Nursing Home Management System",
-  description: "Comprehensive solution for nursing home operations",
+  title: "CareHome - Hệ thống quản lý viện dưỡng lão",
+  description: "Giải pháp toàn diện cho hoạt động viện dưỡng lão",
 };
 
 export default function RootLayout({

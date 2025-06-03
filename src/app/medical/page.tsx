@@ -8,7 +8,10 @@ import {
   PlusCircleIcon,
   ClipboardDocumentListIcon,
   BeakerIcon,
-  DocumentPlusIcon
+  DocumentPlusIcon,
+  HeartIcon,
+  EyeIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline';
 
 // Mock medical records data
@@ -81,25 +84,113 @@ export default function MedicalPage() {
   });
   
   return (
-    <div style={{maxWidth: '1400px', margin: '0 auto'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Hồ sơ y tế</h1>
-        <div style={{display: 'flex', gap: '1rem'}}>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      position: 'relative'
+    }}>
+      {/* Background decorations */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(239, 68, 68, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.03) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none'
+      }} />
+      
+      <div style={{
+        maxWidth: '1400px', 
+        margin: '0 auto', 
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Header Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              <div style={{
+                width: '3.5rem',
+                height: '3.5rem',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+              }}>
+                <HeartIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+              </div>
+              <div>
+                <h1 style={{
+                  fontSize: '2rem', 
+                  fontWeight: 700, 
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Hồ sơ y tế
+                </h1>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Tổng số: {medicalRecords.length} hồ sơ y tế
+                </p>
+              </div>
+            </div>
+            
+            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
           <Link 
             href="/medical/tests" 
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: '#16a34a',
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
               color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
               textDecoration: 'none',
-              fontWeight: 500,
-              fontSize: '0.875rem'
-            }}
-          >
-            <BeakerIcon style={{width: '1rem', height: '1rem', marginRight: '0.375rem'}} />
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(22, 163, 74, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
+                }}
+              >
+                <BeakerIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
             Quản lý xét nghiệm
           </Link>
           <Link 
@@ -107,176 +198,415 @@ export default function MedicalPage() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: '#0284c7',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
               color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
               textDecoration: 'none',
-              fontWeight: 500,
-              fontSize: '0.875rem'
-            }}
-          >
-            <PlusCircleIcon style={{width: '1rem', height: '1rem', marginRight: '0.375rem'}} />
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                }}
+              >
+                <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
             Hồ sơ mới
           </Link>
+            </div>
         </div>
       </div>
       
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '1.5rem'}}>
+        {/* Filters Card */}
         <div style={{
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1rem', 
-          marginBottom: '1.5rem'
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1rem',
+          padding: '1.5rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{
             display: 'flex',
             flexWrap: 'wrap', 
             alignItems: 'center', 
-            justifyContent: 'space-between',
-            gap: '1rem'
+            gap: '1.5rem'
           }}>
-            <div style={{position: 'relative', width: '100%', maxWidth: '20rem'}}>
-              <div style={{position: 'absolute', top: 0, bottom: 0, left: '0.75rem', display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
-                <MagnifyingGlassIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
+            <div style={{flex: '1', minWidth: '20rem'}}>
+              <div style={{position: 'relative'}}>
+                <div style={{
+                  position: 'absolute', 
+                  top: 0, 
+                  bottom: 0, 
+                  left: '1rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  pointerEvents: 'none'
+                }}>
+                  <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
               </div>
               <input
                 type="text"
                 placeholder="Tìm kiếm hồ sơ y tế..."
                 style={{
                   width: '100%',
-                  paddingLeft: '2.25rem',
-                  paddingRight: '0.75rem',
-                  paddingTop: '0.5rem',
-                  paddingBottom: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #e5e7eb',
-                  fontSize: '0.875rem'
+                    paddingLeft: '2.75rem',
+                    paddingRight: '1rem',
+                    paddingTop: '0.75rem',
+                    paddingBottom: '0.75rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem',
+                    background: 'white',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                 }}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-              />
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#ef4444';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  }}
+                />
+              </div>
             </div>
           
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <FunnelIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
+            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'rgba(239, 68, 68, 0.1)',
+                borderRadius: '0.5rem'
+              }}>
+                <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#ef4444'}} />
+                <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#ef4444'}}>
+                  Lọc
+                </span>
+              </div>
                 <select
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.875rem'
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.875rem',
+                  background: 'white',
+                  fontWeight: 500,
+                  minWidth: '12rem',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.2s ease'
                   }}
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#ef4444';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }}
                 >
                   {recordTypes.map((type) => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
-              </div>
-              
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <FunnelIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
                 <select
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.875rem'
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.875rem',
+                  background: 'white',
+                  fontWeight: 500,
+                  minWidth: '10rem',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.2s ease'
                   }}
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#ef4444';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }}
                 >
                   {statuses.map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
-              </div>
             </div>
           </div>
         </div>
         
-        <div style={{overflowX: 'auto'}}>
-          <table style={{minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
-            <thead style={{backgroundColor: '#f9fafb'}}>
-              <tr>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Cư dân</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Loại hồ sơ</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Ngày</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Bác sĩ</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Trạng thái</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody style={{backgroundColor: 'white'}}>
+        {/* Records Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+          gap: '1.5rem'
+        }}>
               {filteredRecords.map((record) => (
-                <tr key={record.id} style={{borderBottom: '1px solid #e5e7eb'}}>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', fontWeight: 500, color: '#111827'}}>{record.residentName}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap'}}>
+            <div
+              key={record.id}
+              style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              {/* Record Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0,
+                    marginBottom: '0.25rem'
+                  }}>
+                    {record.residentName}
+                  </h3>
                     <span style={{
                       display: 'inline-flex', 
                       padding: '0.25rem 0.75rem', 
                       fontSize: '0.75rem', 
-                      fontWeight: 500, 
+                    fontWeight: 600, 
                       borderRadius: '9999px',
-                      backgroundColor: 
-                        record.recordType === 'Ghi chú y tế' ? '#dbeafe' : 
-                        record.recordType === 'Kê đơn thuốc' ? '#dcfce7' :
-                        record.recordType === 'Báo cáo xét nghiệm' ? '#fef3c7' : 
-                        '#e0e7ff',
+                    background: 
+                      record.recordType === 'Ghi chú y tế' ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : 
+                      record.recordType === 'Kê đơn thuốc' ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 
+                      record.recordType === 'Báo cáo xét nghiệm' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' :
+                      'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    color: 
+                      record.recordType === 'Ghi chú y tế' ? '#1d4ed8' : 
+                      record.recordType === 'Kê đơn thuốc' ? '#dc2626' : 
+                      record.recordType === 'Báo cáo xét nghiệm' ? '#166534' :
+                      '#d97706',
+                    border: '1px solid',
+                    borderColor:
+                      record.recordType === 'Ghi chú y tế' ? '#93c5fd' : 
+                      record.recordType === 'Kê đơn thuốc' ? '#fca5a5' : 
+                      record.recordType === 'Báo cáo xét nghiệm' ? '#86efac' :
+                      '#fbbf24'
+                  }}>
+                    {record.recordType}
+                  </span>
+                </div>
+                <span style={{
+                  display: 'inline-flex', 
+                  padding: '0.25rem 0.625rem', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 600, 
+                  borderRadius: '0.375rem',
+                  background: 
+                    record.status === 'Hoàn thành' ? 'rgba(16, 185, 129, 0.1)' : 
+                    record.status === 'Đang xử lý' ? 'rgba(245, 158, 11, 0.1)' : 
+                    'rgba(59, 130, 246, 0.1)',
                       color: 
-                        record.recordType === 'Ghi chú y tế' ? '#1e40af' : 
-                        record.recordType === 'Kê đơn thuốc' ? '#166534' :
-                        record.recordType === 'Báo cáo xét nghiệm' ? '#92400e' : 
-                        '#4338ca'
-                    }}>
-                      {record.recordType}
-                    </span>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>{record.date}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>{record.doctor}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap'}}>
+                    record.status === 'Hoàn thành' ? '#059669' : 
+                    record.status === 'Đang xử lý' ? '#d97706' : 
+                    '#2563eb',
+                  border: '1px solid',
+                  borderColor:
+                    record.status === 'Hoàn thành' ? '#86efac' : 
+                    record.status === 'Đang xử lý' ? '#fbbf24' : 
+                    '#93c5fd'
+                }}>
+                  {record.status}
+                </span>
+              </div>
+
+              {/* Record Details */}
+              <div style={{marginBottom: '1rem'}}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  <div>
                     <span style={{
-                      display: 'inline-flex', 
-                      padding: '0.25rem 0.75rem', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 500, 
-                      borderRadius: '9999px',
-                      backgroundColor: 
-                        record.status === 'Hoàn thành' ? '#dcfce7' : 
-                        record.status === 'Đang xử lý' ? '#fef3c7' : 
-                        '#f0f9ff',
-                      color: 
-                        record.status === 'Hoàn thành' ? '#166534' : 
-                        record.status === 'Đang xử lý' ? '#92400e' : 
-                        '#0369a1'
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 500,
+                      display: 'block'
                     }}>
-                      {record.status}
+                      Ngày
                     </span>
-                  </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                      <Link href={`/medical/${record.id}`} style={{color: '#2563eb', display: 'flex', alignItems: 'center'}}>
-                        <ClipboardDocumentListIcon style={{width: '1rem', height: '1rem'}} />
-                      </Link>
-                      <Link href={`/medical/${record.id}/edit`} style={{color: '#16a34a', display: 'flex', alignItems: 'center'}}>
-                        <DocumentPlusIcon style={{width: '1rem', height: '1rem'}} />
-                      </Link>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      fontWeight: 600
+                    }}>
+                      {new Date(record.date).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: '0.75rem', 
+                      color: '#6b7280',
+                      fontWeight: 500, 
+                      display: 'block'
+                    }}>
+                      Bác sĩ
+                    </span>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      fontWeight: 600
+                    }}>
+                      {record.doctor}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    fontWeight: 500,
+                    display: 'block',
+                    marginBottom: '0.25rem'
+                  }}>
+                    Ghi chú
+                  </span>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    lineHeight: '1.5',
+                    margin: 0
+                  }}>
+                    {record.notes}
+                  </p>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
+
+              {/* Actions */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.5rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid #f1f5f9'
+              }}>
+                <button
+                  style={{
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                  }}
+                >
+                  <EyeIcon style={{width: '1rem', height: '1rem'}} />
+                </button>
+                <button
+                  style={{
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+                  }}
+                >
+                  <PencilIcon style={{width: '1rem', height: '1rem'}} />
+                </button>
+              </div>
+            </div>
+          ))}
         
         {filteredRecords.length === 0 && (
-          <div style={{textAlign: 'center', padding: '2rem 0'}}>
-            <p style={{color: '#6b7280'}}>Không tìm thấy hồ sơ y tế phù hợp với tìm kiếm của bạn.</p>
+            <div style={{
+              gridColumn: '1 / -1',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1rem',
+              padding: '3rem',
+              textAlign: 'center',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <HeartIcon style={{width: '3rem', height: '3rem', color: '#d1d5db'}} />
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    margin: 0,
+                    marginBottom: '0.5rem'
+                  }}>
+                    Không tìm thấy hồ sơ y tế nào
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#9ca3af',
+                    margin: 0
+                  }}>
+                    Thử điều chỉnh bộ lọc hoặc tìm kiếm khác
+                  </p>
+                </div>
+              </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

@@ -72,12 +72,12 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   // Helper function to render care level with appropriate color
   const renderCareLevel = (level: string) => {
     const bgColor = 
-      level === 'Low' ? '#dcfce7' : 
-      level === 'Medium' ? '#fef9c3' : '#fee2e2';
+      level === 'Cơ bản' ? '#dbeafe' : 
+      level === 'Nâng cao' ? '#dcfce7' : '#f3e8ff';
       
     const textColor = 
-      level === 'Low' ? '#166534' : 
-      level === 'Medium' ? '#854d0e' : '#b91c1c';
+      level === 'Cơ bản' ? '#1d4ed8' : 
+      level === 'Nâng cao' ? '#166534' : '#7c3aed';
       
     return (
       <span style={{
@@ -135,7 +135,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 {resident.age} tuổi | Phòng: {resident.room}
               </p>
               <div style={{marginTop: '0.5rem'}}>
-                <span style={{fontSize: '0.875rem', color: '#6b7280', marginRight: '0.5rem'}}>Mức độ chăm sóc:</span>
+                <span style={{fontSize: '0.875rem', color: '#6b7280', marginRight: '0.5rem'}}>Gói dịch vụ:</span>
                 {renderCareLevel(resident.careLevel)}
               </div>
             </div>

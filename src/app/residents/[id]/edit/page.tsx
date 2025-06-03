@@ -416,7 +416,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
               {/* Care Level */}
               <div>
                 <label htmlFor="careLevel" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Mức độ chăm sóc*
+                  Gói dịch vụ*
                 </label>
                 <select
                   id="careLevel"
@@ -430,12 +430,12 @@ export default function EditResidentPage({ params }: { params: { id: string } })
                     fontSize: '0.875rem',
                     outline: 'none'
                   }}
-                  {...register('careLevel', { required: 'Mức độ chăm sóc là bắt buộc' })}
+                  {...register('careLevel', { required: 'Gói dịch vụ là bắt buộc' })}
                 >
-                  <option value="">Chọn mức độ chăm sóc</option>
-                  <option value="Low">Thấp</option>
-                  <option value="Medium">Trung bình</option>
-                  <option value="High">Cao</option>
+                  <option value="">Chọn gói dịch vụ</option>
+                  <option value="Cơ bản">Cơ bản</option>
+                  <option value="Nâng cao">Nâng cao</option>
+                  <option value="Cao cấp">Cao cấp</option>
                 </select>
                 {errors.careLevel && (
                   <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.careLevel.message}</p>

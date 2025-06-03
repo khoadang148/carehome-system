@@ -10,7 +10,10 @@ import {
   FunnelIcon, 
   MagnifyingGlassIcon,
   CalendarIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  ChartBarIcon,
+  EyeIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline';
 
 // Mock financial transactions data
@@ -108,212 +111,698 @@ export default function FinancePage() {
   });
   
   return (
-    <div style={{maxWidth: '1400px', margin: '0 auto'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Quản lý tài chính</h1>
-        <div style={{display: 'flex', gap: '1rem'}}>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      position: 'relative'
+    }}>
+      {/* Background decorations */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.03) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none'
+      }} />
+      
+      <div style={{
+        maxWidth: '1400px', 
+        margin: '0 auto', 
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Header Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              <div style={{
+                width: '3.5rem',
+                height: '3.5rem',
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)'
+              }}>
+                <ChartBarIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+              </div>
+              <div>
+                <h1 style={{
+                  fontSize: '2rem', 
+                  fontWeight: 700, 
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Quản lý tài chính
+                </h1>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Theo dõi thu chi và báo cáo tài chính
+                </p>
+              </div>
+            </div>
+            
+            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
+              <Link 
+                href="/finance/reports" 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                }}
+              >
+                <ChartBarIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
+                Báo cáo
+              </Link>
           <Link 
             href="/finance/new-transaction" 
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: '#0284c7',
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
               color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
               textDecoration: 'none',
-              fontWeight: 500,
-              fontSize: '0.875rem'
-            }}
-          >
-            <DocumentPlusIcon style={{width: '1rem', height: '1rem', marginRight: '0.375rem'}} />
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(22, 163, 74, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
+                }}
+              >
+                <DocumentPlusIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
             Giao dịch mới
           </Link>
+        </div>
         </div>
       </div>
       
       {/* Financial summary cards */}
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem'}}>
-        <div style={{backgroundColor: '#f0f9ff', borderRadius: '0.5rem', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'}}>
-          <h2 style={{fontSize: '0.875rem', fontWeight: 500, color: '#0c4a6e', marginBottom: '0.75rem', marginTop: 0}}>Thu nhập</h2>
+        <div style={{
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: '1.5rem', 
+          marginBottom: '2rem'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            boxShadow: '0 10px 25px -5px rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.2)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-1rem',
+              right: '-1rem',
+              width: '4rem',
+              height: '4rem',
+              background: 'radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
+            <h2 style={{
+              fontSize: '0.875rem', 
+              fontWeight: 600, 
+              color: '#166534', 
+              marginBottom: '1rem', 
+              marginTop: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.025em'
+            }}>
+              Thu nhập
+            </h2>
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-            <div style={{fontSize: '1.5rem', fontWeight: 600, color: '#0369a1'}}>{formatCurrency(totalIncome)}</div>
-            <ArrowTrendingUpIcon style={{width: '2rem', height: '2rem', color: '#0ea5e9'}} />
-          </div>
+              <div style={{
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#16a34a',
+                lineHeight: 1
+              }}>
+                {formatCurrency(totalIncome)}
+              </div>
+              <ArrowTrendingUpIcon style={{width: '3rem', height: '3rem', color: '#22c55e'}} />
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#166534',
+              marginTop: '0.5rem',
+              fontWeight: 500
+            }}>
+              +12.5% so với tháng trước
+            </div>
         </div>
         
-        <div style={{backgroundColor: '#fef2f2', borderRadius: '0.5rem', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'}}>
-          <h2 style={{fontSize: '0.875rem', fontWeight: 500, color: '#991b1b', marginBottom: '0.75rem', marginTop: 0}}>Chi phí</h2>
+          <div style={{
+            background: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-1rem',
+              right: '-1rem',
+              width: '4rem',
+              height: '4rem',
+              background: 'radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
+            <h2 style={{
+              fontSize: '0.875rem', 
+              fontWeight: 600, 
+              color: '#991b1b', 
+              marginBottom: '1rem', 
+              marginTop: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.025em'
+            }}>
+              Chi phí
+            </h2>
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-            <div style={{fontSize: '1.5rem', fontWeight: 600, color: '#b91c1c'}}>{formatCurrency(totalExpenses)}</div>
-            <ArrowTrendingDownIcon style={{width: '2rem', height: '2rem', color: '#ef4444'}} />
+              <div style={{
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#dc2626',
+                lineHeight: 1
+              }}>
+                {formatCurrency(totalExpenses)}
+              </div>
+              <ArrowTrendingDownIcon style={{width: '3rem', height: '3rem', color: '#ef4444'}} />
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#991b1b',
+              marginTop: '0.5rem',
+              fontWeight: 500
+            }}>
+              -5.2% so với tháng trước
           </div>
         </div>
         
         <div style={{
-          backgroundColor: balance >= 0 ? '#f0fdf4' : '#fef2f2', 
-          borderRadius: '0.5rem', 
-          padding: '1.25rem', 
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}>
+            background: balance >= 0 
+              ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' 
+              : 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            boxShadow: balance >= 0 
+              ? '0 10px 25px -5px rgba(59, 130, 246, 0.1)' 
+              : '0 10px 25px -5px rgba(239, 68, 68, 0.1)',
+            border: balance >= 0 
+              ? '1px solid rgba(59, 130, 246, 0.2)' 
+              : '1px solid rgba(239, 68, 68, 0.2)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-1rem',
+              right: '-1rem',
+              width: '4rem',
+              height: '4rem',
+              background: balance >= 0 
+                ? 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' 
+                : 'radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
           <h2 style={{
             fontSize: '0.875rem', 
-            fontWeight: 500, 
-            color: balance >= 0 ? '#166534' : '#991b1b', 
-            marginBottom: '0.75rem', 
-            marginTop: 0
+              fontWeight: 600, 
+              color: balance >= 0 ? '#1e40af' : '#991b1b', 
+              marginBottom: '1rem', 
+              marginTop: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.025em'
           }}>
             Số dư
           </h2>
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-            <div style={{fontSize: '1.5rem', fontWeight: 600, color: balance >= 0 ? '#16a34a' : '#b91c1c'}}>{formatCurrency(balance)}</div>
-            <BanknotesIcon style={{width: '2rem', height: '2rem', color: balance >= 0 ? '#22c55e' : '#ef4444'}} />
+              <div style={{
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: balance >= 0 ? '#2563eb' : '#dc2626',
+                lineHeight: 1
+              }}>
+                {formatCurrency(balance)}
+              </div>
+              <BanknotesIcon style={{
+                width: '3rem', 
+                height: '3rem', 
+                color: balance >= 0 ? '#3b82f6' : '#ef4444'
+              }} />
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: balance >= 0 ? '#1e40af' : '#991b1b',
+              marginTop: '0.5rem',
+              fontWeight: 500
+            }}>
+              {balance >= 0 ? '+18.7%' : '-8.3%} so với tháng trước
           </div>
         </div>
       </div>
       
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '1.5rem'}}>
+        {/* Filters and Transactions */}
         <div style={{
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1rem', 
-          marginBottom: '1.5rem'
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          overflow: 'hidden'
+        }}>
+          {/* Filters */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            padding: '1.5rem 2rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{
             display: 'flex',
             flexWrap: 'wrap', 
             alignItems: 'center', 
-            justifyContent: 'space-between',
-            gap: '1rem'
-          }}>
-            <div style={{position: 'relative', width: '100%', maxWidth: '20rem'}}>
-              <div style={{position: 'absolute', top: 0, bottom: 0, left: '0.75rem', display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
-                <MagnifyingGlassIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
+              gap: '1.5rem'
+            }}>
+              <div style={{flex: '1', minWidth: '20rem'}}>
+                <div style={{position: 'relative'}}>
+                  <div style={{
+                    position: 'absolute', 
+                    top: 0, 
+                    bottom: 0, 
+                    left: '1rem', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    pointerEvents: 'none'
+                  }}>
+                    <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
               </div>
               <input
                 type="text"
                 placeholder="Tìm kiếm giao dịch..."
                 style={{
                   width: '100%',
-                  paddingLeft: '2.25rem',
-                  paddingRight: '0.75rem',
-                  paddingTop: '0.5rem',
-                  paddingBottom: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #e5e7eb',
-                  fontSize: '0.875rem'
+                      paddingLeft: '2.75rem',
+                      paddingRight: '1rem',
+                      paddingTop: '0.75rem',
+                      paddingBottom: '0.75rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '0.875rem',
+                      background: 'white',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                 }}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-              />
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#16a34a';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                    }}
+                  />
+                </div>
             </div>
           
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <FunnelIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  background: 'rgba(22, 163, 74, 0.1)',
+                  borderRadius: '0.5rem'
+                }}>
+                  <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#16a34a'}} />
+                  <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#16a34a'}}>
+                    Lọc
+                  </span>
+                </div>
                 <select
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.875rem'
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem',
+                    background: 'white',
+                    fontWeight: 500,
+                    minWidth: '10rem',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                    transition: 'all 0.2s ease'
                   }}
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#16a34a';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  }}
                 >
                   {categories.map((category) => (
                     <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
-              </div>
-              
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <FunnelIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
                 <select
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.875rem'
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem',
+                    background: 'white',
+                    fontWeight: 500,
+                    minWidth: '10rem',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                    transition: 'all 0.2s ease'
                   }}
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#16a34a';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  }}
                 >
                   {statuses.map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
-              </div>
             </div>
           </div>
         </div>
         
+          {/* Transactions Table */}
         <div style={{overflowX: 'auto'}}>
           <table style={{minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
-            <thead style={{backgroundColor: '#f9fafb'}}>
-              <tr>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Mô tả</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Loại</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Ngày</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Số tiền</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Tham chiếu</th>
-                <th style={{padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Trạng thái</th>
+              <thead>
+                <tr style={{
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+                }}>
+                  <th style={{
+                    padding: '1rem 2rem', 
+                    textAlign: 'left', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600, 
+                    color: '#374151', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    Mô tả
+                  </th>
+                  <th style={{
+                    padding: '1rem 2rem', 
+                    textAlign: 'left', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600, 
+                    color: '#374151', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    Loại
+                  </th>
+                  <th style={{
+                    padding: '1rem 2rem', 
+                    textAlign: 'right', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600, 
+                    color: '#374151', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    Số tiền
+                  </th>
+                  <th style={{
+                    padding: '1rem 2rem', 
+                    textAlign: 'left', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600, 
+                    color: '#374151', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    Ngày
+                  </th>
+                  <th style={{
+                    padding: '1rem 2rem', 
+                    textAlign: 'left', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600, 
+                    color: '#374151', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    Trạng thái
+                  </th>
+                  <th style={{
+                    padding: '1rem 2rem', 
+                    textAlign: 'left', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600, 
+                    color: '#374151', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    Thao tác
+                  </th>
               </tr>
             </thead>
-            <tbody style={{backgroundColor: 'white'}}>
-              {filteredTransactions.map((transaction) => (
-                <tr key={transaction.id} style={{borderBottom: '1px solid #e5e7eb'}}>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', fontWeight: 500, color: '#111827'}}>{transaction.description}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap'}}>
+              <tbody>
+                {filteredTransactions.map((transaction, index) => (
+                  <tr 
+                    key={transaction.id} 
+                    style={{
+                      borderBottom: index !== filteredTransactions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8fafc';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <td style={{
+                      padding: '1.25rem 2rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 600, 
+                      color: '#111827'
+                    }}>
+                      <div>
+                        {transaction.description}
+                      </div>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: '#6b7280',
+                        marginTop: '0.25rem'
+                      }}>
+                        Ref: {transaction.reference}
+                      </div>
+                    </td>
+                    <td style={{padding: '1.25rem 2rem'}}>
                     <span style={{
                       display: 'inline-flex', 
-                      padding: '0.25rem 0.75rem', 
+                        padding: '0.375rem 0.875rem', 
                       fontSize: '0.75rem', 
-                      fontWeight: 500, 
+                        fontWeight: 600, 
                       borderRadius: '9999px',
-                      backgroundColor: transaction.category === 'Thu nhập' ? '#dcfce7' : '#fef2f2',
-                      color: transaction.category === 'Thu nhập' ? '#166534' : '#b91c1c'
+                        background: 
+                          transaction.category === 'Thu nhập' 
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                            : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                        color: 
+                          transaction.category === 'Thu nhập' ? '#166534' : '#dc2626',
+                        border: '1px solid',
+                        borderColor: transaction.category === 'Thu nhập' ? '#86efac' : '#fca5a5'
                     }}>
                       {transaction.category}
                     </span>
                   </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                      <CalendarIcon style={{width: '1rem', height: '1rem', color: '#9ca3af'}} />
-                      {transaction.date}
-                    </div>
+                    <td style={{
+                      padding: '1.25rem 2rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700,
+                      color: transaction.category === 'Thu nhập' ? '#16a34a' : '#dc2626',
+                      textAlign: 'right'
+                    }}>
+                      {transaction.category === 'Thu nhập' ? '+' : '-'}{formatCurrency(transaction.amount)}
                   </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: transaction.category === 'Thu nhập' ? '#15803d' : '#be123c'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                      <CurrencyDollarIcon style={{width: '1rem', height: '1rem'}} />
-                      {formatCurrency(transaction.amount)}
-                    </div>
+                    <td style={{
+                      padding: '1.25rem 2rem', 
+                      fontSize: '0.875rem', 
+                      color: '#6b7280',
+                      fontWeight: 500
+                    }}>
+                      {new Date(transaction.date).toLocaleDateString('vi-VN')}
                   </td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap', fontSize: '0.875rem', color: '#6b7280'}}>{transaction.reference}</td>
-                  <td style={{padding: '1rem 1.5rem', whiteSpace: 'nowrap'}}>
+                    <td style={{padding: '1.25rem 2rem'}}>
                     <span style={{
                       display: 'inline-flex', 
                       padding: '0.25rem 0.75rem', 
                       fontSize: '0.75rem', 
-                      fontWeight: 500, 
-                      borderRadius: '9999px',
-                      backgroundColor: transaction.status === 'Đã xử lý' ? '#f0f9ff' : '#fef3c7',
-                      color: transaction.status === 'Đã xử lý' ? '#0369a1' : '#92400e'
+                        fontWeight: 600, 
+                        borderRadius: '0.375rem',
+                        background: 
+                          transaction.status === 'Đã xử lý' 
+                            ? 'rgba(16, 185, 129, 0.1)' 
+                            : 'rgba(245, 158, 11, 0.1)',
+                        color: 
+                          transaction.status === 'Đã xử lý' ? '#059669' : '#d97706',
+                        border: '1px solid',
+                        borderColor: transaction.status === 'Đã xử lý' ? '#86efac' : '#fbbf24'
                     }}>
                       {transaction.status}
                     </span>
                   </td>
+                    <td style={{padding: '1.25rem 2rem'}}>
+                      <div style={{display: 'flex', gap: '0.5rem'}}>
+                        <button
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                          }}
+                        >
+                          <EyeIcon style={{width: '1rem', height: '1rem'}} />
+                        </button>
+                        <button
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+                          }}
+                        >
+                          <PencilIcon style={{width: '1rem', height: '1rem'}} />
+                        </button>
+                      </div>
+                  </td>
                 </tr>
               ))}
+                {filteredTransactions.length === 0 && (
+                  <tr>
+                    <td 
+                      colSpan={6} 
+                      style={{
+                        padding: '3rem', 
+                        textAlign: 'center', 
+                        color: '#6b7280',
+                        fontSize: '1rem',
+                        fontWeight: 500
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '1rem'
+                      }}>
+                        <ChartBarIcon style={{width: '3rem', height: '3rem', color: '#d1d5db'}} />
+                        Không tìm thấy giao dịch nào
+                      </div>
+                    </td>
+                  </tr>
+                )}
             </tbody>
           </table>
         </div>
-        
-        {filteredTransactions.length === 0 && (
-          <div style={{textAlign: 'center', padding: '2rem 0'}}>
-            <p style={{color: '#6b7280'}}>Không tìm thấy giao dịch phù hợp với tìm kiếm của bạn.</p>
           </div>
-        )}
       </div>
     </div>
   );
