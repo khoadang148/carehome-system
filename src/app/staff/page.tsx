@@ -124,13 +124,18 @@ export default function StaffPage() {
   };
   
   // Handle view staff details
-  const handleViewStaff = (id: number) => {
-    router.push(`/staff/${id}`);
+  const handleViewStaff = (staffId: number) => {
+    router.push(`/staff/${staffId}`);
   };
   
   // Handle edit staff
-  const handleEditStaff = (id: number) => {
-    router.push(`/staff/${id}/edit`);
+  const handleEditStaff = (staffId: number) => {
+    router.push(`/staff/${staffId}/edit`);
+  };
+  
+  // Handle create new staff
+  const handleCreateStaff = () => {
+    router.push('/staff/new');
   };
   
   return (

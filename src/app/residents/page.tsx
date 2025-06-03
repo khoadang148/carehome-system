@@ -52,13 +52,13 @@ export default function ResidentsPage() {
   });
   
   // Handle view resident details
-  const handleViewResident = (id: number) => {
-    router.push(`/residents/${id}`);
+  const handleViewResident = (residentId: number) => {
+    router.push(`/residents/${residentId}`);
   };
   
   // Handle edit resident
-  const handleEditResident = (id: number) => {
-    router.push(`/residents/${id}/edit`);
+  const handleEditResident = (residentId: number) => {
+    router.push(`/residents/${residentId}/edit`);
   };
   
   // Handle delete resident

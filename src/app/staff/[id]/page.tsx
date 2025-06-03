@@ -104,32 +104,38 @@ const initialStaffMembers = [
   },
 ];
 
-export default function StaffDetailPage({ params }: { params: { id: string } }) {
+export default function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [staff, setStaff] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   
   useEffect(() => {
+    // Resolve params Promise
+    const resolveParams = async () => {
+      const resolved = await params;
+      setResolvedParams(resolved);
+    };
+    resolveParams();
+  }, [params]);
+  
+  useEffect(() => {
+    if (!resolvedParams) return;
+    
     // Simulate API call to fetch staff data
     const fetchStaff = async () => {
       try {
         // In a real application, you would fetch from an API endpoint
-        const staffId = parseInt(params.id);
+        const staffId = parseInt(resolvedParams.id);
         
-        // Check if there's saved staff data in localStorage
-        let staffMembers = initialStaffMembers;
-        const savedStaff = localStorage.getItem('nurseryHomeStaff');
-        if (savedStaff) {
-          staffMembers = JSON.parse(savedStaff);
-        }
-        
-        const foundStaff = staffMembers.find(s => s.id === staffId);
+        // Find the staff member from the mock data
+        const foundStaff = initialStaffMembers.find(s => s.id === staffId);
         
         if (foundStaff) {
           setStaff(foundStaff);
         } else {
-          // Staff not found, redirect to list
-          router.push('/staff');
+          // Staff not found, could redirect to 404 page
+          console.error('Staff not found');
         }
       } catch (error) {
         console.error('Error fetching staff:', error);
@@ -139,18 +145,20 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
     };
     
     fetchStaff();
-  }, [params.id, router]);
+  }, [resolvedParams, router]);
   
   const handleEditClick = () => {
-    router.push(`/staff/${params.id}/edit`);
+    if (!resolvedParams) return;
+    router.push(`/staff/${resolvedParams.id}/edit`);
   };
   
   const handleScheduleClick = () => {
-    router.push(`/staff/${params.id}/schedule`);
+    if (!resolvedParams) return;
+    router.push(`/staff/${resolvedParams.id}/schedule`);
   };
   
   // Show loading state while fetching data
-  if (loading) {
+  if (loading || !resolvedParams) {
     return (
       <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
         <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>

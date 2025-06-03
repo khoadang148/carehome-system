@@ -12,7 +12,9 @@ import {
   ComputerDesktopIcon,
   GlobeAltIcon,
   MoonIcon,
-  SunIcon
+  SunIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth-context';
 
@@ -55,6 +57,9 @@ export default function SettingsPage() {
     confirm: ''
   });
 
+  const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({
       ...prev,
@@ -75,13 +80,26 @@ export default function SettingsPage() {
   };
 
   const handleChangePassword = () => {
+    setPasswordError('');
+    
     if (passwords.new !== passwords.confirm) {
-      alert('Mật khẩu mới không khớp!');
+      setPasswordError('Mật khẩu mới không khớp!');
       return;
     }
+    
+    if (passwords.new.length < 6) {
+      setPasswordError('Mật khẩu phải có ít nhất 6 ký tự!');
+      return;
+    }
+    
+    // Simulate API call
     console.log('Changing password...');
-    // TODO: Implement password change
+    setShowPasswordSuccess(true);
     setPasswords({ current: '', new: '', confirm: '' });
+    
+    setTimeout(() => {
+      setShowPasswordSuccess(false);
+    }, 3000);
   };
 
   const SettingCard = ({ title, description, children }: {
@@ -628,6 +646,43 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Password Error/Success Messages */}
+              {passwordError && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  color: '#dc2626',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <ExclamationTriangleIcon style={{width: '1rem', height: '1rem'}} />
+                  {passwordError}
+                </div>
+              )}
+
+              {showPasswordSuccess && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgba(34, 197, 94, 0.2)',
+                  color: '#16a34a',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <CheckCircleIcon style={{width: '1rem', height: '1rem'}} />
+                  Mật khẩu đã được thay đổi thành công!
+                </div>
+              )}
 
               <div style={{marginTop: '1.5rem'}}>
                 <button 

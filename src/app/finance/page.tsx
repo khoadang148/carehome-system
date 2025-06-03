@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   BanknotesIcon,
   ArrowTrendingUpIcon,
@@ -9,8 +10,6 @@ import {
   DocumentPlusIcon,
   FunnelIcon, 
   MagnifyingGlassIcon,
-  CalendarIcon,
-  CurrencyDollarIcon,
   ChartBarIcon,
   EyeIcon,
   PencilIcon
@@ -85,9 +84,19 @@ const formatCurrency = (amount: number) => {
 
 export default function FinancePage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('Tất cả');
+  const [filterType, setFilterType] = useState('Tất cả');
   const [filterStatus, setFilterStatus] = useState('Tất cả');
-  
+  const router = useRouter();
+
+  // Handler functions for button actions
+  const handleViewTransaction = (transactionId: number) => {
+    router.push(`/finance/${transactionId}`);
+  };
+
+  const handleEditTransaction = (transactionId: number) => {
+    router.push(`/finance/${transactionId}/edit`);
+  };
+
   // Financial summary calculations
   const totalIncome = transactions
     .filter(t => t.category === 'Thu nhập')
@@ -104,7 +113,7 @@ export default function FinancePage() {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           transaction.reference.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesCategory = filterCategory === 'Tất cả' || transaction.category === filterCategory;
+    const matchesCategory = filterType === 'Tất cả' || transaction.category === filterType;
     const matchesStatus = filterStatus === 'Tất cả' || transaction.status === filterStatus;
     
     return matchesSearch && matchesCategory && matchesStatus;
@@ -208,57 +217,42 @@ export default function FinancePage() {
                   transition: 'all 0.3s ease',
                   border: '1px solid rgba(255, 255, 255, 0.2)'
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                }}
               >
                 <ChartBarIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
                 Báo cáo
               </Link>
-          <Link 
-            href="/finance/new-transaction" 
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              <Link 
+                href="/finance/new-transaction" 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
                   background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              color: 'white',
+                  color: 'white',
                   padding: '0.875rem 1.5rem',
                   borderRadius: '0.75rem',
-              textDecoration: 'none',
+                  textDecoration: 'none',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
                   transition: 'all 0.3s ease',
                   border: '1px solid rgba(255, 255, 255, 0.2)'
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(22, 163, 74, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
-                }}
               >
                 <DocumentPlusIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-            Giao dịch mới
-          </Link>
+                Giao dịch mới
+              </Link>
+            </div>
+          </div>
         </div>
-        </div>
-      </div>
-      
-      {/* Financial summary cards */}
+        
+        {/* Financial summary cards */}
         <div style={{
           display: 'grid', 
           gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
           gap: '1.5rem', 
           marginBottom: '2rem'
         }}>
+          {/* Income Card */}
           <div style={{
             background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
             borderRadius: '1.5rem',
@@ -288,7 +282,7 @@ export default function FinancePage() {
             }}>
               Thu nhập
             </h2>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
               <div style={{
                 fontSize: '2rem', 
                 fontWeight: 700, 
@@ -307,10 +301,11 @@ export default function FinancePage() {
             }}>
               +12.5% so với tháng trước
             </div>
-        </div>
-        
+          </div>
+          
+          {/* Expenses Card */}
           <div style={{
-            background: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
+            background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
             borderRadius: '1.5rem',
             padding: '2rem',
             boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.1)',
@@ -338,7 +333,7 @@ export default function FinancePage() {
             }}>
               Chi phí
             </h2>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
               <div style={{
                 fontSize: '2rem', 
                 fontWeight: 700, 
@@ -355,22 +350,17 @@ export default function FinancePage() {
               marginTop: '0.5rem',
               fontWeight: 500
             }}>
-              -5.2% so với tháng trước
+              -4.2% so với tháng trước
+            </div>
           </div>
-        </div>
-        
-        <div style={{
-            background: balance >= 0 
-              ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' 
-              : 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
+          
+          {/* Balance Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%)',
             borderRadius: '1.5rem',
             padding: '2rem',
-            boxShadow: balance >= 0 
-              ? '0 10px 25px -5px rgba(59, 130, 246, 0.1)' 
-              : '0 10px 25px -5px rgba(239, 68, 68, 0.1)',
-            border: balance >= 0 
-              ? '1px solid rgba(59, 130, 246, 0.2)' 
-              : '1px solid rgba(239, 68, 68, 0.2)',
+            boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
             position: 'relative',
             overflow: 'hidden'
           }}>
@@ -380,23 +370,21 @@ export default function FinancePage() {
               right: '-1rem',
               width: '4rem',
               height: '4rem',
-              background: balance >= 0 
-                ? 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)' 
-                : 'radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
               borderRadius: '50%'
             }} />
-          <h2 style={{
-            fontSize: '0.875rem', 
+            <h2 style={{
+              fontSize: '0.875rem', 
               fontWeight: 600, 
-              color: balance >= 0 ? '#1e40af' : '#991b1b', 
+              color: '#1e40af', 
               marginBottom: '1rem', 
               marginTop: 0,
               textTransform: 'uppercase',
               letterSpacing: '0.025em'
-          }}>
-            Số dư
-          </h2>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+            }}>
+              Số dư
+            </h2>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
               <div style={{
                 fontSize: '2rem', 
                 fontWeight: 700, 
@@ -405,11 +393,7 @@ export default function FinancePage() {
               }}>
                 {formatCurrency(balance)}
               </div>
-              <BanknotesIcon style={{
-                width: '3rem', 
-                height: '3rem', 
-                color: balance >= 0 ? '#3b82f6' : '#ef4444'
-              }} />
+              <BanknotesIcon style={{width: '3rem', height: '3rem', color: '#3b82f6'}} />
             </div>
             <div style={{
               fontSize: '0.75rem',
@@ -417,11 +401,11 @@ export default function FinancePage() {
               marginTop: '0.5rem',
               fontWeight: 500
             }}>
-              {balance >= 0 ? '+18.7%' : '-8.3%} so với tháng trước
+              {balance >= 0 ? '+18.7%' : '-8.3%'} so với tháng trước
+            </div>
           </div>
         </div>
-      </div>
-      
+        
         {/* Filters and Transactions */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -435,11 +419,11 @@ export default function FinancePage() {
             background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
             padding: '1.5rem 2rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap', 
-            alignItems: 'center', 
+          }}>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap', 
+              alignItems: 'center', 
               gap: '1.5rem'
             }}>
               <div style={{flex: '1', minWidth: '20rem'}}>
@@ -454,12 +438,12 @@ export default function FinancePage() {
                     pointerEvents: 'none'
                   }}>
                     <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
-              </div>
-              <input
-                type="text"
-                placeholder="Tìm kiếm giao dịch..."
-                style={{
-                  width: '100%',
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm giao dịch..."
+                    style={{
+                      width: '100%',
                       paddingLeft: '2.75rem',
                       paddingRight: '1rem',
                       paddingTop: '0.75rem',
@@ -470,21 +454,13 @@ export default function FinancePage() {
                       background: 'white',
                       transition: 'all 0.2s ease',
                       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#16a34a';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)';
                     }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                    }}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-            </div>
-          
+              </div>
+            
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
                 <div style={{
                   display: 'flex',
@@ -511,16 +487,8 @@ export default function FinancePage() {
                     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                     transition: 'all 0.2s ease'
                   }}
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#16a34a';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                  }}
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
                 >
                   {categories.map((category) => (
                     <option key={category} value={category}>{category}</option>
@@ -540,26 +508,18 @@ export default function FinancePage() {
                   }}
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#16a34a';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22, 163, 74, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                  }}
                 >
                   {statuses.map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
+              </div>
             </div>
           </div>
-        </div>
-        
+          
           {/* Transactions Table */}
-        <div style={{overflowX: 'auto'}}>
-          <table style={{minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
+          <div style={{overflowX: 'auto'}}>
+            <table style={{minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
               <thead>
                 <tr style={{
                   background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
@@ -636,8 +596,8 @@ export default function FinancePage() {
                   }}>
                     Thao tác
                   </th>
-              </tr>
-            </thead>
+                </tr>
+              </thead>
               <tbody>
                 {filteredTransactions.map((transaction, index) => (
                   <tr 
@@ -645,12 +605,6 @@ export default function FinancePage() {
                     style={{
                       borderBottom: index !== filteredTransactions.length - 1 ? '1px solid #f1f5f9' : 'none',
                       transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8fafc';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
                     <td style={{
@@ -671,12 +625,12 @@ export default function FinancePage() {
                       </div>
                     </td>
                     <td style={{padding: '1.25rem 2rem'}}>
-                    <span style={{
-                      display: 'inline-flex', 
+                      <span style={{
+                        display: 'inline-flex', 
                         padding: '0.375rem 0.875rem', 
-                      fontSize: '0.75rem', 
+                        fontSize: '0.75rem', 
                         fontWeight: 600, 
-                      borderRadius: '9999px',
+                        borderRadius: '9999px',
                         background: 
                           transaction.category === 'Thu nhập' 
                             ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
@@ -685,10 +639,10 @@ export default function FinancePage() {
                           transaction.category === 'Thu nhập' ? '#166534' : '#dc2626',
                         border: '1px solid',
                         borderColor: transaction.category === 'Thu nhập' ? '#86efac' : '#fca5a5'
-                    }}>
-                      {transaction.category}
-                    </span>
-                  </td>
+                      }}>
+                        {transaction.category}
+                      </span>
+                    </td>
                     <td style={{
                       padding: '1.25rem 2rem', 
                       fontSize: '0.875rem', 
@@ -697,7 +651,7 @@ export default function FinancePage() {
                       textAlign: 'right'
                     }}>
                       {transaction.category === 'Thu nhập' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                  </td>
+                    </td>
                     <td style={{
                       padding: '1.25rem 2rem', 
                       fontSize: '0.875rem', 
@@ -705,12 +659,12 @@ export default function FinancePage() {
                       fontWeight: 500
                     }}>
                       {new Date(transaction.date).toLocaleDateString('vi-VN')}
-                  </td>
+                    </td>
                     <td style={{padding: '1.25rem 2rem'}}>
-                    <span style={{
-                      display: 'inline-flex', 
-                      padding: '0.25rem 0.75rem', 
-                      fontSize: '0.75rem', 
+                      <span style={{
+                        display: 'inline-flex', 
+                        padding: '0.25rem 0.75rem', 
+                        fontSize: '0.75rem', 
                         fontWeight: 600, 
                         borderRadius: '0.375rem',
                         background: 
@@ -721,13 +675,14 @@ export default function FinancePage() {
                           transaction.status === 'Đã xử lý' ? '#059669' : '#d97706',
                         border: '1px solid',
                         borderColor: transaction.status === 'Đã xử lý' ? '#86efac' : '#fbbf24'
-                    }}>
-                      {transaction.status}
-                    </span>
-                  </td>
+                      }}>
+                        {transaction.status}
+                      </span>
+                    </td>
                     <td style={{padding: '1.25rem 2rem'}}>
                       <div style={{display: 'flex', gap: '0.5rem'}}>
                         <button
+                          onClick={() => handleViewTransaction(transaction.id)}
                           style={{
                             padding: '0.5rem',
                             borderRadius: '0.5rem',
@@ -738,18 +693,12 @@ export default function FinancePage() {
                             transition: 'all 0.2s ease',
                             boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
                           }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
-                          }}
+                          title="Xem chi tiết giao dịch"
                         >
                           <EyeIcon style={{width: '1rem', height: '1rem'}} />
                         </button>
                         <button
+                          onClick={() => handleEditTransaction(transaction.id)}
                           style={{
                             padding: '0.5rem',
                             borderRadius: '0.5rem',
@@ -760,21 +709,14 @@ export default function FinancePage() {
                             transition: 'all 0.2s ease',
                             boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
                           }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
-                          }}
+                          title="Chỉnh sửa giao dịch"
                         >
                           <PencilIcon style={{width: '1rem', height: '1rem'}} />
                         </button>
                       </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))}
                 {filteredTransactions.length === 0 && (
                   <tr>
                     <td 
@@ -799,10 +741,10 @@ export default function FinancePage() {
                     </td>
                   </tr>
                 )}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
           </div>
+        </div>
       </div>
     </div>
   );

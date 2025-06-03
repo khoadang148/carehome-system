@@ -132,7 +132,7 @@ const initialScheduleData: ScheduleEntry[] = [
 
 const DAYS_OF_WEEK = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
 
-export default function StaffSchedulePage({ params }: { params: { id: string } }) {
+export default function StaffSchedulePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getMonday(new Date()));
   const [staff, setStaff] = useState<any>(null);
@@ -142,6 +142,7 @@ export default function StaffSchedulePage({ params }: { params: { id: string } }
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedShift, setSelectedShift] = useState<ShiftType>('morning');
   const [notes, setNotes] = useState<string>('');
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   
   // Generate dates for the current week
   const weekDates = Array.from({ length: 7 }, (_, i) => {
@@ -151,10 +152,21 @@ export default function StaffSchedulePage({ params }: { params: { id: string } }
   });
   
   useEffect(() => {
+    // Resolve params Promise
+    const resolveParams = async () => {
+      const resolved = await params;
+      setResolvedParams(resolved);
+    };
+    resolveParams();
+  }, [params]);
+  
+  useEffect(() => {
+    if (!resolvedParams) return;
+    
     // Attempt to load staff member data
     const loadStaff = async () => {
       try {
-        const staffId = parseInt(params.id);
+        const staffId = parseInt(resolvedParams.id);
         
         // Check if there's saved staff data in localStorage
         let staffMembers = initialStaffMembers;
@@ -185,7 +197,7 @@ export default function StaffSchedulePage({ params }: { params: { id: string } }
     };
     
     loadStaff();
-  }, [params.id, router]);
+  }, [resolvedParams, router]);
   
   function getMonday(date: Date): Date {
     const day = date.getDay();
@@ -295,7 +307,7 @@ export default function StaffSchedulePage({ params }: { params: { id: string } }
   }
   
   // Show loading state while fetching data
-  if (loading) {
+  if (loading || !resolvedParams) {
     return (
       <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
         <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>
@@ -315,7 +327,7 @@ export default function StaffSchedulePage({ params }: { params: { id: string } }
   return (
     <div style={{maxWidth: '1400px', margin: '0 auto', padding: '0 1rem'}}>
       <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href={`/staff/${params.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
+        <Link href={`/staff/${resolvedParams.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
           <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
         </Link>
         <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>

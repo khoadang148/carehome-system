@@ -12,6 +12,7 @@ import {
   EyeIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 
 // Mock activity data
 const activities = [
@@ -24,8 +25,20 @@ const activities = [
     scheduledTime: '08:00 AM', 
     duration: 45,
     capacity: 20,
-    participants: 18,
-    facilitator: 'David Wilson'
+    participants: [
+      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
+      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
+      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R'
+    ],
+    facilitator: 'David Wilson',
+    date: '2024-01-15',
+    status: 'Đã lên lịch',
+    notes: 'Cần chuẩn bị thảm tập yoga và nhạc nhẹ nhàng. Kiểm tra sức khỏe của các cư dân trước khi tham gia.',
+    materials: ['Thảm tập yoga', 'Loa phát nhạc', 'Nước uống', 'Khăn nhỏ'],
+    benefits: ['Cải thiện khả năng vận động', 'Tăng cường sức khỏe tim mạch', 'Giảm căng thẳng', 'Cải thiện tâm trạng'],
+    level: 'Dễ',
+    recurring: 'Hàng ngày'
   },
   { 
     id: 2, 
@@ -36,8 +49,19 @@ const activities = [
     scheduledTime: '10:30 AM', 
     duration: 60,
     capacity: 15,
-    participants: 12,
-    facilitator: 'Emily Parker'
+    participants: [
+      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
+      'Võ Thị K', 'Phan Văn L'
+    ],
+    facilitator: 'Emily Parker',
+    date: '2024-01-15',
+    status: 'Đang diễn ra',
+    notes: 'Hoạt động phù hợp với tất cả mức độ. Khuyến khích sự sáng tạo và không có áp lực về kết quả.',
+    materials: ['Giấy vẽ', 'Màu nước', 'Cọ vẽ', 'Kéo', 'Keo dán', 'Vải nỉ'],
+    benefits: ['Kích thích sáng tạo', 'Cải thiện khéo léo tay', 'Thư giãn tinh thần', 'Tăng cường tự tin'],
+    level: 'Trung bình',
+    recurring: 'Hàng tuần'
   },
   { 
     id: 3, 
@@ -48,8 +72,21 @@ const activities = [
     scheduledTime: '02:00 PM', 
     duration: 60,
     capacity: 30,
-    participants: 25,
-    facilitator: 'Robert Johnson'
+    participants: [
+      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
+      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
+      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R', 'Nguyễn Thị S', 'Trần Văn T',
+      'Lê Thị U', 'Hoàng Văn V', 'Phạm Thị W', 'Vũ Văn X', 'Đặng Thị Y'
+    ],
+    facilitator: 'Robert Johnson',
+    date: '2024-01-15',
+    status: 'Đã lên lịch',
+    notes: 'Hoạt động ngoài trời tùy thuộc vào thời tiết. Chuẩn bị nhạc cụ đơn giản và mic.',
+    materials: ['Nhạc cụ đơn giản', 'Micro', 'Loa di động', 'Ghế ngồi'],
+    benefits: ['Thư giãn tinh thần', 'Cải thiện trí nhớ', 'Tăng cường giao tiếp xã hội', 'Giảm stress'],
+    level: 'Dễ',
+    recurring: 'Hàng tuần'
   },
   { 
     id: 4, 
@@ -60,8 +97,18 @@ const activities = [
     scheduledTime: '11:00 AM', 
     duration: 45,
     capacity: 12,
-    participants: 10,
-    facilitator: 'Sarah Thompson'
+    participants: [
+      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J'
+    ],
+    facilitator: 'Sarah Thompson',
+    date: '2024-01-15',
+    status: 'Đã lên lịch',
+    notes: 'Hoạt động được thiết kế để kích thích trí nhớ và tư duy logic. Phù hợp với người cao tuổi.',
+    materials: ['Thẻ trò chơi', 'Bút viết', 'Giấy ghi chú', 'Đồng hồ bấm giờ'],
+    benefits: ['Cải thiện trí nhớ', 'Kích thích tư duy', 'Tăng cường tập trung', 'Ngăn ngừa suy giảm nhận thức'],
+    level: 'Trung bình',
+    recurring: 'Hai lần mỗi tuần'
   },
   { 
     id: 5, 
@@ -72,8 +119,20 @@ const activities = [
     scheduledTime: '04:00 PM', 
     duration: 90,
     capacity: 25,
-    participants: 20,
-    facilitator: 'David Wilson'
+    participants: [
+      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
+      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
+      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R', 'Nguyễn Thị S', 'Trần Văn T'
+    ],
+    facilitator: 'David Wilson',
+    date: '2024-01-15',
+    status: 'Đang diễn ra',
+    notes: 'Tạo không khí vui vẻ và thân thiện. Khuyến khích tương tác xã hội giữa các cư dân.',
+    materials: ['Bài tây', 'Cờ tướng', 'Cờ vua', 'Domino', 'Bàn và ghế'],
+    benefits: ['Tăng cường giao tiếp', 'Giải trí và thư giãn', 'Kích thích tư duy chiến thuật', 'Xây dựng tình bạn'],
+    level: 'Dễ',
+    recurring: 'Hàng ngày'
   },
 ];
 
@@ -81,6 +140,7 @@ const categories = ['Tất cả', 'Thể chất', 'Sáng tạo', 'Trị liệu',
 const locations = ['Tất cả', 'Phòng sinh hoạt chung', 'Phòng hoạt động', 'Khu vườn', 'Phòng giải trí', 'Phòng ăn'];
 
 export default function ActivitiesPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('Tất cả');
   const [filterLocation, setFilterLocation] = useState('Tất cả');
@@ -96,6 +156,19 @@ export default function ActivitiesPage() {
     return matchesSearch && matchesCategory && matchesLocation;
   });
   
+  // Handler functions for button actions
+  const handleViewActivity = (activityId: number) => {
+    router.push(`/activities/${activityId}`);
+  };
+
+  const handleEditActivity = (activityId: number) => {
+    router.push(`/activities/${activityId}/edit`);
+  };
+
+  const handleCreateActivity = () => {
+    router.push('/activities/new');
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -449,7 +522,7 @@ export default function ActivitiesPage() {
                   fontWeight: 500
                 }}>
                   <UserGroupIcon style={{width: '1rem', height: '1rem'}} />
-                  {activity.participants}/{activity.capacity}
+                  {activity.participants?.length || 0}/{activity.capacity}
                 </div>
               </div>
 
@@ -557,6 +630,7 @@ export default function ActivitiesPage() {
                 borderTop: '1px solid #f1f5f9'
               }}>
                 <button
+                  onClick={() => handleViewActivity(activity.id)}
                   style={{
                     padding: '0.5rem',
                     borderRadius: '0.5rem',
@@ -575,10 +649,12 @@ export default function ActivitiesPage() {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
                   }}
+                  title="Xem chi tiết hoạt động"
                 >
                   <EyeIcon style={{width: '1rem', height: '1rem'}} />
                 </button>
                 <button
+                  onClick={() => handleEditActivity(activity.id)}
                   style={{
                     padding: '0.5rem',
                     borderRadius: '0.5rem',
@@ -597,6 +673,7 @@ export default function ActivitiesPage() {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
                   }}
+                  title="Chỉnh sửa hoạt động"
                 >
                   <PencilIcon style={{width: '1rem', height: '1rem'}} />
                 </button>

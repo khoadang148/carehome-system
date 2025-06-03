@@ -24,7 +24,7 @@ const initialResidents = [
     allergies: ['Penicillin'],
     emergencyContact: 'Bob Johnson',
     contactPhone: '(555) 123-4567',
-    personalNotes: 'Enjoys reading and gardening. Needs assistance with bathing.',
+    personalNotes: 'Cần được định hướng lại thường xuyên. Thích liệu pháp âm nhạc.',
     dietaryRestrictions: 'Low sodium',
     mobilityStatus: 'Uses walker'
   },
@@ -44,7 +44,7 @@ const initialResidents = [
     allergies: ['Sulfa drugs'],
     emergencyContact: 'Susan Smith',
     contactPhone: '(555) 234-5678',
-    personalNotes: 'Former professor. Enjoys chess and classical music.',
+    personalNotes: 'Giáo sư về hưu. Thích chơi cờ và nghe nhạc cổ điển.',
     dietaryRestrictions: 'Diabetic diet',
     mobilityStatus: 'Independent'
   },
@@ -64,7 +64,7 @@ const initialResidents = [
     allergies: ['Latex'],
     emergencyContact: 'John Williams',
     contactPhone: '(555) 345-6789',
-    personalNotes: 'Needs frequent reorientation. Enjoys music therapy.',
+    personalNotes: 'Cần được định hướng lại thường xuyên. Thích liệu pháp âm nhạc.',
     dietaryRestrictions: 'Soft diet',
     mobilityStatus: 'Wheelchair bound'
   },
@@ -84,7 +84,7 @@ const initialResidents = [
     allergies: ['Aspirin'],
     emergencyContact: 'Patricia Brown',
     contactPhone: '(555) 456-7890',
-    personalNotes: 'Former carpenter. Enjoys woodworking when able.',
+    personalNotes: 'Thợ mộc trước đây. Thích làm đồ gỗ khi có thể.',
     dietaryRestrictions: 'None',
     mobilityStatus: 'Uses cane'
   },
@@ -104,7 +104,7 @@ const initialResidents = [
     allergies: ['None known'],
     emergencyContact: 'Michael Davis',
     contactPhone: '(555) 567-8901',
-    personalNotes: 'Former teacher. Enjoys crafts and socializing.',
+    personalNotes: 'Giáo viên về hưu. Thích thủ công và giao tiếp xã hội.',
     dietaryRestrictions: 'Vegetarian',
     mobilityStatus: 'Independent'
   },
@@ -127,12 +127,13 @@ type ResidentFormData = {
   notes: string;
 };
 
-export default function EditResidentPage({ params }: { params: { id: string } }) {
+export default function EditResidentPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [residents, setResidents] = useState(initialResidents);
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   
   const { 
     register, 
@@ -142,6 +143,17 @@ export default function EditResidentPage({ params }: { params: { id: string } })
   } = useForm<ResidentFormData>();
   
   useEffect(() => {
+    // Resolve params Promise
+    const resolveParams = async () => {
+      const resolved = await params;
+      setResolvedParams(resolved);
+    };
+    resolveParams();
+  }, [params]);
+  
+  useEffect(() => {
+    if (!resolvedParams) return;
+    
     // Check if there's saved residents data in localStorage
     const savedResidents = localStorage.getItem('nurseryHomeResidents');
     if (savedResidents) {
@@ -152,7 +164,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
     const fetchResident = async () => {
       try {
         // In a real application, you would fetch from an API endpoint
-        const residentId = parseInt(params.id);
+        const residentId = parseInt(resolvedParams.id);
         // Use the residents from state or localStorage
         const foundResident = residents.find(r => r.id === residentId);
         
@@ -186,14 +198,16 @@ export default function EditResidentPage({ params }: { params: { id: string } })
     };
     
     fetchResident();
-  }, [params.id, reset]);
+  }, [resolvedParams, reset]);
   
   const onSubmit = async (data: ResidentFormData) => {
+    if (!resolvedParams) return;
+    
     setIsSubmitting(true);
     
     try {
       // In a real application, you would send the data to your backend API
-      const residentId = parseInt(params.id);
+      const residentId = parseInt(resolvedParams.id);
       
       // Update the resident in the array
       const updatedResidents = residents.map(resident => {
@@ -233,7 +247,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Navigate back to resident details page
-      router.push(`/residents/${params.id}`);
+      router.push(`/residents/${resolvedParams.id}`);
     } catch (error) {
       console.error('Error updating resident:', error);
     } finally {
@@ -242,7 +256,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
   };
   
   // Show loading state while fetching data
-  if (loading) {
+  if (loading || !resolvedParams) {
     return (
       <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
         <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>
@@ -262,7 +276,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
   return (
     <div style={{maxWidth: '1400px', margin: '0 auto', padding: '0 1rem'}}>
       <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href={`/residents/${params.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
+        <Link href={`/residents/${resolvedParams.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
           <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
         </Link>
         <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Chỉnh sửa thông tin cư dân</h1>
@@ -648,7 +662,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
           {/* Form Buttons */}
           <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem'}}>
             <Link 
-              href={`/residents/${params.id}`} 
+              href={`/residents/${resolvedParams.id}`} 
               style={{
                 padding: '0.5rem 1rem', 
                 border: '1px solid #d1d5db', 

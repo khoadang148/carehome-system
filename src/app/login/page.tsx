@@ -322,14 +322,6 @@ export default function LoginPage() {
                   }}
                 />
               </div>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#64748b',
-                margin: '0.5rem 0 0 0',
-                fontStyle: 'italic'
-              }}>
-                Để trống để sử dụng tài khoản demo
-              </p>
               </div>
               
             {/* Password Input */}
@@ -405,14 +397,6 @@ export default function LoginPage() {
                   }
                 </button>
               </div>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#64748b',
-                margin: '0.5rem 0 0 0',
-                fontStyle: 'italic'
-              }}>
-                Để trống để sử dụng mật khẩu demo
-              </p>
               </div>
               
             {/* Submit Button */}
@@ -477,24 +461,6 @@ export default function LoginPage() {
             borderRadius: '0.75rem',
             border: '1px solid #e2e8f0'
           }}>
-            <h3 style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: '#374151',
-              margin: '0 0 0.5rem 0'
-            }}>
-              Thông tin demo:
-            </h3>
-            <div style={{
-              display: 'grid',
-              gap: '0.25rem',
-              fontSize: '0.75rem',
-              color: '#64748b'
-            }}>
-              <p style={{margin: 0}}>• <strong>Quản trị viên:</strong> admin@example.com / admin</p>
-              <p style={{margin: 0}}>• <strong>Nhân viên:</strong> staff@example.com / staff</p>
-              <p style={{margin: 0}}>• <strong>Gia đình:</strong> family@example.com / family</p>
-            </div>
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   EyeIcon,
   PencilIcon
 } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 
 // Mock medical records data
 const medicalRecords = [
@@ -70,7 +71,21 @@ export default function MedicalPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('Tất cả');
   const [filterStatus, setFilterStatus] = useState('Tất cả');
+  const router = useRouter();
   
+  // Handler functions for button actions
+  const handleViewMedicalRecord = (recordId: number) => {
+    router.push(`/medical/${recordId}`);
+  };
+
+  const handleEditMedicalRecord = (recordId: number) => {
+    router.push(`/medical/${recordId}/edit`);
+  };
+
+  const handleCreateMedicalRecord = () => {
+    router.push('/medical/new');
+  };
+
   // Filter medical records based on search term, type and status
   const filteredRecords = medicalRecords.filter((record) => {
     const matchesSearch = record.residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -521,6 +536,7 @@ export default function MedicalPage() {
                 borderTop: '1px solid #f1f5f9'
               }}>
                 <button
+                  onClick={() => handleViewMedicalRecord(record.id)}
                   style={{
                     padding: '0.5rem',
                     borderRadius: '0.5rem',
@@ -539,10 +555,12 @@ export default function MedicalPage() {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
                   }}
+                  title="Xem chi tiết bệnh án"
                 >
                   <EyeIcon style={{width: '1rem', height: '1rem'}} />
                 </button>
                 <button
+                  onClick={() => handleEditMedicalRecord(record.id)}
                   style={{
                     padding: '0.5rem',
                     borderRadius: '0.5rem',
@@ -561,6 +579,7 @@ export default function MedicalPage() {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
                   }}
+                  title="Chỉnh sửa bệnh án"
                 >
                   <PencilIcon style={{width: '1rem', height: '1rem'}} />
                 </button>

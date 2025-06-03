@@ -86,57 +86,82 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Unwrap the params Promise using React.use()
-  const resolvedParams = use(params);
-  const activityId = resolvedParams.id;
-  
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const id = parseInt(activityId);
+        const resolvedParams = await params;
         
-        // Check localStorage for activities data
-        let activities = activitiesData;
-        const savedActivities = localStorage.getItem('nurseryHomeActivities');
-        if (savedActivities) {
-          activities = JSON.parse(savedActivities);
-        }
+        // Mock activity data with full structure
+        const mockActivity = {
+          id: parseInt(resolvedParams.id),
+          name: 'Tập thể dục buổi sáng',
+          description: 'Các bài tập kéo giãn và vận động nhẹ nhàng để cải thiện khả năng vận động',
+          category: 'Thể chất',
+          location: 'Phòng sinh hoạt chung',
+          scheduledTime: '08:00 AM',
+          duration: 45,
+          capacity: 20,
+          participants: [
+            'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+            'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
+            'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
+            'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R'
+          ],
+          facilitator: 'David Wilson',
+          date: '2024-01-15',
+          status: 'Đã lên lịch',
+          notes: 'Cần chuẩn bị thảm tập yoga và nhạc nhẹ nhàng. Kiểm tra sức khỏe của các cư dân trước khi tham gia.',
+          materials: ['Thảm tập yoga', 'Loa phát nhạc', 'Nước uống', 'Khăn nhỏ'],
+          benefits: ['Cải thiện khả năng vận động', 'Tăng cường sức khỏe tim mạch', 'Giảm căng thẳng', 'Cải thiện tâm trạng'],
+          level: 'Dễ',
+          recurring: 'Hàng ngày'
+        };
         
-        const foundActivity = activities.find(a => a.id === id);
-        
-        if (foundActivity) {
-          setActivity(foundActivity);
-        } else {
-          router.push('/activities');
-        }
+        setActivity(mockActivity);
       } catch (error) {
         console.error('Error fetching activity:', error);
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchActivity();
-  }, [activityId, router]);
+  }, [params]);
   
   const handleEditClick = () => {
-    router.push(`/activities/${activityId}/edit`);
+    router.push(`/activities/${activity.id}/edit`);
   };
   
-  // Show loading state while fetching data
   if (loading) {
     return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
-        <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '50vh',
+        fontSize: '1.125rem',
+        color: '#6b7280'
+      }}>
+        Đang tải thông tin hoạt động...
       </div>
     );
   }
   
-  // If activity is not found
   if (!activity) {
     return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
-        <p style={{fontSize: '1rem', color: '#6b7280'}}>Không tìm thấy thông tin hoạt động.</p>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '50vh',
+        fontSize: '1.125rem',
+        color: '#6b7280'
+      }}>
+        <h2 style={{fontSize: '1.5rem', marginBottom: '1rem'}}>Không tìm thấy hoạt động</h2>
+        <Link href="/activities" style={{color: '#16a34a', textDecoration: 'underline'}}>
+          Quay lại danh sách hoạt động
+        </Link>
       </div>
     );
   }
@@ -314,9 +339,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 <div>
                   <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563'}}>Đã đăng ký:</span>
                   <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
-                    {activity.participants.length} người 
-                    <span style={{color: activity.participants.length >= activity.capacity ? '#dc2626' : '#16a34a'}}>
-                      ({activity.participants.length >= activity.capacity ? 'Đầy' : `Còn ${activity.capacity - activity.participants.length} chỗ`})
+                    {activity.participants?.length || 0} người 
+                    <span style={{color: (activity.participants?.length || 0) >= activity.capacity ? '#dc2626' : '#16a34a'}}>
+                      ({(activity.participants?.length || 0) >= activity.capacity ? 'Đầy' : `Còn ${activity.capacity - (activity.participants?.length || 0)} chỗ`})
                     </span>
                   </p>
                 </div>
@@ -342,9 +367,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   Lợi ích
                 </h4>
                 <ul style={{margin: 0, paddingLeft: '1.25rem'}}>
-                  {activity.benefits.map((benefit: string, index: number) => (
+                  {activity.benefits?.map((benefit: string, index: number) => (
                     <li key={index} style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem'}}>{benefit}</li>
-                  ))}
+                  )) || <li style={{fontSize: '0.875rem', color: '#6b7280'}}>Chưa có thông tin</li>}
                 </ul>
               </div>
               
@@ -353,9 +378,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   Dụng cụ cần thiết
                 </h4>
                 <ul style={{margin: 0, paddingLeft: '1.25rem'}}>
-                  {activity.materials.map((material: string, index: number) => (
+                  {activity.materials?.map((material: string, index: number) => (
                     <li key={index} style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem'}}>{material}</li>
-                  ))}
+                  )) || <li style={{fontSize: '0.875rem', color: '#6b7280'}}>Chưa có thông tin</li>}
                 </ul>
               </div>
             </div>
@@ -364,21 +389,33 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           {/* Participants List */}
           <div style={{marginTop: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', padding: '1.5rem'}}>
             <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginTop: 0, marginBottom: '1rem'}}>
-              Danh sách tham gia ({activity.participants.length}/{activity.capacity})
+              Danh sách tham gia ({activity.participants?.length || 0}/{activity.capacity})
             </h3>
             
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem'}}>
-              {activity.participants.map((participant: string, index: number) => (
-                <div key={index} style={{
-                  padding: '0.5rem 0.75rem',
-                  backgroundColor: '#f9fafb',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  color: '#374151'
+              {activity.participants?.length > 0 ? (
+                activity.participants.map((participant: string, index: number) => (
+                  <div key={index} style={{
+                    padding: '0.5rem 0.75rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    color: '#374151'
+                  }}>
+                    {participant}
+                  </div>
+                ))
+              ) : (
+                <div style={{
+                  padding: '1rem',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  fontStyle: 'italic',
+                  gridColumn: '1 / -1'
                 }}>
-                  {participant}
+                  Chưa có người tham gia
                 </div>
-              ))}
+              )}
             </div>
           </div>
           

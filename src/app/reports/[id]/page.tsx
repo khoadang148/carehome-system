@@ -141,7 +141,88 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
   };
   
   const handleDownload = () => {
-    alert('Tính năng tải xuống báo cáo sẽ được triển khai trong phiên bản tiếp theo.');
+    if (!report) return;
+    
+    // Generate PDF-like content as HTML
+    const reportContent = generateReportHTML(report);
+    const blob = new Blob([reportContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bao-cao-${report.title.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    URL.revokeObjectURL(url);
+  };
+
+  const generateReportHTML = (report: any) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Báo cáo: ${report.title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+            .metric { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+            .metric-title { font-weight: bold; color: #333; }
+            .metric-value { font-size: 1.2em; color: #0066cc; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${report.title}</h1>
+            <p><strong>Kỳ báo cáo:</strong> ${formatPeriod(report.period, report.type)}</p>
+            <p><strong>Ngày tạo:</strong> ${new Date(report.generatedDate).toLocaleDateString('vi-VN')}</p>
+          </div>
+          
+          <div class="content">
+            <h2>Tóm tắt chỉ số chính</h2>
+            ${report.data ? generateMetricsHTML(report.data) : '<p>Không có dữ liệu</p>'}
+          </div>
+          
+          <div class="footer" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc;">
+            <p><em>Báo cáo được tạo tự động từ hệ thống quản lý viện dưỡng lão</em></p>
+            <p><em>Thời gian xuất: ${new Date().toLocaleString('vi-VN')}</em></p>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const generateMetricsHTML = (data: any) => {
+    let html = '';
+    
+    if (data.residents) {
+      html += `
+        <div class="metric">
+          <div class="metric-title">Thông tin cư dân</div>
+          <div class="metric-value">Tổng số: ${data.residents.total}</div>
+          ${data.residents.newAdmissions ? `<div>Nhập viện mới: ${data.residents.newAdmissions}</div>` : ''}
+          ${data.residents.occupancyRate ? `<div>Tỷ lệ lấp đầy: ${data.residents.occupancyRate}%</div>` : ''}
+        </div>
+      `;
+    }
+    
+    if (data.financial) {
+      html += `
+        <div class="metric">
+          <div class="metric-title">Thông tin tài chính</div>
+          <div class="metric-value">Doanh thu: ${formatCurrency(data.financial.revenue)}</div>
+          <div>Chi phí: ${formatCurrency(data.financial.expenses)}</div>
+          <div>Lợi nhuận: ${formatCurrency(data.financial.profit)}</div>
+          <div>Tỷ lệ lợi nhuận: ${data.financial.profitMargin}%</div>
+        </div>
+      `;
+    }
+    
+    return html;
   };
   
   const handlePrint = () => {

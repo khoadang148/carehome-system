@@ -126,12 +126,13 @@ type StaffFormData = {
   notes: string;
 };
 
-export default function EditStaffPage({ params }: { params: { id: string } }) {
+export default function EditStaffPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [staffMembers, setStaffMembers] = useState(initialStaffMembers);
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   
   const { 
     register, 
@@ -141,6 +142,17 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
   } = useForm<StaffFormData>();
   
   useEffect(() => {
+    // Resolve params Promise
+    const resolveParams = async () => {
+      const resolved = await params;
+      setResolvedParams(resolved);
+    };
+    resolveParams();
+  }, [params]);
+  
+  useEffect(() => {
+    if (!resolvedParams) return;
+    
     // Check if there's saved staff data in localStorage
     const savedStaff = localStorage.getItem('nurseryHomeStaff');
     if (savedStaff) {
@@ -151,7 +163,7 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
     const fetchStaff = async () => {
       try {
         // In a real application, you would fetch from an API endpoint
-        const staffId = parseInt(params.id);
+        const staffId = parseInt(resolvedParams.id);
         
         // Use the staff data from state (which might be from localStorage)
         const foundStaff = staffMembers.find(s => s.id === staffId);
@@ -187,14 +199,16 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
     };
     
     fetchStaff();
-  }, [params.id, reset, staffMembers]);
+  }, [resolvedParams, reset, staffMembers]);
   
   const onSubmit = async (data: StaffFormData) => {
+    if (!resolvedParams) return;
+    
     setIsSubmitting(true);
     
     try {
       // In a real application, you would send the data to your backend API
-      const staffId = parseInt(params.id);
+      const staffId = parseInt(resolvedParams.id);
       
       // Update the staff member in the array
       const updatedStaffMembers = staffMembers.map(staff => {
@@ -230,7 +244,7 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Navigate back to staff details page
-      router.push(`/staff/${params.id}`);
+      router.push(`/staff/${resolvedParams.id}`);
     } catch (error) {
       console.error('Error updating staff:', error);
     } finally {
@@ -239,7 +253,7 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
   };
   
   // Show loading state while fetching data
-  if (loading) {
+  if (loading || !resolvedParams) {
     return (
       <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
         <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>
@@ -259,7 +273,7 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
   return (
     <div style={{maxWidth: '1400px', margin: '0 auto', padding: '0 1rem'}}>
       <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href={`/staff/${params.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
+        <Link href={`/staff/${resolvedParams.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
           <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
         </Link>
         <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Chỉnh sửa thông tin nhân viên</h1>
@@ -663,7 +677,7 @@ export default function EditStaffPage({ params }: { params: { id: string } }) {
           {/* Form Buttons */}
           <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem'}}>
             <Link 
-              href={`/staff/${params.id}`} 
+              href={`/staff/${resolvedParams.id}`} 
               style={{
                 padding: '0.5rem 1rem', 
                 border: '1px solid #d1d5db', 
