@@ -21,7 +21,20 @@ const initialResidents = [
     contactPhone: '(555) 123-4567',
     personalNotes: 'Enjoys reading and gardening. Needs assistance with bathing.',
     dietaryRestrictions: 'Low sodium',
-    mobilityStatus: 'Uses walker'
+    mobilityStatus: 'Uses walker',
+    carePackage: {
+      id: 2,
+      name: 'Gói Nâng Cao',
+      price: 25000000,
+      purchaseDate: '2024-03-15',
+      features: [
+        'Tất cả dịch vụ của gói Cơ Bản',
+        'Chăm sóc y tế chuyên sâu',
+        'Vật lý trị liệu định kỳ',
+        'Hoạt động giải trí đa dạng',
+        'Chế độ dinh dưỡng cá nhân hóa'
+      ]
+    }
   },
   { 
     id: 2, 
@@ -307,6 +320,80 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                 </div>
               </div>
             </div>
+
+            {/* Care Package Information */}
+            {resident.carePackage ? (
+              <div style={{borderRadius: '0.5rem', border: '1px solid #e5e7eb', padding: '1.5rem'}}>
+                <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginTop: 0, marginBottom: '1rem'}}>
+                  Gói Dịch Vụ Đang Sử Dụng
+                </h3>
+                
+                <div style={{display: 'grid', gap: '1rem'}}>
+                  <div>
+                    <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
+                      Tên gói
+                    </h4>
+                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{resident.carePackage.name}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
+                      Giá gói
+                    </h4>
+                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
+                      {new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND'
+                      }).format(resident.carePackage.price)}/tháng
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
+                      Ngày đăng ký
+                    </h4>
+                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
+                      {new Date(resident.carePackage.purchaseDate).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
+                      Dịch vụ bao gồm
+                    </h4>
+                    <ul style={{margin: 0, paddingLeft: '1.25rem'}}>
+                      {resident.carePackage.features.map((feature: string, index: number) => (
+                        <li key={index} style={{fontSize: '0.875rem', color: '#6b7280'}}>{feature}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{borderRadius: '0.5rem', border: '1px solid #e5e7eb', padding: '1.5rem'}}>
+                <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginTop: 0, marginBottom: '1rem'}}>
+                  Gói Dịch Vụ
+                </h3>
+                <p style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem'}}>
+                  Chưa đăng ký gói dịch vụ nào
+                </p>
+                <Link
+                  href="/services"
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    textDecoration: 'none'
+                  }}
+                >
+                  Xem các gói dịch vụ
+                </Link>
+              </div>
+            )}
           </div>
           
           {/* Notes Section */}
