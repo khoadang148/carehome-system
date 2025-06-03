@@ -15,7 +15,8 @@ import {
   ChevronRightIcon,
   ShieldCheckIcon,
   BanknotesIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  CubeIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth-context';
 
@@ -33,6 +34,7 @@ const menuGroups = [
     title: "Hoạt động & Gia đình",
     items: [
       { name: 'Hoạt động', href: '/activities', icon: CalendarIcon, roles: ['admin', 'staff', 'family'] },
+      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'staff', 'family'] },
       { name: 'Cổng gia đình', href: '/family', icon: UserGroupIcon, roles: ['admin', 'family'] },
     ]
   },
@@ -105,8 +107,8 @@ export default function Sidebar() {
           }}
         >
           {collapsed ? 
-            <ChevronRightIcon style={{width: '1.25rem', height: '1.25rem'}} /> : 
-            <ChevronLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
+            <ChevronRightIcon style={{width: '1rem', height: '1rem'}} /> : 
+            <ChevronLeftIcon style={{width: '1rem', height: '1rem'}} />
           }
         </button>
       </div>
@@ -164,8 +166,8 @@ export default function Sidebar() {
                         }}
                       >
                         <item.icon style={{
-                          width: '1.25rem', 
-                          height: '1.25rem',
+                          width: '1rem', 
+                          height: '1rem',
                           flexShrink: 0,
                           marginRight: collapsed ? 0 : '0.75rem',
                           margin: collapsed ? '0 auto' : undefined

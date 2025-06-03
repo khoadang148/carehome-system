@@ -11,61 +11,13 @@ import {
   EyeIcon, 
   TrashIcon 
 } from '@heroicons/react/24/outline';
-
-// Mock resident data
-const initialResidents = [
-  { 
-    id: 1, 
-    name: 'Alice Johnson', 
-    age: 78, 
-    room: '101', 
-    careLevel: 'Low', 
-    admissionDate: '2023-02-15',
-    medicalConditions: ['Hypertension', 'Arthritis']
-  },
-  { 
-    id: 2, 
-    name: 'Robert Smith', 
-    age: 82, 
-    room: '102', 
-    careLevel: 'Medium', 
-    admissionDate: '2023-01-10',
-    medicalConditions: ['Diabetes', 'Heart Disease']
-  },
-  { 
-    id: 3, 
-    name: 'Mary Williams', 
-    age: 85, 
-    room: '103', 
-    careLevel: 'High', 
-    admissionDate: '2022-11-23',
-    medicalConditions: ['Alzheimer\'s', 'Osteoporosis']
-  },
-  { 
-    id: 4, 
-    name: 'James Brown', 
-    age: 76, 
-    room: '104', 
-    careLevel: 'Medium', 
-    admissionDate: '2023-03-05',
-    medicalConditions: ['COPD', 'Arthritis']
-  },
-  { 
-    id: 5, 
-    name: 'Patricia Davis', 
-    age: 81, 
-    room: '105', 
-    careLevel: 'Low', 
-    admissionDate: '2023-04-12',
-    medicalConditions: ['Hypertension', 'Depression']
-  },
-];
+import { RESIDENTS_DATA } from '@/lib/residents-data';
 
 export default function ResidentsPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCareLevel, setFilterCareLevel] = useState('');
-  const [residentsData, setResidentsData] = useState(initialResidents);
+  const [residentsData, setResidentsData] = useState(RESIDENTS_DATA);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState<number | null>(null);
   
@@ -73,7 +25,18 @@ export default function ResidentsPage() {
   useEffect(() => {
     const savedResidents = localStorage.getItem('nurseryHomeResidents');
     if (savedResidents) {
-      setResidentsData(JSON.parse(savedResidents));
+      try {
+        const parsedResidents = JSON.parse(savedResidents);
+        setResidentsData(parsedResidents);
+      } catch (error) {
+        console.error('Error parsing saved residents data:', error);
+        // If there's an error, reset to default data
+        localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
+        setResidentsData(RESIDENTS_DATA);
+      }
+    } else {
+      // Initialize localStorage with default data if it's empty
+      localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
     }
   }, []);
   

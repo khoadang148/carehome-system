@@ -1,127 +1,35 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { RESIDENTS_DATA } from '@/lib/residents-data';
 
-// Mock resident data (same as in the residents page)
-const initialResidents = [
-  { 
-    id: 1, 
-    name: 'Alice Johnson', 
-    age: 78, 
-    room: '101', 
-    careLevel: 'Low', 
-    admissionDate: '2023-02-15',
-    medicalConditions: ['Hypertension', 'Arthritis'],
-    medications: ['Lisinopril', 'Ibuprofen'],
-    allergies: ['Penicillin'],
-    emergencyContact: 'Bob Johnson',
-    contactPhone: '(555) 123-4567',
-    personalNotes: 'Enjoys reading and gardening. Needs assistance with bathing.',
-    dietaryRestrictions: 'Low sodium',
-    mobilityStatus: 'Uses walker',
-    carePackage: {
-      id: 2,
-      name: 'Gói Nâng Cao',
-      price: 25000000,
-      purchaseDate: '2024-03-15',
-      features: [
-        'Tất cả dịch vụ của gói Cơ Bản',
-        'Chăm sóc y tế chuyên sâu',
-        'Vật lý trị liệu định kỳ',
-        'Hoạt động giải trí đa dạng',
-        'Chế độ dinh dưỡng cá nhân hóa'
-      ]
-    }
-  },
-  { 
-    id: 2, 
-    name: 'Robert Smith', 
-    age: 82, 
-    room: '102', 
-    careLevel: 'Medium', 
-    admissionDate: '2023-01-10',
-    medicalConditions: ['Diabetes', 'Heart Disease'],
-    medications: ['Metformin', 'Atorvastatin'],
-    allergies: ['Sulfa drugs'],
-    emergencyContact: 'Susan Smith',
-    contactPhone: '(555) 234-5678',
-    personalNotes: 'Former professor. Enjoys chess and classical music.',
-    dietaryRestrictions: 'Diabetic diet',
-    mobilityStatus: 'Independent'
-  },
-  { 
-    id: 3, 
-    name: 'Mary Williams', 
-    age: 85, 
-    room: '103', 
-    careLevel: 'High', 
-    admissionDate: '2022-11-23',
-    medicalConditions: ['Alzheimer\'s', 'Osteoporosis'],
-    medications: ['Donepezil', 'Calcium supplements'],
-    allergies: ['Latex'],
-    emergencyContact: 'John Williams',
-    contactPhone: '(555) 345-6789',
-    personalNotes: 'Needs frequent reorientation. Enjoys music therapy.',
-    dietaryRestrictions: 'Soft diet',
-    mobilityStatus: 'Wheelchair bound'
-  },
-  { 
-    id: 4, 
-    name: 'James Brown', 
-    age: 76, 
-    room: '104', 
-    careLevel: 'Medium', 
-    admissionDate: '2023-03-05',
-    medicalConditions: ['COPD', 'Arthritis'],
-    medications: ['Albuterol', 'Acetaminophen'],
-    allergies: ['Aspirin'],
-    emergencyContact: 'Patricia Brown',
-    contactPhone: '(555) 456-7890',
-    personalNotes: 'Former carpenter. Enjoys woodworking when able.',
-    dietaryRestrictions: 'None',
-    mobilityStatus: 'Uses cane'
-  },
-  { 
-    id: 5, 
-    name: 'Patricia Davis', 
-    age: 81, 
-    room: '105', 
-    careLevel: 'Low', 
-    admissionDate: '2023-04-12',
-    medicalConditions: ['Hypertension', 'Depression'],
-    medications: ['Amlodipine', 'Sertraline'],
-    allergies: ['None known'],
-    emergencyContact: 'Michael Davis',
-    contactPhone: '(555) 567-8901',
-    personalNotes: 'Former teacher. Enjoys crafts and socializing.',
-    dietaryRestrictions: 'Vegetarian',
-    mobilityStatus: 'Independent'
-  },
-];
-
-export default function ResidentDetailPage({ params }: { params: { id: string } }) {
+export default function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [resident, setResident] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(params);
+  const residentId = resolvedParams.id;
   
   useEffect(() => {
     // Simulate API call to fetch resident data
     const fetchResident = async () => {
       try {
         // In a real application, you would fetch from an API endpoint
-        const residentId = parseInt(params.id);
+        const id = parseInt(residentId);
         
         // Check if there's saved residents data in localStorage
-        let residents = initialResidents;
+        let residents = RESIDENTS_DATA;
         const savedResidents = localStorage.getItem('nurseryHomeResidents');
         if (savedResidents) {
           residents = JSON.parse(savedResidents);
         }
         
-        const foundResident = residents.find(r => r.id === residentId);
+        const foundResident = residents.find(r => r.id === id);
         
         if (foundResident) {
           setResident(foundResident);
@@ -137,10 +45,10 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
     };
     
     fetchResident();
-  }, [params.id, router]);
+  }, [residentId, router]);
   
   const handleEditClick = () => {
-    router.push(`/residents/${params.id}/edit`);
+    router.push(`/residents/${residentId}/edit`);
   };
   
   // Show loading state while fetching data
@@ -255,7 +163,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   Tình trạng sức khỏe
                 </h4>
                 <ul style={{margin: 0, paddingLeft: '1.25rem'}}>
-                  {resident.medicalConditions.map((condition: string, index: number) => (
+                  {(resident.medicalConditions || []).map((condition: string, index: number) => (
                     <li key={index} style={{fontSize: '0.875rem', color: '#6b7280'}}>{condition}</li>
                   ))}
                 </ul>
@@ -266,7 +174,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   Thuốc đang sử dụng
                 </h4>
                 <ul style={{margin: 0, paddingLeft: '1.25rem'}}>
-                  {resident.medications.map((medication: string, index: number) => (
+                  {(resident.medications || []).map((medication: string, index: number) => (
                     <li key={index} style={{fontSize: '0.875rem', color: '#6b7280'}}>{medication}</li>
                   ))}
                 </ul>
@@ -277,7 +185,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   Dị ứng
                 </h4>
                 <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
-                  {resident.allergies.length > 0 ? resident.allergies.join(', ') : 'Không có'}
+                  {(resident.allergies || []).length > 0 ? (resident.allergies || []).join(', ') : 'Không có'}
                 </p>
               </div>
             </div>
@@ -362,7 +270,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                       Dịch vụ bao gồm
                     </h4>
                     <ul style={{margin: 0, paddingLeft: '1.25rem'}}>
-                      {resident.carePackage.features.map((feature: string, index: number) => (
+                      {(resident.carePackage?.features || []).map((feature: string, index: number) => (
                         <li key={index} style={{fontSize: '0.875rem', color: '#6b7280'}}>{feature}</li>
                       ))}
                     </ul>
