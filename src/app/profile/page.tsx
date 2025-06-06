@@ -3,21 +3,60 @@
 import { useState } from 'react';
 import { 
   UserCircleIcon,
-  CameraIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
   PhoneIcon,
   EnvelopeIcon,
   MapPinIcon,
-  CalendarIcon
+  CalendarIcon,
+  BriefcaseIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth-context';
 
+// Validation types
+interface ValidationErrors {
+  [key: string]: string;
+}
+
+interface FormData {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  dateOfBirth: string;
+  department: string;
+  startDate: string;
+  relationship: string;
+}
+
+// Family members data (matching family page)
+const familyMembers = [
+  { 
+    id: 1, 
+    name: 'Nguyễn Văn Nam', 
+    room: 'A01', 
+    age: 78,
+    relationship: 'Cha',
+    status: 'Ổn định'
+  },
+  { 
+    id: 2, 
+    name: 'Lê Thị Hoa', 
+    room: 'A02', 
+    age: 75,
+    relationship: 'Mẹ',
+    status: 'Khá'
+  }
+];
+
 export default function ProfilePage() {
   const { user } = useAuth();
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState(familyMembers[0]);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
     name: user?.name || '',
     email: user?.email || '',
     phone: '+84 123 456 789',
@@ -25,17 +64,126 @@ export default function ProfilePage() {
     dateOfBirth: '1985-06-15',
     department: user?.role === 'staff' ? 'Chăm sóc bệnh nhân' : '',
     startDate: '2020-01-15',
-    bio: 'Tôi là một nhân viên y tế với hơn 10 năm kinh nghiệm trong lĩnh vực chăm sóc người cao tuổi.'
+    relationship: user?.role === 'family' ? 'Con' : '',
   });
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [touched, setTouched] = useState<{[key: string]: boolean}>({});
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleSave = () => {
-    // TODO: Implement save functionality
+  // Validation functions
+  const validateField = (name: string, value: string): string => {
+    switch (name) {
+      case 'name':
+        if (!value.trim()) return 'Họ và tên là bắt buộc';
+        if (value.trim().length < 2) return 'Họ và tên phải có ít nhất 2 ký tự';
+        if (value.trim().length > 50) return 'Họ và tên không được vượt quá 50 ký tự';
+        if (!/^[a-zA-ZÀ-ỹ\s]+$/.test(value.trim())) return 'Họ và tên chỉ được chứa chữ cái và khoảng trắng';
+        return '';
+
+      case 'email':
+        if (!value.trim()) return 'Email là bắt buộc';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value.trim())) return 'Định dạng email không hợp lệ';
+        return '';
+
+      case 'phone':
+        if (!value.trim()) return 'Số điện thoại là bắt buộc';
+        const phoneRegex = /^(\+84|84|0)(3|5|7|8|9)[0-9]{8}$/;
+        if (!phoneRegex.test(value.replace(/\s/g, ''))) return 'Số điện thoại không hợp lệ (VD: +84 987 654 321)';
+        return '';
+
+      case 'address':
+        if (!value.trim()) return 'Địa chỉ là bắt buộc';
+        if (value.trim().length < 5) return 'Địa chỉ phải có ít nhất 5 ký tự';
+        if (value.trim().length > 200) return 'Địa chỉ không được vượt quá 200 ký tự';
+        return '';
+
+      case 'dateOfBirth':
+        if (!value) return 'Ngày sinh là bắt buộc';
+        const birthDate = new Date(value);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        if (age < 18) return 'Tuổi phải từ 18 trở lên';
+        if (age > 100) return 'Ngày sinh không hợp lệ';
+        return '';
+
+      case 'department':
+        if ((user?.role === 'staff' || user?.role === 'admin') && !value.trim()) {
+          return 'Phòng ban là bắt buộc';
+        }
+        if (value && value.trim().length > 100) return 'Tên phòng ban không được vượt quá 100 ký tự';
+        return '';
+
+      case 'relationship':
+        if (user?.role === 'family' && !value.trim()) {
+          return 'Mối quan hệ là bắt buộc';
+        }
+        return '';
+
+      default:
+        return '';
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: ValidationErrors = {};
+    const fields = ['name', 'email', 'phone', 'address', 'dateOfBirth'];
+    
+    // Add role-specific fields
+    if (user?.role === 'staff' || user?.role === 'admin') {
+      fields.push('department');
+    }
+    if (user?.role === 'family') {
+      fields.push('relationship');
+    }
+
+    fields.forEach(field => {
+      const error = validateField(field, formData[field as keyof FormData]);
+      if (error) {
+        newErrors[field] = error;
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    setTouched({
+      name: true,
+      email: true,
+      phone: true,
+      address: true,
+      dateOfBirth: true,
+      department: true,
+      relationship: true
+    });
+
+    if (!validateForm()) {
+      // Focus on first error field
+      const firstErrorField = Object.keys(errors)[0];
+      const element = document.querySelector(`[name="${firstErrorField}"]`) as HTMLElement;
+      element?.focus();
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
     console.log('Saving profile data:', formData);
     setIsEditing(false);
+      setTouched({});
+      // Show success message (could add toast notification here)
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      // Handle save error
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
-    // Reset form data
     setFormData({
       name: user?.name || '',
       email: user?.email || '',
@@ -44,7 +192,7 @@ export default function ProfilePage() {
       dateOfBirth: '1985-06-15',
       department: user?.role === 'staff' ? 'Chăm sóc bệnh nhân' : '',
       startDate: '2020-01-15',
-      bio: 'Tôi là một nhân viên y tế với hơn 10 năm kinh nghiệm trong lĩnh vực chăm sóc người cao tuổi.'
+      relationship: user?.role === 'family' ? 'Con' : '',
     });
     setIsEditing(false);
   };
@@ -54,556 +202,644 @@ export default function ProfilePage() {
       ...prev,
       [field]: value
     }));
+
+    // Real-time validation for touched fields
+    if (touched[field]) {
+      const error = validateField(field, value);
+      setErrors(prev => ({
+        ...prev,
+        [field]: error
+      }));
+    }
+  };
+
+  const handleFieldBlur = (field: string) => {
+    setTouched(prev => ({
+      ...prev,
+      [field]: true
+    }));
+
+    const error = validateField(field, formData[field as keyof FormData]);
+    setErrors(prev => ({
+      ...prev,
+      [field]: error
+    }));
+  };
+
+  const getRoleBadge = () => {
+    const roleConfig = {
+      admin: { label: 'Quản trị viên', color: '#3b82f6', bg: '#dbeafe' },
+      staff: { label: 'Nhân viên', color: '#059669', bg: '#dcfce7' },
+      family: { label: 'Người thân', color: '#d97706', bg: '#fef3c7' }
+    };
+    const config = roleConfig[user?.role as keyof typeof roleConfig] || roleConfig.family;
+    return (
+      <span style={{
+        display: 'inline-flex',
+        padding: '0.25rem 0.75rem',
+        borderRadius: '1rem',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        background: config.bg,
+        color: config.color,
+        border: `1px solid ${config.color}20`
+      }}>
+        {config.label}
+      </span>
+    );
+  };
+
+  // Error message component
+  const ErrorMessage = ({ error }: { error?: string }) => {
+    if (!error) return null;
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.25rem',
+        marginTop: '0.25rem',
+        fontSize: '0.75rem',
+        color: '#dc2626'
+      }}>
+        <ExclamationTriangleIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+        {error}
+      </div>
+    );
+  };
+
+  // Input field with validation
+  const renderInput = (
+    type: string,
+    name: string,
+    value: string,
+    placeholder?: string,
+    isTextarea?: boolean
+  ) => {
+    const hasError = touched[name] && errors[name];
+    const baseStyle = {
+      width: '100%',
+      padding: '0.5rem',
+      borderRadius: '0.375rem',
+      border: `1px solid ${hasError ? '#dc2626' : '#d1d5db'}`,
+      fontSize: '0.875rem',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
+      outline: 'none'
+    };
+
+    const focusStyle = hasError ? {
+      borderColor: '#dc2626',
+      boxShadow: '0 0 0 3px rgba(220, 38, 38, 0.1)'
+    } : {
+      borderColor: '#6366f1',
+      boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)'
+    };
+
+    if (isTextarea) {
+      return (
+        <textarea
+          name={name}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => handleInputChange(name, e.target.value)}
+          onFocus={(e) => Object.assign(e.target.style, focusStyle)}
+          onBlur={(e) => {
+            handleFieldBlur(name);
+            e.target.style.borderColor = hasError ? '#dc2626' : '#d1d5db';
+            e.target.style.boxShadow = 'none';
+          }}
+          style={baseStyle}
+        />
+      );
+    }
+
+    return (
+      <input
+        type={type}
+        name={name}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => handleInputChange(name, e.target.value)}
+        onFocus={(e) => Object.assign(e.target.style, focusStyle)}
+        onBlur={(e) => {
+          handleFieldBlur(name);
+          e.target.style.borderColor = hasError ? '#dc2626' : '#d1d5db';
+          e.target.style.boxShadow = 'none';
+        }}
+        style={baseStyle}
+      />
+    );
   };
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
+      background: '#f8fafc',
+      padding: '1.5rem 1rem'
     }}>
-      {/* Background decorations */}
       <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(139, 92, 246, 0.03) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none'
-      }} />
-      
-      <div style={{
-        maxWidth: '1200px', 
-        margin: '0 auto', 
-        padding: '2rem 1.5rem',
-        position: 'relative',
-        zIndex: 1
+        maxWidth: '800px',
+        margin: '0 auto'
       }}>
-        {/* Header Section */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
+        {/* Header */}
           <div style={{
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
+          marginBottom: '2rem',
             flexWrap: 'wrap',
             gap: '1rem'
           }}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              <div style={{
-                width: '3.5rem',
-                height: '3.5rem',
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                borderRadius: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-              }}>
-                <UserCircleIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
-              </div>
               <div>
                 <h1 style={{
-                  fontSize: '2rem', 
+              fontSize: '1.875rem',
                   fontWeight: 700, 
-                  margin: 0,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.025em'
+              color: '#111827',
+              margin: '0 0 0.25rem 0'
                 }}>
                   Hồ sơ cá nhân
                 </h1>
                 <p style={{
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: 500
-                }}>
-                  Quản lý thông tin tài khoản của bạn
-                </p>
-              </div>
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Quản lý thông tin tài khoản
+            </p>
             </div>
             
             {!isEditing ? (
               <button 
                 onClick={() => setIsEditing(true)}
                 style={{
-                  display: 'inline-flex',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: '#6366f1',
+                color: 'white',
+                padding: '0.75rem 1.25rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: 500,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
+              onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
+            >
+              <PencilIcon style={{width: '1rem', height: '1rem'}} />
+              Chỉnh sửa
+            </button>
+          ) : (
+            <div style={{display: 'flex', gap: '0.5rem'}}>
+              <button 
+                onClick={handleSave}
+                disabled={isSubmitting}
+                style={{
+                  display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  background: isSubmitting ? '#9ca3af' : '#10b981',
                   color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
                   border: 'none',
-                  fontWeight: 600,
+                  fontWeight: 500,
                   fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(99, 102, 241, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.6 : 1
                 }}
               >
-                <PencilIcon style={{width: '1.125rem', height: '1.125rem'}} />
-                Chỉnh sửa
-              </button>
-            ) : (
-              <div style={{display: 'flex', gap: '0.75rem'}}>
-                <button 
-                  onClick={handleSave}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    padding: '0.875rem 1.5rem',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  <CheckIcon style={{width: '1.125rem', height: '1.125rem'}} />
-                  Lưu
+                <CheckIcon style={{width: '1rem', height: '1rem'}} />
+                {isSubmitting ? 'Đang lưu...' : 'Lưu'}
                 </button>
                 <button 
                   onClick={handleCancel}
                   style={{
-                    display: 'inline-flex',
+                  display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: '#ef4444',
                     color: 'white',
-                    padding: '0.875rem 1.5rem',
-                    borderRadius: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
                     border: 'none',
-                    fontWeight: 600,
+                  fontWeight: 500,
                     fontSize: '0.875rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-                    transition: 'all 0.3s ease'
+                  cursor: 'pointer'
                   }}
                 >
-                  <XMarkIcon style={{width: '1.125rem', height: '1.125rem'}} />
+                <XMarkIcon style={{width: '1rem', height: '1rem'}} />
                   Hủy
                 </button>
               </div>
             )}
-          </div>
         </div>
 
-        {/* Profile Content */}
+        {/* Profile Card */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '2rem'
+          background: 'white',
+          borderRadius: '1rem',
+          padding: '2rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #e5e7eb'
         }}>
-          {/* Avatar and Basic Info */}
+          {/* Avatar & Basic Info */}
           <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1.5rem',
+            marginBottom: '2rem',
+            flexWrap: 'wrap'
           }}>
             <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              marginBottom: '2rem'
-            }}>
-              <div style={{
-                position: 'relative',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{
-                  width: '8rem',
-                  height: '8rem',
-                  borderRadius: '2rem',
+              width: '5rem',
+              height: '5rem',
+              borderRadius: '1rem',
                   background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
-                  fontSize: '2rem',
+              fontSize: '1.5rem',
                   fontWeight: 700,
-                  boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)',
-                  border: '4px solid white'
+              flexShrink: 0
                 }}>
                   {user?.name?.substring(0, 2).toUpperCase() || 'ND'}
-                </div>
-                <button style={{
-                  position: 'absolute',
-                  bottom: '0.25rem',
-                  right: '0.25rem',
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  border: '3px solid white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 8px rgba(245, 158, 11, 0.3)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.1)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}>
-                  <CameraIcon style={{width: '1rem', height: '1rem', color: 'white'}} />
-                </button>
               </div>
               
+            <div style={{ flex: 1, minWidth: '200px' }}>
               <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 700,
+                fontSize: '1.25rem',
+                fontWeight: 600,
                 color: '#111827',
                 margin: '0 0 0.5rem 0'
               }}>
                 {formData.name}
               </h2>
-              
-              <div style={{
-                display: 'inline-flex',
-                padding: '0.5rem 1rem',
-                borderRadius: '9999px',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                background: user?.role === 'admin' 
-                  ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' 
-                  : user?.role === 'staff'
-                  ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
-                  : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                color: user?.role === 'admin' ? '#1e40af' : user?.role === 'staff' ? '#166534' : '#92400e',
-                border: '1px solid',
-                borderColor: user?.role === 'admin' ? '#93c5fd' : user?.role === 'staff' ? '#86efac' : '#fbbf24'
-              }}>
-                {user?.role === 'admin' ? 'Quản trị viên' : 
-                 user?.role === 'staff' ? 'Nhân viên' : 'Thành viên gia đình'}
-              </div>
-            </div>
-
-            {/* Bio Section */}
-            <div style={{
-              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
-              <h3 style={{
-                fontSize: '1rem',
-                fontWeight: 600,
-                color: '#374151',
-                margin: '0 0 1rem 0'
-              }}>
-                Giới thiệu
-              </h3>
-              {isEditing ? (
-                <textarea
-                  value={formData.bio}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
-                  style={{
-                    width: '100%',
-                    minHeight: '100px',
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '0.875rem',
-                    resize: 'vertical',
-                    background: 'white'
-                  }}
-                />
-              ) : (
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  lineHeight: '1.6',
-                  margin: 0
-                }}>
-                  {formData.bio}
-                </p>
-              )}
+              {getRoleBadge()}
             </div>
           </div>
 
-          {/* Contact Information */}
+          {/* Information Grid */}
           <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1.5rem'
           }}>
+            {/* Contact Info */}
+            <div>
             <h3 style={{
-              fontSize: '1.25rem',
+                fontSize: '1rem',
               fontWeight: 600,
-              color: '#111827',
-              margin: '0 0 1.5rem 0',
+                color: '#374151',
+                margin: '0 0 1rem 0',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
             }}>
-              <EnvelopeIcon style={{width: '1.25rem', height: '1.25rem', color: '#6366f1'}} />
+                <EnvelopeIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
               Thông tin liên hệ
             </h3>
 
-            <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-              {/* Email */}
+              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
               <div>
                 <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                   fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem',
+                    display: 'block'
                 }}>
                   Email
                 </label>
                 {isEditing ? (
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+                    <div>
+                      {renderInput('email', 'email', formData.email, 'Nhập địa chỉ email')}
+                      <ErrorMessage error={touched.email ? errors.email : undefined} />
+                    </div>
                 ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <EnvelopeIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
-                    <span style={{fontSize: '0.875rem', color: '#111827'}}>{formData.email}</span>
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>
+                      <EnvelopeIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                      {formData.email}
                   </div>
                 )}
               </div>
 
-              {/* Phone */}
               <div>
                 <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                   fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem',
+                    display: 'block'
                 }}>
                   Số điện thoại
                 </label>
                 {isEditing ? (
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+                    <div>
+                      {renderInput('tel', 'phone', formData.phone, 'Nhập số điện thoại')}
+                      <ErrorMessage error={touched.phone ? errors.phone : undefined} />
+                    </div>
                 ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <PhoneIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
-                    <span style={{fontSize: '0.875rem', color: '#111827'}}>{formData.phone}</span>
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>
+                      <PhoneIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                      {formData.phone}
                   </div>
                 )}
               </div>
 
-              {/* Address */}
               <div>
                 <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                   fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem',
+                    display: 'block'
                 }}>
                   Địa chỉ
                 </label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+                    <div>
+                      {renderInput('text', 'address', formData.address, 'Nhập địa chỉ', true)}
+                      <ErrorMessage error={touched.address ? errors.address : undefined} />
+                    </div>
                 ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <MapPinIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
-                    <span style={{fontSize: '0.875rem', color: '#111827'}}>{formData.address}</span>
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>
+                      <MapPinIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                      {formData.address}
                   </div>
                 )}
               </div>
 
-              {/* Date of Birth */}
               <div>
                 <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                   fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem',
+                    display: 'block'
                 }}>
                   Ngày sinh
                 </label>
                 {isEditing ? (
-                  <input
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+                    <div>
+                      {renderInput('date', 'dateOfBirth', formData.dateOfBirth, '')}
+                      <ErrorMessage error={touched.dateOfBirth ? errors.dateOfBirth : undefined} />
+                    </div>
                 ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <CalendarIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
-                    <span style={{fontSize: '0.875rem', color: '#111827'}}>
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>
+                      <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
                       {new Date(formData.dateOfBirth).toLocaleDateString('vi-VN')}
-                    </span>
                   </div>
                 )}
+                </div>
               </div>
+            </div>
 
-              {/* Work Information for Staff */}
-              {(user?.role === 'staff' || user?.role === 'admin') && (
+            {/* Role-specific Info */}
+            <div>
+              <h3 style={{
+                fontSize: '1rem',
+                fontWeight: 600,
+                color: '#374151',
+                margin: '0 0 1rem 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                {user?.role === 'family' ? (
+                  <>
+                    <UserCircleIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
+                    Thông tin người thân
+                  </>
+                ) : (
+                  <>
+                    <BriefcaseIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
+                    Thông tin công việc
+                  </>
+                )}
+              </h3>
+
+              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                {user?.role === 'family' ? (
                 <>
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
+                                          <label style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem',
+                        display: 'block'
+                      }}>
+                        Người thân được chăm sóc
+                      </label>
+                      
+                      {familyMembers.length > 1 ? (
+                        <div>
+                          <select
+                            value={selectedFamilyMember.id}
+                            onChange={(e) => {
+                              const member = familyMembers.find(m => m.id === parseInt(e.target.value));
+                              if (member) setSelectedFamilyMember(member);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #d1d5db',
+                              fontSize: '0.875rem',
+                              background: 'white',
+                              marginBottom: '0.5rem'
+                            }}
+                          >
+                            {familyMembers.map(member => (
+                              <option key={member.id} value={member.id}>
+                                {member.name} ({member.relationship})
+                              </option>
+                            ))}
+                          </select>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            Phòng {selectedFamilyMember.room} • {selectedFamilyMember.age} tuổi • {selectedFamilyMember.status}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            color: '#111827',
+                            fontWeight: 500
+                          }}>
+                            {selectedFamilyMember?.name || 'Chưa được phân công'}
+                          </div>
+                          {selectedFamilyMember && (
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: '#6b7280',
+                              marginTop: '0.25rem'
+                            }}>
+                              Phòng {selectedFamilyMember.room} • {selectedFamilyMember.age} tuổi • {selectedFamilyMember.status}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label style={{
+                        fontSize: '0.75rem',
                       fontWeight: 500,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Phòng ban
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem',
+                        display: 'block'
+                      }}>
+                        Mối quan hệ
                     </label>
                     {isEditing ? (
-                      <input
-                        type="text"
-                        value={formData.department}
-                        onChange={(e) => handleInputChange('department', e.target.value)}
+                        <div>
+                          <select
+                            name="relationship"
+                            value={formData.relationship}
+                            onChange={(e) => handleInputChange('relationship', e.target.value)}
                         style={{
                           width: '100%',
-                          padding: '0.75rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid #e2e8f0',
-                          fontSize: '0.875rem'
-                        }}
-                      />
+                              padding: '0.5rem',
+                              borderRadius: '0.375rem',
+                              border: `1px solid ${touched.relationship && errors.relationship ? '#dc2626' : '#d1d5db'}`,
+                              fontSize: '0.875rem',
+                              background: 'white',
+                              transition: 'border-color 0.2s, box-shadow 0.2s',
+                              outline: 'none'
+                            }}
+                            onFocus={(e) => {
+                              const hasError = touched.relationship && errors.relationship;
+                              e.target.style.borderColor = hasError ? '#dc2626' : '#6366f1';
+                              e.target.style.boxShadow = hasError ? '0 0 0 3px rgba(220, 38, 38, 0.1)' : '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                            }}
+                            onBlur={(e) => {
+                              handleFieldBlur('relationship');
+                              const hasError = touched.relationship && errors.relationship;
+                              e.target.style.borderColor = hasError ? '#dc2626' : '#d1d5db';
+                              e.target.style.boxShadow = 'none';
+                            }}
+                          >
+                            <option value="">Chọn mối quan hệ</option>
+                            <option value="Con">Con</option>
+                            <option value="Cháu">Cháu</option>
+                            <option value="Anh/Chị/Em">Anh/Chị/Em</option>
+                            <option value="Vợ/Chồng">Vợ/Chồng</option>
+                            <option value="Người thân khác">Người thân khác</option>
+                          </select>
+                          <ErrorMessage error={touched.relationship ? errors.relationship : undefined} />
+                        </div>
                     ) : (
                       <div style={{
-                        padding: '0.75rem',
-                        background: '#f8fafc',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #e2e8f0'
+                          fontSize: '0.875rem',
+                          color: '#111827'
+                        }}>
+                          {formData.relationship}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem',
+                        display: 'block'
                       }}>
-                        <span style={{fontSize: '0.875rem', color: '#111827'}}>{formData.department}</span>
+                        Phòng ban
+                      </label>
+                      {isEditing ? (
+                        <div>
+                          {renderInput('text', 'department', formData.department, 'Nhập tên phòng ban')}
+                          <ErrorMessage error={touched.department ? errors.department : undefined} />
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.875rem',
+                          color: '#111827'
+                        }}>
+                          <BriefcaseIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                          {formData.department}
                       </div>
                     )}
                   </div>
 
                   <div>
                     <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
+                        fontSize: '0.75rem',
                       fontWeight: 500,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Ngày bắt đầu làm việc
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem',
+                        display: 'block'
+                      }}>
+                        Ngày bắt đầu
                     </label>
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      padding: '0.75rem',
-                      background: '#f8fafc',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <CalendarIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
-                      <span style={{fontSize: '0.875rem', color: '#111827'}}>
+                        fontSize: '0.875rem',
+                        color: '#111827'
+                      }}>
+                        <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
                         {new Date(formData.startDate).toLocaleDateString('vi-VN')}
-                      </span>
                     </div>
                   </div>
                 </>
               )}
+              </div>
             </div>
           </div>
         </div>

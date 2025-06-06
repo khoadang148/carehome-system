@@ -19,10 +19,23 @@ import {
   CubeIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth, UserRole } from '@/lib/auth-context';
+
+interface MenuItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ style?: React.CSSProperties }>;
+  roles: UserRole[];
+  color: string;
+}
+
+interface MenuGroup {
+  title: string;
+  items: MenuItem[];
+}
 
 // Phân loại menu theo nhóm chức năng
-const menuGroups = [
+const menuGroups: MenuGroup[] = [
   {
     title: "Quản lý chính",
     items: [
@@ -34,7 +47,7 @@ const menuGroups = [
   {
     title: "Hoạt động & Gia đình",
     items: [
-      { name: 'Hoạt động', href: '/activities', icon: CalendarIcon, roles: ['admin', 'staff', 'family'], color: '#f59e0b' },
+      { name: 'Hoạt động', href: '/activities', icon: CalendarIcon, roles: ['admin', 'staff'], color: '#f59e0b' },
       { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'staff', 'family'], color: '#8b5cf6' },
       { name: 'Cổng gia đình', href: '/family', icon: UserGroupIcon, roles: ['admin', 'family'], color: '#ec4899' },
     ]
@@ -111,13 +124,6 @@ export default function Sidebar() {
                 letterSpacing: '-0.025em'
               }}>
                 CareHome
-              </div>
-              <div style={{
-                fontSize: '0.6875rem',
-                color: '#64748b',
-                fontWeight: 500
-              }}>
-                Quản lý thông minh
               </div>
             </div>
           </div>
@@ -198,82 +204,87 @@ export default function Sidebar() {
                 {filteredItems.map((item) => {
                   const isActive = pathname === item.href;
                   return (
-                    <li key={item.name}>
+                    <li key={item.href} style={{position: 'relative'}}>
                       <Link
                         href={item.href}
-                        title={collapsed ? item.name : undefined}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          padding: '0.875rem 1rem',
-                          borderRadius: '0.75rem',
-                          color: isActive ? 'white' : '#475569',
-                          background: isActive 
-                            ? `linear-gradient(135deg, ${item.color} 0%, ${item.color}dd 100%)`
-                            : 'transparent',
-                          fontWeight: isActive ? 600 : 500,
-                          fontSize: '0.875rem',
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          gap: '0.75rem',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          color: isActive ? item.color : '#64748b',
+                          background: isActive ? `${item.color}10` : 'transparent',
                           textDecoration: 'none',
+                          transition: 'all 0.2s ease-in-out',
                           position: 'relative',
-                          overflow: 'hidden',
-                          border: isActive ? 'none' : '1px solid transparent',
-                          boxShadow: isActive ? `0 4px 6px -1px ${item.color}33, 0 2px 4px -1px ${item.color}22` : 'none'
+                          overflow: 'hidden'
                         }}
                         onMouseOver={(e) => {
                           if (!isActive) {
-                            e.currentTarget.style.backgroundColor = '#f8fafc';
-                            e.currentTarget.style.borderColor = '#e2e8f0';
-                            e.currentTarget.style.color = item.color;
-                            e.currentTarget.style.transform = 'translateX(2px)';
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.transform = 'translateX(0.25rem)';
                           }
                         }}
                         onMouseOut={(e) => {
                           if (!isActive) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.borderColor = 'transparent';
-                            e.currentTarget.style.color = '#475569';
+                            e.currentTarget.style.background = 'transparent';
                             e.currentTarget.style.transform = 'translateX(0)';
                           }
                         }}
+                        onMouseEnter={e => {
+                          if (collapsed) {
+                            const tooltip = document.createElement('div');
+                            tooltip.innerText = item.name;
+                            tooltip.style.position = 'fixed';
+                            tooltip.style.left = (e.currentTarget.getBoundingClientRect().right + 10) + 'px';
+                            tooltip.style.top = (e.currentTarget.getBoundingClientRect().top + e.currentTarget.offsetHeight/2 - 18) + 'px';
+                            tooltip.style.background = 'rgba(31, 41, 55, 0.95)';
+                            tooltip.style.color = 'white';
+                            tooltip.style.padding = '0.5rem 1rem';
+                            tooltip.style.borderRadius = '0.5rem';
+                            tooltip.style.fontSize = '0.95rem';
+                            tooltip.style.fontWeight = '600';
+                            tooltip.style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
+                            tooltip.style.zIndex = '9999';
+                            tooltip.style.pointerEvents = 'none';
+                            tooltip.className = 'sidebar-tooltip';
+                            document.body.appendChild(tooltip);
+                            (e.currentTarget as HTMLAnchorElement & { _tooltip?: HTMLDivElement })._tooltip = tooltip;
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (collapsed && (e.currentTarget as HTMLAnchorElement & { _tooltip?: HTMLDivElement })._tooltip) {
+                            document.body.removeChild((e.currentTarget as HTMLAnchorElement & { _tooltip?: HTMLDivElement })._tooltip!);
+                            (e.currentTarget as HTMLAnchorElement & { _tooltip?: HTMLDivElement })._tooltip = undefined;
+                          }
+                        }}
                       >
-                        <div style={{
-                          width: '2rem',
-                          height: '2rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '0.5rem',
-                          background: isActive 
-                            ? 'rgba(255,255,255,0.2)' 
-                            : 'rgba(255,255,255,0.5)',
-                          marginRight: collapsed ? 0 : '0.75rem',
-                          margin: collapsed ? '0 auto' : undefined,
-                          transition: 'all 0.2s ease-in-out'
-                        }}>
-                          <item.icon style={{
-                            width: '1.125rem', 
-                            height: '1.125rem',
-                            flexShrink: 0
-                          }} />
-                        </div>
+                        <item.icon style={{
+                          width: '1.25rem',
+                          height: '1.25rem',
+                          color: isActive ? item.color : '#64748b'
+                        }} />
                         {!collapsed && (
                           <span style={{
-                            flex: 1,
-                            letterSpacing: '-0.01em'
+                            fontSize: '0.875rem',
+                            fontWeight: isActive ? 600 : 500,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                           }}>
                             {item.name}
                           </span>
                         )}
-                        
-                        {/* Active indicator */}
-                        {isActive && !collapsed && (
+                        {isActive && (
                           <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
                             width: '0.25rem',
-                            height: '1rem',
-                            backgroundColor: 'white',
-                            borderRadius: '0.125rem',
-                            opacity: 0.8
+                            background: item.color,
+                            borderRadius: '0.125rem'
                           }} />
                         )}
                       </Link>
@@ -294,65 +305,36 @@ export default function Sidebar() {
           background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)'
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', 
             color: 'white', 
             borderRadius: '0.75rem', 
-            padding: '1rem',
+            padding: '1.25rem 1.5rem',
             position: 'relative',
             overflow: 'hidden',
-            boxShadow: '0 4px 6px -1px rgba(102, 126, 234, 0.25)'
+            boxShadow: '0 4px 12px -1px rgba(139, 92, 246, 0.18)'
           }}>
             {/* Background decoration */}
             <div style={{
               position: 'absolute',
-              top: '-50%',
-              right: '-25%',
-              width: '100%',
-              height: '200%',
-              background: 'linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 100%)',
+              top: '-40%',
+              right: '-20%',
+              width: '80%',
+              height: '180%',
+              background: 'linear-gradient(45deg, rgba(255,255,255,0.08) 0%, transparent 100%)',
               borderRadius: '50%'
             }} />
-            
-            <div style={{position: 'relative', zIndex: 1}}>
-              <div style={{
-                fontSize: '0.875rem', 
-                fontWeight: 600, 
-                marginBottom: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <div style={{
-                  width: '1.5rem',
-                  height: '1.5rem',
-                  background: 'rgba(255,255,255,0.2)',
-                  borderRadius: '0.375rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <UserIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                </div>
-                {user.role === 'admin' ? 'Quản trị viên' : 
-                 user.role === 'staff' ? 'Nhân viên' : 'Thành viên gia đình'}
+            <div style={{position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+              <div style={{fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.01em', marginBottom: '0.25rem'}}>
+                Viện Dưỡng Lão CareHome
               </div>
-              <div style={{
-                fontSize: '0.75rem', 
-                color: 'rgba(255,255,255,0.9)',
-                fontWeight: 500
-              }}>
-                {user.name}
+              <div style={{fontSize: '0.9rem', color: 'rgba(255,255,255,0.92)', fontWeight: 500}}>
+                123 Đường Hạnh Phúc, Quận 1, TP.HCM
               </div>
-              <div style={{
-                fontSize: '0.6875rem', 
-                color: 'rgba(255,255,255,0.7)',
-                marginTop: '0.5rem',
-                padding: '0.375rem 0.75rem',
-                background: 'rgba(255,255,255,0.1)',
-                borderRadius: '0.375rem',
-                textAlign: 'center'
-              }}>
-                Hỗ trợ: 555-123-4567
+              <div style={{fontSize: '0.9rem', color: 'rgba(255,255,255,0.92)', fontWeight: 500}}>
+                ☎ 028-1234-5678
+              </div>
+              <div style={{fontSize: '0.9rem', color: 'rgba(255,255,255,0.92)', fontWeight: 500}}>
+                ✉ lienhe@carehome.com
               </div>
             </div>
           </div>

@@ -1,9 +1,14 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
-module.exports = {
-    eslint: {
-      ignoreDuringBuilds: true,
-    },
+const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  images: {
+    domains: ['fonts.gstatic.com'],
+  },
+  experimental: {
+    optimizeFonts: true,
   }
-  
+};
+
 export default nextConfig;

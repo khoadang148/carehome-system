@@ -5,11 +5,22 @@ import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { SparklesIcon } from "@heroicons/react/24/outline";
+import { ReactNode } from "react";
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
+interface ClientLayoutProps {
+  children: ReactNode;
+}
+
+export default function ClientLayout({ children }: ClientLayoutProps) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  
+  // Kiểm tra xem có phải là trang chính không (không phải trang con của family)
+  const isMainPage = pathname === "/" || 
+                    (pathname.startsWith("/family") && 
+                     !pathname.includes("/schedule") && 
+                     !pathname.includes("/photos"));
   
   // Enhanced loading spinner with beautiful design
   if (loading) {
@@ -148,8 +159,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           pointerEvents: 'none',
           zIndex: 0
         }} />
-        
-        <Header />
+        {isMainPage && <Header />}
         <main style={{
           flexGrow: 1,
           overflowY: 'auto',
@@ -159,8 +169,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }}>
           {children}
         </main>
-        
-        {/* Modern footer */}
+        {/* Footer đã bị ẩn */}
+        {/*
         <footer style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderTop: '1px solid #e2e8f0',
@@ -194,6 +204,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             Phiên bản 1.0.0 - Chăm sóc tận tâm, quản lý thông minh
           </p>
         </footer>
+        */}
       </div>
     </div>
   );

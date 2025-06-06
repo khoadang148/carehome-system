@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { AuthProvider } from "@/lib/auth-context";
+import { ResidentsProvider } from "@/lib/residents-context";
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist",
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "CareHome - Hệ thống quản lý viện dưỡng lão",
@@ -16,23 +14,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="vi" className="h-full">
       <body
+        className={inter.className}
         style={{
-          margin: 0,
-          fontFamily: 'system-ui, "Segoe UI", "Geist", Roboto, Helvetica, Arial, sans-serif',
-          backgroundColor: '#f5f7fa',
-          height: '100%'
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <AuthProvider>
-          <ClientLayout>
-              {children}
-          </ClientLayout>
+          <ResidentsProvider>
+            <ClientLayout>{children}</ClientLayout>
+          </ResidentsProvider>
         </AuthProvider>
       </body>
     </html>

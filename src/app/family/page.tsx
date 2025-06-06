@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   ChatBubbleLeftRightIcon, 
@@ -37,46 +37,92 @@ const styles = `
   }
 `;
 
-// Mock family member data
+// Mock family member data - multiple family members
 const residents = [
   { 
     id: 1, 
-    name: 'Alice Johnson', 
-    room: '101', 
-    photo: 'https://randomuser.me/api/portraits/women/72.jpg',
+    name: 'Nguyễn Văn Nam', 
+    room: 'A01', 
+    photo: 'https://randomuser.me/api/portraits/men/72.jpg',
     age: 78,
+    relationship: 'Cha',
     status: 'Ổn định',
     activities: [
-      { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00 AM', participated: true },
-      { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30 AM', participated: true },
-      { id: 3, name: 'Liệu pháp âm nhạc', time: '02:00 PM', participated: false }
+      { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
+      { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
+      { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: false }
     ],
     vitals: {
-      lastUpdated: '2023-05-10 09:30 AM',
+      lastUpdated: '10/05/2024 09:30',
       bloodPressure: '130/85',
       heartRate: 72,
       temperature: 36.8,
-      weight: '65 kg'
+      weight: '65'
     },
     careNotes: [
-      { id: 1, date: '2023-05-10', note: 'Tham gia tập thể dục buổi sáng rất tích cực. Ăn hết 100% bữa sáng.', staff: 'John Smith, RN' },
-      { id: 2, date: '2023-05-09', note: 'Báo cáo khó chịu nhẹ ở đầu gối phải. Đã áp dụng túi chườm nóng. Sẽ theo dõi.', staff: 'Sarah Johnson, CNA' },
-      { id: 3, date: '2023-05-08', note: 'Được con gái Emily thăm. Tâm trạng cải thiện rõ rệt sau chuyến thăm.', staff: 'David Wilson' }
+      { id: 1, date: '2024-05-10', note: 'Tham gia tập thể dục buổi sáng rất tích cực. Ăn hết 100% bữa sáng.', staff: 'Nguyễn Thị Lan, Y tá trưởng' },
+      { id: 2, date: '2024-05-09', note: 'Báo cáo khó chịu nhẹ ở đầu gối phải. Đã áp dụng túi chườm nóng. Sẽ theo dõi.', staff: 'Lê Thị Hoa, Nhân viên chăm sóc' },
+      { id: 3, date: '2024-05-08', note: 'Được gia đình thăm. Tâm trạng cải thiện rõ rệt sau chuyến thăm.', staff: 'Vũ Thị Mai, Quản lý ca' }
     ],
     medications: [
-      { id: 1, name: 'Lisinopril', dosage: '10mg', schedule: 'Mỗi ngày một lần', lastAdministered: '2023-05-10 08:00 AM' },
-      { id: 2, name: 'Simvastatin', dosage: '20mg', schedule: 'Mỗi ngày một lần trước giờ đi ngủ', lastAdministered: '2023-05-09 09:00 PM' },
-      { id: 3, name: 'Vitamin D', dosage: '1000 IU', schedule: 'Mỗi ngày một lần', lastAdministered: '2023-05-10 08:00 AM' }
+      { id: 1, name: 'Lisinopril', dosage: '10mg', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' },
+      { id: 2, name: 'Simvastatin', dosage: '20mg', schedule: 'Mỗi ngày một lần trước giờ đi ngủ', lastAdministered: '09/05/2024 21:00' },
+      { id: 3, name: 'Vitamin D', dosage: '1000 IU', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' }
     ],
     appointments: [
-      { id: 1, type: 'Khám bác sĩ', date: '2023-05-15', time: '10:00 AM', provider: 'Dr. Robert Brown' },
-      { id: 2, type: 'Vật lý trị liệu', date: '2023-05-12', time: '02:30 PM', provider: 'Michael Stevens, PT' }
+      { id: 1, type: 'Khám bác sĩ', date: '2024-05-15', time: '10:00', provider: 'BS. Trần Văn Nam' },
+      { id: 2, type: 'Vật lý trị liệu', date: '2024-05-12', time: '14:30', provider: 'KTV. Phạm Văn Minh' }
+    ]
+  },
+  { 
+    id: 2, 
+    name: 'Lê Thị Hoa', 
+    room: 'A02', 
+    photo: 'https://randomuser.me/api/portraits/women/65.jpg',
+    age: 75,
+    relationship: 'Mẹ',
+    status: 'Khá',
+    activities: [
+      { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
+      { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+      { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true }
+    ],
+    vitals: {
+      lastUpdated: '10/05/2024 10:15',
+      bloodPressure: '125/80',
+      heartRate: 68,
+      temperature: 36.6,
+      weight: '58'
+    },
+    careNotes: [
+      { id: 1, date: '2024-05-10', note: 'Tham gia hoạt động vẽ tranh với tinh thần rất vui vẻ. Hoàn thành một bức tranh đẹp.', staff: 'Phạm Văn Minh, Chuyên viên hoạt động' },
+      { id: 2, date: '2024-05-09', note: 'Ăn uống tốt, ngủ đầy đủ. Không có vấn đề gì bất thường.', staff: 'Lê Thị Hoa, Nhân viên chăm sóc' },
+      { id: 3, date: '2024-05-08', note: 'Rất vui khi được gia đình đến thăm. Kể nhiều câu chuyện vui.', staff: 'Nguyễn Thị Lan, Y tá trưởng' }
+    ],
+    medications: [
+      { id: 1, name: 'Amlodipine', dosage: '5mg', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' },
+      { id: 2, name: 'Calcium', dosage: '500mg', schedule: 'Hai lần mỗi ngày', lastAdministered: '10/05/2024 08:00' },
+      { id: 3, name: 'Omega-3', dosage: '1000mg', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' }
+    ],
+    appointments: [
+      { id: 1, type: 'Khám định kỳ', date: '2024-05-18', time: '09:00', provider: 'BS. Nguyễn Thị Minh' },
+      { id: 2, type: 'Khám mắt', date: '2024-05-20', time: '15:00', provider: 'BS. Lê Văn Đức' }
     ]
   }
 ];
 
 export default function FamilyPortalPage() {
   const [selectedResident, setSelectedResident] = useState(residents[0]);
+  
+  // Add notifications state
+  interface Notification {
+    id: number;
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+    timestamp: string;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   
   // Modal states
   const [showContactModal, setShowContactModal] = useState(false);
@@ -94,6 +140,7 @@ export default function FamilyPortalPage() {
 
   // Handler functions for button actions
   const handleContactStaff = () => {
+    console.log('Opening contact modal');
     setShowContactModal(true);
   };
 
@@ -113,7 +160,7 @@ export default function FamilyPortalPage() {
   const submitContactRequest = () => {
     if (contactMessage.trim() && selectedStaff) {
       // Create success notification
-      setNotifications(prev => [...prev, {
+      setNotifications((prev: Notification[]) => [...prev, {
         id: Date.now(),
         type: 'success',
         title: 'Yêu cầu liên hệ đã được gửi!',
@@ -129,7 +176,7 @@ export default function FamilyPortalPage() {
   const submitMessage = () => {
     if (messageContent.trim()) {
       // Create success notification
-      setNotifications(prev => [...prev, {
+      setNotifications((prev: Notification[]) => [...prev, {
         id: Date.now(),
         type: 'success',
         title: 'Tin nhắn đã được gửi!',
@@ -144,7 +191,7 @@ export default function FamilyPortalPage() {
   const submitVisitSchedule = () => {
     if (visitDate && visitTime && visitPurpose) {
       // Create success notification
-      setNotifications(prev => [...prev, {
+      setNotifications((prev: Notification[]) => [...prev, {
         id: Date.now(),
         type: 'success',
         title: 'Đặt lịch thăm thành công!',
@@ -175,6 +222,24 @@ export default function FamilyPortalPage() {
     'Chuyên viên hoạt động - Phạm Văn Minh',
     'Quản lý ca - Vũ Thị Mai'
   ];
+
+  useEffect(() => {
+    console.log('Modal states:', { showContactModal, showScheduleModal, showPhotosModal, showMessageModal });
+    // Only hide header for photo and schedule modals, not contact or message modals
+    if (showScheduleModal || showPhotosModal) {
+      console.log('Adding hide-header class and preventing scroll');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('Removing hide-header class and allowing scroll');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showScheduleModal, showPhotosModal, showContactModal, showMessageModal]);
 
   return (
     <div style={{
@@ -285,12 +350,104 @@ export default function FamilyPortalPage() {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
             }}>
-              <PhoneIcon style={{width: '1.125rem', height: '1.125rem'}} />
+              <ChatBubbleLeftRightIcon style={{width: '1.125rem', height: '1.125rem'}} />
               Liên hệ nhân viên
             </button>
           </div>
         </div>
         
+        {/* Family Member Selector */}
+        {residents.length > 1 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            padding: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{
+              fontSize: '1rem',
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <UsersIcon style={{width: '1.25rem', height: '1.25rem', color: '#8b5cf6'}} />
+              Chọn người thân để xem thông tin
+            </h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem'}}>
+              {residents.map((resident) => (
+                <div
+                  key={resident.id}
+                  onClick={() => setSelectedResident(resident)}
+                  style={{
+                    background: selectedResident.id === resident.id ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' : 'white',
+                    border: selectedResident.id === resident.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                    borderRadius: '1rem',
+                    padding: '1.5rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    position: 'relative'
+                  }}
+                  onMouseOver={(e) => {
+                    if (selectedResident.id !== resident.id) {
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.1)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (selectedResident.id !== resident.id) {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
+                  }}
+                >
+                  <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                    <img 
+                      src={resident.photo} 
+                      alt={resident.name} 
+                      style={{
+                        height: '3.5rem', 
+                        width: '3.5rem', 
+                        borderRadius: '1rem', 
+                        objectFit: 'cover',
+                        border: '3px solid white',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <div style={{flex: 1}}>
+                      <div style={{fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                        {resident.name}
+                      </div>
+                      <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem'}}>
+                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age}
+                      </div>
+                      <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
+                        <span style={{fontWeight: 600}}>Phòng:</span> {resident.room} • <span style={{fontWeight: 600}}>Trạng thái:</span> {resident.status}
+                      </div>
+                    </div>
+                    {selectedResident.id === resident.id && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '1rem',
+                        right: '1rem',
+                        color: '#3b82f6'
+                      }}>
+                        <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem'}} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Resident Overview */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -317,73 +474,27 @@ export default function FamilyPortalPage() {
                 />
               </div>
               <div style={{flex: 1}}>
-                <h2 style={{
-                  fontSize: '1.5rem', 
-                  fontWeight: 700, 
-                  color: '#111827', 
-                  margin: '0 0 0.5rem 0'
-                }}>
-                  {selectedResident.name}
-                </h2>
-                <p style={{
-                  fontSize: '1rem', 
-                  color: '#6b7280', 
-                  margin: '0 0 1rem 0',
-                  fontWeight: 500
-                }}>
-                  Phòng {selectedResident.room} • {selectedResident.age} tuổi
-                </p>
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                  <span style={{fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '0.25rem 0.75rem', borderRadius: '9999px', border: '1px solid #e5e7eb'}}>
+                    {selectedResident.relationship}
+                  </span>
+                </div>
+                <div style={{marginBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 600, color: '#374151'}}>Tên: </span>{selectedResident.name}
+                </div>
+                <div style={{marginBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 600, color: '#374151'}}>Phòng: </span>{selectedResident.room}
+                </div>
+                <div style={{marginBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 600, color: '#374151'}}>Tuổi: </span>{selectedResident.age} tuổi
+                </div>
                 <div style={{marginBottom: '1.5rem'}}>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                    color: '#166534',
-                    border: '1px solid #86efac'
-                  }}>
-                    <div style={{
-                      width: '0.5rem', 
-                      height: '0.5rem', 
-                      background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                      borderRadius: '9999px', 
-                      marginRight: '0.5rem'
-                    }}></div>
+                  <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
+                    <div style={{width: '0.5rem', height: '0.5rem', background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
                     Trạng thái: {selectedResident.status}
                   </span>
                 </div>
                 <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
-                  <button style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    color: 'white',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    padding: '0.625rem 1.25rem',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
-                    transition: 'all 0.2s ease',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onClick={handleSendMessage}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
-                  }}>
-                    <ChatBubbleLeftRightIcon style={{width: '1rem', height: '1rem'}} />
-                    Gửi tin nhắn
-                  </button>
                   <button style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -410,7 +521,7 @@ export default function FamilyPortalPage() {
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
                   }}>
                     <CalendarDaysIcon style={{width: '1rem', height: '1rem'}} />
-                    Lịch thăm
+                    Đặt Lịch Thăm
                   </button>
                   <button style={{
                     display: 'inline-flex',
@@ -438,7 +549,7 @@ export default function FamilyPortalPage() {
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.3)';
                   }}>
                     <PhotoIcon style={{width: '1rem', height: '1rem'}} />
-                    Xem ảnh
+                    Xem Ảnh Người Thân
                   </button>
                 </div>
               </div>
@@ -459,7 +570,7 @@ export default function FamilyPortalPage() {
                   color: '#374151', 
                   margin: '0 0 0.5rem 0'
                 }}>
-                  Chỉ số sức khỏe
+                  Chỉ số sức khỏe của {selectedResident.name}
                 </h3>
                 <p style={{
                   fontSize: '0.75rem', 
@@ -468,27 +579,22 @@ export default function FamilyPortalPage() {
                 }}>
                   Cập nhật lần cuối: {selectedResident.vitals.lastUpdated}
                 </p>
-                <div style={{
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(2, 1fr)', 
-                  gap: '1rem', 
-                  fontSize: '0.875rem'
-                }}>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', fontSize: '0.875rem'}}>
                   <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Huyết áp</span> 
-                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.bloodPressure}</span>
+                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Huyết áp</span>
+                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.bloodPressure} mmHg</span>
                   </div>
                   <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Nhịp tim</span> 
+                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Nhịp tim</span>
                     <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.heartRate} nhịp/phút</span>
                   </div>
                   <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Nhiệt độ</span> 
+                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Nhiệt độ</span>
                     <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.temperature}°C</span>
                   </div>
                   <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Cân nặng</span> 
-                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.weight}</span>
+                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Cân nặng</span>
+                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.weight} kg</span>
                   </div>
                 </div>
               </div>
@@ -544,7 +650,7 @@ export default function FamilyPortalPage() {
                     : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
                 }`
               }>
-                Lịch hẹn
+                Lịch Khám Bệnh
               </Tab>
             </Tab.List>
             <Tab.Panels>
@@ -581,24 +687,15 @@ export default function FamilyPortalPage() {
                         )}
                       </div>
                       <div style={{flex: 1}}>
-                        <div style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#111827',
-                          marginBottom: '0.25rem'
-                        }}>
-                          {activity.name}
+                        <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                          <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
                         </div>
                         <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
-                          {activity.time}
+                          <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
                         </div>
                       </div>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: activity.participated ? '#166534' : '#6b7280'
-                      }}>
-                        {activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
+                      <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
+                        <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
                       </span>
                     </div>
                   ))}
@@ -614,49 +711,34 @@ export default function FamilyPortalPage() {
                 }}>
                   Ghi chú chăm sóc gần đây
                 </h3>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                  {selectedResident.careNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      style={{
-                        padding: '1.5rem',
-                        borderRadius: '0.75rem',
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-                      }}
-                    >
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: '0.75rem'
-                      }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          color: '#6b7280',
-                          fontWeight: 500
-                        }}>
-                          {new Date(note.date).toLocaleDateString('vi-VN')}
-                        </span>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          color: '#8b5cf6',
-                          fontWeight: 500
-                        }}>
-                          {note.staff}
-                        </span>
-                      </div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#374151',
-                        lineHeight: '1.5',
-                        margin: 0
-                      }}>
-                        {note.note}
-                      </p>
-                    </div>
-                  ))}
+                <div style={{overflowX: 'auto'}}>
+                  <table style={{width: '100%', borderCollapse: 'collapse', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderRadius: '0.75rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}>
+                    <thead>
+                      <tr>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ngày</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nội dung ghi chú</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhân viên chăm sóc</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedResident.careNotes.map((note) => {
+                        let staffName = note.staff;
+                        let staffRole = '';
+                        if (note.staff.includes(',')) {
+                          const parts = note.staff.split(',');
+                          staffName = parts[0].trim();
+                          staffRole = parts[1].trim();
+                        }
+                        return (
+                          <tr key={note.id} style={{borderTop: '1px solid #e5e7eb'}}>
+                            <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}><span style={{fontWeight: 600}}></span>{new Date(note.date).toLocaleDateString('vi-VN')}</td>
+                            <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}><span style={{fontWeight: 600}}>Nội dung: </span>{note.note}</td>
+                            <td style={{padding: '0.75rem', fontSize: '0.95em'}}><span style={{fontWeight: 600}}></span><span style={{fontWeight: 700, color: '#8b5cf6'}}>{staffName}</span>{staffRole && (<span style={{fontWeight: 500, color: '#6366f1', fontSize: '0.85em', marginLeft: 4}}>&nbsp;({staffRole})</span>)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </Tab.Panel>
               
@@ -667,7 +749,7 @@ export default function FamilyPortalPage() {
                   color: '#111827',
                   marginBottom: '1.5rem'
                 }}>
-                  Thuốc hiện tại
+                  Thuốc đang sử dụng hiện tại
                 </h3>
                 <div style={{display: 'grid', gap: '1rem'}}>
                   {selectedResident.medications.map((medication) => (
@@ -681,32 +763,18 @@ export default function FamilyPortalPage() {
                         boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)'
                       }}
                     >
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '2fr 1fr 1fr',
-                        gap: '1rem',
-                        alignItems: 'center'
-                      }}>
+                      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1rem', alignItems: 'center'}}>
                         <div>
-                          <div style={{
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            color: '#111827',
-                            marginBottom: '0.25rem'
-                          }}>
-                            {medication.name}
+                          <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                            <span style={{fontWeight: 600}}>Tên thuốc: </span>{medication.name}
                           </div>
                           <div style={{fontSize: '0.75rem', color: '#92400e'}}>
-                            {medication.dosage} - {medication.schedule}
+                            <span style={{fontWeight: 600}}>Liều lượng: </span>{medication.dosage} <span style={{fontWeight: 600}}>• Lịch dùng: </span>{medication.schedule}
                           </div>
                         </div>
                         <div>
-                          <span style={{fontSize: '0.75rem', color: '#6b7280', display: 'block'}}>
-                            Uống lần cuối
-                          </span>
-                          <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#92400e'}}>
-                            {medication.lastAdministered}
-                          </span>
+                          <span style={{fontSize: '0.75rem', color: '#6b7280', display: 'block'}}><span style={{fontWeight: 600}}>Uống lần cuối: </span></span>
+                          <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#92400e'}}>{medication.lastAdministered}</span>
                         </div>
                       </div>
                     </div>
@@ -721,7 +789,7 @@ export default function FamilyPortalPage() {
                   color: '#111827',
                   marginBottom: '1.5rem'
                 }}>
-                  Lịch hẹn sắp tới
+                  Lịch khám bệnh sắp tới
                 </h3>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
                   {selectedResident.appointments.map((appointment) => (
@@ -740,19 +808,14 @@ export default function FamilyPortalPage() {
                         <CalendarDaysIcon style={{width: '2rem', height: '2rem', color: '#1d4ed8'}} />
                       </div>
                       <div style={{flex: 1}}>
-                        <div style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#111827',
-                          marginBottom: '0.25rem'
-                        }}>
-                          {appointment.type}
+                        <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                          <span style={{fontWeight: 600}}>Loại lịch: </span>{appointment.type}
                         </div>
                         <div style={{fontSize: '0.75rem', color: '#1e40af', marginBottom: '0.25rem'}}>
-                          {appointment.provider}
+                          <span style={{fontWeight: 600}}>Bác sĩ/Chuyên viên: </span>{appointment.provider}
                         </div>
                         <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
-                          {new Date(appointment.date).toLocaleDateString('vi-VN')} lúc {appointment.time}
+                          <span style={{fontWeight: 600}}>Thời gian: </span>{new Date(appointment.date).toLocaleDateString('vi-VN')} lúc {appointment.time}
                         </div>
                       </div>
                     </div>
@@ -800,7 +863,9 @@ export default function FamilyPortalPage() {
               gap: '1rem',
               marginBottom: '2rem',
               paddingBottom: '1rem',
-              borderBottom: '1px solid rgba(239, 68, 68, 0.1)'
+              borderBottom: '1px solid rgba(239, 68, 68, 0.1)',
+              position: 'relative',
+              zIndex: 10
             }}>
               <div style={{
                 width: '3rem',
@@ -812,7 +877,7 @@ export default function FamilyPortalPage() {
                 justifyContent: 'center',
                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
               }}>
-                <PhoneIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
+                <ChatBubbleLeftRightIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
               </div>
               <div style={{flex: 1}}>
                 <h3 style={{fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#111827'}}>
@@ -887,6 +952,9 @@ export default function FamilyPortalPage() {
                   <option key={index} value={staff}>{staff}</option>
                 ))}
               </select>
+              <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
+                💡 Chọn nhân viên phù hợp với nhu cầu của bạn (ví dụ: y tá cho vấn đề sức khỏe, nhân viên chăm sóc cho hoạt động hàng ngày)
+              </p>
             </div>
             
             <div style={{marginBottom: '2rem'}}>
@@ -929,7 +997,7 @@ export default function FamilyPortalPage() {
                 }}
               />
               <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                💡 Nhân viên sẽ liên hệ lại trong vòng 30 phút đến 2 giờ
+                💡 Nhân viên sẽ liên hệ lại trong vòng 30 phút đến 2 giờ. Vui lòng cung cấp thông tin chi tiết để nhân viên có thể hỗ trợ tốt nhất.
               </p>
             </div>
             
@@ -995,7 +1063,7 @@ export default function FamilyPortalPage() {
                   }
                 }}
               >
-                <PhoneIcon style={{width: '1rem', height: '1rem'}} />
+                <PaperAirplaneIcon style={{width: '1rem', height: '1rem'}} />
                 Gửi yêu cầu
               </button>
             </div>
@@ -1058,7 +1126,7 @@ export default function FamilyPortalPage() {
                   Gửi tin nhắn
                 </h3>
                 <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
-                  Tin nhắn sẽ được gửi đến nhóm chăm sóc của cư dân
+                  Gửi tin nhắn trực tiếp cho nhân viên chăm sóc
                 </p>
               </div>
               <button
@@ -1126,7 +1194,7 @@ export default function FamilyPortalPage() {
                 }}
               />
               <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                💬 Tin nhắn sẽ được gửi ngay lập tức và nhân viên sẽ phản hồi sớm nhất có thể
+                💬 Tin nhắn sẽ được gửi ngay lập tức và nhân viên sẽ phản hồi sớm nhất có thể. Vui lòng cung cấp thông tin rõ ràng để nhân viên có thể hỗ trợ tốt nhất.
               </p>
             </div>
             
@@ -1319,6 +1387,9 @@ export default function FamilyPortalPage() {
                     e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                   }}
                 />
+                <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
+                  📅 Chọn ngày bạn muốn đến thăm. Vui lòng đặt lịch trước ít nhất 24 giờ.
+                </p>
               </div>
               
               <div>
@@ -1363,6 +1434,9 @@ export default function FamilyPortalPage() {
                   <option value="15:00">15:00 - 16:00</option>
                   <option value="16:00">16:00 - 17:00</option>
                 </select>
+                <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
+                  ⏰ Chọn khung giờ phù hợp với lịch của bạn. Mỗi lần thăm kéo dài 1 giờ.
+                </p>
               </div>
               
               <div>
@@ -1407,6 +1481,9 @@ export default function FamilyPortalPage() {
                   <option value="Tham gia hoạt động">Tham gia hoạt động</option>
                   <option value="Khác">Khác</option>
                 </select>
+                <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
+                  🎯 Chọn mục đích thăm để nhân viên có thể chuẩn bị tốt nhất cho chuyến thăm của bạn.
+                </p>
               </div>
             </div>
             

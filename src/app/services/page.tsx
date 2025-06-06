@@ -25,7 +25,7 @@ const carePackages = [
     id: 2,
     name: 'Gói Nâng Cao',
     price: 25000000,
-    image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+    image: 'https://img.rawpixel.com/s3fs-private/rawpixel_images/website_content/v211batch10-audi-80-health_2.jpg?w=1300&dpr=1&fit=default&crop=default&q=80&vib=3&con=3&usm=15&bg=F4F4F3&ixlib=js-2.2.1&s=0c9814284e1b21fa1d1751a6e3f1374b',
     badge: 'Phổ biến nhất',
     features: [
       'Tất cả dịch vụ của gói Cơ Bản',
@@ -88,19 +88,24 @@ export default function ServicesPage() {
             marginBottom: '1rem',
             textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
           }}>
-            Gói Dịch Vụ Chăm Sóc
+            {user?.role === 'family' ? 'Gói Chăm Sóc Cho Người Thân' : 'Gói Dịch Vụ Chăm Sóc'}
           </h1>
           <p style={{ 
             fontSize: '1.25rem', 
             opacity: 0.9, 
-            maxWidth: '600px', 
+            maxWidth: '700px', 
             margin: '0 auto',
             lineHeight: 1.6
           }}>
-            Chọn gói dịch vụ phù hợp để mang lại sự chăm sóc tốt nhất cho người thân của bạn
+            {user?.role === 'family' 
+              ? 'Lựa chọn gói chăm sóc phù hợp nhất cho người thân yêu của bạn. Chúng tôi cam kết mang lại sự an tâm và chất lượng chăm sóc tốt nhất.'
+              : 'Chọn gói dịch vụ phù hợp để mang lại sự chăm sóc tốt nhất cho người thân của bạn'
+            }
           </p>
         </div>
       </div>
+
+
 
       {/* Packages Section */}
       <div style={{ 
@@ -109,6 +114,8 @@ export default function ServicesPage() {
         padding: '3rem 1rem',
         transform: 'translateY(-2rem)'
       }}>
+
+        
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
@@ -159,8 +166,7 @@ export default function ServicesPage() {
               {/* Image */}
               <div style={{ 
                 height: '200px', 
-                backgroundImage: `linear-gradient(${pkg.color}), url(${pkg.image})`,
-                backgroundBlendMode: 'overlay',
+                backgroundImage: `url(${pkg.image})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 position: 'relative'
@@ -268,6 +274,8 @@ export default function ServicesPage() {
                   </ul>
                 </div>
 
+
+
                 {/* Button */}
                 <button
                   onClick={() => handlePackageSelect(pkg.id)}
@@ -295,7 +303,7 @@ export default function ServicesPage() {
                     e.currentTarget.style.boxShadow = `0 4px 15px ${pkg.buttonColor}40`;
                   }}
                 >
-                  Chọn Gói Này
+                  {user?.role === 'family' ? 'Đăng Ký Cho Người Thân' : 'Chọn Gói Này'}
                 </button>
               </div>
             </div>

@@ -50,7 +50,7 @@ const stats = [
     lightBg: 'rgba(245, 158, 11, 0.1)'
   },
   { 
-    name: 'Tỷ lệ lấp đầy', 
+    name: 'Tỷ lệ cư dân hiện tại', 
     value: '92%', 
     change: '+5%', 
     trend: 'up', 
@@ -125,7 +125,7 @@ export default function Home() {
   
   useEffect(() => {
     if (!user) {
-      router.push('/login');
+      router.push('/welcome');
     } else if (user.role === 'family') {
       router.push('/family');
     }
@@ -271,11 +271,11 @@ export default function Home() {
                       borderRadius: '0.375rem',
                       background: stat.trend === 'up' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'
                     }}>
-                  {stat.trend === 'up' ? (
+                      {stat.trend === 'up' ? (
                         <ArrowUpIcon style={{width: '0.875rem', height: '0.875rem', color: '#10b981', marginRight: '0.25rem'}} />
-                  ) : (
+                      ) : (
                         <ArrowDownIcon style={{width: '0.875rem', height: '0.875rem', color: '#ef4444', marginRight: '0.25rem'}} />
-                  )}
+                      )}
                       <span style={{
                         color: stat.trend === 'up' ? '#10b981' : '#ef4444',
                         fontWeight: 600
@@ -629,7 +629,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-        </div>
+          </div>
         )}
       </div>
     </div>

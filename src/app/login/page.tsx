@@ -7,7 +7,6 @@ import {
   LockClosedIcon, 
   EnvelopeIcon, 
   ExclamationTriangleIcon,
-  SparklesIcon,
   UserIcon,
   HomeIcon,
   EyeIcon,
@@ -50,7 +49,7 @@ export default function LoginPage() {
     { 
       value: 'admin', 
       label: 'Quản trị viên', 
-      icon: SparklesIcon,
+      icon: UserIcon,
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       lightBg: 'rgba(102, 126, 234, 0.1)'
     },
@@ -133,37 +132,74 @@ export default function LoginPage() {
           background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
           position: 'relative'
         }}>
-          {/* Logo */}
+          {/* CareHome Logo */}
           <div style={{
-            width: '4rem',
-            height: '4rem',
+            width: '4.5rem',
+            height: '4.5rem',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '1rem',
+            borderRadius: '1.25rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 1rem auto',
-            boxShadow: '0 8px 16px -4px rgba(102, 126, 234, 0.4)'
+            margin: '0 auto 1.5rem auto',
+            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
+            position: 'relative'
           }}>
-            <SparklesIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+            {/* Sparkles/Stars icon */}
+            <div style={{
+              position: 'relative',
+              width: '2.5rem',
+              height: '2.5rem'
+            }}>
+              {/* Main star */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '1.5rem',
+                height: '1.5rem',
+                background: 'white',
+                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+              }} />
+              
+              {/* Small stars */}
+              <div style={{
+                position: 'absolute',
+                top: '0.2rem',
+                right: '0.2rem',
+                width: '0.6rem',
+                height: '0.6rem',
+                background: 'white',
+                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+              }} />
+              
+              <div style={{
+                position: 'absolute',
+                bottom: '0.2rem',
+                left: '0.2rem',
+                width: '0.5rem',
+                height: '0.5rem',
+                background: 'white',
+                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+              }} />
+            </div>
           </div>
           
           <h1 style={{
-            fontSize: '2rem',
+            fontSize: '2.25rem',
             fontWeight: 700,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: '#667eea',
             margin: '0 0 0.5rem 0',
             letterSpacing: '-0.025em'
           }}>
             CareHome
           </h1>
           <p style={{
-            fontSize: '1rem',
+            fontSize: '1.125rem',
+            fontWeight: 500,
             color: '#64748b',
-            margin: 0,
-            fontWeight: 500
+            margin: 0
           }}>
             Hệ thống quản lý viện dưỡng lão
           </p>
