@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { 
   ChatBubbleLeftRightIcon, 
   CalendarDaysIcon, 
@@ -112,6 +114,7 @@ const residents = [
 ];
 
 export default function FamilyPortalPage() {
+  
   const [selectedResident, setSelectedResident] = useState(residents[0]);
   
   // Add notifications state
@@ -137,6 +140,7 @@ export default function FamilyPortalPage() {
   const [visitTime, setVisitTime] = useState('');
   const [visitPurpose, setVisitPurpose] = useState('');
   const [selectedStaff, setSelectedStaff] = useState('');
+  const [allPhotos, setAllPhotos] = useState<any[]>([]);
 
   // Handler functions for button actions
   const handleContactStaff = () => {
@@ -224,22 +228,64 @@ export default function FamilyPortalPage() {
   ];
 
   useEffect(() => {
+    // Load uploaded photos from localStorage and combine with mock photos
+    try {
+      const uploadedPhotos = localStorage.getItem('uploadedPhotos');
+      if (uploadedPhotos) {
+        const parsedPhotos = JSON.parse(uploadedPhotos);
+        // Filter photos for current resident and format them
+        const residentPhotos = parsedPhotos
+          .filter((photo: any) => photo.residentId.toString() === selectedResident.id.toString())
+          .map((photo: any) => ({
+            id: `uploaded_${photo.id}`,
+            url: photo.url,
+            caption: photo.caption,
+            date: new Date(photo.uploadDate).toISOString().split('T')[0],
+            uploadedBy: photo.uploadedBy,
+            isUploaded: true
+          }));
+        
+        // Combine with mock photos
+        const combinedPhotos = [...mockPhotos, ...residentPhotos];
+        // Sort by date (newest first)
+        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setAllPhotos(combinedPhotos);
+      } else {
+        setAllPhotos(mockPhotos);
+      }
+    } catch (error) {
+      console.error('Error loading photos:', error);
+      setAllPhotos(mockPhotos);
+    }
+  }, [selectedResident]);
+
+  useEffect(() => {
     console.log('Modal states:', { showContactModal, showScheduleModal, showPhotosModal, showMessageModal });
-    // Only hide header for photo and schedule modals, not contact or message modals
-    if (showScheduleModal || showPhotosModal) {
-      console.log('Adding hide-header class and preventing scroll');
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showContactModal || showScheduleModal || showPhotosModal || showMessageModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
       document.body.classList.add('hide-header');
       document.body.style.overflow = 'hidden';
     } else {
-      console.log('Removing hide-header class and allowing scroll');
+      console.log('No modal open - removing hide-header class');
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     }
+    
     return () => {
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     };
   }, [showScheduleModal, showPhotosModal, showContactModal, showMessageModal]);
+
+  // Ensure header is shown when component mounts
+  useEffect(() => {
+    // Make sure header is visible when page loads
+    document.body.classList.remove('hide-header');
+    document.body.style.overflow = 'unset';
+  }, []);
 
   return (
     <div style={{
@@ -1656,7 +1702,7 @@ export default function FamilyPortalPage() {
               gap: '1.5rem',
               marginBottom: '2rem'
             }}>
-              {mockPhotos.map((photo) => (
+              {allPhotos.map((photo) => (
                 <div key={photo.id} style={{
                   background: 'white',
                   borderRadius: '1rem',
@@ -1696,17 +1742,45 @@ export default function FamilyPortalPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'space-between',
                       gap: '0.5rem'
                     }}>
-                      <CalendarDaysIcon style={{width: '0.875rem', height: '0.875rem', color: '#f59e0b'}} />
-                      <p style={{
-                        fontSize: '0.75rem',
-                        color: '#6b7280',
-                        margin: 0,
-                        fontWeight: 500
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
                       }}>
-                        {new Date(photo.date).toLocaleDateString('vi-VN')}
-                      </p>
+                        <CalendarDaysIcon style={{width: '0.875rem', height: '0.875rem', color: '#f59e0b'}} />
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          margin: 0,
+                          fontWeight: 500
+                        }}>
+                          {new Date(photo.date).toLocaleDateString('vi-VN')}
+                        </p>
+                      </div>
+                      {photo.isUploaded && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.375rem',
+                          border: '1px solid rgba(16, 185, 129, 0.2)'
+                        }}>
+                          <UsersIcon style={{width: '0.75rem', height: '0.75rem', color: '#10b981'}} />
+                          <p style={{
+                            fontSize: '0.625rem',
+                            color: '#10b981',
+                            margin: 0,
+                            fontWeight: 600
+                          }}>
+                            {photo.uploadedBy}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

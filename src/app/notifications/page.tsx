@@ -22,7 +22,7 @@ const mockNotifications = [
     time: '2023-05-15T10:30:00',
     isRead: false,
     type: 'medication',
-    priority: 'high',
+    priority: 'cao',
     category: 'Chăm sóc y tế'
   },
   {
@@ -32,7 +32,7 @@ const mockNotifications = [
     time: '2023-05-15T09:30:00',
     isRead: false,
     type: 'meeting',
-    priority: 'medium',
+    priority: 'trung bình',
     category: 'Cuộc họp'
   },
   {

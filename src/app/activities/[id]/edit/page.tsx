@@ -84,15 +84,16 @@ const activitiesData = [
   }
 ];
 
-export default function EditActivityPage({ params }: { params: Promise<{ id: string }> }) {
+export default function EditActivityPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [selectedResident, setSelectedResident] = useState('');
   
-  // Unwrap the params Promise using React.use()
-  const resolvedParams = use(params);
-  const activityId = resolvedParams.id;
+  // Get activityId from params directly
+  const activityId = params.id;
   
   const { 
     register, 
@@ -118,6 +119,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
         
         if (foundActivity) {
           setActivity(foundActivity);
+          setParticipants(foundActivity.participants || []);
           
           // Set form values
           setValue('name', foundActivity.name);
@@ -178,6 +180,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
           level: data.level,
           recurring: data.recurring,
           status: data.status,
+          participants: participants,
           updatedAt: new Date().toISOString()
         };
         
@@ -187,8 +190,8 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Redirect to activity detail
-        router.push(`/activities/${activityId}`);
+        // Redirect to activities list
+        router.push('/activities');
       }
     } catch (error) {
       console.error('Error updating activity:', error);
@@ -196,6 +199,34 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Mock residents data - in real app this would come from API
+  const allResidents = [
+    'Alice Johnson', 'Robert Smith', 'Mary Williams', 'James Brown', 'Patricia Davis',
+    'Michael Johnson', 'Linda Wilson', 'David Anderson', 'Barbara Taylor', 'William Moore',
+    'Elizabeth Jackson', 'Richard White', 'Susan Harris', 'Joseph Martin', 'Jessica Thompson',
+    'Christopher Garcia', 'Sarah Martinez', 'Matthew Robinson', 'Ashley Clark', 'Anthony Rodriguez',
+    'Amanda Lewis', 'Daniel Lee', 'Stephanie Walker', 'Mark Hall', 'Michelle Young',
+    'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
+    'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
+    'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
+    'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R', 'Nguyễn Thị S', 'Trần Văn T'
+  ];
+
+  // Get available residents (not already selected)
+  const availableResidents = allResidents.filter(resident => !participants.includes(resident));
+
+  // Participant management functions
+  const addParticipant = () => {
+    if (selectedResident && !participants.includes(selectedResident)) {
+      setParticipants(prev => [...prev, selectedResident]);
+      setSelectedResident('');
+    }
+  };
+
+  const removeParticipant = (participantToRemove: string) => {
+    setParticipants(prev => prev.filter(p => p !== participantToRemove));
   };
   
   if (loading) {
@@ -217,7 +248,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   return (
     <div style={{maxWidth: '1200px', margin: '0 auto', padding: '0 1rem'}}>
       <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href={`/activities/${activityId}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
+        <Link href="/activities" style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
           <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
         </Link>
         <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Chỉnh sửa hoạt động</h1>
@@ -557,6 +588,157 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
           
+          {/* Participant Management */}
+          <div>
+            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
+              Quản lý người tham gia
+            </h2>
+            <div style={{marginBottom: '1rem'}}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}>
+                <span style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  fontWeight: 500
+                }}>
+                  Số lượng hiện tại: {participants.length}/{activity?.capacity || 0}
+                </span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '9999px',
+                  background: participants.length >= (activity?.capacity || 0) ? 
+                    'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                  color: participants.length >= (activity?.capacity || 0) ? '#ef4444' : '#22c55e',
+                  fontWeight: 600
+                }}>
+                  {participants.length >= (activity?.capacity || 0) ? 'Đã đầy' : 'Còn chỗ'}
+                </span>
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}>
+                <select
+                  value={selectedResident}
+                  onChange={(e) => setSelectedResident(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d1d5db',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    background: 'white'
+                  }}
+                >
+                  <option value="">
+                    {availableResidents.length > 0 ? 'Chọn cư dân...' : 'Không còn cư dân nào'}
+                  </option>
+                  {availableResidents.map((resident, index) => (
+                    <option key={index} value={resident}>
+                      {resident}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={addParticipant}
+                  disabled={!selectedResident || availableResidents.length === 0}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: !selectedResident || availableResidents.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: !selectedResident || availableResidents.length === 0 ? 0.5 : 1,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Thêm
+                </button>
+              </div>
+              
+              {participants.length > 0 && (
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Danh sách người tham gia:
+                  </label>
+                  <div style={{
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.375rem',
+                    padding: '0.75rem'
+                  }}>
+                    {participants.map((participant, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '0.5rem',
+                          marginBottom: '0.25rem',
+                          background: '#f9fafb',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #e5e7eb'
+                        }}
+                      >
+                        <span style={{
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          fontWeight: 500
+                        }}>
+                          {participant}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeParticipant(participant)}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.25rem',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
           {/* Additional Information */}
           <div>
             <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
@@ -633,7 +815,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
           {/* Form Buttons */}
           <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem'}}>
             <Link 
-              href={`/activities/${activityId}`} 
+              href="/activities" 
               style={{
                 padding: '0.5rem 1rem', 
                 border: '1px solid #d1d5db', 

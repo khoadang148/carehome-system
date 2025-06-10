@@ -109,8 +109,10 @@ export default function Header() {
       padding: '0 2rem',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       backdropFilter: 'blur(10px)',
-      position: 'relative',
-      zIndex: 1000
+      position: 'sticky',
+      top: 0,
+      zIndex: 30,
+      flexShrink: 0
     }}>
       {/* Logo/Brand area */}
       <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
@@ -148,27 +150,7 @@ export default function Header() {
       </div>
       
       <div style={{display: 'flex', alignItems: 'center', gap: '1.25rem'}}>
-        {/* Hiển thị ngày hiện tại */}
-        <div style={{
-          padding: '0.5rem 1rem',
-          backgroundColor: 'rgba(255,255,255,0.15)',
-          borderRadius: '0.5rem',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.2)'
-        }} className="md:block hidden">
-          <span style={{
-            fontSize: '0.875rem', 
-            color: 'white',
-            fontWeight: 500
-          }}>
-            {new Date().toLocaleDateString('vi-VN', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </span>
-        </div>
+
 
         {!user ? (
           <button 
@@ -203,21 +185,7 @@ export default function Header() {
         ) : (
           <>
             {/* Role badge */}
-            {(user.role === 'admin' || user.role === 'staff') && (
-              <div style={{
-                background: user.role === 'admin' ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.5rem',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                {user.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
-              </div>
-            )}
+
 
             {/* Notifications */}
             <Menu as="div" className="relative">

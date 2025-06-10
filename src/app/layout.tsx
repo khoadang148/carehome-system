@@ -4,6 +4,7 @@ import "./globals.css";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { AuthProvider } from "@/lib/auth-context";
 import { ResidentsProvider } from "@/lib/residents-context";
+import { ActivitiesProvider } from "@/lib/activities-context";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,7 +30,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ResidentsProvider>
-            <ClientLayout>{children}</ClientLayout>
+            <ActivitiesProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </ActivitiesProvider>
           </ResidentsProvider>
         </AuthProvider>
       </body>

@@ -14,6 +14,9 @@ import {
   PencilIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { useEffect } from 'react';
+
 
 // Mock medical records data
 const medicalRecords = [
@@ -72,6 +75,20 @@ export default function MedicalPage() {
   const [filterType, setFilterType] = useState('Tất cả');
   const [filterStatus, setFilterStatus] = useState('Tất cả');
   const router = useRouter();
+  const { user } = useAuth();
+  
+  // Check access permissions
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
   
   // Handler functions for button actions
   const handleViewMedicalRecord = (recordId: number) => {
@@ -181,34 +198,6 @@ export default function MedicalPage() {
             
             <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
           <Link 
-            href="/medical/tests" 
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-              textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
-                  transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(22, 163, 74, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
-                }}
-              >
-                <BeakerIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-            Quản lý xét nghiệm
-          </Link>
-          <Link 
             href="/medical/new" 
             style={{
               display: 'inline-flex',
@@ -240,6 +229,8 @@ export default function MedicalPage() {
         </div>
       </div>
       
+
+      
         {/* Filters Card */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -250,12 +241,22 @@ export default function MedicalPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{
-            display: 'flex',
-            flexWrap: 'wrap', 
-            alignItems: 'center', 
+            display: 'grid',
+            gridTemplateColumns: '1fr auto auto auto',
+            alignItems: 'end',
             gap: '1.5rem'
           }}>
-            <div style={{flex: '1', minWidth: '20rem'}}>
+            {/* Search Input */}
+            <div>
+              <label style={{
+                fontSize: '0.875rem', 
+                fontWeight: 600, 
+                color: '#374151',
+                display: 'block',
+                marginBottom: '0.5rem'
+              }}>
+                Tìm kiếm hồ sơ y tế
+              </label>
               <div style={{position: 'relative'}}>
                 <div style={{
                   position: 'absolute', 
@@ -267,12 +268,12 @@ export default function MedicalPage() {
                   pointerEvents: 'none'
                 }}>
                   <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
-              </div>
-              <input
-                type="text"
-                placeholder="Tìm kiếm hồ sơ y tế..."
-                style={{
-                  width: '100%',
+                </div>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm hồ sơ y tế..."
+                  style={{
+                    width: '100%',
                     paddingLeft: '2.75rem',
                     paddingRight: '1rem',
                     paddingTop: '0.75rem',
@@ -283,9 +284,9 @@ export default function MedicalPage() {
                     background: 'white',
                     transition: 'all 0.2s ease',
                     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                  }}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = '#ef4444';
                     e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
@@ -297,23 +298,37 @@ export default function MedicalPage() {
                 />
               </div>
             </div>
-          
-            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                background: 'rgba(239, 68, 68, 0.1)',
-                borderRadius: '0.5rem'
+
+            {/* Filter Button */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1rem',
+              background: 'rgba(239, 68, 68, 0.1)',
+              borderRadius: '0.75rem',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              height: 'fit-content'
+            }}>
+              <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#ef4444'}} />
+              <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#ef4444'}}>
+                Lọc
+              </span>
+            </div>
+            
+            {/* Record Type Filter */}
+            <div>
+              <label style={{
+                fontSize: '0.875rem', 
+                fontWeight: 600, 
+                color: '#374151',
+                display: 'block',
+                marginBottom: '0.5rem'
               }}>
-                <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#ef4444'}} />
-                <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#ef4444'}}>
-                  Lọc
-                </span>
-              </div>
-                <select
-                  style={{
+                Loại hồ sơ
+              </label>
+              <select
+                style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '0.75rem',
                   border: '1px solid #e2e8f0',
@@ -323,9 +338,9 @@ export default function MedicalPage() {
                   minWidth: '12rem',
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                   transition: 'all 0.2s ease'
-                  }}
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
+                }}
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#ef4444';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
@@ -334,13 +349,26 @@ export default function MedicalPage() {
                   e.currentTarget.style.borderColor = '#e2e8f0';
                   e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                 }}
-                >
-                  {recordTypes.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                <select
-                  style={{
+              >
+                {recordTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Status Filter */}
+            <div>
+              <label style={{
+                fontSize: '0.875rem', 
+                fontWeight: 600, 
+                color: '#374151',
+                display: 'block',
+                marginBottom: '0.5rem'
+              }}>
+                Trạng thái
+              </label>
+              <select
+                style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '0.75rem',
                   border: '1px solid #e2e8f0',
@@ -350,9 +378,9 @@ export default function MedicalPage() {
                   minWidth: '10rem',
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                   transition: 'all 0.2s ease'
-                  }}
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                }}
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#ef4444';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
@@ -361,11 +389,11 @@ export default function MedicalPage() {
                   e.currentTarget.style.borderColor = '#e2e8f0';
                   e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                 }}
-                >
-                  {statuses.map((status) => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
+              >
+                {statuses.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -411,7 +439,7 @@ export default function MedicalPage() {
                     margin: 0,
                     marginBottom: '0.25rem'
                   }}>
-                    {record.residentName}
+                    Bệnh nhân {record.residentName}
                   </h3>
                     <span style={{
                       display: 'inline-flex', 

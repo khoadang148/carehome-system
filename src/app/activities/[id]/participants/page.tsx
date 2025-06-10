@@ -68,16 +68,15 @@ const activitiesData = [
   }
 ];
 
-export default function ActivityParticipantsPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ActivityParticipantsPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   
-  // Unwrap the params Promise using React.use()
-  const resolvedParams = use(params);
-  const activityId = resolvedParams.id;
+  // Get activityId from params directly
+  const activityId = params.id;
   
   useEffect(() => {
     const fetchActivity = async () => {

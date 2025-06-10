@@ -18,6 +18,8 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { useEffect } from 'react';
 
 // Mock user data
 const users = [
@@ -137,6 +139,20 @@ export default function PermissionsPage() {
   const [filterDepartment, setFilterDepartment] = useState('Tất cả');
   
   const router = useRouter();
+  const { user } = useAuth();
+  
+  // Check access permissions - Only admin can access permissions management
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (user.role !== 'admin') {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
   
   // Filter users based on search term, role and department
   const filteredUsers = users.filter((user) => {

@@ -84,14 +84,13 @@ const reportsData = [
   }
 ];
 
-export default function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ReportDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Unwrap the params Promise using React.use()
-  const resolvedParams = use(params);
-  const reportId = resolvedParams.id;
+  // Get reportId from params directly
+  const reportId = params.id;
   
   useEffect(() => {
     const fetchReport = async () => {
@@ -204,7 +203,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
         <div class="metric">
           <div class="metric-title">Thông tin cư dân</div>
           <div class="metric-value">Tổng số: ${data.residents.total}</div>
-          ${data.residents.newAdmissions ? `<div>Nhập viện mới: ${data.residents.newAdmissions}</div>` : ''}
+          ${data.residents.newAdmissions ? `<div>Cư dân mới: ${data.residents.newAdmissions}</div>` : ''}
           ${data.residents.occupancyRate ? `<div>Tỷ lệ lấp đầy: ${data.residents.occupancyRate}%</div>` : ''}
         </div>
       `;
@@ -365,7 +364,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                       </div>
                       {report.data.residents.newAdmissions && (
                         <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                          <span style={{fontSize: '0.875rem', color: '#075985'}}>Nhập viện mới:</span>
+                          <span style={{fontSize: '0.875rem', color: '#075985'}}>Cư dân mới:</span>
                           <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#0c4a6e'}}>{report.data.residents.newAdmissions}</span>
                         </div>
                       )}

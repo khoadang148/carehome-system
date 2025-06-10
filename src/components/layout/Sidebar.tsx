@@ -17,7 +17,10 @@ import {
   BanknotesIcon,
   ClipboardDocumentListIcon,
   CubeIcon,
-  SparklesIcon
+  SparklesIcon,
+  DocumentTextIcon,
+  ClipboardDocumentCheckIcon,
+  HeartIcon
 } from '@heroicons/react/24/outline';
 import { useAuth, UserRole } from '@/lib/auth-context';
 
@@ -36,34 +39,47 @@ interface MenuGroup {
 
 // Phân loại menu theo nhóm chức năng
 const menuGroups: MenuGroup[] = [
+ 
   {
     title: "Quản lý chính",
     items: [
       { name: 'Tổng quan', href: '/', icon: HomeIcon, roles: ['admin', 'staff'], color: '#667eea' },
       { name: 'Cư dân', href: '/residents', icon: UserIcon, roles: ['admin', 'staff'], color: '#10b981' },
-      { name: 'Nhân viên', href: '/staff', icon: UsersIcon, roles: ['admin'], color: '#3b82f6' },
+      { name: 'Đội ngũ chăm sóc', href: '/staff', icon: UsersIcon, roles: ['admin'], color: '#3b82f6' },
     ]
   },
   {
-    title: "Hoạt động & Gia đình",
+    title: "Lối tắt chăm sóc",
     items: [
-      { name: 'Hoạt động', href: '/activities', icon: CalendarIcon, roles: ['admin', 'staff'], color: '#f59e0b' },
-      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'staff', 'family'], color: '#8b5cf6' },
-      { name: 'Cổng gia đình', href: '/family', icon: UserGroupIcon, roles: ['admin', 'family'], color: '#ec4899' },
+      { name: 'Kê đơn thuốc', href: '/staff/prescription', icon: DocumentTextIcon, roles: ['staff'], color: '#10b981' },
+             { name: 'Lịch khám sức khỏe', href: '/staff/medical-plan', icon: ClipboardDocumentCheckIcon, roles: ['staff'], color: '#f59e0b' },
+      { name: 'Nhật ký theo dõi', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
+    ]
+  },
+  {
+    title: "Chương trình & Gia đình",
+    items: [
+      { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['admin', 'staff'], color: '#f59e0b' },
+      { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['admin', 'staff'], color: '#8b5cf6' },
+      { name: 'Cổng gia đình', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
+      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'family'], color: '#6366f1' },
+      
     ]
   },
   {
     title: "Dữ liệu & Báo cáo",
     items: [
-      { name: 'Báo cáo', href: '/reports', icon: ChartBarIcon, roles: ['admin', 'staff'], color: '#06b6d4' },
-      { name: 'Tài chính', href: '/finance', icon: BanknotesIcon, roles: ['admin'], color: '#16a34a' },
-      { name: 'Hồ sơ y tế', href: '/medical', icon: ClipboardDocumentListIcon, roles: ['admin', 'staff'], color: '#dc2626' },
+      { name: 'Báo cáo', href: '/reports', icon: ChartBarIcon, roles: ['admin'], color: '#06b6d4' },
+      { name: 'Tài chính', href: '/finance', icon: BanknotesIcon, roles: ['admin', 'family'], color: '#16a34a' },
+      { name: 'Chăm sóc sức khỏe', href: '/medical', icon: ClipboardDocumentListIcon, roles: ['admin', 'staff'], color: '#dc2626' },
+      { name: 'Quản lý kho', href: '/inventory', icon: CubeIcon, roles: ['admin'], color: '#0891b2' },
     ]
   },
   {
     title: "Hệ thống",
     items: [
-      { name: 'Quyền hạn', href: '/permissions', icon: ShieldCheckIcon, roles: ['admin'], color: '#7c3aed' },
+      { name: 'Tuân thủ', href: '/compliance', icon: ShieldCheckIcon, roles: ['admin'], color: '#7c3aed' },
+      { name: 'Quyền hạn', href: '/permissions', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' },
       { name: 'Cài đặt', href: '/settings', icon: Cog6ToothIcon, roles: ['admin'], color: '#6b7280' },
     ]
   }
@@ -89,8 +105,10 @@ export default function Sidebar() {
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',
-      position: 'relative'
+      height: '100vh',
+      position: 'relative',
+      zIndex: 20,
+      flexShrink: 0
     }}>
       {/* Header section */}
       <div style={{

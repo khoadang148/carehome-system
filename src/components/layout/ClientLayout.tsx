@@ -16,11 +16,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
   
-  // Kiểm tra xem có phải là trang chính không (không phải trang con của family)
-  const isMainPage = pathname === "/" || 
-                    (pathname.startsWith("/family") && 
-                     !pathname.includes("/schedule") && 
-                     !pathname.includes("/photos"));
+  // Hiển thị header cho tất cả các trang trừ một số trang đặc biệt
+  const shouldShowHeader = pathname !== "/welcome" && 
+                           pathname !== "/setup" && 
+                           pathname !== "/residents" &&
+                           !pathname.startsWith("/medical");
   
   // Enhanced loading spinner with beautiful design
   if (loading) {
@@ -132,7 +132,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
-      overflow: 'hidden',
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
     }}>
       <Sidebar />
@@ -140,32 +139,33 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         flexGrow: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        minHeight: '100vh',
         position: 'relative'
       }}>
         {/* Background pattern */}
         <div style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           background: `
-            radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 75% 25%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 25% 75%, rgba(245, 158, 11, 0.1) 0%, transparent 50%)
+            radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 75% 25%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 25% 75%, rgba(245, 158, 11, 0.03) 0%, transparent 50%)
           `,
           pointerEvents: 'none',
-          zIndex: 0
+          zIndex: -1
         }} />
-        {isMainPage && <Header />}
+        {shouldShowHeader && <Header />}
         <main style={{
           flexGrow: 1,
           overflowY: 'auto',
           overflowX: 'hidden',
           position: 'relative',
-          zIndex: 1
+          zIndex: 10,
+          minHeight: shouldShowHeader ? 'calc(100vh - 4.5rem)' : '100vh'
         }}>
           {children}
         </main>

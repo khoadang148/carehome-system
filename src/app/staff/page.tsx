@@ -11,8 +11,10 @@ import {
   EyeIcon, 
   CalendarIcon,
   TrashIcon,
-  UsersIcon
+  UsersIcon,
+
 } from '@heroicons/react/24/outline';
+import { useAuth } from '@/lib/auth-context';
 
 // Mock staff data
 const initialStaffMembers = [
@@ -73,19 +75,62 @@ const shifts = ['Tất cả', 'Sáng', 'Chiều', 'Đêm', 'Ngày'];
 
 export default function StaffPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  
+  // Check access permissions - Only admin can access staff management
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (user.role !== 'admin') {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('Tất cả');
   const [filterShift, setFilterShift] = useState('Tất cả');
   const [staffData, setStaffData] = useState(initialStaffMembers);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<number | null>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [pendingPackages, setPendingPackages] = useState<any[]>([]);
   
+  const loadPendingPackages = () => {
+    try {
+      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      if (savedResidents) {
+        const residents = JSON.parse(savedResidents);
+        const pending = residents
+          .filter((r: any) => r.carePackage && r.carePackage.status === 'pending_approval')
+          .map((r: any) => ({
+            ...r.carePackage,
+            residentName: r.name,
+            residentId: r.id,
+            residentAge: r.age,
+            residentRoom: r.room
+          }));
+        setPendingPackages(pending);
+      }
+    } catch (error) {
+      console.error('Error loading pending packages:', error);
+    }
+  };
+
+
+
   // Load staff data from localStorage when component mounts
   useEffect(() => {
     const savedStaff = localStorage.getItem('nurseryHomeStaff');
     if (savedStaff) {
       setStaffData(JSON.parse(savedStaff));
     }
+    
+    // Load pending service packages
+    loadPendingPackages();
   }, []);
   
   // Filter staff based on search term and filters
@@ -136,6 +181,80 @@ export default function StaffPage() {
   // Handle create new staff
   const handleCreateStaff = () => {
     router.push('/staff/new');
+  };
+
+
+
+  // Handle approve/reject service packages
+  const handleApprovePackage = (registrationId: string) => {
+    try {
+      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      if (savedResidents) {
+        const residents = JSON.parse(savedResidents);
+        const updatedResidents = residents.map((r: any) => {
+          if (r.carePackage && r.carePackage.registrationId === registrationId) {
+            return {
+              ...r,
+              carePackage: {
+                ...r.carePackage,
+                status: 'active',
+                approvedDate: new Date().toISOString(),
+                approvedBy: 'Nhân viên quản lý'
+              }
+            };
+          }
+          return r;
+        });
+        
+        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+        loadPendingPackages(); // Reload pending packages
+        alert('✅ Đã duyệt gói dịch vụ thành công!');
+      }
+    } catch (error) {
+      console.error('Error approving package:', error);
+      alert('❌ Có lỗi xảy ra khi duyệt gói dịch vụ!');
+    }
+  };
+
+  const handleRejectPackage = (registrationId: string) => {
+    const reason = prompt('Nhập lý do từ chối:');
+    if (!reason) return;
+
+    try {
+      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      if (savedResidents) {
+        const residents = JSON.parse(savedResidents);
+        const updatedResidents = residents.map((r: any) => {
+          if (r.carePackage && r.carePackage.registrationId === registrationId) {
+            return {
+              ...r,
+              carePackage: {
+                ...r.carePackage,
+                status: 'rejected',
+                rejectedDate: new Date().toISOString(),
+                rejectedBy: 'Nhân viên quản lý',
+                rejectionReason: reason
+              }
+            };
+          }
+          return r;
+        });
+        
+        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+        loadPendingPackages(); // Reload pending packages
+        alert('❌ Đã từ chối gói dịch vụ!');
+      }
+    } catch (error) {
+      console.error('Error rejecting package:', error);
+      alert('❌ Có lỗi xảy ra khi từ chối gói dịch vụ!');
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
   };
   
   return (
@@ -206,7 +325,7 @@ export default function StaffPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Quản lý nhân viên
+                  Quản lý Đội ngũ chăm sóc
                 </h1>
                 <p style={{
                   fontSize: '1rem',
@@ -214,12 +333,71 @@ export default function StaffPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {staffData.length} nhân viên
+                  Tổng số: {staffData.length} thành viên
                 </p>
               </div>
             </div>
             
             <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
+              <button
+                onClick={() => setShowApprovalModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: pendingPackages.length > 0 
+                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                    : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                  color: 'white',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: pendingPackages.length > 0 
+                    ? '0 4px 12px rgba(245, 158, 11, 0.3)' 
+                    : '0 4px 12px rgba(107, 114, 128, 0.3)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  position: 'relative'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = pendingPackages.length > 0 
+                    ? '0 8px 20px rgba(245, 158, 11, 0.4)' 
+                    : '0 8px 20px rgba(107, 114, 128, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = pendingPackages.length > 0 
+                    ? '0 4px 12px rgba(245, 158, 11, 0.3)' 
+                    : '0 4px 12px rgba(107, 114, 128, 0.3)';
+                }}
+              >
+                <svg style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Duyệt gói dịch vụ
+                {pendingPackages.length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-0.5rem',
+                    right: '-0.5rem',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    border: '2px solid white'
+                  }}>
+                    {pendingPackages.length}
+                  </span>
+                )}
+              </button>
           <Link 
             href="/staff/schedule" 
             style={{
@@ -248,16 +426,46 @@ export default function StaffPage() {
                 <CalendarIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
             Lịch làm việc
           </Link>
-          <Link 
-            href="/staff/add" 
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+                      <div style={{display: 'flex', gap: '1rem'}}>
+              <button
+                onClick={handleCreateStaff}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white',
+                  color: 'white',
                   padding: '0.875rem 1.5rem',
                   borderRadius: '0.75rem',
-              textDecoration: 'none',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                }}
+              >
+                <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
+                Thêm thành viên
+              </button>
+
+              <Link 
+                href="/staff/add" 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  padding: '0.875rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  textDecoration: 'none',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
@@ -274,8 +482,9 @@ export default function StaffPage() {
                 }}
               >
                 <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-            Thêm nhân viên
-          </Link>
+                Thêm thành viên
+              </Link>
+            </div>
             </div>
         </div>
       </div>
@@ -791,6 +1000,322 @@ export default function StaffPage() {
           </div>
         </div>
       )}
+
+      {/* Service Package Approval Modal */}
+      {showApprovalModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            maxWidth: '900px',
+            width: '95%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)',
+              borderRadius: '1rem 1rem 0 0'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.5rem',
+                    fontWeight: 700,
+                    color: '#92400e',
+                    margin: '0 0 0.5rem 0'
+                  }}>
+                    🔍 Duyệt gói dịch vụ chờ phê duyệt
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#b45309',
+                    margin: 0
+                  }}>
+                    Có {pendingPackages.length} gói dịch vụ đang chờ duyệt
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowApprovalModal(false)}
+                  style={{
+                    background: 'rgba(146, 64, 14, 0.1)',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem',
+                    cursor: 'pointer',
+                    color: '#92400e'
+                  }}
+                >
+                  <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '1.5rem' }}>
+              {pendingPackages.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#d1d5db' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#374151' }}>
+                    Không có gói dịch vụ nào chờ duyệt
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.875rem' }}>
+                    Tất cả các gói dịch vụ đã được xử lý
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {pendingPackages.map((pkg, index) => (
+                    <div key={pkg.registrationId} style={{
+                      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.75rem',
+                      padding: '1.5rem',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+                    }}>
+                      {/* Package Header */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: '1rem'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{
+                            fontSize: '1.125rem',
+                            fontWeight: 600,
+                            color: '#111827',
+                            margin: '0 0 0.5rem 0'
+                          }}>
+                            {pkg.name}
+                          </h4>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '0.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            <p style={{ margin: 0 }}>
+                              <strong>Người thụ hưởng:</strong> {pkg.residentName}
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Tuổi:</strong> {pkg.residentAge} tuổi
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Phòng:</strong> {pkg.residentRoom}
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Mã đăng ký:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{pkg.registrationId}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div style={{
+                          background: '#fef3c7',
+                          border: '1px solid #fbbf24',
+                          borderRadius: '1rem',
+                          padding: '0.375rem 0.75rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#92400e'
+                        }}>
+                          CHỜ DUYỆT
+                        </div>
+                      </div>
+
+                      {/* Package Details */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                        gap: '1rem',
+                        marginBottom: '1rem'
+                      }}>
+                        <div style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '0.5rem',
+                          padding: '1rem'
+                        }}>
+                          <h5 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#059669', margin: '0 0 0.5rem 0' }}>
+                            💰 Thông tin thanh toán
+                          </h5>
+                          <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.4 }}>
+                            {pkg.discount > 0 ? (
+                              <>
+                                <p style={{ margin: '0.25rem 0' }}>Giá gốc: {formatCurrency(pkg.price)}</p>
+                                <p style={{ margin: '0.25rem 0', color: '#059669' }}>Giảm giá: -{formatCurrency(pkg.discountAmount)} ({pkg.discount}%)</p>
+                                <p style={{ margin: '0.25rem 0', fontWeight: 600 }}>Thành tiền: {formatCurrency(pkg.finalPrice)}/tháng</p>
+                              </>
+                            ) : (
+                              <p style={{ margin: '0.25rem 0', fontWeight: 600 }}>Chi phí: {formatCurrency(pkg.price)}/tháng</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '0.5rem',
+                          padding: '1rem'
+                        }}>
+                          <h5 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1d4ed8', margin: '0 0 0.5rem 0' }}>
+                            📅 Thông tin thời gian
+                          </h5>
+                          <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.4 }}>
+                            <p style={{ margin: '0.25rem 0' }}>
+                              <strong>Ngày đăng ký:</strong> {new Date(pkg.purchaseDate).toLocaleDateString('vi-VN')}
+                            </p>
+                            {pkg.startDate && (
+                              <p style={{ margin: '0.25rem 0' }}>
+                                <strong>Ngày bắt đầu:</strong> {new Date(pkg.startDate).toLocaleDateString('vi-VN')}
+                              </p>
+                            )}
+                            <p style={{ margin: '0.25rem 0' }}>
+                              <strong>Phương thức:</strong> {pkg.paymentMethod === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Notes */}
+                      {pkg.medicalNotes && (
+                        <div style={{
+                          background: '#fefce8',
+                          border: '1px solid #fde047',
+                          borderRadius: '0.5rem',
+                          padding: '1rem',
+                          marginBottom: '1rem'
+                        }}>
+                          <h5 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#a16207', margin: '0 0 0.5rem 0' }}>
+                            🏥 Ghi chú y tế
+                          </h5>
+                          <p style={{ fontSize: '0.8rem', color: '#374151', margin: 0, lineHeight: 1.4 }}>
+                            {pkg.medicalNotes}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div style={{
+                        display: 'flex',
+                        gap: '0.75rem',
+                        justifyContent: 'flex-end',
+                        paddingTop: '1rem',
+                        borderTop: '1px solid #e5e7eb'
+                      }}>
+                        <button
+                          onClick={() => handleRejectPackage(pkg.registrationId)}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #ef4444',
+                            background: 'white',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#fef2f2';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'white';
+                          }}
+                        >
+                          ❌ Từ chối
+                        </button>
+                        <button
+                          onClick={() => handleApprovePackage(pkg.registrationId)}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(5, 150, 105, 0.4)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(5, 150, 105, 0.3)';
+                          }}
+                        >
+                          ✅ Duyệt
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              background: '#f9fafb',
+              borderRadius: '0 0 1rem 1rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  loadPendingPackages(); // Refresh data when closing
+                }}
+                style={{
+                  background: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
       </div>
     </div>
   );

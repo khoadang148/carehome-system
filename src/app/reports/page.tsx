@@ -13,6 +13,9 @@ import {
   PencilIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { useEffect } from 'react';
 
 // Mock report data
 const reports = [
@@ -71,6 +74,22 @@ const reports = [
 const categories = ['Tất cả', 'Hoạt động', 'Y tế', 'Tài chính', 'Nhân sự'];
 
 export default function ReportsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  
+  // Check access permissions
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('Tất cả');
   

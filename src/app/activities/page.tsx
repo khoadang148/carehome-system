@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   MagnifyingGlassIcon, 
@@ -10,140 +10,106 @@ import {
   UserGroupIcon, 
   CalendarIcon,
   EyeIcon,
-  SparklesIcon
+  SparklesIcon,
+  CalendarDaysIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  MapPinIcon,
+  ListBulletIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { useActivities } from '@/lib/activities-context';
 
-// Mock activity data
-const activities = [
-  { 
-    id: 1, 
-    name: 'Tập thể dục buổi sáng', 
-    description: 'Các bài tập kéo giãn và vận động nhẹ nhàng để cải thiện khả năng vận động',
-    category: 'Thể chất', 
-    location: 'Phòng sinh hoạt chung',
-    scheduledTime: '08:00 AM', 
-    duration: 45,
-    capacity: 20,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
-      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
-      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R'
-    ],
-    facilitator: 'David Wilson',
-    date: '2024-01-15',
-    status: 'Đã lên lịch',
-    notes: 'Cần chuẩn bị thảm tập yoga và nhạc nhẹ nhàng. Kiểm tra sức khỏe của các cư dân trước khi tham gia.',
-    materials: ['Thảm tập yoga', 'Loa phát nhạc', 'Nước uống', 'Khăn nhỏ'],
-    benefits: ['Cải thiện khả năng vận động', 'Tăng cường sức khỏe tim mạch', 'Giảm căng thẳng', 'Cải thiện tâm trạng'],
-    level: 'Dễ',
-    recurring: 'Hàng ngày'
-  },
-  { 
-    id: 2, 
-    name: 'Mỹ thuật & Thủ công', 
-    description: 'Hoạt động vẽ tranh và làm đồ thủ công sáng tạo',
-    category: 'Sáng tạo', 
-    location: 'Phòng hoạt động',
-    scheduledTime: '10:30 AM', 
-    duration: 60,
-    capacity: 15,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
-      'Võ Thị K', 'Phan Văn L'
-    ],
-    facilitator: 'Emily Parker',
-    date: '2024-01-15',
-    status: 'Đang diễn ra',
-    notes: 'Hoạt động phù hợp với tất cả mức độ. Khuyến khích sự sáng tạo và không có áp lực về kết quả.',
-    materials: ['Giấy vẽ', 'Màu nước', 'Cọ vẽ', 'Kéo', 'Keo dán', 'Vải nỉ'],
-    benefits: ['Kích thích sáng tạo', 'Cải thiện khéo léo tay', 'Thư giãn tinh thần', 'Tăng cường tự tin'],
-    level: 'Trung bình',
-    recurring: 'Hàng tuần'
-  },
-  { 
-    id: 3, 
-    name: 'Trị liệu âm nhạc', 
-    description: 'Buổi âm nhạc trị liệu với các hoạt động hát theo và chơi nhạc cụ',
-    category: 'Trị liệu', 
-    location: 'Khu vườn',
-    scheduledTime: '02:00 PM', 
-    duration: 60,
-    capacity: 30,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
-      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
-      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R', 'Nguyễn Thị S', 'Trần Văn T',
-      'Lê Thị U', 'Hoàng Văn V', 'Phạm Thị W', 'Vũ Văn X', 'Đặng Thị Y'
-    ],
-    facilitator: 'Robert Johnson',
-    date: '2024-01-15',
-    status: 'Đã lên lịch',
-    notes: 'Hoạt động ngoài trời tùy thuộc vào thời tiết. Chuẩn bị nhạc cụ đơn giản và mic.',
-    materials: ['Nhạc cụ đơn giản', 'Micro', 'Loa di động', 'Ghế ngồi'],
-    benefits: ['Thư giãn tinh thần', 'Cải thiện trí nhớ', 'Tăng cường giao tiếp xã hội', 'Giảm stress'],
-    level: 'Dễ',
-    recurring: 'Hàng tuần'
-  },
-  { 
-    id: 4, 
-    name: 'Trò chơi trí nhớ', 
-    description: 'Các trò chơi nhận thức để cải thiện trí nhớ và sự nhanh nhạy tinh thần',
-    category: 'Nhận thức', 
-    location: 'Phòng hoạt động',
-    scheduledTime: '11:00 AM', 
-    duration: 45,
-    capacity: 12,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J'
-    ],
-    facilitator: 'Sarah Thompson',
-    date: '2024-01-15',
-    status: 'Đã lên lịch',
-    notes: 'Hoạt động được thiết kế để kích thích trí nhớ và tư duy logic. Phù hợp với người cao tuổi.',
-    materials: ['Thẻ trò chơi', 'Bút viết', 'Giấy ghi chú', 'Đồng hồ bấm giờ'],
-    benefits: ['Cải thiện trí nhớ', 'Kích thích tư duy', 'Tăng cường tập trung', 'Ngăn ngừa suy giảm nhận thức'],
-    level: 'Trung bình',
-    recurring: 'Hai lần mỗi tuần'
-  },
-  { 
-    id: 5, 
-    name: 'Trò chơi buổi tối', 
-    description: 'Các trò chơi bàn và trò chơi bài giao lưu',
-    category: 'Xã hội', 
-    location: 'Phòng giải trí',
-    scheduledTime: '04:00 PM', 
-    duration: 90,
-    capacity: 25,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
-      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
-      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R', 'Nguyễn Thị S', 'Trần Văn T'
-    ],
-    facilitator: 'David Wilson',
-    date: '2024-01-15',
-    status: 'Đang diễn ra',
-    notes: 'Tạo không khí vui vẻ và thân thiện. Khuyến khích tương tác xã hội giữa các cư dân.',
-    materials: ['Bài tây', 'Cờ tướng', 'Cờ vua', 'Domino', 'Bàn và ghế'],
-    benefits: ['Tăng cường giao tiếp', 'Giải trí và thư giãn', 'Kích thích tư duy chiến thuật', 'Xây dựng tình bạn'],
-    level: 'Dễ',
-    recurring: 'Hàng ngày'
-  },
-];
+// Map context data to match component expectations
+const mapActivities = (contextActivities: any[]) => {
+  return contextActivities.map(activity => ({
+    ...activity,
+    category: getCategoryLabel(activity.category),
+    scheduledTime: formatTime(activity.startTime),
+    recurring: getRecurringLabel(activity.recurring)
+  }));
+};
+
+const getCategoryLabel = (categoryId: string) => {
+  const categoryMap: { [key: string]: string } = {
+    'physical': 'Thể chất',
+    'creative': 'Sáng tạo', 
+    'therapy': 'Trị liệu',
+    'cognitive': 'Nhận thức',
+    'social': 'Xã hội',
+    'educational': 'Giáo dục'
+  };
+  return categoryMap[categoryId] || categoryId;
+};
+
+const formatTime = (time: string) => {
+  const [hours, minutes] = time.split(':');
+  const hour24 = parseInt(hours);
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
+const getRecurringLabel = (recurring: string) => {
+  const recurringMap: { [key: string]: string } = {
+    'none': 'Không lặp lại',
+    'daily': 'Hàng ngày',
+    'weekly': 'Hàng tuần', 
+    'biweekly': 'Hai tuần một lần',
+    'monthly': 'Hàng tháng'
+  };
+  return recurringMap[recurring] || recurring;
+};
 
 const categories = ['Tất cả', 'Thể chất', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục'];
 const locations = ['Tất cả', 'Phòng sinh hoạt chung', 'Phòng hoạt động', 'Khu vườn', 'Phòng giải trí', 'Phòng ăn'];
 
 export default function ActivitiesPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { activities: contextActivities } = useActivities();
+  
+  // Map activities from context to match component expectations
+  const activities = mapActivities(contextActivities);
+  
+  // Check access permissions
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!user.role || !['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('Tất cả');
   const [filterLocation, setFilterLocation] = useState('Tất cả');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [selectedWeek, setSelectedWeek] = useState(0);
+  
+  // Get current week's dates
+  const getWeekDates = (weekOffset: number = 0) => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const mondayDate = new Date(today);
+    mondayDate.setDate(today.getDate() - currentDay + 1 + (weekOffset * 7));
+    
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(mondayDate);
+      date.setDate(mondayDate.getDate() + i);
+      weekDates.push(date);
+    }
+    return weekDates;
+  };
+
+  const weekDates = getWeekDates(selectedWeek);
   
   // Filter activities based on search term and filters
   const filteredActivities = activities.filter((activity) => {
@@ -155,6 +121,64 @@ export default function ActivitiesPage() {
     
     return matchesSearch && matchesCategory && matchesLocation;
   });
+
+  // Filter activities for current week when in calendar view
+  const weekActivities = filteredActivities.filter(activity => {
+    if (viewMode === 'list') return true;
+    
+    const activityDate = new Date(activity.date);
+    return weekDates.some(date => 
+      date.toDateString() === activityDate.toDateString()
+    );
+  });
+
+  // Get activities for a specific date
+  const getActivitiesForDate = (date: Date) => {
+    return weekActivities.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return activityDate.toDateString() === date.toDateString();
+    });
+  };
+
+  const getDayLabel = (date: Date) => {
+    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    return days[date.getDay()];
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    setSelectedWeek(prev => direction === 'next' ? prev + 1 : prev - 1);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Đã hoàn thành':
+        return { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
+      case 'Đang diễn ra':
+        return { bg: '#dbeafe', text: '#1d4ed8', border: '#bfdbfe' };
+      case 'Đã lên lịch':
+        return { bg: '#fef3c7', text: '#d97706', border: '#fde68a' };
+      case 'Đã hủy':
+        return { bg: '#fee2e2', text: '#dc2626', border: '#fecaca' };
+      default:
+        return { bg: '#f3f4f6', text: '#6b7280', border: '#e5e7eb' };
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'Thể chất': return '#10b981';
+      case 'Sáng tạo': return '#8b5cf6';
+      case 'Trị liệu': return '#ec4899';
+      case 'Nhận thức': return '#3b82f6';
+      case 'Xã hội': return '#f59e0b';
+      default: return '#6b7280';
+    }
+  };
   
   // Handler functions for button actions
   const handleViewActivity = (activityId: number) => {
@@ -172,24 +196,9 @@ export default function ActivitiesPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
+      position: 'relative',
+      zIndex: 1
     }}>
-      {/* Background decorations */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(16, 185, 129, 0.03) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none'
-      }} />
-      
       <div style={{
         maxWidth: '1400px', 
         margin: '0 auto', 
@@ -197,7 +206,7 @@ export default function ActivitiesPage() {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Header Section */}
+        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -214,7 +223,7 @@ export default function ActivitiesPage() {
             flexWrap: 'wrap',
             gap: '1rem'
           }}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{
                 width: '3.5rem',
                 height: '3.5rem',
@@ -225,11 +234,11 @@ export default function ActivitiesPage() {
                 justifyContent: 'center',
                 boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
               }}>
-                <SparklesIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+                <SparklesIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
               </div>
               <div>
                 <h1 style={{
-                  fontSize: '2rem', 
+                  fontSize: 'clamp(1.4rem, 3vw, 2rem)',
                   fontWeight: 700, 
                   margin: 0,
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -237,7 +246,7 @@ export default function ActivitiesPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Quản lý hoạt động
+                  Quản lý Chương trình sinh hoạt
                 </h1>
                 <p style={{
                   fontSize: '1rem',
@@ -245,55 +254,93 @@ export default function ActivitiesPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {activities.length} hoạt động
+                  Tổng số: {filteredActivities.length} chương trình
                 </p>
+                {viewMode === 'calendar' && (
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#94a3b8',
+                    margin: '0.5rem 0 0 0',
+                    fontWeight: 500
+                  }}>
+                    Hôm nay: {new Date().toLocaleDateString('vi-VN', { 
+                      weekday: 'long', 
+                      day: '2-digit', 
+                      month: '2-digit', 
+                      year: 'numeric' 
+                    })}
+                  </p>
+                )}
               </div>
             </div>
             
-            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
-          <Link 
-            href="/activities/calendar" 
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* View Mode Toggle */}
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                borderRadius: '0.75rem',
+                padding: '0.25rem',
+                border: '1px solid #e2e8f0'
+              }}>
+                <button
+                  onClick={() => setViewMode('list')}
             style={{
-              display: 'inline-flex',
+                    display: 'flex',
               alignItems: 'center',
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-              textDecoration: 'none',
+                    gap: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: viewMode === 'list' ? '#8b5cf6' : 'transparent',
+                    color: viewMode === 'list' ? 'white' : '#64748b',
+                    fontSize: '0.875rem',
                   fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <ListBulletIcon style={{ width: '1rem', height: '1rem' }} />
+                  Danh sách
+                </button>
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: viewMode === 'calendar' ? '#3b82f6' : 'transparent',
+                    color: viewMode === 'calendar' ? 'white' : '#64748b',
                   fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-                  transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(139, 92, 246, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-                }}
-              >
-                <CalendarIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <CalendarDaysIcon style={{ width: '1rem', height: '1rem' }} />
             Lịch hoạt động
-          </Link>
-          <Link 
-            href="/activities/new" 
+                </button>
+              </div>
+
+              <button
+                onClick={handleCreateActivity}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
+                  gap: '0.5rem',
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
               color: 'white',
                   padding: '0.875rem 1.5rem',
                   borderRadius: '0.75rem',
-              textDecoration: 'none',
+                  border: 'none',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
                   transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  cursor: 'pointer'
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -304,150 +351,307 @@ export default function ActivitiesPage() {
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
                 }}
               >
-                <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
+                <PlusCircleIcon style={{ width: '1.125rem', height: '1.125rem' }} />
             Thêm hoạt động
-          </Link>
+              </button>
             </div>
         </div>
       </div>
       
-        {/* Filters Card */}
+        {/* Filters */}
         <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          background: 'white',
           borderRadius: '1rem',
           padding: '1.5rem',
-          marginBottom: '1.5rem',
+          marginBottom: '2rem',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{
-            display: 'flex',
-            flexWrap: 'wrap', 
-            alignItems: 'center', 
-            gap: '1.5rem'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '1rem',
+            alignItems: 'end'
           }}>
-            <div style={{flex: '1', minWidth: '20rem'}}>
-              <div style={{position: 'relative'}}>
-                <div style={{
-                  position: 'absolute', 
-                  top: 0, 
-                  bottom: 0, 
-                  left: '1rem', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  pointerEvents: 'none'
-                }}>
-                  <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
-              </div>
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}>
+                Tìm kiếm chương trình
+              </label>
+              <div style={{ position: 'relative' }}>
+                <MagnifyingGlassIcon style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '1rem',
+                  height: '1rem',
+                  color: '#9ca3af'
+                }} />
               <input
                 type="text"
-                placeholder="Tìm kiếm hoạt động..."
+                  placeholder="Tìm kiếm chương trình..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
-                    paddingLeft: '2.75rem',
+                    paddingLeft: '2.5rem',
                     paddingRight: '1rem',
                     paddingTop: '0.75rem',
                     paddingBottom: '0.75rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '0.875rem',
-                    background: 'white',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#f59e0b';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                    borderRadius: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.875rem'
                   }}
                 />
               </div>
             </div>
           
-            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                background: 'rgba(245, 158, 11, 0.1)',
-                borderRadius: '0.5rem'
-              }}>
-                <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#f59e0b'}} />
-                <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#f59e0b'}}>
-                  Lọc
-                </span>
-              </div>
+            <div>
+                <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '0.5rem'
+                }}>
+                  Danh mục
+                </label>
                 <select
-                  style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                  fontWeight: 500,
-                  minWidth: '12rem',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.2s ease'
-                  }}
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#f59e0b';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem'
                 }}
                 >
                   {categories.map((category) => (
-                  <option key={category} value={category}>{category}</option>
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
                   ))}
                 </select>
+              </div>
+              
+            <div>
+                <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '0.5rem'
+                }}>
+                  Địa điểm
+                </label>
                 <select
+                value={filterLocation}
+                onChange={(e) => setFilterLocation(e.target.value)}
                   style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                  fontWeight: 500,
-                  minWidth: '10rem',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.2s ease'
-                  }}
-                  value={filterLocation}
-                  onChange={(e) => setFilterLocation(e.target.value)}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#f59e0b';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem'
                 }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                }}
-                >
-                  {locations.map((location) => (
-                  <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
+              >
+                {locations.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
+
+        {/* Calendar View Week Navigation */}
+        {viewMode === 'calendar' && (
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
+            }}>
+              <button
+                onClick={() => navigateWeek('prev')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ChevronLeftIcon style={{ width: '1rem', height: '1rem' }} />
+                Tuần trước
+              </button>
+
+              <div style={{ textAlign: 'center' }}>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 0.25rem 0'
+                }}>
+                  {selectedWeek === 0 && 'Tuần này'}
+                  {selectedWeek === 1 && 'Tuần sau'}
+                  {selectedWeek === -1 && 'Tuần trước'}
+                  {Math.abs(selectedWeek) > 1 && `${selectedWeek > 0 ? '+' : ''}${selectedWeek} tuần`}
+                </h2>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: 0,
+                  fontWeight: 500
+                }}>
+                  {weekDates[0].toLocaleDateString('vi-VN')} - {weekDates[6].toLocaleDateString('vi-VN')}
+                </p>
+              </div>
+
+              <button
+                onClick={() => navigateWeek('next')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                  }}
+              >
+                Tuần sau
+                <ChevronRightIcon style={{ width: '1rem', height: '1rem' }} />
+              </button>
+            </div>
+
+            {/* Week Calendar */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: '1rem'
+            }}>
+              {weekDates.map((date, index) => {
+                const dayActivities = getActivitiesForDate(date);
+                const today = isToday(date);
+
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      background: today ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#f8fafc',
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      border: today ? 'none' : '1px solid #e2e8f0',
+                      color: today ? 'white' : '#374151',
+                      minHeight: '140px'
+                    }}
+                  >
+                    <div style={{
+                      textAlign: 'center',
+                      marginBottom: '0.75rem'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        opacity: today ? 1 : 0.7,
+                        marginBottom: '0.25rem'
+                      }}>
+                        {getDayLabel(date)}
+                      </div>
+                      <div style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 700
+                      }}>
+                        {date.getDate()}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      {dayActivities.slice(0, 3).map((activity, activityIndex) => (
+                        <div
+                          key={activityIndex}
+                          style={{
+                            background: today ? 'rgba(255, 255, 255, 0.2)' : getCategoryColor(activity.category),
+                            color: today ? 'white' : 'white',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.25rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            textAlign: 'center',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => handleViewActivity(activity.id)}
+                        >
+                          {activity.name}
+                        </div>
+                      ))}
+                      {dayActivities.length > 3 && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          textAlign: 'center',
+                          opacity: 0.7,
+                          marginTop: '0.25rem'
+                        }}>
+                          +{dayActivities.length - 3} khác
+              </div>
+                      )}
+            </div>
+          </div>
+                );
+              })}
+        </div>
+          </div>
+        )}
         
-        {/* Activities Grid */}
+        {/* Activities List */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+          gridTemplateColumns: viewMode === 'calendar' ? 
+            'repeat(auto-fit, minmax(350px, 1fr))' : 
+            'repeat(auto-fit, minmax(400px, 1fr))',
           gap: '1.5rem'
         }}>
-              {filteredActivities.map((activity) => (
+          {(viewMode === 'calendar' ? weekActivities : filteredActivities)
+            .sort((a, b) => {
+              if (viewMode === 'calendar') {
+                return new Date(a.date).getTime() - new Date(b.date).getTime();
+              }
+              return a.startTime.localeCompare(b.startTime);
+            })
+            .map((activity) => {
+              const statusColor = getStatusColor(activity.status);
+              const categoryColor = getCategoryColor(activity.category);
+
+              return (
             <div
               key={activity.id}
               style={{
@@ -467,259 +671,259 @@ export default function ActivitiesPage() {
                 e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
               }}
             >
-              {/* Activity Header */}
+                  {/* Header */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
                 marginBottom: '1rem'
               }}>
-                <div>
+                    <div style={{ flex: 1 }}>
                   <h3 style={{
                     fontSize: '1.125rem',
                     fontWeight: 600,
                     color: '#111827',
-                    margin: 0,
-                    marginBottom: '0.25rem'
-                  }}>
+                        margin: '0 0 0.25rem 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <div style={{
+                          width: '0.75rem',
+                          height: '0.75rem',
+                          borderRadius: '50%',
+                          background: categoryColor
+                        }} />
                     {activity.name}
                   </h3>
-                    <span style={{
-                      display: 'inline-flex', 
-                      padding: '0.25rem 0.75rem', 
-                      fontSize: '0.75rem', 
-                    fontWeight: 600, 
-                      borderRadius: '9999px',
-                    background: 
-                      activity.category === 'Thể chất' ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 
-                      activity.category === 'Sáng tạo' ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : 
-                      activity.category === 'Trị liệu' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' :
-                      activity.category === 'Nhận thức' ? 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)' :
-                      'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                      color: 
-                      activity.category === 'Thể chất' ? '#dc2626' : 
-                      activity.category === 'Sáng tạo' ? '#1d4ed8' : 
-                        activity.category === 'Trị liệu' ? '#166534' :
-                      activity.category === 'Nhận thức' ? '#7c3aed' :
-                      '#d97706',
-                    border: '1px solid',
-                    borderColor:
-                      activity.category === 'Thể chất' ? '#fca5a5' : 
-                      activity.category === 'Sáng tạo' ? '#93c5fd' : 
-                      activity.category === 'Trị liệu' ? '#86efac' :
-                      activity.category === 'Nhận thức' ? '#c4b5fd' :
-                      '#fbbf24'
-                  }}>
-                    {activity.category}
-                  </span>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        margin: 0,
+                        lineHeight: 1.4
+                      }}>
+                        {activity.description}
+                      </p>
                 </div>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  fontWeight: 500
-                }}>
-                  <UserGroupIcon style={{width: '1rem', height: '1rem'}} />
-                  {activity.participants?.length || 0}/{activity.capacity}
+                      gap: '0.25rem',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      background: statusColor.bg,
+                      color: statusColor.text,
+                      border: `1px solid ${statusColor.border}`,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {activity.status}
                 </div>
               </div>
 
-              {/* Activity Details */}
-              <div style={{marginBottom: '1rem'}}>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#374151',
-                  lineHeight: '1.5',
-                  margin: '0 0 1rem 0'
-                }}>
-                  {activity.description}
-                </p>
-                
+                  {/* Date, Time & Location */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '0.75rem',
-                  marginBottom: '0.75rem'
+                    gridTemplateColumns: viewMode === 'calendar' ? '1fr' : '1fr 1fr',
+                    gap: '1rem',
+                  marginBottom: '1rem'
                 }}>
-                  <div>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      color: '#6b7280',
-                      fontWeight: 500,
-                      display: 'block'
-                    }}>
-                      Thời gian
-                    </span>
-                    <span style={{
+                    {viewMode === 'calendar' && (
+                      <div style={{
+                        display: 'flex',
+                      alignItems: 'center',
+                        gap: '0.5rem',
                       fontSize: '0.875rem',
-                      color: '#111827',
-                      fontWeight: 600
+                        color: '#6b7280'
                     }}>
-                      {activity.scheduledTime}
-                    </span>
-                      </div>
-                  <div>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      color: '#6b7280',
-                      fontWeight: 500,
-                      display: 'block'
-                    }}>
-                      Thời lượng
-                    </span>
-                    <span style={{
+                        <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                        <span>{new Date(activity.date).toLocaleDateString('vi-VN')}</span>
+                  </div>
+                    )}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
                       fontSize: '0.875rem',
-                      color: '#111827',
-                      fontWeight: 600
+                      color: '#6b7280'
                     }}>
-                      {activity.duration} phút
-                    </span>
-                      </div>
-                    </div>
-                
+                      <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                      <span>{activity.startTime} - {activity.endTime} ({activity.duration} phút)</span>
+                  </div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                      color: '#6b7280'
+                    }}>
+                      <MapPinIcon style={{ width: '1rem', height: '1rem' }} />
+                      <span>{activity.location}</span>
+                  </div>
+                </div>
+
+                  {/* Category & Participants */}
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '0.75rem'
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  marginBottom: '1rem'
                 }}>
-                  <div>
                     <span style={{
+                      background: `${categoryColor}20`,
+                      color: categoryColor,
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
                       fontSize: '0.75rem',
-                      color: '#6b7280',
-                      fontWeight: 500,
-                      display: 'block'
-                    }}>
-                      Địa điểm
-                    </span>
-                    <span style={{
-                      fontSize: '0.875rem',
-                      color: '#111827',
                       fontWeight: 600
                     }}>
-                      {activity.location}
+                      {activity.category}
                     </span>
-                  </div>
-                  <div>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      color: '#6b7280',
-                      fontWeight: 500,
-                      display: 'block'
-                    }}>
-                      Hướng dẫn viên
-                    </span>
-                    <span style={{
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
                       fontSize: '0.875rem',
-                      color: '#111827',
-                      fontWeight: 600
+                      color: '#6b7280'
                     }}>
-                      {activity.facilitator}
-                    </span>
+                      <UserGroupIcon style={{ width: '1rem', height: '1rem' }} />
+                      <span>{activity.participants}/{activity.capacity}</span>
                   </div>
-                    </div>
+                  </div>
+
+                  {/* Facilitator */}
+                  <div style={{
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    borderRadius: '0.5rem',
+                    padding: '0.75rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <strong>Hướng dẫn viên:</strong> {activity.facilitator}
+                    </p>
         </div>
 
               {/* Actions */}
               <div style={{
                 display: 'flex',
-                justifyContent: 'flex-end',
                 gap: '0.5rem',
-                paddingTop: '1rem',
-                borderTop: '1px solid #f1f5f9'
+                    justifyContent: 'flex-end'
               }}>
                 <button
                   onClick={() => handleViewActivity(activity.id)}
                   style={{
-                    padding: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        padding: '0.5rem 1rem',
                     borderRadius: '0.5rem',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    color: 'white',
+                        border: '1px solid #d1d5db',
+                        background: 'white',
+                        color: '#374151',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
-                  }}
-                  title="Xem chi tiết hoạt động"
-                >
-                  <EyeIcon style={{width: '1rem', height: '1rem'}} />
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <EyeIcon style={{ width: '1rem', height: '1rem' }} />
+                      Xem chi tiết
                 </button>
+                    {['admin', 'staff'].includes(user?.role || '') && (
                 <button
                   onClick={() => handleEditActivity(activity.id)}
                   style={{
-                    padding: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.5rem 1rem',
                     borderRadius: '0.5rem',
                     border: 'none',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                     color: 'white',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
-                  }}
-                  title="Chỉnh sửa hoạt động"
-                >
-                  <PencilIcon style={{width: '1rem', height: '1rem'}} />
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                        Chỉnh sửa
                 </button>
+                    )}
               </div>
             </div>
-          ))}
+              );
+            })}
+        </div>
         
-        {filteredActivities.length === 0 && (
+        {(viewMode === 'calendar' ? weekActivities : filteredActivities).length === 0 && (
             <div style={{
-              gridColumn: '1 / -1',
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            background: 'white',
               borderRadius: '1rem',
               padding: '3rem',
               textAlign: 'center',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '1rem'
-              }}>
-                <SparklesIcon style={{width: '3rem', height: '3rem', color: '#d1d5db'}} />
-                <div>
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <SparklesIcon style={{
+              width: '4rem',
+              height: '4rem',
+              color: '#d1d5db',
+              margin: '0 auto 1rem'
+            }} />
                   <h3 style={{
                     fontSize: '1.125rem',
                     fontWeight: 600,
-                    color: '#6b7280',
-                    margin: 0,
+              color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Không tìm thấy hoạt động nào
+              {viewMode === 'calendar' 
+                ? 'Không có hoạt động nào trong tuần này'
+                : 'Không tìm thấy hoạt động nào'
+              }
                   </h3>
                   <p style={{
                     fontSize: '0.875rem',
-                    color: '#9ca3af',
-                    margin: 0
-                  }}>
-                    Thử điều chỉnh bộ lọc hoặc tìm kiếm khác
-                  </p>
-                </div>
-              </div>
+              color: '#6b7280',
+              marginBottom: '1rem'
+            }}>
+              {viewMode === 'calendar' 
+                ? 'Thử chuyển sang tuần khác hoặc tạo hoạt động mới'
+                : 'Thử thay đổi bộ lọc hoặc tạo hoạt động mới'
+              }
+            </p>
+            <button
+              onClick={handleCreateActivity}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              <PlusCircleIcon style={{ width: '1rem', height: '1rem' }} />
+              {viewMode === 'calendar' 
+                ? 'Tạo hoạt động cho tuần này'
+                : 'Tạo hoạt động đầu tiên'
+              }
+            </button>
           </div>
         )}
-        </div>
       </div>
     </div>
   );

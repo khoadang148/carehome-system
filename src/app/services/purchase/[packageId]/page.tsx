@@ -58,7 +58,7 @@ const carePackages = [
   }
 ];
 
-export default function PurchaseServicePage({ params }: { params: Promise<{ packageId: string }> }) {
+export default function PurchaseServicePage({ params }: { params: { packageId: string } }) {
   const router = useRouter();
   const { user } = useAuth();
   const [selectedResident, setSelectedResident] = useState('');
@@ -69,6 +69,20 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   // Advanced business logic states
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Hide header when modals are open
+  useEffect(() => {
+    if (showConfirmation || showSuccessModal) {
+      document.body.classList.add('hide-header');
+    } else {
+      document.body.classList.remove('hide-header');
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove('hide-header');
+    };
+  }, [showConfirmation, showSuccessModal]);
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [emergencyContact, setEmergencyContact] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
@@ -80,9 +94,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [registrationData, setRegistrationData] = useState<any>(null);
 
-  // Unwrap the params Promise using React.use()
-  const unwrappedParams = React.use(params);
-  const packageId = unwrappedParams.packageId;
+  // Get packageId from params directly
+  const packageId = params.packageId;
 
   // Debug logging
   console.log('Package ID from URL:', packageId);
@@ -968,37 +981,16 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
             border: '1px solid rgba(255, 255, 255, 0.2)'
           }}>
             {/* Header */}
-            <div style={{
-              textAlign: 'center',
-              marginBottom: '2rem'
-            }}>
-              <div style={{
-                width: '4rem',
-                height: '4rem',
-                background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 1rem',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-              }}>
-                <svg style={{ width: '2rem', height: '2rem', color: 'white' }} fill="currentColor" viewBox="0 0 20 20">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl">
+                <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </div>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 700,
-                color: '#111827',
-                margin: '0 0 0.5rem 0'
-              }}>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Xác nhận đăng ký dịch vụ
               </h2>
-              <p style={{
-                color: '#6B7280',
-                fontSize: '1rem'
-              }}>
+              <p className="text-gray-600">
                 Vui lòng kiểm tra thông tin trước khi hoàn tất đăng ký
               </p>
             </div>
@@ -1006,72 +998,84 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
             {/* Registration Form */}
             <div style={{ marginBottom: '2rem' }}>
               {/* Service Summary */}
-              <div style={{
-                background: 'rgba(59, 130, 246, 0.05)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                marginBottom: '1.5rem'
-              }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827', margin: '0 0 1rem 0' }}>
-                  📋 Thông tin gói dịch vụ
+              <div className="bg-gradient-to-r from-gray-50 to-blue-50 border border-blue-200 rounded-2xl p-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  Thông tin gói dịch vụ
                 </h3>
-                                 <div style={{ fontSize: '0.95rem', color: '#374151', lineHeight: 1.6 }}>
-                   <p style={{ margin: '0.5rem 0' }}><strong>Gói dịch vụ:</strong> {selectedPackage?.name}</p>
+                                 <div className="text-sm text-gray-700">
+                   <div className="flex justify-between items-center py-2 mb-4">
+                     <span className="font-medium text-gray-600">Gói dịch vụ:</span>
+                     <span className="font-semibold text-gray-900">{selectedPackage?.name}</span>
+                   </div>
                    
                    {/* Detailed beneficiary information */}
-                   <div style={{
-                     background: 'rgba(59, 130, 246, 0.05)',
-                     border: '1px solid rgba(59, 130, 246, 0.15)',
-                     borderRadius: '8px',
-                     padding: '1rem',
-                     margin: '1rem 0'
-                   }}>
-                     <h4 style={{ 
-                       fontSize: '1rem', 
-                       fontWeight: 600, 
-                       color: '#1e40af', 
-                       margin: '0 0 0.75rem 0',
-                       display: 'flex',
-                       alignItems: 'center',
-                       gap: '0.5rem'
-                     }}>
-                       👤 Thông tin người thụ hưởng
+                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 mb-4">
+                     <h4 className="text-base font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                       <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center">
+                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                         </svg>
+                       </div>
+                       Thông tin người thụ hưởng
                      </h4>
-                     {(() => {
-                       const beneficiary = familyResidents.find(m => m.id.toString() === selectedResident);
-                       return beneficiary ? (
-                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                           <div>
-                             <span style={{ fontWeight: 600, color: '#374151' }}>👨‍👩‍👧‍👦 Họ và tên:</span>
-                             <br />
-                             <span style={{ color: '#1e40af', fontWeight: 500 }}>{beneficiary.name}</span>
-                           </div>
-                           <div>
-                             <span style={{ fontWeight: 600, color: '#374151' }}>🎂 Tuổi:</span>
-                             <br />
-                             <span>{beneficiary.age} tuổi</span>
-                           </div>
-                           <div>
-                             <span style={{ fontWeight: 600, color: '#374151' }}>🏠 Phòng:</span>
-                             <br />
-                             <span>{beneficiary.room}</span>
-                           </div>
-                           <div>
-                             <span style={{ fontWeight: 600, color: '#374151' }}>👥 Mối quan hệ:</span>
-                             <br />
-                             <span>{beneficiary.relationship}</span>
-                           </div>
-                           <div>
-                             <span style={{ fontWeight: 600, color: '#374151' }}>🏥 Tình trạng sức khỏe:</span>
-                             <br />
-                             <span style={{ 
-                               color: beneficiary.condition === 'Tốt' ? '#059669' : '#f59e0b',
-                               fontWeight: 500
-                             }}>
-                               {beneficiary.condition || 'Ổn định'}
-                             </span>
-                           </div>
+                                            {(() => {
+                         const beneficiary = familyResidents.find(m => m.id.toString() === selectedResident);
+                         return beneficiary ? (
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="bg-white rounded-lg p-3 border border-blue-100">
+                               <div className="flex items-center gap-2 mb-1">
+                                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                 </svg>
+                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Họ và tên</span>
+                               </div>
+                               <span className="text-sm font-semibold text-blue-700">{beneficiary.name}</span>
+                             </div>
+                             <div className="bg-white rounded-lg p-3 border border-blue-100">
+                               <div className="flex items-center gap-2 mb-1">
+                                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                 </svg>
+                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tuổi</span>
+                               </div>
+                               <span className="text-sm font-semibold text-gray-900">{beneficiary.age} tuổi</span>
+                             </div>
+                             <div className="bg-white rounded-lg p-3 border border-blue-100">
+                               <div className="flex items-center gap-2 mb-1">
+                                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                 </svg>
+                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phòng</span>
+                               </div>
+                               <span className="text-sm font-semibold text-gray-900">{beneficiary.room}</span>
+                             </div>
+                             <div className="bg-white rounded-lg p-3 border border-blue-100">
+                               <div className="flex items-center gap-2 mb-1">
+                                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-1H21m0 0l-3 3m3-3l-3-3" />
+                                 </svg>
+                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Mối quan hệ</span>
+                               </div>
+                               <span className="text-sm font-semibold text-gray-900">{beneficiary.relationship}</span>
+                             </div>
+                             <div className="bg-white rounded-lg p-3 border border-blue-100 md:col-span-2">
+                               <div className="flex items-center gap-2 mb-1">
+                                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                 </svg>
+                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tình trạng sức khỏe</span>
+                               </div>
+                               <span className={`text-sm font-semibold ${
+                                 beneficiary.condition === 'Tốt' ? 'text-green-600' : 'text-yellow-600'
+                               }`}>
+                                 {beneficiary.condition || 'Tốt'}
+                               </span>
+                             </div>
                            {beneficiary.age >= 80 && (
                              <div style={{ gridColumn: '1 / -1' }}>
                                <div style={{
@@ -1092,35 +1096,75 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                    </div>
                    
                    {/* Pricing information */}
-                   <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
-                     <p style={{ margin: '0.5rem 0' }}>
-                       <strong>💰 Giá gốc:</strong> {selectedPackage?.price.toLocaleString('vi-VN')} VNĐ/tháng
-                     </p>
-                     {discountApplied > 0 && (
-                       <p style={{ margin: '0.5rem 0', color: '#059669' }}>
-                         <strong>🎁 Tổng giảm giá:</strong> {discountApplied}% (-{((selectedPackage?.price || 0) * discountApplied / 100).toLocaleString('vi-VN')} VNĐ)
-                         <br />
-                         <small style={{ fontSize: '0.8rem', opacity: 0.8 }}>
-                           {familyResidents.length > 1 && "• Giảm 10% do có nhiều thành viên"}<br />
-                           {(() => {
+                   <div className="border-t border-gray-200 pt-4 mt-4">
+                     <div className="space-y-3">
+                       <div className="flex justify-between items-center">
+                         <div className="flex items-center gap-2">
+                           <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                           </svg>
+                           <span className="font-medium text-gray-700">Giá gốc:</span>
+                         </div>
+                         <span className="font-semibold text-gray-900">{selectedPackage?.price.toLocaleString('vi-VN')} VND/tháng</span>
+                       </div>
+                       
+                       {discountApplied > 0 && (
+                         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                           <div className="flex justify-between items-center mb-2">
+                             <div className="flex items-center gap-2">
+                               <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                               </svg>
+                               <span className="font-medium text-green-700">Tổng giảm giá: {discountApplied}%</span>
+                             </div>
+                             <span className="font-semibold text-red-600">(-{((selectedPackage?.price || 0) * discountApplied / 100).toLocaleString('vi-VN')} VND)</span>
+                           </div>
+                           {(familyResidents.length > 1 || (() => {
                              if (startDate) {
                                const selectedDate = new Date(startDate);
                                const thirtyDaysFromNow = new Date();
                                thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-                               if (selectedDate > thirtyDaysFromNow) return "• Giảm 5% do đăng ký sớm";
+                               return selectedDate > thirtyDaysFromNow;
                              }
-                             return "";
-                           })()}<br />
-                           {(() => {
+                             return false;
+                           })() || (() => {
                              const beneficiary = familyResidents.find(m => m.id.toString() === selectedResident);
-                             return beneficiary?.age >= 80 ? "• Giảm 5% do trên 80 tuổi" : "";
-                           })()}
-                         </small>
-                       </p>
-                     )}
-                     <p style={{ margin: '0.5rem 0', fontSize: '1.1rem', fontWeight: 600, color: '#059669' }}>
-                       <strong>💳 Tổng thanh toán:</strong> {((selectedPackage?.price || 0) * (100 - discountApplied) / 100).toLocaleString('vi-VN')} VNĐ/tháng
-                     </p>
+                             return beneficiary?.age >= 80;
+                           })()) && (
+                             <div className="text-xs text-green-600 space-y-1">
+                               {familyResidents.length > 1 && <div>• Giảm 10% do có nhiều thành viên</div>}
+                               {(() => {
+                                 if (startDate) {
+                                   const selectedDate = new Date(startDate);
+                                   const thirtyDaysFromNow = new Date();
+                                   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+                                   if (selectedDate > thirtyDaysFromNow) return <div>• Giảm 5% do đăng ký sớm</div>;
+                                 }
+                                 return null;
+                               })()}
+                               {(() => {
+                                 const beneficiary = familyResidents.find(m => m.id.toString() === selectedResident);
+                                 return beneficiary?.age >= 80 ? <div>• Giảm 5% do trên 80 tuổi</div> : null;
+                               })()}
+                             </div>
+                           )}
+                         </div>
+                       )}
+                       
+                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                         <div className="flex justify-between items-center">
+                           <div className="flex items-center gap-2">
+                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                             </svg>
+                             <span className="text-lg font-bold text-blue-900">Tổng thanh toán:</span>
+                           </div>
+                           <span className="text-xl font-bold text-blue-600">
+                             {((selectedPackage?.price || 0) * (100 - discountApplied) / 100).toLocaleString('vi-VN')} VND/tháng
+                           </span>
+                         </div>
+                       </div>
+                     </div>
                    </div>
                  </div>
               </div>
@@ -1252,36 +1296,21 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+            <div className="flex gap-4 justify-end pt-6 border-t border-gray-200">
               <button
                 onClick={() => setShowConfirmation(false)}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  fontSize: '0.875rem'
-                }}
+                className="px-6 py-3 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
               >
                 Hủy bỏ
               </button>
               <button
                 onClick={handlePurchase}
                 disabled={loading}
-                style={{
-                  background: loading ? '#9CA3AF' : 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 2rem',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: loading ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.3)'
-                }}
+                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                  loading 
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                }`}
               >
                 {loading ? 'Đang xử lý...' : 'Xác nhận đăng ký'}
               </button>

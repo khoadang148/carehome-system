@@ -6,9 +6,6 @@ const nextConfig = {
   images: {
     domains: ['fonts.gstatic.com'],
   },
-  experimental: {
-    optimizeFonts: true,
-  }
 };
 
-export default nextConfig;
+module.exports = nextConfig;
