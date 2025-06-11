@@ -303,6 +303,11 @@ export default function FamilyPortalPage() {
     'Quản lý ca - Vũ Thị Mai'
   ];
 
+  const residentMembers = [
+    'Nguyễn Văn Nam - Cha',
+    ' Lê Thị Hoa - Mẹ'
+  ];
+
   useEffect(() => {
     // Load uploaded photos from localStorage and combine with mock photos
     try {
@@ -1053,6 +1058,9 @@ export default function FamilyPortalPage() {
         </div>
       </div>
 
+
+
+
       {/* Contact Staff Modal */}
       {showContactModal && (
         <div style={{
@@ -1136,6 +1144,58 @@ export default function FamilyPortalPage() {
                 <XMarkIcon style={{width: '1.25rem', height: '1.25rem'}} />
               </button>
             </div>
+
+
+
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{
+                display: 'flex', 
+                fontSize: '0.875rem', 
+                fontWeight: 600, 
+                color: '#374151', 
+                marginBottom: '0.75rem',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <UsersIcon style={{width: '1rem', height: '1rem', color: '#ef4444'}} />
+                Chọn người thân
+              </label>
+              <select
+                value={selectedStaff}
+                onChange={(e) => setSelectedStaff(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.875rem',
+                  background: 'white',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#ef4444';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                <option value="">Chọn người thân của bạn...</option>
+                {residentMembers.map((resident, index) => (
+                  <option key={index} value={resident}>{resident}</option>
+                ))}
+              </select>
+              <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
+                💡 Chọn người thân để trao đổi về vấn đề sức khỏe....
+              </p>
+            </div>
+
+
+
+
+
             
             {/* Form Content */}
             <div style={{marginBottom: '1.5rem'}}>
