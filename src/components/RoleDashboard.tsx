@@ -41,36 +41,13 @@ const ROLE_DASHBOARDS = {
       },
       {
         title: 'Đội ngũ chăm sóc',
-        description: 'Thông tin và lịch làm việc',
+        description: 'Thông tin và hồ sơ nhân viên',
         icon: UserGroupIcon,
         href: '/staff',
         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         stats: '28 thành viên'
       },
-      {
-        title: 'Trợ lý thông minh',
-        description: 'Gợi ý chương trình sinh hoạt',
-        icon: SparklesIcon,
-        href: '/ai-recommendations',
-        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-        stats: 'Mới cập nhật'
-      },
-      {
-        title: 'Quản lý kho',
-        description: 'Vật tư, thuốc và thiết bị',
-        icon: CubeIcon,
-        href: '/inventory',
-        gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-        stats: '234 vật tư'
-      },
-      {
-        title: 'Tuân thủ quy định',
-        description: 'Giám sát và báo cáo',
-        icon: ShieldCheckIcon,
-        href: '/compliance',
-        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        stats: '92% tuân thủ'
-      },
+    
       {
         title: 'Báo cáo tài chính',
         description: 'Quản lý thu chi và doanh thu',
@@ -108,22 +85,6 @@ const ROLE_DASHBOARDS = {
         href: '/ai-recommendations',
         gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
         stats: '5 gợi ý mới'
-      },
-      {
-        title: 'Chăm sóc sức khỏe',
-        description: 'Cập nhật tình trạng sức khỏe',
-        icon: HeartIcon,
-        href: '/medical',
-        gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-        stats: '2 cần theo dõi'
-      },
-      {
-        title: 'Lịch làm việc',
-        description: 'Xem lịch trình cá nhân',
-        icon: CalendarDaysIcon,
-        href: '/reports/shift',
-        gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        stats: 'Tuần này'
       }
     ]
   },
@@ -268,9 +229,9 @@ export default function RoleDashboard() {
         </div>
 
         {/* Staff Widgets - Moved to top */}
-        {user.role === 'staff' && (
+        {/* {user.role === 'staff' && (
           <StaffDashboardWidgets />
-        )}
+        )} */}
 
         {/* Family Widgets */}
         {user.role === 'family' && (
@@ -374,62 +335,7 @@ export default function RoleDashboard() {
           ))}
         </div>
 
-        {/* Quick Stats for Admin */}
-        {user.role === 'admin' && (
-          <div style={{
-            marginTop: '2rem',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h2 style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              margin: '0 0 1.5rem 0',
-              color: '#1e293b'
-            }}>
-              Tổng quan hệ thống
-            </h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem'
-            }}>
-              {[
-                { label: 'Tổng cư dân', value: '45', color: '#3b82f6' },
-                { label: 'Nhân viên hoạt động', value: '28', color: '#10b981' },
-                { label: 'Hoạt động hôm nay', value: '12', color: '#f59e0b' },
-                { label: 'Doanh thu tháng', value: '450M', color: '#ef4444' }
-              ].map((stat, index) => (
-                <div key={index} style={{
-                  padding: '1.5rem',
-                  background: `linear-gradient(135deg, ${stat.color}10 0%, ${stat.color}05 100%)`,
-                  borderRadius: '1rem',
-                  border: `1px solid ${stat.color}20`,
-                  textAlign: 'center'
-                }}>
-                  <div style={{
-                    fontSize: '2rem',
-                    fontWeight: 700,
-                    color: stat.color,
-                    marginBottom: '0.5rem'
-                  }}>
-                    {stat.value}
-                  </div>
-                  <div style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b',
-                    fontWeight: 600
-                  }}>
-                    {stat.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+       
 
 
       </div>
@@ -453,7 +359,7 @@ function getRoleColor(role: string): string {
 function getRoleLabel(role: string): string {
   switch (role) {
     case 'admin':
-      return 'Quản trị';
+      return '';
     case 'staff':
       return '';
     case 'family':

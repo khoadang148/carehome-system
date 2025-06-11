@@ -22,7 +22,7 @@ const initialStaffMembers = [
     name: 'John Smith', 
     firstName: 'John',
     lastName: 'Smith',
-    position: 'Y tá đã đăng ký', 
+    position: 'Y tá', 
     department: 'Y tế', 
     shiftType: 'Sáng', 
     hireDate: '2022-03-15',

@@ -10,8 +10,7 @@ import {
   DocumentTextIcon,
   ClipboardIcon
 } from '@heroicons/react/24/outline';
-import PrescriptionModal from './PrescriptionModal';
-import MedicalPlanModal from './MedicalPlanModal';
+
 
 interface QuickActionsProps {
   residentId: number;
@@ -24,8 +23,7 @@ export default function QuickActions({ residentId, residentName, onActionComplet
   const [showMedicationModal, setShowMedicationModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showMedicationListModal, setShowMedicationListModal] = useState(false);
-  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [showMedicalPlanModal, setShowMedicalPlanModal] = useState(false);
+
 
   return (
     <>
@@ -66,108 +64,6 @@ export default function QuickActions({ residentId, residentName, onActionComplet
           <div>
             <div>Thêm ghi chú</div>
             <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Ghi chú chăm sóc hàng ngày</div>
-          </div>
-        </button>
-
-        {/* Prescription - Lên đơn thuốc */}
-        <button
-          onClick={() => setShowPrescriptionModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            padding: '1rem',
-            background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-            border: '1px solid #86efac',
-            borderRadius: '0.75rem',
-            color: '#166534',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            textAlign: 'left'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.15)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <DocumentTextIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-          <div>
-            <div>Lên đơn thuốc</div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Kê đơn thuốc từ bác sĩ</div>
-          </div>
-        </button>
-
-        {/* Add Single Medication */}
-        <button
-          onClick={() => setShowMedicationModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            padding: '1rem',
-            background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
-            border: '1px solid #81d4fa',
-            borderRadius: '0.75rem',
-            color: '#0277bd',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            textAlign: 'left'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 119, 189, 0.15)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <BeakerIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-          <div>
-            <div>Thêm thuốc đơn lẻ</div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Thêm một thuốc riêng biệt</div>
-          </div>
-        </button>
-
-        {/* Medical Plan */}
-        <button
-          onClick={() => setShowMedicalPlanModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            padding: '1rem',
-            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-            border: '1px solid #fbbf24',
-            borderRadius: '0.75rem',
-            color: '#d97706',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            textAlign: 'left'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.15)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <ClipboardIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-          <div>
-            <div>Lập kế hoạch khám</div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Lên plan khám bệnh toàn diện</div>
           </div>
         </button>
 
@@ -289,29 +185,7 @@ export default function QuickActions({ residentId, residentName, onActionComplet
         />
       )}
 
-      {showPrescriptionModal && (
-        <PrescriptionModal
-          residentId={residentId}
-          residentName={residentName}
-          onClose={() => setShowPrescriptionModal(false)}
-          onComplete={() => {
-            setShowPrescriptionModal(false);
-            onActionComplete?.();
-          }}
-        />
-      )}
 
-      {showMedicalPlanModal && (
-        <MedicalPlanModal
-          residentId={residentId}
-          residentName={residentName}
-          onClose={() => setShowMedicalPlanModal(false)}
-          onComplete={() => {
-            setShowMedicalPlanModal(false);
-            onActionComplete?.();
-          }}
-        />
-      )}
     </>
   );
 }

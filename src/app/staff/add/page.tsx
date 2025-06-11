@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, UserPlusIcon, BriefcaseIcon, PhoneIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 type StaffFormData = {
   firstName: string;
@@ -40,7 +40,7 @@ const departments = [
 ];
 
 const positions = [
-  'Y tá đã đăng ký',
+  'Y tá',
   'Trợ lý y tá',
   'Người chăm sóc',
   'Chuyên viên vật lý trị liệu',
@@ -98,9 +98,7 @@ export default function AddStaffPage() {
         address: data.address,
         position: data.position,
         department: data.department,
-        shiftType: data.shiftType.split(' (')[0], // Remove time details for display
         hireDate: data.hireDate,
-        salary: parseFloat(data.salary) || 0,
         certification: data.certification,
         emergencyContact: {
           name: data.emergencyContactName,
@@ -135,111 +133,95 @@ export default function AddStaffPage() {
   };
   
   return (
-    <div style={{maxWidth: '1200px', margin: '0 auto', padding: '0 1rem'}}>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href="/staff" style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
-          <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
-        </Link>
-        <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Thêm nhân viên mới</h1>
+    <div style={{maxWidth: 1100, margin: '0 auto', marginTop: 32, marginBottom: 32}}>
+      {/* Header lớn */}
+      <div style={{
+        background: 'linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%)',
+        borderRadius: '1.5rem',
+        padding: '2.5rem 2rem 2rem 2rem',
+        marginBottom: 32,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 24,
+        boxShadow: '0 8px 32px 0 rgba(99,102,241,0.08)'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '1rem',
+          width: 64,
+          height: 64,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.10)'
+        }}>
+          <UserPlusIcon style={{width: 36, height: 36, color: '#6366f1'}} />
+        </div>
+        <div>
+          <h1 style={{fontSize: '2rem', fontWeight: 800, color: 'white', margin: 0, letterSpacing: '-0.01em'}}>Thêm nhân viên mới</h1>
+          <p style={{fontSize: '1.1rem', color: 'rgba(255,255,255,0.95)', margin: '0.5rem 0 0 0', fontWeight: 500}}>Điền thông tin chi tiết để đăng ký nhân viên mới vào hệ thống</p>
+        </div>
       </div>
-      
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '1.5rem'}}>
-        <form onSubmit={handleSubmit(onSubmit)} style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
-          
-          {/* Personal Information Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin cá nhân
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{display: 'flex', flexDirection: 'column', gap: '2.5rem'}}>
+        {/* Section: Thông tin cá nhân */}
+        <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(99,102,241,0.06)', marginBottom: 24}}>
+          <div style={{
+            background: 'linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%)',
+            padding: '1.25rem 2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12
+          }}>
+            <UserPlusIcon style={{width: 24, height: 24, color: 'white'}} />
+            <h2 style={{fontSize: '1.15rem', fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.01em'}}>Thông tin cá nhân</h2>
+          </div>
+          <div style={{padding: '2rem'}}>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem'}}>
               <div>
-                <label htmlFor="firstName" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Tên*
-                </label>
+                <label htmlFor="firstName" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Tên*</label>
                 <input
                   id="firstName"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.firstName ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.firstName ? '1.5px solid #fca5a5' : undefined, background: errors.firstName ? '#fef2f2' : undefined}}
                   {...register('firstName', { required: 'Tên là bắt buộc' })}
                 />
                 {errors.firstName && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.firstName.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.firstName.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="lastName" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Họ*
-                </label>
+                <label htmlFor="lastName" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Họ*</label>
                 <input
                   id="lastName"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.lastName ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.lastName ? '1.5px solid #fca5a5' : undefined, background: errors.lastName ? '#fef2f2' : undefined}}
                   {...register('lastName', { required: 'Họ là bắt buộc' })}
                 />
                 {errors.lastName && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.lastName.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.lastName.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="dateOfBirth" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ngày sinh*
-                </label>
+                <label htmlFor="dateOfBirth" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Ngày sinh*</label>
                 <input
                   id="dateOfBirth"
                   type="date"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.dateOfBirth ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.dateOfBirth ? '1.5px solid #fca5a5' : undefined, background: errors.dateOfBirth ? '#fef2f2' : undefined}}
                   {...register('dateOfBirth', { required: 'Ngày sinh là bắt buộc' })}
                 />
                 {errors.dateOfBirth && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.dateOfBirth.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.dateOfBirth.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="gender" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Giới tính*
-                </label>
+                <label htmlFor="gender" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Giới tính*</label>
                 <select
                   id="gender"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.gender ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.gender ? '1.5px solid #fca5a5' : undefined, background: errors.gender ? '#fef2f2' : undefined}}
                   {...register('gender', { required: 'Giới tính là bắt buộc' })}
                 >
                   <option value="">Chọn giới tính</option>
@@ -248,51 +230,29 @@ export default function AddStaffPage() {
                   <option value="Khác">Khác</option>
                 </select>
                 {errors.gender && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.gender.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.gender.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="phone" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Số điện thoại*
-                </label>
+                <label htmlFor="phone" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Số điện thoại*</label>
                 <input
                   id="phone"
                   type="tel"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.phone ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.phone ? '1.5px solid #fca5a5' : undefined, background: errors.phone ? '#fef2f2' : undefined}}
                   {...register('phone', { required: 'Số điện thoại là bắt buộc' })}
                 />
                 {errors.phone && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.phone.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.phone.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="email" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Email*
-                </label>
+                <label htmlFor="email" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Email*</label>
                 <input
                   id="email"
                   type="email"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.email ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.email ? '1.5px solid #fca5a5' : undefined, background: errors.email ? '#fef2f2' : undefined}}
                   {...register('email', { 
                     required: 'Email là bắt buộc',
                     pattern: {
@@ -302,55 +262,32 @@ export default function AddStaffPage() {
                   })}
                 />
                 {errors.email && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.email.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.email.message}</p>
                 )}
               </div>
             </div>
-            
-            <div style={{marginTop: '1rem'}}>
-              <label htmlFor="address" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                Địa chỉ
-              </label>
-              <textarea
-                id="address"
-                rows={2}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #d1d5db',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-                {...register('address')}
-              />
-            </div>
           </div>
-          
-          {/* Job Information Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin công việc
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
+            </div>
+        {/* Section: Thông tin công việc */}
+        <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(16,185,129,0.06)', marginBottom: 24}}>
+          <div style={{
+            background: 'linear-gradient(90deg, #10b981 0%, #6ee7b7 100%)',
+            padding: '1.25rem 2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12
+          }}>
+            <BriefcaseIcon style={{width: 24, height: 24, color: 'white'}} />
+            <h2 style={{fontSize: '1.15rem', fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.01em'}}>Thông tin công việc</h2>
+          </div>
+          <div style={{padding: '2rem'}}>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem'}}>
               <div>
-                <label htmlFor="position" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Chức vụ*
-                </label>
+                <label htmlFor="position" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Chức vụ*</label>
                 <select
                   id="position"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.position ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.position ? '1.5px solid #fca5a5' : undefined, background: errors.position ? '#fef2f2' : undefined}}
                   {...register('position', { required: 'Chức vụ là bắt buộc' })}
                 >
                   <option value="">Chọn chức vụ</option>
@@ -359,306 +296,157 @@ export default function AddStaffPage() {
                   ))}
                 </select>
                 {errors.position && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.position.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.position.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="department" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Phòng ban*
-                </label>
+                <label htmlFor="department" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Khoa*</label>
                 <select
                   id="department"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.department ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('department', { required: 'Phòng ban là bắt buộc' })}
+                  className="input-field"
+                  style={{border: errors.department ? '1.5px solid #fca5a5' : undefined, background: errors.department ? '#fef2f2' : undefined}}
+                  {...register('department', { required: 'Khoa là bắt buộc' })}
                 >
-                  <option value="">Chọn phòng ban</option>
+                  <option value="">Chọn khoakhoa</option>
                   {departments.map(dept => (
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                 </select>
                 {errors.department && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.department.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.department.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="shiftType" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ca làm việc*
-                </label>
-                <select
-                  id="shiftType"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.shiftType ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('shiftType', { required: 'Ca làm việc là bắt buộc' })}
-                >
-                  <option value="">Chọn ca làm việc</option>
-                  {shiftTypes.map(shift => (
-                    <option key={shift} value={shift}>{shift}</option>
-                  ))}
-                </select>
-                {errors.shiftType && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.shiftType.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="hireDate" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ngày tuyển dụng*
-                </label>
+                <label htmlFor="hireDate" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Ngày tuyển dụng*</label>
                 <input
                   id="hireDate"
                   type="date"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.hireDate ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.hireDate ? '1.5px solid #fca5a5' : undefined, background: errors.hireDate ? '#fef2f2' : undefined}}
                   {...register('hireDate', { required: 'Ngày tuyển dụng là bắt buộc' })}
                 />
                 {errors.hireDate && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.hireDate.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.hireDate.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="salary" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Lương cơ bản (VNĐ)*
-                </label>
-                <input
-                  id="salary"
-                  type="number"
-                  step="1000"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.salary ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('salary', { required: 'Lương cơ bản là bắt buộc' })}
-                />
-                {errors.salary && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.salary.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="certification" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Chứng chỉ
-                </label>
+                <label htmlFor="certification" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Chứng chỉ</label>
                 <input
                   id="certification"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.certification ? '1.5px solid #fca5a5' : undefined, background: errors.certification ? '#fef2f2' : undefined}}
                   placeholder="VD: RN, BSN, CNA, DPT..."
                   {...register('certification')}
                 />
               </div>
             </div>
           </div>
-          
-          {/* Emergency Contact Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin liên hệ khẩn cấp
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
+        </div>
+        {/* Section: Thông tin liên hệ khẩn cấp */}
+        <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(59,130,246,0.06)', marginBottom: 24}}>
+          <div style={{
+            background: 'linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%)',
+            padding: '1.25rem 2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12
+          }}>
+            <PhoneIcon style={{width: 24, height: 24, color: 'white'}} />
+            <h2 style={{fontSize: '1.15rem', fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.01em'}}>Thông tin liên hệ khẩn cấp</h2>
+          </div>
+          <div style={{padding: '2rem'}}>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem'}}>
               <div>
-                <label htmlFor="emergencyContactName" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Tên người liên hệ*
-                </label>
+                <label htmlFor="emergencyContactName" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Tên người liên hệ*</label>
                 <input
                   id="emergencyContactName"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.emergencyContactName ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.emergencyContactName ? '1.5px solid #fca5a5' : undefined, background: errors.emergencyContactName ? '#fef2f2' : undefined}}
                   {...register('emergencyContactName', { required: 'Tên người liên hệ khẩn cấp là bắt buộc' })}
                 />
                 {errors.emergencyContactName && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.emergencyContactName.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.emergencyContactName.message}</p>
                 )}
               </div>
-              
               <div>
-                <label htmlFor="emergencyContactPhone" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Số điện thoại liên hệ*
-                </label>
+                <label htmlFor="emergencyContactPhone" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Số điện thoại liên hệ*</label>
                 <input
                   id="emergencyContactPhone"
                   type="tel"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.emergencyContactPhone ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.emergencyContactPhone ? '1.5px solid #fca5a5' : undefined, background: errors.emergencyContactPhone ? '#fef2f2' : undefined}}
                   {...register('emergencyContactPhone', { required: 'Số điện thoại liên hệ khẩn cấp là bắt buộc' })}
                 />
                 {errors.emergencyContactPhone && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.emergencyContactPhone.message}</p>
+                  <p style={{marginTop: '0.25rem', fontSize: '0.95rem', color: '#dc2626'}}>{errors.emergencyContactPhone.message}</p>
                 )}
               </div>
             </div>
           </div>
-          
-          {/* Additional Information Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin bổ sung
-            </h2>
-            <div style={{display: 'grid', gap: '1rem'}}>
+        </div>
+        {/* Section: Thông tin bổ sung */}
+        <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(139,92,246,0.06)', marginBottom: 24}}>
+          <div style={{
+            background: 'linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%)',
+            padding: '1.25rem 2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12
+          }}>
+            <InformationCircleIcon style={{width: 24, height: 24, color: 'white'}} />
+            <h2 style={{fontSize: '1.15rem', fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.01em'}}>Thông tin bổ sung</h2>
+          </div>
+          <div style={{padding: '2rem'}}>
+            <div style={{display: 'grid', gap: '1.25rem'}}>
               <div>
-                <label htmlFor="workExperience" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Kinh nghiệm làm việc
-                </label>
+                <label htmlFor="workExperience" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Kinh nghiệm làm việc</label>
                 <textarea
                   id="workExperience"
                   rows={3}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.workExperience ? '1.5px solid #fca5a5' : undefined, background: errors.workExperience ? '#fef2f2' : undefined}}
                   placeholder="Mô tả kinh nghiệm làm việc trước đây..."
                   {...register('workExperience')}
                 />
               </div>
-              
               <div>
-                <label htmlFor="specializations" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Chuyên môn đặc biệt
-                </label>
+                <label htmlFor="specializations" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Chuyên môn đặc biệt</label>
                 <input
                   id="specializations"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.specializations ? '1.5px solid #fca5a5' : undefined, background: errors.specializations ? '#fef2f2' : undefined}}
                   placeholder="Phân cách bằng dấu phẩy (VD: Chăm sóc Alzheimer, Vật lý trị liệu, Dinh dưỡng)"
                   {...register('specializations')}
                 />
               </div>
-              
               <div>
-                <label htmlFor="notes" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ghi chú bổ sung
-                </label>
+                <label htmlFor="notes" style={{display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.35rem'}}>Ghi chú bổ sung</label>
                 <textarea
                   id="notes"
                   rows={3}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="input-field"
+                  style={{border: errors.notes ? '1.5px solid #fca5a5' : undefined, background: errors.notes ? '#fef2f2' : undefined}}
                   {...register('notes')}
                 />
               </div>
             </div>
           </div>
-          
-          {/* Form Buttons */}
-          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem'}}>
-            <Link 
-              href="/staff" 
-              style={{
-                padding: '0.5rem 1rem', 
-                border: '1px solid #d1d5db', 
-                borderRadius: '0.375rem', 
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                color: '#374151',
-                textDecoration: 'none'
-              }}
-            >
-              Hủy
-            </Link>
+        </div>
+        {/* Nút hành động */}
+        <div style={{display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 24}}>
             <button
               type="submit"
+            className="btn-gradient"
+            style={{minWidth: 160, fontSize: '1.1rem', borderRadius: '0.75rem', padding: '0.85rem 2.5rem'}}
               disabled={isSubmitting}
-              style={{
-                padding: '0.5rem 1rem', 
-                border: '1px solid transparent', 
-                borderRadius: '0.375rem', 
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                color: 'white', 
-                backgroundColor: '#0284c7',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.5 : 1
-              }}
-            >
-              {isSubmitting ? 'Đang lưu...' : 'Lưu nhân viên'}
+          >
+            {isSubmitting ? 'Đang lưu...' : 'Thêm nhân viên'}
             </button>
           </div>
         </form>
-      </div>
     </div>
   );
 } 

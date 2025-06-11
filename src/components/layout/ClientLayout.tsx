@@ -19,8 +19,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   // Hiển thị header cho tất cả các trang trừ một số trang đặc biệt
   const shouldShowHeader = pathname !== "/welcome" && 
                            pathname !== "/setup" && 
-                           pathname !== "/residents" &&
-                           !pathname.startsWith("/medical");
+                           pathname !== "/residents";
   
   // Enhanced loading spinner with beautiful design
   if (loading) {

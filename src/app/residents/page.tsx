@@ -137,7 +137,7 @@ export default function ResidentsPage() {
     
     // Resident selection
     if (!selectedResident) {
-      errors.selectedResident = 'Vui lòng chọn cư dân';
+      errors.selectedResident = 'Vui lòng chọn người cao tuổi';
     }
     
     // Activity type
@@ -401,7 +401,7 @@ export default function ResidentsPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Quản lý Cư dân
+                  Quản lý Người cao tuổi
                 </h1>
                 <p style={{
                   fontSize: '1rem',
@@ -409,7 +409,7 @@ export default function ResidentsPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {residentsData.length} cư dân
+                  Tổng số: {residentsData.length} người cao tuổituổi
                 </p>
               </div>
             </div>
@@ -417,7 +417,7 @@ export default function ResidentsPage() {
             <div style={{display: 'flex', gap: '1rem'}}>
               <button
                 onClick={() => setShowUploadModal(true)}
-                title="Đăng tải ảnh hoạt động của cư dân để chia sẻ với gia đình"
+                title="Đăng tải ảnh hoạt động của người cao tuổi để chia sẻ với gia đình"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -442,8 +442,7 @@ export default function ResidentsPage() {
                 }}
               >
                 <PhotoIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Đăng ảnh cư dân
-              </button>
+                Đăng ảnh Người cao tuổi    </button>
 
               <Link 
                 href="/residents/add" 
@@ -471,7 +470,7 @@ export default function ResidentsPage() {
                 }}
               >
                 <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Thêm cư dân mới
+                Thêm Người cao tuổi mới
               </Link>
             </div>
           </div>
@@ -587,7 +586,7 @@ export default function ResidentsPage() {
                 margin: 0,
                 fontWeight: 600
               }}>
-                Hiển thị: {filteredResidents.length} cư dân
+                Hiển thị: {filteredResidents.length} người cao tuổi
               </p>
             </div>
           </div>
@@ -615,7 +614,7 @@ export default function ResidentsPage() {
                     fontWeight: 600,
                     color: '#374151'
                   }}>
-                    Cư dân
+                    Người cao tuổi
                   </th>
                   <th style={{
                     padding: '1rem',
@@ -791,7 +790,7 @@ export default function ResidentsPage() {
                       }}>
                         <button
                           onClick={() => handleViewResident(resident.id)}
-                          title="Xem thông tin chi tiết cư dân"
+                          title="Xem thông tin chi tiết người cao tuổi"
                           style={{
                             padding: '0.5rem',
                             borderRadius: '0.375rem',
@@ -814,7 +813,7 @@ export default function ResidentsPage() {
                         </button>
                         <button
                           onClick={() => handleEditResident(resident.id)}
-                          title="Chỉnh sửa thông tin cư dân"
+                          title="Chỉnh sửa thông tin người cao tuổi"
                           style={{
                             padding: '0.5rem',
                             borderRadius: '0.375rem',
@@ -837,7 +836,7 @@ export default function ResidentsPage() {
                         </button>
                         <button
                           onClick={() => handleDeleteClick(resident.id)}
-                          title="Xóa cư dân khỏi hệ thống"
+                          title="Xóa người cao tuổi khỏi hệ thống"
                           style={{
                             padding: '0.5rem',
                             borderRadius: '0.375rem',
@@ -884,7 +883,7 @@ export default function ResidentsPage() {
                 margin: '0 0 0.5rem 0',
                 color: '#374151'
               }}>
-                Không tìm thấy cư dân
+                Không tìm thấy người cao tuổi
               </h3>
               <p style={{margin: 0, fontSize: '0.875rem'}}>
                 Thử thay đổi tiêu chí tìm kiếm hoặc bộ lọc
@@ -930,7 +929,7 @@ export default function ResidentsPage() {
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div>
                   <h3 style={{fontSize: '1.5rem', fontWeight: 700, margin: 0}}>
-                    📸 Đăng ảnh hoạt động cư dân
+                    📸 Đăng ảnh hoạt động của người cao tuổi
                   </h3>
                   <p style={{fontSize: '0.95rem', margin: '0.5rem 0 0 0', opacity: 0.9}}>
                     Ghi lại những khoảnh khắc đáng nhớ và chia sẻ với gia đình
@@ -967,7 +966,7 @@ export default function ResidentsPage() {
                   color: '#374151',
                   fontSize: '0.95rem'
                 }}>
-                  Chọn cư dân <span style={{color: '#ef4444'}}>*</span>
+                  Chọn người cao tuổi <span style={{color: '#ef4444'}}>*</span>
                 </label>
                 <select
                   value={selectedResident}
@@ -986,7 +985,7 @@ export default function ResidentsPage() {
                     transition: 'border-color 0.2s'
                   }}
                 >
-                  <option value="">Chọn cư dân...</option>
+                  <option value="">Chọn người cao tuổi...</option>
                   {residentsData.map((resident) => (
                     <option key={resident.id} value={resident.id}>
                       {resident.name} - Phòng {resident.room} ({resident.careLevel || 'Chưa có gói'})
@@ -1090,7 +1089,7 @@ export default function ResidentsPage() {
                   color: '#374151',
                   fontSize: '0.95rem'
                 }}>
-                  Trạng thái cư dân (chọn nhiều)
+                  Trạng thái người cao tuổi (chọn nhiều)
                 </label>
                 <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
                   {PHOTO_TAGS.map((tag) => (
@@ -1483,10 +1482,10 @@ export default function ResidentsPage() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
           }}>
             <h3 style={{fontSize: '1.25rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#111827'}}>
-              Xác nhận xóa cư dân
+              Xác nhận xóa người cao tuổi
             </h3>
             <p style={{margin: '0 0 1.5rem 0', color: '#6b7280'}}>
-              Bạn có chắc chắn muốn xóa cư dân này? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa người cao tuổituổi này? Hành động này không thể hoàn tác.
             </p>
             <div style={{display: 'flex', justifyContent: 'flex-end', gap: '1rem'}}>
               <button

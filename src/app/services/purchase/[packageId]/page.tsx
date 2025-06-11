@@ -1378,159 +1378,111 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                  margin: '0 0 0.5rem 0',
                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
                }}>
-                 🎉 Đăng Ký Thành Công!
+                 Đăng Ký Thành Công!
                </h2>
                <p style={{
                  fontSize: '1.1rem',
                  margin: 0,
                  opacity: 0.95
                }}>
-                 Cảm ơn bạn đã tin tưởng dịch vụ của chúng tôi
+                 Đang chờ hệ thống phê duyệt đăng ký
                </p>
              </div>
 
+
              {/* Registration Details */}
              <div style={{ padding: '2rem' }}>
-               {/* Registration ID Card */}
-               <div style={{
-                 background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                 borderRadius: '16px',
-                 padding: '1.5rem',
-                 marginBottom: '2rem',
-                 color: 'white',
-                 position: 'relative',
-                 overflow: 'hidden'
-               }}>
-                 <div style={{
-                   position: 'absolute',
-                   top: '-50%',
-                   right: '-20%',
-                   width: '200px',
-                   height: '200px',
-                   background: 'rgba(255, 255, 255, 0.1)',
-                   borderRadius: '50%'
-                 }} />
-                 <h3 style={{ 
-                   fontSize: '1.2rem', 
-                   fontWeight: 600, 
-                   margin: '0 0 1rem 0',
-                   position: 'relative',
-                   zIndex: 1
-                 }}>
-                   📋 Mã Đăng Ký
-                 </h3>
-                 <div style={{
-                   fontSize: '1.8rem',
-                   fontWeight: 700,
-                   fontFamily: 'monospace',
-                   letterSpacing: '2px',
-                   position: 'relative',
-                   zIndex: 1
-                 }}>
-                   {registrationData.registrationId}
-                 </div>
-                 <p style={{ 
-                   fontSize: '0.9rem', 
-                   margin: '0.5rem 0 0 0', 
-                   opacity: 0.9,
-                   position: 'relative',
-                   zIndex: 1
-                 }}>
-                   Vui lòng lưu mã này để tra cứu đăng ký
-                 </p>
-               </div>
-
                {/* Service Details */}
                <div style={{
                  display: 'grid',
-                 gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
                  gap: '1.5rem',
                  marginBottom: '2rem'
                }}>
                  <div style={{
-                   background: 'rgba(16, 185, 129, 0.05)',
-                   border: '1px solid rgba(16, 185, 129, 0.2)',
+                   background: '#f8fafc',
+                   border: '1px solid #e5e7eb',
                    borderRadius: '12px',
                    padding: '1.5rem'
                  }}>
                    <h4 style={{ 
-                     fontSize: '1.1rem', 
+                     fontSize: '1rem', 
                      fontWeight: 600, 
-                     color: '#059669', 
-                     margin: '0 0 1rem 0',
-                     display: 'flex',
-                     alignItems: 'center',
-                     gap: '0.5rem'
+                     color: '#374151', 
+                     margin: '0 0 1rem 0'
                    }}>
-                     📦 Thông Tin Dịch Vụ
+                     Thông Tin Dịch Vụ
                    </h4>
-                   <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: 1.6 }}>
+                   <div style={{ fontSize: '0.875rem', color: '#6b7280', lineHeight: 1.6 }}>
                      <p style={{ margin: '0.5rem 0' }}>
-                       <strong>Gói:</strong> {registrationData.packageName}
+                       <span style={{ fontWeight: 600, color: '#374151' }}>Gói:</span> {registrationData.packageName}
                      </p>
                      <p style={{ margin: '0.5rem 0' }}>
-                       <strong>Người thụ hưởng:</strong> {registrationData.memberName}
+                       <span style={{ fontWeight: 600, color: '#374151' }}>Người thụ hưởng:</span> {registrationData.memberName}
                      </p>
                      <p style={{ margin: '0.5rem 0' }}>
-                       <strong>Bắt đầu:</strong> {new Date(registrationData.startDate).toLocaleDateString('vi-VN')}
+                       <span style={{ fontWeight: 600, color: '#374151' }}>Bắt đầu:</span> {new Date(registrationData.startDate).toLocaleDateString('vi-VN')}
                      </p>
                    </div>
                  </div>
 
                  <div style={{
-                   background: 'rgba(59, 130, 246, 0.05)',
-                   border: '1px solid rgba(59, 130, 246, 0.2)',
+                   background: '#f8fafc',
+                   border: '1px solid #e5e7eb',
                    borderRadius: '12px',
                    padding: '1.5rem'
                  }}>
                    <h4 style={{ 
-                     fontSize: '1.1rem', 
+                     fontSize: '1rem', 
                      fontWeight: 600, 
-                     color: '#1e40af', 
-                     margin: '0 0 1rem 0',
-                     display: 'flex',
-                     alignItems: 'center',
-                     gap: '0.5rem'
+                     color: '#374151', 
+                     margin: '0 0 1rem 0'
                    }}>
-                     💰 Chi Tiết Thanh Toán
+                     Chi Tiết Thanh Toán
                    </h4>
-                   <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: 1.6 }}>
+                   <div style={{ fontSize: '0.875rem', color: '#6b7280', lineHeight: 1.6 }}>
                      <p style={{ margin: '0.5rem 0' }}>
-                       <strong>Giá gốc:</strong> {registrationData.originalPrice.toLocaleString('vi-VN')} VNĐ
+                       <span style={{ fontWeight: 600, color: '#374151' }}>Giá gốc:</span> {registrationData.originalPrice.toLocaleString('vi-VN')} VNĐ
                      </p>
                      {registrationData.discountApplied > 0 && (
-                       <p style={{ margin: '0.5rem 0', color: '#059669' }}>
-                         <strong>Giảm giá:</strong> -{registrationData.discountAmount.toLocaleString('vi-VN')} VNĐ ({registrationData.discountApplied}%)
+                       <p style={{ margin: '0.5rem 0' }}>
+                         <span style={{ fontWeight: 600, color: '#374151' }}>Giảm giá:</span> <span style={{ color: '#059669' }}>-{registrationData.discountAmount.toLocaleString('vi-VN')} VNĐ ({registrationData.discountApplied}%)</span>
                        </p>
                      )}
-                     <p style={{ margin: '0.5rem 0', fontSize: '1.1rem', fontWeight: 600, color: '#1e40af' }}>
-                       <strong>Tổng cộng:</strong> {registrationData.finalPrice.toLocaleString('vi-VN')} VNĐ/tháng
+                     <p style={{ margin: '0.5rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
+                       <span style={{ fontWeight: 600 }}>Tổng cộng:</span> {registrationData.finalPrice.toLocaleString('vi-VN')} VNĐ/tháng
                      </p>
                    </div>
                  </div>
                </div>
 
-               {/* Simple Completion Message */}
+               {/* Status Message */}
                <div style={{
-                 background: 'rgba(16, 185, 129, 0.05)',
-                 border: '1px solid rgba(16, 185, 129, 0.2)',
-                 borderRadius: '16px',
+                 background: '#fef3c7',
+                 border: '1px solid #fbbf24',
+                 borderRadius: '12px',
                  padding: '1.5rem',
                  marginBottom: '2rem',
                  textAlign: 'center'
                }}>
-                 
+                 <h4 style={{
+                   fontSize: '1rem',
+                   fontWeight: 600,
+                   color: '#92400e',
+                   margin: '0 0 0.75rem 0'
+                 }}>
+                   Quá trình phê duyệt
+                 </h4>
                  <p style={{
-                   fontSize: '0.9rem',
-                   color: '#374151',
+                   fontSize: '0.875rem',
+                   color: '#78350f',
                    margin: 0,
                    lineHeight: 1.5
                  }}>
-                   Cảm ơn bạn đã tin tưởng và lựa chọn dịch vụ chăm sóc của chúng tôi. Chúng tôi cam kết mang đến sự chăm sóc tận tâm nhất cho người thân yêu quý của bạn.
+                   Đăng ký của bạn đã được gửi thành công và đang chờ hệ thống phê duyệt. Chúng tôi sẽ liên hệ với bạn trong vòng <span style={{ fontWeight: 600 }}>1-2 ngày làm việc</span> để xác nhận và hoàn tất thủ tục.
                  </p>
                </div>
 
-               {/* Simple Action Button */}
+               {/* Action Button */}
                <div style={{ display: 'flex', justifyContent: 'center' }}>
                  <button
                    onClick={() => {
@@ -1541,24 +1493,27 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                      color: 'white',
                      border: 'none',
-                     padding: '1rem 2rem',
-                     borderRadius: '12px',
-                     fontSize: '1rem',
+                     padding: '0.875rem 2rem',
+                     borderRadius: '0.75rem',
+                     fontSize: '0.875rem',
                      fontWeight: 600,
                      cursor: 'pointer',
-                     boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
-                     transition: 'all 0.2s ease'
+                     boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                     transition: 'all 0.3s ease',
+                     minWidth: '120px'
                    }}
                    onMouseOver={(e) => {
                      e.currentTarget.style.transform = 'translateY(-2px)';
-                     e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.5)';
+                     e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
+                     e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
                    }}
                    onMouseOut={(e) => {
                      e.currentTarget.style.transform = 'translateY(0)';
-                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
+                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                     e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                    }}
                  >
-                   ✓ Hoàn Tất
+                   Về Trang Chủ
                  </button>
                </div>
              </div>

@@ -8,8 +8,7 @@ import {
   UserIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
-import PrescriptionModal from './PrescriptionModal';
-import MedicalPlanModal from './MedicalPlanModal';
+
 
 interface Resident {
   id: number;
@@ -23,8 +22,7 @@ export default function StaffOverviewPanel() {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [showMedicalPlanModal, setShowMedicalPlanModal] = useState(false);
+
   const [showCareNoteModal, setShowCareNoteModal] = useState(false);
 
   useEffect(() => {
@@ -60,15 +58,7 @@ export default function StaffOverviewPanel() {
     window.dispatchEvent(new CustomEvent('dataUpdated'));
   };
 
-  const openPrescriptionModal = (resident: Resident) => {
-    setSelectedResident(resident);
-    setShowPrescriptionModal(true);
-  };
 
-  const openMedicalPlanModal = (resident: Resident) => {
-    setSelectedResident(resident);
-    setShowMedicalPlanModal(true);
-  };
 
   const openCareNoteModal = (resident: Resident) => {
     setSelectedResident(resident);
@@ -138,32 +128,6 @@ export default function StaffOverviewPanel() {
         gap: '1.5rem',
         marginBottom: '2rem'
       }}>
-        {/* Prescription Button */}
-        <ActionCard
-          title="Kê đơn thuốc điều trị"
-          description="Lập đơn thuốc theo chỉ định của bác sĩ"
-          icon={<DocumentTextIcon style={{ width: '1.5rem', height: '1.5rem', color: '#166534' }} />}
-          gradient="linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)"
-          borderColor="#86efac"
-          textColor="#166534"
-          residents={filteredResidents}
-          onSelectResident={openPrescriptionModal}
-          searchTerm={searchTerm}
-        />
-
-        {/* Medical Plan Button */}
-        <ActionCard
-          title="Lịch khám sức khỏe"
-          description="Lập kế hoạch khám và theo dõi sức khỏe"
-          icon={<ClipboardIcon style={{ width: '1.5rem', height: '1.5rem', color: '#d97706' }} />}
-          gradient="linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)"
-          borderColor="#fbbf24"
-          textColor="#d97706"
-          residents={filteredResidents}
-          onSelectResident={openMedicalPlanModal}
-          searchTerm={searchTerm}
-        />
-
         {/* Care Notes Button */}
         <ActionCard
           title="Nhật ký theo dõi"
@@ -179,38 +143,6 @@ export default function StaffOverviewPanel() {
       </div>
 
       {/* Modals */}
-      {showPrescriptionModal && selectedResident && (
-        <PrescriptionModal
-          residentId={selectedResident.id}
-          residentName={selectedResident.name}
-          onClose={() => {
-            setShowPrescriptionModal(false);
-            setSelectedResident(null);
-          }}
-          onComplete={() => {
-            setShowPrescriptionModal(false);
-            setSelectedResident(null);
-            handleActionComplete();
-          }}
-        />
-      )}
-
-      {showMedicalPlanModal && selectedResident && (
-        <MedicalPlanModal
-          residentId={selectedResident.id}
-          residentName={selectedResident.name}
-          onClose={() => {
-            setShowMedicalPlanModal(false);
-            setSelectedResident(null);
-          }}
-          onComplete={() => {
-            setShowMedicalPlanModal(false);
-            setSelectedResident(null);
-            handleActionComplete();
-          }}
-        />
-      )}
-
       {showCareNoteModal && selectedResident && (
         <CareNoteModal
           residentId={selectedResident.id}

@@ -16,7 +16,10 @@ import {
   UsersIcon,
   XMarkIcon,
   PaperAirplaneIcon,
-  CheckIcon
+  CheckIcon,
+  XCircleIcon,
+  InformationCircleIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 import { Tab } from '@headlessui/react';
 
@@ -35,6 +38,28 @@ const styles = `
     to { 
       opacity: 1; 
       transform: translateY(0); 
+    }
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 `;
@@ -132,6 +157,15 @@ export default function FamilyPortalPage() {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showPhotosModal, setShowPhotosModal] = useState(false);
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalData, setSuccessModalData] = useState<{
+    title: string;
+    message: string;
+    actionType: string;
+    timestamp: string;
+    id?: string;
+  } | null>(null);
   
   // Form states
   const [contactMessage, setContactMessage] = useState('');
@@ -163,14 +197,28 @@ export default function FamilyPortalPage() {
   // Submit handlers
   const submitContactRequest = () => {
     if (contactMessage.trim() && selectedStaff) {
-      // Create success notification
+      const requestId = `REQ-${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      
+      // Create professional notification
       setNotifications((prev: Notification[]) => [...prev, {
         id: Date.now(),
         type: 'success',
-        title: 'Yêu cầu liên hệ đã được gửi!',
-        message: `Đã gửi yêu cầu liên hệ đến ${selectedStaff}. Chúng tôi sẽ phản hồi trong vòng 24 giờ.`,
-        timestamp: new Date().toISOString()
+        title: 'Yêu cầu liên hệ đã được gửi',
+        message: `Yêu cầu liên hệ đã được gửi thành công.`,
+        timestamp: timestamp
       }]);
+
+      // Show success modal
+      setSuccessModalData({
+        title: 'Đã gửi tin nhắn thành công!!!',
+        message: `Nhân viên sẽ phản hồi trong vòng 30 phút đến 2 tiếng.`,
+        actionType: 'contact',
+        timestamp: timestamp,
+        id: requestId
+      });
+      setShowSuccessModal(true);
+
       setContactMessage('');
       setSelectedStaff('');
       setShowContactModal(false);
@@ -179,14 +227,28 @@ export default function FamilyPortalPage() {
 
   const submitMessage = () => {
     if (messageContent.trim()) {
-      // Create success notification
+      const messageId = `MSG-${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      
+      // Create professional notification
       setNotifications((prev: Notification[]) => [...prev, {
         id: Date.now(),
         type: 'success',
-        title: 'Tin nhắn đã được gửi!',
-        message: `Tin nhắn của bạn đã được gửi thành công. Chúng tôi sẽ phản hồi sớm nhất có thể.`,
-        timestamp: new Date().toISOString()
+        title: 'Tin nhắn đã được gửi thành công',
+        message: `Tin nhắn của bạn đã được gửi và đang được xử lý.`,
+        timestamp: timestamp
       }]);
+
+      // Show success modal for important actions
+      setSuccessModalData({
+        title: 'Đã gửi tin nhắn thành công',
+        message: `Người nhận sẽ trả lời sau từ 30 phút đến 2 tiếng.`,
+        actionType: 'message',
+        timestamp: timestamp,
+        id: messageId
+      });
+      setShowSuccessModal(true);
+
       setMessageContent('');
       setShowMessageModal(false);
     }
@@ -194,14 +256,28 @@ export default function FamilyPortalPage() {
 
   const submitVisitSchedule = () => {
     if (visitDate && visitTime && visitPurpose) {
-      // Create success notification
+      const scheduleId = `SCH-${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      
+      // Create professional notification
       setNotifications((prev: Notification[]) => [...prev, {
         id: Date.now(),
         type: 'success',
-        title: 'Đặt lịch thăm thành công!',
-        message: `Đã đặt lịch thăm ngày ${visitDate} lúc ${visitTime}. Chúng tôi sẽ xác nhận với bạn trước 1 ngày.`,
-        timestamp: new Date().toISOString()
+        title: 'Đã đặt lịch thăm thành công',
+        message: `Lịch thăm đã được đặt thành công.`,
+        timestamp: timestamp
       }]);
+
+      // Show success modal
+      setSuccessModalData({
+        title: 'Đã đặt lịch thăm thành công',
+        message: `Chúng tôi sẽ xác nhận lịch hẹn với bạn trong vòng 3 đến 12 tiếng.`,
+        actionType: 'schedule',
+        timestamp: timestamp,
+        id: scheduleId
+      });
+      setShowSuccessModal(true);
+
       setVisitDate('');
       setVisitTime('');
       setVisitPurpose('');
@@ -287,6 +363,23 @@ export default function FamilyPortalPage() {
     document.body.style.overflow = 'unset';
   }, []);
 
+  // Remove notification after 5 seconds
+  useEffect(() => {
+    const timers: NodeJS.Timeout[] = [];
+    
+    notifications.forEach((notification) => {
+      const timer = setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+      }, 5000); // Remove after 5 seconds
+      
+      timers.push(timer);
+    });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [notifications]);
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -295,6 +388,192 @@ export default function FamilyPortalPage() {
     }}>
       {/* Inject CSS animations */}
       <style dangerouslySetInnerHTML={{ __html: styles }} />
+      
+      {/* Professional Notification Banner */}
+      {notifications.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: '0',
+          left: '0',
+          right: '0',
+          zIndex: 10000,
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          padding: '1rem 2rem',
+          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          animation: 'slideDown 0.4s ease-out'
+        }}>
+          <div style={{
+            maxWidth: '1400px',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                background: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+              </div>
+              <div>
+                <h4 style={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  margin: '0 0 0.25rem 0'
+                }}>
+                  {notifications[notifications.length - 1]?.title}
+                </h4>
+                <p style={{
+                  fontSize: '0.875rem',
+                  margin: 0,
+                  opacity: 0.9
+                }}>
+                  {notifications[notifications.length - 1]?.message}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={() => setNotifications(prev => prev.slice(0, -1))}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '0.25rem',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'none';
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+                }}
+              >
+                <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal for Important Actions */}
+      {showSuccessModal && successModalData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+          backdropFilter: 'blur(4px)',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
+            maxWidth: '500px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            animation: 'slideUp 0.3s ease-out'
+          }}>
+            {/* Success Icon */}
+            <div style={{
+              width: '5rem',
+              height: '5rem',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
+            }}>
+              <CheckCircleIcon style={{ width: '2.5rem', height: '2.5rem', color: 'white' }} />
+            </div>
+
+            {/* Modal Content */}
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: '#111827',
+              margin: '0 0 1rem 0'
+            }}>
+              {successModalData.title}
+            </h2>
+
+            <p style={{
+              fontSize: '1rem',
+              color: '#6b7280',
+              margin: '0 0 1.5rem 0',
+              lineHeight: 1.6
+            }}>
+              {successModalData.message}
+            </p>
+
+
+
+            {/* Close Button */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                style={{
+                  padding: '1rem 3rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  minWidth: '120px'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       
       {/* Background decorations */}
       <div style={{
@@ -474,7 +753,7 @@ export default function FamilyPortalPage() {
                         <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age}
                       </div>
                       <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                        <span style={{fontWeight: 600}}>Phòng:</span> {resident.room} • <span style={{fontWeight: 600}}>Trạng thái:</span> {resident.status}
+                        <span style={{fontWeight: 600}}>Phòng:</span> {resident.room} • <span style={{fontWeight: 600}}>Trạng thái sức khỏe:</span> {resident.status}
                       </div>
                     </div>
                     {selectedResident.id === resident.id && (
@@ -537,7 +816,7 @@ export default function FamilyPortalPage() {
                 <div style={{marginBottom: '1.5rem'}}>
                   <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
                     <div style={{width: '0.5rem', height: '0.5rem', background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
-                    Trạng thái: {selectedResident.status}
+                    Trạng thái sức khỏe: {selectedResident.status}
                   </span>
                 </div>
                 <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
@@ -680,24 +959,6 @@ export default function FamilyPortalPage() {
               }>
                 Ghi chú chăm sóc
               </Tab>
-              <Tab className={({ selected }) => 
-                `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  selected 
-                    ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
-                }`
-              }>
-                Thuốc & Điều trị
-              </Tab>
-              <Tab className={({ selected }) => 
-                `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  selected 
-                    ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
-                }`
-              }>
-                Lịch Khám Bệnh
-              </Tab>
             </Tab.List>
             <Tab.Panels>
               <Tab.Panel style={{padding: '2rem'}}>
@@ -741,7 +1002,7 @@ export default function FamilyPortalPage() {
                         </div>
                       </div>
                       <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
-                        <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
+                        <span style={{fontWeight: 600}}>Trạng thái sức khỏe: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
                       </span>
                     </div>
                   ))}
@@ -785,87 +1046,6 @@ export default function FamilyPortalPage() {
                       })}
                     </tbody>
                   </table>
-                </div>
-              </Tab.Panel>
-              
-              <Tab.Panel style={{padding: '2rem'}}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  marginBottom: '1.5rem'
-                }}>
-                  Thuốc đang sử dụng hiện tại
-                </h3>
-                <div style={{display: 'grid', gap: '1rem'}}>
-                  {selectedResident.medications.map((medication) => (
-                    <div
-                      key={medication.id}
-                      style={{
-                        padding: '1.5rem',
-                        borderRadius: '0.75rem',
-                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                        border: '1px solid #fbbf24',
-                        boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)'
-                      }}
-                    >
-                      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1rem', alignItems: 'center'}}>
-                        <div>
-                          <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                            <span style={{fontWeight: 600}}>Tên thuốc: </span>{medication.name}
-                          </div>
-                          <div style={{fontSize: '0.75rem', color: '#92400e'}}>
-                            <span style={{fontWeight: 600}}>Liều lượng: </span>{medication.dosage} <span style={{fontWeight: 600}}>• Lịch dùng: </span>{medication.schedule}
-                          </div>
-                        </div>
-                        <div>
-                          <span style={{fontSize: '0.75rem', color: '#6b7280', display: 'block'}}><span style={{fontWeight: 600}}>Uống lần cuối: </span></span>
-                          <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#92400e'}}>{medication.lastAdministered}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Tab.Panel>
-              
-              <Tab.Panel style={{padding: '2rem'}}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  marginBottom: '1.5rem'
-                }}>
-                  Lịch khám bệnh sắp tới
-                </h3>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                  {selectedResident.appointments.map((appointment) => (
-                    <div
-                      key={appointment.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '1.5rem',
-                        borderRadius: '0.75rem',
-                        background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                        border: '1px solid #93c5fd'
-                      }}
-                    >
-                      <div style={{marginRight: '1.5rem'}}>
-                        <CalendarDaysIcon style={{width: '2rem', height: '2rem', color: '#1d4ed8'}} />
-                      </div>
-                      <div style={{flex: 1}}>
-                        <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                          <span style={{fontWeight: 600}}>Loại lịch: </span>{appointment.type}
-                        </div>
-                        <div style={{fontSize: '0.75rem', color: '#1e40af', marginBottom: '0.25rem'}}>
-                          <span style={{fontWeight: 600}}>Bác sĩ/Chuyên viên: </span>{appointment.provider}
-                        </div>
-                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
-                          <span style={{fontWeight: 600}}>Thời gian: </span>{new Date(appointment.date).toLocaleDateString('vi-VN')} lúc {appointment.time}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </Tab.Panel>
             </Tab.Panels>

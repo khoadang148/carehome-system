@@ -43,24 +43,22 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Quản lý chính",
     items: [
-      { name: 'Tổng quan', href: '/', icon: HomeIcon, roles: ['admin', 'staff'], color: '#667eea' },
-      { name: 'Cư dân', href: '/residents', icon: UserIcon, roles: ['admin', 'staff'], color: '#10b981' },
-      { name: 'Đội ngũ chăm sóc', href: '/staff', icon: UsersIcon, roles: ['admin'], color: '#3b82f6' },
+      { name: 'Tổng quan', href: '/', icon: HomeIcon, roles: ['admin','staff'], color: '#667eea' },
+      { name: 'Người cao tuổi', href: '/residents', icon: UserIcon, roles: ['admin', 'staff'], color: '#10b981' },
+      { name: 'Đội ngũ nhân viên chăm sóc', href: '/staff', icon: UsersIcon, roles: ['admin'], color: '#3b82f6' },
     ]
   },
   {
     title: "Lối tắt chăm sóc",
     items: [
-      { name: 'Kê đơn thuốc', href: '/staff/prescription', icon: DocumentTextIcon, roles: ['staff'], color: '#10b981' },
-             { name: 'Lịch khám sức khỏe', href: '/staff/medical-plan', icon: ClipboardDocumentCheckIcon, roles: ['staff'], color: '#f59e0b' },
       { name: 'Nhật ký theo dõi', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
     ]
   },
   {
     title: "Chương trình & Gia đình",
     items: [
-      { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['admin', 'staff'], color: '#f59e0b' },
-      { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['admin', 'staff'], color: '#8b5cf6' },
+      { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['staff'], color: '#f59e0b' },
+      { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['staff'], color: '#8b5cf6' },
       { name: 'Cổng gia đình', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
       { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'family'], color: '#6366f1' },
       
@@ -69,18 +67,14 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Dữ liệu & Báo cáo",
     items: [
-      { name: 'Báo cáo', href: '/reports', icon: ChartBarIcon, roles: ['admin'], color: '#06b6d4' },
-      { name: 'Tài chính', href: '/finance', icon: BanknotesIcon, roles: ['admin', 'family'], color: '#16a34a' },
-      { name: 'Chăm sóc sức khỏe', href: '/medical', icon: ClipboardDocumentListIcon, roles: ['admin', 'staff'], color: '#dc2626' },
-      { name: 'Quản lý kho', href: '/inventory', icon: CubeIcon, roles: ['admin'], color: '#0891b2' },
+      { name: 'Tài chính', href: '/finance', icon: BanknotesIcon, roles: ['admin', 'family'], color: '#16a34a' }
     ]
   },
   {
     title: "Hệ thống",
     items: [
-      { name: 'Tuân thủ', href: '/compliance', icon: ShieldCheckIcon, roles: ['admin'], color: '#7c3aed' },
-      { name: 'Quyền hạn', href: '/permissions', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' },
-      { name: 'Cài đặt', href: '/settings', icon: Cog6ToothIcon, roles: ['admin'], color: '#6b7280' },
+      { name: 'Tài khoản nhân viên', href: '/permissions', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' },
+      { name: 'Tài khoản người thân', href: '/permissions/family/register', icon: UserGroupIcon, roles: [], color: '#a21caf' }
     ]
   }
 ];

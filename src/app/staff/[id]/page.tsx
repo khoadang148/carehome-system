@@ -12,7 +12,7 @@ const initialStaffMembers = [
     name: 'John Smith', 
     firstName: 'John',
     lastName: 'Smith',
-    position: 'Y tá đã đăng ký', 
+    position: 'Y tá', 
     department: 'Y tế', 
     shiftType: 'Sáng', 
     hireDate: '2022-03-15',
@@ -152,11 +152,6 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
     router.push(`/staff/${resolvedParams.id}/edit`);
   };
   
-  const handleScheduleClick = () => {
-    if (!resolvedParams) return;
-    router.push(`/staff/${resolvedParams.id}/schedule`);
-  };
-  
   // Show loading state while fetching data
   if (loading || !resolvedParams) {
     return (
@@ -203,170 +198,126 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   };
   
   return (
-    <div style={{maxWidth: '1400px', margin: '0 auto', padding: '0 1rem'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-          <Link href="/staff" style={{color: '#6b7280', display: 'flex'}}>
-            <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
-          </Link>
-          <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Chi tiết nhân viên</h1>
+    <div style={{maxWidth: '1100px', margin: '0 auto', marginTop: 32, marginBottom: 32}}>
+      {/* Header lớn với avatar và action */}
+      <div style={{
+        background: 'linear-gradient(90deg, #f8fafc 0%, #e0e7ef 100%)',
+        borderRadius: '1.5rem',
+        padding: '2rem 2rem 1.5rem 2rem',
+        marginBottom: 32,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 32,
+        boxShadow: '0 2px 12px 0 rgba(100,116,139,0.06)'
+      }}>
+        <Link href="/staff" style={{color: '#64748b', display: 'flex', alignItems: 'center', marginRight: 18}}>
+          <ArrowLeftIcon style={{width: 24, height: 24}} />
+        </Link>
+        {/* Avatar */}
+        <div style={{
+          width: 76, height: 76, borderRadius: '50%', background: 'linear-gradient(135deg, #a5b4fc 0%, #f0abfc 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(59,130,246,0.10)'
+        }}>
+          {staff.name?.[0] || '?'}
         </div>
-        
-        <div style={{display: 'flex', gap: '1rem'}}>
-          <button
-            onClick={handleScheduleClick}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#7e22ce',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            <CalendarIcon style={{width: '1rem', height: '1rem'}} />
-            Lịch làm việc
-          </button>
+        <div style={{flex: 1}}>
+          <h1 style={{fontSize: '2.1rem', fontWeight: 800, color: '#334155', margin: 0, letterSpacing: '-0.01em'}}>{staff.name}</h1>
+          <p style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+  Chức vụ: {staff.position} 
+</p>
+
+<p style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+  Khoa :{staff.department}
+</p>
+
+        </div>
+        <div style={{display: 'flex', gap: 14}}>
           
           <button
             onClick={handleEditClick}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#16a34a',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: 'pointer'
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.2rem', background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', color: 'white', borderRadius: '0.75rem', border: 'none', fontSize: '0.97rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s'
             }}
           >
-            <PencilIcon style={{width: '1rem', height: '1rem'}} />
-            Chỉnh sửa thông tin
+            <PencilIcon style={{ width: '1rem', height: '1rem' }} />Chỉnh sửa
           </button>
         </div>
       </div>
-      
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden'}}>
-        {/* Header with basic info */}
-        <div style={{backgroundColor: '#f9fafb', padding: '1.5rem', borderBottom: '1px solid #e5e7eb'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+      {/* Card section */}
+      <div style={{background: '#fff', borderRadius: '1.25rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px 0 rgba(100,116,139,0.04)', overflow: 'hidden'}}>
+        {/* Header với thông tin cơ bản */}
+        <div style={{background: '#f1f5f9', padding: '2rem 2rem 1.5rem 2rem', borderBottom: '1px solid #ffffff'}}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 24}}>
             <div>
-              <h2 style={{fontSize: '1.5rem', fontWeight: 600, color: '#111827', margin: 0}}>{staff.name}</h2>
-              <p style={{fontSize: '1rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: '0.5rem'}}>
-                {staff.position} | {staff.department}
-              </p>
-              <div style={{marginTop: '0.5rem'}}>
-                <span style={{fontSize: '0.875rem', color: '#6b7280', marginRight: '0.5rem'}}>Ca làm việc:</span>
-                {renderShiftType(staff.shiftType)}
-              </div>
+              <h2 style={{fontSize: '1.35rem', fontWeight: 700, color: '#0f172a', margin: 0}}>Thông tin nhân viên</h2>
+             
             </div>
-            
             <div>
-              <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
-                <span style={{fontWeight: 500}}>Ngày vào làm:</span>{' '}
+              <p style={{fontSize: '0.97rem', color: '#64748b', margin: 0}}>
+                <span style={{fontWeight: 600}}>Ngày vào làm:</span>{' '}
                 {new Date(staff.hireDate).toLocaleDateString()}
               </p>
             </div>
           </div>
         </div>
-        
         {/* Main content */}
-        <div style={{padding: '1.5rem'}}>
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem'}}>
-            {/* Personal Information */}
-            <div style={{borderRadius: '0.5rem', border: '1px solid #e5e7eb', padding: '1.5rem'}}>
-              <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginTop: 0, marginBottom: '1rem'}}>
+        <div style={{padding: '2.5rem'}}>
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem'}}>
+            {/* Thông tin cá nhân */}
+            <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
+              <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
                 Thông tin cá nhân
               </h3>
-              
-              <div style={{display: 'grid', gap: '1rem'}}>
+              <div style={{display: 'grid', gap: '1.1rem'}}>
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Ngày sinh
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
-                    {staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A'}
-                  </p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Ngày sinh:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A'}</span>
                 </div>
-                
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Giới tính
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
-                    {staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Khác'}
-                  </p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Giới tính:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Khác'}</span>
                 </div>
-                
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Địa chỉ
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.address || 'N/A'}</p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Địa chỉ:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.address || 'N/A'}</span>
                 </div>
-                
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Chứng chỉ
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.certification || 'Không có'}</p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Chứng chỉ:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.certification || 'Không có'}</span>
                 </div>
               </div>
             </div>
-            
-            {/* Contact Information */}
-            <div style={{borderRadius: '0.5rem', border: '1px solid #e5e7eb', padding: '1.5rem'}}>
-              <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginTop: 0, marginBottom: '1rem'}}>
+            {/* Thông tin liên hệ */}
+            <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
+              <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
                 Thông tin liên hệ
               </h3>
-              
-              <div style={{display: 'grid', gap: '1rem'}}>
+              <div style={{display: 'grid', gap: '1.1rem'}}>
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Email
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.email || 'N/A'}</p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Email:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.email || 'N/A'}</span>
                 </div>
-                
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Số điện thoại
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.contactPhone}</p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Số điện thoại:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.contactPhone}</span>
                 </div>
-                
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    Liên hệ khẩn cấp
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.emergencyContact || 'N/A'}</p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Liên hệ khẩn cấp:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyContact || 'N/A'}</span>
                 </div>
-                
                 <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: 500, color: '#4b5563', marginBottom: '0.25rem'}}>
-                    SĐT khẩn cấp
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.emergencyPhone || 'N/A'}</p>
+                  <span style={{fontWeight: 600, color: '#475569'}}>SĐT khẩn cấp:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyPhone || 'N/A'}</span>
                 </div>
               </div>
             </div>
           </div>
-          
           {/* Notes Section */}
-          <div style={{marginTop: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', padding: '1.5rem'}}>
-            <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginTop: 0, marginBottom: '1rem'}}>
+          <div style={{marginTop: '2.5rem', borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
+            <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
               Ghi chú
             </h3>
-            <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{staff.notes || 'Không có ghi chú.'}</p>
+            <p style={{fontSize: '1.05rem', color: '#64748b', margin: 0}}>{staff.notes || 'Không có ghi chú.'}</p>
           </div>
         </div>
       </div>

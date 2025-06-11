@@ -12,7 +12,8 @@ import {
   CalendarIcon,
   TrashIcon,
   UsersIcon,
-
+  CheckCircleIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth-context';
 
@@ -21,7 +22,7 @@ const initialStaffMembers = [
   { 
     id: 1, 
     name: 'John Smith', 
-    position: 'Y tá đã đăng ký', 
+    position: 'Y tá', 
     department: 'Y tế', 
     shiftType: 'Sáng', 
     hireDate: '2022-03-15',
@@ -257,6 +258,21 @@ export default function StaffPage() {
     }).format(amount);
   };
   
+  // Thêm effect để ẩn header khi modal duyệt gói dịch vụ mở
+  useEffect(() => {
+    if (showApprovalModal) {
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showApprovalModal]);
+  
   return (
     <div style={{
       minHeight: '100vh',
@@ -398,63 +414,9 @@ export default function StaffPage() {
                   </span>
                 )}
               </button>
-          <Link 
-            href="/staff/schedule" 
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-              color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-              textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                  transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                }}
-              >
-                <CalendarIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-            Lịch làm việc
-          </Link>
+          
                       <div style={{display: 'flex', gap: '1rem'}}>
-              <button
-                onClick={handleCreateStaff}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  border: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                }}
-              >
-                <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Thêm thành viên
-              </button>
+              
 
               <Link 
                 href="/staff/add" 
@@ -482,7 +444,7 @@ export default function StaffPage() {
                 }}
               >
                 <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Thêm thành viên
+                Thêm nhân viên
               </Link>
             </div>
             </div>
@@ -500,121 +462,71 @@ export default function StaffPage() {
         }}>
           <div style={{
             display: 'flex',
-            flexWrap: 'wrap', 
-            alignItems: 'center', 
-            gap: '1.5rem'
+            alignItems: 'flex-end',
+            gap: '2rem',
+            flexWrap: 'wrap'
           }}>
-            <div style={{flex: '1', minWidth: '20rem'}}>
-              <div style={{position: 'relative'}}>
-                <div style={{
-                  position: 'absolute', 
-                  top: 0, 
-                  bottom: 0, 
-                  left: '1rem', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  pointerEvents: 'none'
-                }}>
-                  <MagnifyingGlassIcon style={{width: '1.125rem', height: '1.125rem', color: '#9ca3af'}} />
-              </div>
-              <input
-                type="text"
-                placeholder="Tìm kiếm nhân viên..."
-                style={{
-                  width: '100%',
-                    paddingLeft: '2.75rem',
-                    paddingRight: '1rem',
-                    paddingTop: '0.75rem',
-                    paddingBottom: '0.75rem',
-                    borderRadius: '0.75rem',
+            {/* Tìm kiếm */}
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <label style={{
+                display: 'block',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: 8,
+                fontSize: '1rem'
+              }}>
+                Tìm kiếm
+              </label>
+              <div style={{ position: 'relative' }}>
+                <MagnifyingGlassIcon style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, color: '#9ca3af' }} />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên hoặc chức vụ..."
+                  style={{
+                    width: '100%',
+                    paddingLeft: 40,
+                    paddingRight: 12,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    borderRadius: 12,
                     border: '1px solid #e2e8f0',
-                    fontSize: '0.875rem',
-                    background: 'white',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#10b981';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    fontSize: '1rem',
+                    background: 'white'
                   }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                  }}
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
-          
-            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                background: 'rgba(16, 185, 129, 0.1)',
-                borderRadius: '0.5rem'
+
+            {/* Khoa */}
+            <div style={{ minWidth: 180 }}>
+              <label style={{
+                display: 'block',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: 8,
+                fontSize: '1rem'
               }}>
-                <FunnelIcon style={{width: '1.125rem', height: '1.125rem', color: '#10b981'}} />
-                <span style={{fontSize: '0.875rem', fontWeight: 500, color: '#10b981'}}>
-                  Lọc
-                </span>
-              </div>
-                <select
-                  style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.75rem',
+                Khoa
+              </label>
+              <select
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  borderRadius: 12,
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem',
+                  fontSize: '1rem',
                   background: 'white',
-                  fontWeight: 500,
-                  minWidth: '10rem',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.2s ease'
-                  }}
-                  value={filterDepartment}
-                  onChange={(e) => setFilterDepartment(e.target.value)}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#10b981';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  fontWeight: 500
                 }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                }}
+                value={filterDepartment}
+                onChange={e => setFilterDepartment(e.target.value)}
               >
                 {departments.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                <select
-                  style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                  fontWeight: 500,
-                  minWidth: '8rem',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.2s ease'
-                  }}
-                  value={filterShift}
-                  onChange={(e) => setFilterShift(e.target.value)}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#10b981';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                }}
-              >
-                {shifts.map(shift => (
-                  <option key={shift} value={shift}>{shift}</option>
-                  ))}
-                </select>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -679,19 +591,7 @@ export default function StaffPage() {
                     letterSpacing: '0.05em',
                     borderBottom: '1px solid #e2e8f0'
                   }}>
-                    Ca làm việc
-                  </th>
-                  <th style={{
-                    padding: '1rem 1.5rem', 
-                    textAlign: 'left', 
-                    fontSize: '0.75rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em',
-                    borderBottom: '1px solid #e2e8f0'
-                  }}>
-                    Liên hệ
+                    Số điện thoại
                   </th>
                   <th style={{
                     padding: '1rem 1.5rem', 
@@ -768,33 +668,6 @@ export default function StaffPage() {
                         {staff.department}
                       </span>
                     </td>
-                    <td style={{padding: '1.25rem 1.5rem'}}>
-                    <span style={{
-                      display: 'inline-flex', 
-                      padding: '0.25rem 0.75rem', 
-                      fontSize: '0.75rem', 
-                        fontWeight: 600, 
-                        borderRadius: '0.375rem',
-                        background: 
-                          staff.shiftType === 'Sáng' ? 'rgba(245, 158, 11, 0.1)' : 
-                          staff.shiftType === 'Chiều' ? 'rgba(59, 130, 246, 0.1)' : 
-                          staff.shiftType === 'Đêm' ? 'rgba(139, 92, 246, 0.1)' :
-                          'rgba(16, 185, 129, 0.1)',
-                      color: 
-                          staff.shiftType === 'Sáng' ? '#d97706' : 
-                          staff.shiftType === 'Chiều' ? '#2563eb' : 
-                          staff.shiftType === 'Đêm' ? '#7c3aed' :
-                          '#059669',
-                        border: '1px solid',
-                        borderColor:
-                          staff.shiftType === 'Sáng' ? '#fbbf24' : 
-                          staff.shiftType === 'Chiều' ? '#93c5fd' : 
-                          staff.shiftType === 'Đêm' ? '#c4b5fd' :
-                          '#86efac'
-                    }}>
-                      {staff.shiftType}
-                    </span>
-                  </td>
                     <td style={{
                       padding: '1.25rem 1.5rem', 
                       fontSize: '0.875rem', 
@@ -805,79 +678,151 @@ export default function StaffPage() {
                     </td>
                     <td style={{padding: '1.25rem 1.5rem'}}>
                       <div style={{display: 'flex', gap: '0.5rem'}}>
-                      <button 
-                        onClick={() => handleViewStaff(staff.id)}
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '0.5rem',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        {/* Nút xem */}
+                        <div style={{position: 'relative', display: 'inline-block'}}>
+                          <button 
+                            onClick={() => handleViewStaff(staff.id)}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                              e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                            }}
+                            onFocus={e => e.currentTarget.parentElement.querySelector('.tooltip-view').style.opacity = 1}
+                            onBlur={e => e.currentTarget.parentElement.querySelector('.tooltip-view').style.opacity = 0}
+                            onMouseEnter={e => e.currentTarget.parentElement.querySelector('.tooltip-view').style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.parentElement.querySelector('.tooltip-view').style.opacity = 0}
+                          >
+                            <EyeIcon style={{width: '1rem', height: '1rem'}} />
+                          </button>
+                          <span className="tooltip-view" style={{
+                            position: 'absolute',
+                            left: '50%',
+                            top: '-2.2rem',
+                            transform: 'translateX(-50%)',
+                            background: '#3b82f6',
                             color: 'white',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
-                          }}
-                      >
-                        <EyeIcon style={{width: '1rem', height: '1rem'}} />
-                      </button>
-                      <button
-                        onClick={() => handleEditStaff(staff.id)}
-                          style={{
-                            padding: '0.5rem',
+                            padding: '0.35rem 0.75rem',
                             borderRadius: '0.5rem',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                            opacity: 0,
+                            pointerEvents: 'none',
+                            transition: 'opacity 0.2s',
+                            zIndex: 10
+                          }}>Xem chi tiết</span>
+                        </div>
+                        {/* Nút sửa */}
+                        <div style={{position: 'relative', display: 'inline-block'}}>
+                          <button
+                            onClick={() => handleEditStaff(staff.id)}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                              e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+                            }}
+                            onFocus={e => e.currentTarget.parentElement.querySelector('.tooltip-edit').style.opacity = 1}
+                            onBlur={e => e.currentTarget.parentElement.querySelector('.tooltip-edit').style.opacity = 0}
+                            onMouseEnter={e => e.currentTarget.parentElement.querySelector('.tooltip-edit').style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.parentElement.querySelector('.tooltip-edit').style.opacity = 0}
+                          >
+                            <PencilIcon style={{width: '1rem', height: '1rem'}} />
+                          </button>
+                          <span className="tooltip-edit" style={{
+                            position: 'absolute',
+                            left: '50%',
+                            top: '-2.2rem',
+                            transform: 'translateX(-50%)',
+                            background: '#10b981',
                             color: 'white',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
-                          }}
-                      >
-                        <PencilIcon style={{width: '1rem', height: '1rem'}} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteClick(staff.id)}
-                          style={{
-                            padding: '0.5rem',
+                            padding: '0.35rem 0.75rem',
                             borderRadius: '0.5rem',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                            opacity: 0,
+                            pointerEvents: 'none',
+                            transition: 'opacity 0.2s',
+                            zIndex: 10
+                          }}>Chỉnh sửa</span>
+                        </div>
+                        {/* Nút xóa */}
+                        <div style={{position: 'relative', display: 'inline-block'}}>
+                          <button 
+                            onClick={() => handleDeleteClick(staff.id)}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                              e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.3)';
+                            }}
+                            onFocus={e => e.currentTarget.parentElement.querySelector('.tooltip-delete').style.opacity = 1}
+                            onBlur={e => e.currentTarget.parentElement.querySelector('.tooltip-delete').style.opacity = 0}
+                            onMouseEnter={e => e.currentTarget.parentElement.querySelector('.tooltip-delete').style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.parentElement.querySelector('.tooltip-delete').style.opacity = 0}
+                          >
+                            <TrashIcon style={{width: '1rem', height: '1rem'}} />
+                          </button>
+                          <span className="tooltip-delete" style={{
+                            position: 'absolute',
+                            left: '50%',
+                            top: '-2.2rem',
+                            transform: 'translateX(-50%)',
+                            background: '#ef4444',
                             color: 'white',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.4)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.3)';
-                          }}
-                      >
-                        <TrashIcon style={{width: '1rem', height: '1rem'}} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                            opacity: 0,
+                            pointerEvents: 'none',
+                            transition: 'opacity 0.2s',
+                            zIndex: 10
+                          }}>Xóa</span>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
                 {filteredStaff.length === 0 && (
                   <tr>
                     <td 
@@ -1003,279 +948,193 @@ export default function StaffPage() {
 
       {/* Service Package Approval Modal */}
       {showApprovalModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(5px)'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            maxWidth: '900px',
-            width: '95%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-          }}>
+        <div className="modal-backdrop">
+          <div className="modal-container" style={{padding: 0, position: 'relative'}}>
             {/* Header */}
             <div style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb',
               background: 'linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)',
-              borderRadius: '1rem 1rem 0 0'
+              borderTopLeftRadius: '1rem',
+              borderTopRightRadius: '1rem',
+              padding: '2rem 2.5rem 1.25rem 2.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #fde68a',
             }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <h3 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 700,
-                    color: '#92400e',
-                    margin: '0 0 0.5rem 0'
-                  }}>
-                    🔍 Duyệt gói dịch vụ chờ phê duyệt
-                  </h3>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#b45309',
-                    margin: 0
-                  }}>
-                    Có {pendingPackages.length} gói dịch vụ đang chờ duyệt
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowApprovalModal(false)}
-                  style={{
-                    background: 'rgba(146, 64, 14, 0.1)',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                    color: '#92400e'
-                  }}
-                >
-                  <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
+              <div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#92400e', margin: 0 }}>
+                  🔍 Duyệt gói dịch vụ chờ phê duyệt
+                </h3>
+                <p style={{ fontSize: '0.95rem', color: '#b45309', margin: 0, fontWeight: 500 }}>
+                  Có {pendingPackages.length} gói dịch vụ đang chờ duyệt
+                </p>
               </div>
+              <button
+                onClick={() => setShowApprovalModal(false)}
+                className="hover:bg-yellow-100 transition-colors duration-150"
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  borderRadius: '50%',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#92400e',
+                  fontSize: '1.5rem',
+                  position: 'absolute',
+                  top: '1.25rem',
+                  right: '1.25rem',
+                  zIndex: 2
+                }}
+                aria-label="Đóng"
+              >
+                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-
             {/* Content */}
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{ padding: '2rem 2.5rem' }}>
               {pendingPackages.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '3rem',
-                  color: '#6b7280'
-                }}>
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280' }}>
                   <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#d1d5db' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <h4 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#374151' }}>
                     Không có gói dịch vụ nào chờ duyệt
                   </h4>
-                  <p style={{ margin: 0, fontSize: '0.875rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem' }}>
                     Tất cả các gói dịch vụ đã được xử lý
                   </p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {pendingPackages.map((pkg, index) => (
-                    <div key={pkg.registrationId} style={{
-                      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.75rem',
-                      padding: '1.5rem',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
-                    }}>
-                      {/* Package Header */}
+                    <div key={pkg.registrationId} className="card" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)', padding: '2rem 1.5rem' }}>
+                      {/* Tiêu đề gói dịch vụ */}
                       <div style={{
                         display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: '1rem'
+                        marginBottom: '1.5rem'
                       }}>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{
-                            fontSize: '1.125rem',
-                            fontWeight: 600,
-                            color: '#111827',
-                            margin: '0 0 0.5rem 0'
+                        <div>
+                          <h2 style={{
+                            fontSize: '1.35rem',
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            margin: 0,
+                            letterSpacing: '-0.01em'
                           }}>
                             {pkg.name}
-                          </h4>
+                          </h2>
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                             gap: '0.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
+                            fontSize: '1rem',
+                            color: '#334155',
+                            marginTop: 8
                           }}>
-                            <p style={{ margin: 0 }}>
-                              <strong>Người thụ hưởng:</strong> {pkg.residentName}
-                            </p>
-                            <p style={{ margin: 0 }}>
-                              <strong>Tuổi:</strong> {pkg.residentAge} tuổi
-                            </p>
-                            <p style={{ margin: 0 }}>
-                              <strong>Phòng:</strong> {pkg.residentRoom}
-                            </p>
-                            <p style={{ margin: 0 }}>
-                              <strong>Mã đăng ký:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{pkg.registrationId}</span>
-                            </p>
+                            <div><strong>Người thụ hưởng:</strong> {pkg.residentName}</div>
+                            <div><strong>Tuổi:</strong> {pkg.residentAge} tuổi</div>
+                            <div><strong>Phòng:</strong> {pkg.residentRoom}</div>
+                            <div><strong>Mã đăng ký:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{pkg.registrationId}</span></div>
                           </div>
                         </div>
                         <div style={{
                           background: '#fef3c7',
                           border: '1px solid #fbbf24',
                           borderRadius: '1rem',
-                          padding: '0.375rem 0.75rem',
-                          fontSize: '0.75rem',
+                          padding: '0.5rem 1.25rem',
+                          fontSize: '0.95rem',
                           fontWeight: 600,
-                          color: '#92400e'
+                          color: '#92400e',
+                          marginLeft: 16,
+                          minWidth: 120,
+                          textAlign: 'center'
                         }}>
                           CHỜ DUYỆT
                         </div>
                       </div>
-
-                      {/* Package Details */}
+                      {/* Thông tin thanh toán & thời gian */}
                       <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                        gap: '1rem',
-                        marginBottom: '1rem'
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                        gap: '1.5rem',
+                        marginBottom: '1.5rem'
                       }}>
                         <div style={{
                           background: '#f0fdf4',
                           border: '1px solid #bbf7d0',
-                          borderRadius: '0.5rem',
-                          padding: '1rem'
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          boxShadow: '0 2px 8px rgba(16,185,129,0.06)'
                         }}>
-                          <h5 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#059669', margin: '0 0 0.5rem 0' }}>
-                            💰 Thông tin thanh toán
-                          </h5>
-                          <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.4 }}>
-                            {pkg.discount > 0 ? (
-                              <>
-                                <p style={{ margin: '0.25rem 0' }}>Giá gốc: {formatCurrency(pkg.price)}</p>
-                                <p style={{ margin: '0.25rem 0', color: '#059669' }}>Giảm giá: -{formatCurrency(pkg.discountAmount)} ({pkg.discount}%)</p>
-                                <p style={{ margin: '0.25rem 0', fontWeight: 600 }}>Thành tiền: {formatCurrency(pkg.finalPrice)}/tháng</p>
-                              </>
-                            ) : (
-                              <p style={{ margin: '0.25rem 0', fontWeight: 600 }}>Chi phí: {formatCurrency(pkg.price)}/tháng</p>
+                          <div style={{ fontWeight: 600, color: '#059669', marginBottom: 8 }}>Thông tin thanh toán</div>
+                          <div style={{ color: '#334155', fontSize: '1rem', lineHeight: 1.6 }}>
+                            <div>Giá gốc: <span style={{ fontWeight: 500 }}>{formatCurrency(pkg.price)}</span></div>
+                            {pkg.discount > 0 && (
+                              <div style={{ color: '#059669' }}>Giảm giá: -{formatCurrency(pkg.discountAmount)} ({pkg.discount}%)</div>
                             )}
+                            <div style={{ fontWeight: 700, color: '#059669', fontSize: '1.1rem' }}>
+                              Thành tiền: {formatCurrency(pkg.finalPrice)}/tháng
+                            </div>
                           </div>
                         </div>
-
                         <div style={{
                           background: '#eff6ff',
                           border: '1px solid #bfdbfe',
-                          borderRadius: '0.5rem',
-                          padding: '1rem'
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          boxShadow: '0 2px 8px rgba(59,130,246,0.06)'
                         }}>
-                          <h5 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1d4ed8', margin: '0 0 0.5rem 0' }}>
-                            📅 Thông tin thời gian
-                          </h5>
-                          <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.4 }}>
-                            <p style={{ margin: '0.25rem 0' }}>
-                              <strong>Ngày đăng ký:</strong> {new Date(pkg.purchaseDate).toLocaleDateString('vi-VN')}
-                            </p>
+                          <div style={{ fontWeight: 600, color: '#1d4ed8', marginBottom: 8 }}>Thông tin thời gian</div>
+                          <div style={{ color: '#334155', fontSize: '1rem', lineHeight: 1.6 }}>
+                            <div>Ngày đăng ký: <strong>{new Date(pkg.purchaseDate).toLocaleDateString('vi-VN')}</strong></div>
                             {pkg.startDate && (
-                              <p style={{ margin: '0.25rem 0' }}>
-                                <strong>Ngày bắt đầu:</strong> {new Date(pkg.startDate).toLocaleDateString('vi-VN')}
-                              </p>
+                              <div>Ngày bắt đầu: <strong>{new Date(pkg.startDate).toLocaleDateString('vi-VN')}</strong></div>
                             )}
-                            <p style={{ margin: '0.25rem 0' }}>
-                              <strong>Phương thức:</strong> {pkg.paymentMethod === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt'}
-                            </p>
+                            <div>Phương thức: <strong>{pkg.paymentMethod === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt'}</strong></div>
                           </div>
                         </div>
                       </div>
-
-                      {/* Additional Notes */}
+                      {/* Ghi chú y tế */}
                       {pkg.medicalNotes && (
                         <div style={{
                           background: '#fefce8',
                           border: '1px solid #fde047',
-                          borderRadius: '0.5rem',
-                          padding: '1rem',
-                          marginBottom: '1rem'
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          marginTop: '1rem',
+                          color: '#a16207',
+                          fontSize: '1rem'
                         }}>
-                          <h5 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#a16207', margin: '0 0 0.5rem 0' }}>
-                            🏥 Ghi chú y tế
-                          </h5>
-                          <p style={{ fontSize: '0.8rem', color: '#374151', margin: 0, lineHeight: 1.4 }}>
-                            {pkg.medicalNotes}
-                          </p>
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Ghi chú y tế</div>
+                          <div style={{ color: '#374151', fontWeight: 400 }}>{pkg.medicalNotes}</div>
                         </div>
                       )}
-
                       {/* Action Buttons */}
-                      <div style={{
-                        display: 'flex',
-                        gap: '0.75rem',
-                        justifyContent: 'flex-end',
-                        paddingTop: '1rem',
-                        borderTop: '1px solid #e5e7eb'
-                      }}>
+                      <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb', marginTop: '2rem' }}>
                         <button
                           onClick={() => handleRejectPackage(pkg.registrationId)}
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            borderRadius: '0.5rem',
-                            border: '1px solid #ef4444',
-                            background: 'white',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            fontSize: '0.875rem',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#fef2f2';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'white';
-                          }}
+                          className="btn-outline-gradient"
+                          style={{ minWidth: 120, display: 'flex', alignItems: 'center', gap: 8 }}
                         >
-                          ❌ Từ chối
+                          <XMarkIcon style={{ width: '1.1em', height: '1.1em', marginRight: 6, color: '#ef4444' }} />
+                          Từ chối
                         </button>
                         <button
                           onClick={() => handleApprovePackage(pkg.registrationId)}
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            borderRadius: '0.5rem',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            fontSize: '0.875rem',
-                            boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(5, 150, 105, 0.4)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(5, 150, 105, 0.3)';
-                          }}
+                          className="btn-gradient"
+                          style={{ minWidth: 120, display: 'flex', alignItems: 'center', gap: 8 }}
                         >
-                          ✅ Duyệt
+                          <CheckCircleIcon style={{ width: '1.1em', height: '1.1em', marginRight: 6, color: 'white' }} />
+                          Duyệt
                         </button>
                       </div>
                     </div>
@@ -1283,30 +1142,14 @@ export default function StaffPage() {
                 </div>
               )}
             </div>
-
             {/* Footer */}
-            <div style={{
-              padding: '1rem 1.5rem',
-              background: '#f9fafb',
-              borderRadius: '0 0 1rem 1rem',
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}>
+            <div style={{ padding: '1.25rem 2.5rem', background: '#f9fafb', borderRadius: '0 0 1rem 1rem', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
                   setShowApprovalModal(false);
                   loadPendingPackages(); // Refresh data when closing
                 }}
-                style={{
-                  background: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
+                className="btn-secondary"
               >
                 Đóng
               </button>

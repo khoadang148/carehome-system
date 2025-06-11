@@ -17,11 +17,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { RESIDENTS_DATA } from '@/lib/residents-data';
 import { useAuth } from '@/lib/auth-context';
-import MedicationDisplay from '@/components/staff/MedicationDisplay';
+
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
-import MedicalPlansDisplay from '@/components/staff/MedicalPlansDisplay';
-import PrescriptionsDisplay from '@/components/staff/PrescriptionsDisplay';
+
 
 export default function ResidentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -617,39 +616,30 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   Thuốc đang sử dụng
                 </h3>
                 
-                {resident.medications_detail && resident.medications_detail.length > 0 ? (
-                  <MedicationDisplay
-                    residentId={parseInt(residentId)}
-                    medications={resident.medications_detail}
-                    onMedicationUpdate={handleActionComplete}
-                    isStaff={user?.role === 'staff'}
-                  />
-                ) : (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '1rem'
-                  }}>
-                    {(resident.medications || []).length > 0 ? (
-                      (resident.medications || []).map((medication: string, index: number) => (
-                        <div key={index} style={{
-                          padding: '0.75rem',
-                          background: 'rgba(255, 255, 255, 0.8)',
-                          borderRadius: '0.5rem',
-                          border: '1px solid rgba(16, 185, 129, 0.1)'
-                        }}>
-                          <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                            {medication}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
-                        Không có thuốc đang sử dụng
-                      </p>
-                    )}
-                  </div>
-                )}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '1rem'
+                }}>
+                  {(resident.medications || []).length > 0 ? (
+                    (resident.medications || []).map((medication: string, index: number) => (
+                      <div key={index} style={{
+                        padding: '0.75rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        borderRadius: '0.5rem',
+                        border: '1px solid rgba(16, 185, 129, 0.1)'
+                      }}>
+                        <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                          {medication}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+                      Không có thuốc đang sử dụng
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Allergies */}
@@ -760,48 +750,6 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
           {/* Activities Tab */}
           {activeTab === 'activities' && (
             <div style={{ display: 'grid', gap: '1.5rem' }}>
-              {/* Medical Plans */}
-              <div style={{
-                background: 'rgba(139, 92, 246, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(139, 92, 246, 0.2)'
-              }}>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: '0 0 1rem 0',
-                  color: '#1e293b'
-                }}>
-                  Kế hoạch khám bệnh
-                </h3>
-                <MedicalPlansDisplay
-                  medicalPlans={resident.medicalPlans || []}
-                  isStaff={user?.role === 'staff'}
-                />
-              </div>
-
-              {/* Prescriptions */}
-              <div style={{
-                background: 'rgba(59, 130, 246, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(59, 130, 246, 0.2)'
-              }}>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: '0 0 1rem 0',
-                  color: '#1e293b'
-                }}>
-                  Lịch sử đơn thuốc
-                </h3>
-                <PrescriptionsDisplay
-                  prescriptions={resident.prescriptions || []}
-                  isStaff={user?.role === 'staff'}
-                />
-              </div>
-
               {/* Individual Appointments */}
               <div style={{
                 background: 'rgba(16, 185, 129, 0.05)',

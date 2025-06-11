@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, UserIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 // Mock staff data (same as in the staff page)
 const initialStaffMembers = [
@@ -13,7 +13,7 @@ const initialStaffMembers = [
     name: 'John Smith', 
     firstName: 'John',
     lastName: 'Smith',
-    position: 'Y tá đã đăng ký', 
+    position: 'Y tá', 
     department: 'Y tế', 
     shiftType: 'Sáng', 
     hireDate: '2022-03-15',
@@ -177,7 +177,6 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
             gender: foundStaff.gender,
             position: foundStaff.position,
             department: foundStaff.department,
-            shiftType: foundStaff.shiftType,
             hireDate: foundStaff.hireDate,
             email: foundStaff.email || '',
             certification: foundStaff.certification || '',
@@ -223,7 +222,6 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
             gender: data.gender,
             position: data.position,
             department: data.department,
-            shiftType: data.shiftType,
             hireDate: data.hireDate,
             email: data.email,
             certification: data.certification,
@@ -255,8 +253,8 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
   // Show loading state while fetching data
   if (loading || !resolvedParams) {
     return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
-        <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>
+      <div className="flex justify-center items-center h-[50vh]">
+        <p className="text-base text-gray-400">Đang tải thông tin...</p>
       </div>
     );
   }
@@ -264,121 +262,82 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
   // If staff is not found
   if (notFound) {
     return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
-        <p style={{fontSize: '1rem', color: '#6b7280'}}>Không tìm thấy thông tin nhân viên.</p>
+      <div className="flex justify-center items-center h-[50vh]">
+        <p className="text-base text-gray-400">Không tìm thấy thông tin nhân viên.</p>
       </div>
     );
   }
   
   return (
-    <div style={{maxWidth: '1400px', margin: '0 auto', padding: '0 1rem'}}>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href={`/staff/${resolvedParams.id}`} style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
-          <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
-        </Link>
-        <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Chỉnh sửa thông tin nhân viên</h1>
+    <div className="max-w-5xl mx-auto mt-8 p-8 bg-white rounded-3xl shadow-lg">
+      {/* Tiêu đề */}
+      <div className="flex items-center mb-2">
+        <div className="bg-blue-100 p-2 rounded-full mr-3">
+          <UserIcon className="w-6 h-6 text-blue-500" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Chỉnh sửa thông tin nhân viên</h2>
+          <p className="text-gray-500 text-sm">Cập nhật thông tin cá nhân, công việc và liên hệ của nhân viên</p>
+        </div>
       </div>
-      
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '1.5rem'}}>
-        <form onSubmit={handleSubmit(onSubmit)} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-          {/* Personal Information Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin cá nhân
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-8">
+        {/* Thông tin cá nhân */}
+        <section>
+          <h3 className="text-lg font-semibold mb-4">Thông tin cá nhân</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* First Name */}
               <div>
-                <label htmlFor="firstName" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Tên*
+              <label htmlFor="firstName" className="block font-medium text-gray-700 mb-1">
+                Tên <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="firstName"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.firstName ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('firstName', { required: 'Tên là bắt buộc' })}
                 />
                 {errors.firstName && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.firstName.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.firstName.message}</p>
                 )}
               </div>
-              
               {/* Last Name */}
               <div>
-                <label htmlFor="lastName" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Họ*
+              <label htmlFor="lastName" className="block font-medium text-gray-700 mb-1">
+                Họ <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="lastName"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.lastName ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('lastName', { required: 'Họ là bắt buộc' })}
                 />
                 {errors.lastName && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.lastName.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.lastName.message}</p>
                 )}
               </div>
-              
               {/* Date of Birth */}
               <div>
-                <label htmlFor="dateOfBirth" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ngày sinh*
+              <label htmlFor="dateOfBirth" className="block font-medium text-gray-700 mb-1">
+                Ngày sinh <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="dateOfBirth"
                   type="date"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.dateOfBirth ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('dateOfBirth', { required: 'Ngày sinh là bắt buộc' })}
                 />
                 {errors.dateOfBirth && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.dateOfBirth.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth.message}</p>
                 )}
               </div>
-              
               {/* Gender */}
               <div>
-                <label htmlFor="gender" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Giới tính*
+              <label htmlFor="gender" className="block font-medium text-gray-700 mb-1">
+                Giới tính <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="gender"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.gender ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('gender', { required: 'Giới tính là bắt buộc' })}
                 >
                   <option value="">Chọn giới tính</option>
@@ -387,61 +346,39 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
                   <option value="other">Khác</option>
                 </select>
                 {errors.gender && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.gender.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.gender.message}</p>
                 )}
-              </div>
             </div>
           </div>
-          
-          {/* Employment Information Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin công việc
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
+        </section>
+        {/* Thông tin công việc */}
+        <section>
+          <h3 className="text-lg font-semibold mb-4">Thông tin công việc</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Position */}
               <div>
-                <label htmlFor="position" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Vị trí*
+              <label htmlFor="position" className="block font-medium text-gray-700 mb-1">
+                Vị trí <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="position"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.position ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('position', { required: 'Vị trí là bắt buộc' })}
                 />
                 {errors.position && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.position.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.position.message}</p>
                 )}
               </div>
-              
               {/* Department */}
               <div>
-                <label htmlFor="department" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Phòng ban*
+              <label htmlFor="department" className="block font-medium text-gray-700 mb-1">
+                Khoa <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="department"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.department ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('department', { required: 'Phòng ban là bắt buộc' })}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
+                  {...register('department', { required: 'Khoa là bắt buộc' })}
                 >
                   <option value="">Chọn phòng ban</option>
                   {departments.map(dept => (
@@ -449,269 +386,135 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
                   ))}
                 </select>
                 {errors.department && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.department.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.department.message}</p>
                 )}
               </div>
-              
-              {/* Shift Type */}
-              <div>
-                <label htmlFor="shiftType" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ca làm việc*
-                </label>
-                <select
-                  id="shiftType"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.shiftType ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('shiftType', { required: 'Ca làm việc là bắt buộc' })}
-                >
-                  <option value="">Chọn ca làm việc</option>
-                  {shifts.map(shift => (
-                    <option key={shift} value={shift}>{shift}</option>
-                  ))}
-                </select>
-                {errors.shiftType && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.shiftType.message}</p>
-                )}
-              </div>
-              
               {/* Hire Date */}
               <div>
-                <label htmlFor="hireDate" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ngày vào làm*
+              <label htmlFor="hireDate" className="block font-medium text-gray-700 mb-1">
+                Ngày vào làm <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="hireDate"
                   type="date"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.hireDate ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('hireDate', { required: 'Ngày vào làm là bắt buộc' })}
                 />
                 {errors.hireDate && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.hireDate.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.hireDate.message}</p>
                 )}
               </div>
-
               {/* Certification */}
               <div>
-                <label htmlFor="certification" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
+              <label htmlFor="certification" className="block font-medium text-gray-700 mb-1">
                   Chứng chỉ
                 </label>
                 <input
                   id="certification"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('certification')}
                 />
-              </div>
             </div>
           </div>
-          
-          {/* Contact Information Section */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin liên hệ
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
+        </section>
+        {/* Thông tin liên hệ */}
+        <section>
+          <h3 className="text-lg font-semibold mb-4">Thông tin liên hệ</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Email */}
               <div>
-                <label htmlFor="email" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
+              <label htmlFor="email" className="block font-medium text-gray-700 mb-1">
                   Email
                 </label>
                 <input
                   id="email"
                   type="email"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('email')}
                 />
               </div>
-              
               {/* Contact Phone */}
               <div>
-                <label htmlFor="contactPhone" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Số điện thoại*
+              <label htmlFor="contactPhone" className="block font-medium text-gray-700 mb-1">
+                Số điện thoại <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="contactPhone"
                   type="tel"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.contactPhone ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('contactPhone', { required: 'Số điện thoại là bắt buộc' })}
                 />
                 {errors.contactPhone && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.contactPhone.message}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.contactPhone.message}</p>
                 )}
               </div>
-              
               {/* Address */}
               <div>
-                <label htmlFor="address" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
+              <label htmlFor="address" className="block font-medium text-gray-700 mb-1">
                   Địa chỉ
                 </label>
                 <input
                   id="address"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('address')}
                 />
               </div>
-              
               {/* Emergency Contact */}
               <div>
-                <label htmlFor="emergencyContact" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
+              <label htmlFor="emergencyContact" className="block font-medium text-gray-700 mb-1">
                   Liên hệ khẩn cấp
                 </label>
                 <input
                   id="emergencyContact"
                   type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('emergencyContact')}
                 />
               </div>
-              
               {/* Emergency Phone */}
               <div>
-                <label htmlFor="emergencyPhone" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
+              <label htmlFor="emergencyPhone" className="block font-medium text-gray-700 mb-1">
                   SĐT khẩn cấp
                 </label>
                 <input
                   id="emergencyPhone"
                   type="tel"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
                   {...register('emergencyPhone')}
                 />
-              </div>
             </div>
           </div>
-          
-          {/* Notes Section */}
+        </section>
+        {/* Ghi chú */}
           <div>
-            <label htmlFor="notes" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-              Ghi chú
-            </label>
+          <label htmlFor="notes" className="block font-medium text-gray-700 mb-1">Ghi chú</label>
             <textarea
               id="notes"
               rows={4}
-              style={{
-                display: 'block',
-                width: '100%',
-                borderRadius: '0.375rem',
-                border: '1px solid #d1d5db',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.875rem',
-                outline: 'none'
-              }}
+            className="w-full rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 p-3 text-base"
               {...register('notes')}
             />
           </div>
-          
-          {/* Form Buttons */}
-          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem'}}>
+        {/* Nút action */}
+        <div className="flex justify-end gap-4 mt-8">
             <Link 
               href={`/staff/${resolvedParams.id}`} 
-              style={{
-                padding: '0.5rem 1rem', 
-                border: '1px solid #d1d5db', 
-                borderRadius: '0.375rem', 
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                color: '#374151',
-                textDecoration: 'none'
-              }}
-            >
-              Huỷ
+            className="px-6 py-3 rounded-xl border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition"
+          >
+            Huỷ bỏ
             </Link>
             <button
               type="submit"
               disabled={isSubmitting}
-              style={{
-                padding: '0.5rem 1rem', 
-                border: '1px solid transparent', 
-                borderRadius: '0.375rem', 
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                color: 'white', 
-                backgroundColor: '#0284c7',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.5 : 1
-              }}
-            >
-              {isSubmitting ? 'Đang lưu...' : 'Lưu thông tin'}
+            className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold flex items-center gap-2 hover:bg-green-700 transition disabled:opacity-60"
+          >
+            <CheckCircleIcon className="w-5 h-5" />
+            {isSubmitting ? 'Đang lưu...' : 'Cập nhật thông tin'}
             </button>
           </div>
         </form>
-      </div>
     </div>
   );
 } 

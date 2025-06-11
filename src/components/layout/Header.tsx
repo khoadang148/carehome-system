@@ -69,9 +69,6 @@ export default function Header() {
     const notification = notifications.find(n => n.id === notificationId);
     if (notification) {
       switch (notification.type) {
-        case 'medication':
-          router.push('/medical');
-          break;
         case 'meeting':
           router.push('/activities');
           break;
