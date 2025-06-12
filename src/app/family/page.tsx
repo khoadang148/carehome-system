@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -19,7 +19,8 @@ import {
   CheckIcon,
   XCircleIcon,
   InformationCircleIcon,
-  BellIcon
+  BellIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { Tab } from '@headlessui/react';
 
@@ -139,6 +140,7 @@ const residents = [
 ];
 
 export default function FamilyPortalPage() {
+  const router = useRouter();
   
   const [selectedResident, setSelectedResident] = useState(residents[0]);
   
@@ -175,6 +177,9 @@ export default function FamilyPortalPage() {
   const [visitPurpose, setVisitPurpose] = useState('');
   const [selectedStaff, setSelectedStaff] = useState('');
   const [allPhotos, setAllPhotos] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [lightboxPhoto, setLightboxPhoto] = useState<any>(null);
 
   // Handler functions for button actions
   const handleContactStaff = () => {
@@ -329,7 +334,7 @@ export default function FamilyPortalPage() {
         // Combine with mock photos
         const combinedPhotos = [...mockPhotos, ...residentPhotos];
         // Sort by date (newest first)
-        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a).getTime());
         setAllPhotos(combinedPhotos);
       } else {
         setAllPhotos(mockPhotos);
@@ -642,7 +647,7 @@ export default function FamilyPortalPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Cổng thông tin gia đình
+                  Thông tin người thân 
                 </h1>
                 <p style={{
                   fontSize: '1rem',
@@ -804,19 +809,18 @@ export default function FamilyPortalPage() {
                 />
               </div>
               <div style={{flex: 1}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
-                  <span style={{fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '0.25rem 0.75rem', borderRadius: '9999px', border: '1px solid #e5e7eb'}}>
-                    {selectedResident.relationship}
-                  </span>
-                </div>
+                
                 <div style={{marginBottom: '0.5rem'}}>
                   <span style={{fontWeight: 600, color: '#374151'}}>Tên: </span>{selectedResident.name}
+                </div>
+                <div style={{marginBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 600, color: '#374151'}}>Mối quan hệ: </span>{selectedResident.relationship}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
                   <span style={{fontWeight: 600, color: '#374151'}}>Phòng: </span>{selectedResident.room}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 600, color: '#374151'}}>Tuổi: </span>{selectedResident.age} tuổi
+                  <span style={{fontWeight: 600, color: '#374151'}}>Tuổi: </span>{selectedResident.age}
                 </div>
                 <div style={{marginBottom: '1.5rem'}}>
                   <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
@@ -1609,7 +1613,7 @@ export default function FamilyPortalPage() {
                   Đặt lịch thăm
                 </h3>
                 <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
-                  Đặt lịch hẹn để thăm cư dân tại viện dưỡng lão
+                  Đặt lịch hẹn để thăm người thân tại viện dưỡng lão
                 </p>
               </div>
               <button
@@ -1674,7 +1678,7 @@ export default function FamilyPortalPage() {
                   }}
                 />
                 <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                  📅 Chọn ngày bạn muốn đến thăm. Vui lòng đặt lịch trước ít nhất 24 giờ.
+                   Chọn ngày bạn muốn đến thăm. Vui lòng đặt lịch trước ít nhất 24 giờ.
                 </p>
               </div>
               
@@ -1721,7 +1725,7 @@ export default function FamilyPortalPage() {
                   <option value="16:00">16:00 - 17:00</option>
                 </select>
                 <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                  ⏰ Chọn khung giờ phù hợp với lịch của bạn. Mỗi lần thăm kéo dài 1 giờ.
+                  Chọn khung giờ phù hợp với lịch của bạn. Mỗi lần thăm kéo dài 1 giờ.
                 </p>
               </div>
               
@@ -1768,7 +1772,7 @@ export default function FamilyPortalPage() {
                   <option value="Khác">Khác</option>
                 </select>
                 <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                  🎯 Chọn mục đích thăm để nhân viên có thể chuẩn bị tốt nhất cho chuyến thăm của bạn.
+                  Chọn mục đích thăm để nhân viên có thể chuẩn bị tốt nhất cho chuyến thăm của bạn.
                 </p>
               </div>
             </div>
@@ -1781,7 +1785,7 @@ export default function FamilyPortalPage() {
               marginBottom: '2rem'
             }}>
               <p style={{fontSize: '0.875rem', color: '#059669', margin: 0, fontWeight: 500}}>
-                📌 Lưu ý: Thời gian thăm từ 9:00-11:00 và 14:00-17:00. Vui lòng đặt lịch trước ít nhất 24 giờ.
+                Lưu ý: Thời gian thăm từ 9:00-11:00 và 14:00-17:00. Vui lòng đặt lịch trước ít nhất 24 giờ.
               </p>
             </div>
             
@@ -1856,13 +1860,81 @@ export default function FamilyPortalPage() {
 
       {/* View Photos Modal */}
       {showPhotosModal && (
+        <PhotoGalleryModal
+          allPhotos={allPhotos}
+          onClose={() => setShowPhotosModal(false)}
+        />
+      )}
+    </div>
+  );
+} 
+
+// Thêm component PhotoGalleryModal ở cuối file
+function PhotoGalleryModal({ allPhotos, onClose }: { allPhotos: any[]; onClose: () => void }) {
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [selectedPhotos, setSelectedPhotos] = useState<any[]>([]); // array of photo ids
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null); // index in filteredPhotos
+
+  // Lấy danh sách tháng/năm có trong ảnh
+  const months = useMemo(() => Array.from(new Set(allPhotos.map((p: any) => p.date.slice(5,7)))).sort(), [allPhotos]);
+  const years = useMemo(() => Array.from(new Set(allPhotos.map((p: any) => p.date.slice(0,4)))).sort().reverse(), [allPhotos]);
+
+  // Lọc ảnh theo search và filter
+  const filteredPhotos = useMemo(() => allPhotos.filter((photo: any) => {
+    const matchSearch =
+      photo.caption.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (photo.uploadedBy && photo.uploadedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      photo.date.includes(searchTerm);
+    const matchMonth = monthFilter ? photo.date.slice(5,7) === monthFilter : true;
+    const matchYear = yearFilter ? photo.date.slice(0,4) === yearFilter : true;
+    return matchSearch && matchMonth && matchYear;
+  }), [allPhotos, searchTerm, monthFilter, yearFilter]);
+
+  // Group by date
+  const groupedPhotos = useMemo(() => filteredPhotos.reduce((groups: Record<string, any[]>, photo: any) => {
+    const date = photo.date;
+    if (!groups[date]) groups[date] = [];
+    groups[date].push(photo);
+    return groups;
+  }, {} as Record<string, any[]>), [filteredPhotos]);
+  const sortedDates = useMemo(() => Object.keys(groupedPhotos).sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime()), [groupedPhotos]);
+
+  // Lightbox navigation
+  const openLightbox = (photoId: any) => {
+    const idx = filteredPhotos.findIndex((p: any) => p.id === photoId);
+    setLightboxIndex(idx);
+  };
+  const closeLightbox = () => setLightboxIndex(null);
+  const prevLightbox = () => setLightboxIndex(i => (i !== null && i > 0 ? i - 1 : i));
+  const nextLightbox = () => setLightboxIndex(i => (i !== null && i < filteredPhotos.length - 1 ? i + 1 : i));
+
+  // Tải ảnh về
+  const downloadPhoto = (url: string, name: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name || 'photo.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+  const downloadSelected = () => {
+    selectedPhotos.forEach((id: any) => {
+      const p = filteredPhotos.find((ph: any) => ph.id === id);
+      if (p) downloadPhoto(p.url, p.caption || 'photo.jpg');
+    });
+  };
+
+  return (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      background: 'linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(255,255,255,0.95) 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1871,197 +1943,357 @@ export default function FamilyPortalPage() {
           animation: 'fadeIn 0.3s ease-out'
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2.5rem',
-            maxWidth: '50rem',
-            width: '90%',
-            maxHeight: '85vh',
+        background: 'linear-gradient(135deg, #fff 60%, #f3f4f6 100%)',
+        borderRadius: '1.5rem',
+        padding: '2.5rem',
+        maxWidth: '60rem',
+        width: '98%',
+        maxHeight: '92vh',
             overflowY: 'auto',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            position: 'relative',
-            animation: 'slideUp 0.3s ease-out'
+        boxShadow: '0 20px 40px -10px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.04)',
+        position: 'relative',
+        border: '1px solid #e5e7eb',
+        marginLeft: '180px'
           }}>
             {/* Header */}
             <div style={{
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '1rem',
-              marginBottom: '2rem',
-              paddingBottom: '1rem',
-              borderBottom: '1px solid rgba(245, 158, 11, 0.1)'
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1.2rem',
+              marginBottom: '2.5rem',
+              paddingBottom: '1.2rem',
+              borderBottom: 'none',
+              background: 'none',
+              boxShadow: 'none',
             }}>
+
+<button
+  onClick={() => router.push('/')}
+  style={{
+    marginRight: '800px',
+    color: '#667eea',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '2.5rem',
+    height: '2.5rem',
+    borderRadius: '0.5rem',
+    background: 'rgba(102, 126, 234, 0.1)',
+    transition: 'all 0.2s',
+    textDecoration: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    outline: 'none'
+  }}
+  title="Quay lại trang chủ"
+>
+  <ArrowLeftIcon style={{height: '1.25rem', width: '1.25rem'}} />
+</button>
+
+
               <div style={{
-                width: '3rem',
-                height: '3rem',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                borderRadius: '1rem',
+                width: '4.5rem',
+                height: '4.5rem',
+                background: 'linear-gradient(135deg, #ffb347 0%, #ff5858 100%)',
+                borderRadius: '1.5rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                boxShadow: '0 4px 24px 0 rgba(255,88,88,0.10)'
               }}>
-                <PhotoIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
+                <PhotoIcon style={{width: '2.5rem', height: '2.5rem', color: 'white'}} />
               </div>
-              <div style={{flex: 1}}>
-                <h3 style={{fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#111827'}}>
-                  Thư viện ảnh của cư dân
-                </h3>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
-                  Xem những khoảnh khắc đẹp của cư dân tại viện
-                </p>
-              </div>
-              <button
-                onClick={() => setShowPhotosModal(false)}
-                style={{
-                  padding: '0.5rem',
-                  borderRadius: '0.75rem',
-                  border: 'none',
-                  background: 'rgba(107, 114, 128, 0.1)',
-                  color: '#6b7280',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
-                  e.currentTarget.style.color = '#f59e0b';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(107, 114, 128, 0.1)';
-                  e.currentTarget.style.color = '#6b7280';
-                }}
-              >
-                <XMarkIcon style={{width: '1.25rem', height: '1.25rem'}} />
-              </button>
+              <h3 style={{
+                fontSize: '2.1rem',
+                fontWeight: 900,
+                margin: 0,
+                background: 'linear-gradient(90deg, #ff5858 0%, #ffb347 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.5px',
+                textAlign: 'center',
+                lineHeight: 1.15,
+                textShadow: '0 2px 12px rgba(255,88,88,0.08)'
+              }}>
+                Nhật ký hình ảnh người thân của bạn
+              </h3>
+              <p style={{
+                fontSize: '1.08rem',
+                color: '#6b7280',
+                margin: 0,
+                textAlign: 'center',
+                fontWeight: 500,
+                maxWidth: 520,
+                lineHeight: 1.6
+              }}>
+                Dõi theo từng khoảnh khắc đáng nhớ của người thân tại viện dưỡng lão
+              </p>
             </div>
-            
+        {/* Thanh tìm kiếm và filter */}
+        <div
+          style={{
+            marginBottom: '2rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+            background: 'none',
+            borderRadius: '2rem',
+            padding: 0,
+            boxShadow: 'none',
+            border: 'none'
+          }}
+        >
+          <div style={{
+            position: 'relative',
+            flex: 1,
+            maxWidth: 520,
+            width: '100%',
+            background: '#fff',
+            borderRadius: '2.5rem',
+            boxShadow: '0 4px 24px 0 rgba(30,41,59,0.10)',
+            border: '1.5px solid #f1f5f9'
+          }}>
+            <span style={{
+              position: 'absolute',
+              left: 22,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#cbd5e1',
+              fontSize: 22,
+              pointerEvents: 'none',
+              zIndex: 2
+            }}>
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input
+              type="text"
+              placeholder="Tìm kiếm ảnh..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '1.1rem 1.1rem 1.1rem 3.2rem',
+                borderRadius: '2.5rem',
+                border: '1.5px solid #f1f5f9',
+                fontSize: '1.08rem',
+                background: '#fff',
+                color: '#374151',
+                boxShadow: '0 2px 12px rgba(30,41,59,0.06)',
+                outline: 'none',
+                transition: 'border 0.2s, box-shadow 0.2s',
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+                marginBottom: 0
+              }}
+              onFocus={e => {
+                e.currentTarget.style.border = '1.5px solid #ff5858';
+                e.currentTarget.style.boxShadow = '0 0 0 2px #ffe4e6';
+              }}
+              onBlur={e => {
+                e.currentTarget.style.border = '1.5px solid #f1f5f9';
+                e.currentTarget.style.boxShadow = '0 2px 12px rgba(30,41,59,0.06)';
+              }}
+            />
+          </div>
+          {selectedPhotos.length > 0 && (
+            <button
+              onClick={downloadSelected}
+              style={{
+                borderRadius: '2rem',
+                padding: '1.1rem 2.1rem',
+                border: 'none',
+                background: 'linear-gradient(90deg, #ff5858 0%, #ffb347 100%)',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: '1.08rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(255,88,88,0.08)',
+                transition: 'background 0.2s',
+                marginLeft: 12
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #ff5858 0%, #ff9147 100%)'; }}
+              onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #ff5858 0%, #ffb347 100%)'; }}
+            >Tải ảnh</button>
+          )}
+        </div>
+        {/* Phân nhóm ảnh theo ngày */}
+        {sortedDates.length === 0 ? (
+          <div style={{textAlign: 'center', color: '#6b7280', fontSize: '1.2rem', margin: '2.5rem 0'}}>Không tìm thấy ảnh phù hợp.</div>
+        ) : (
+          sortedDates.map((date: string) => (
+            <div key={date} style={{marginBottom: '2.5rem'}}>
+              <div style={{
+                fontWeight: 800,
+                fontSize: '1.2rem',
+                color: '#ef4444',
+                margin: '0 0 1.2rem 0',
+                letterSpacing: '0.01em',
+                textShadow: '0 1px 4px rgba(239,68,68,0.08)'
+              }}>
+                {new Date(date).toLocaleDateString('vi-VN')}
+              </div>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-              gap: '1.5rem',
-              marginBottom: '2rem'
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '18px'
             }}>
-              {allPhotos.map((photo) => (
-                <div key={photo.id} style={{
-                  background: 'white',
-                  borderRadius: '1rem',
+                {groupedPhotos[date].map((photo: any) => (
+                  <div
+                    key={photo.id}
+                    style={{
+                      position: 'relative',
+                      borderRadius: '1rem',
                   overflow: 'hidden',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid #e5e7eb',
-                  transition: 'all 0.3s ease'
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      border: selectedPhotos.includes(photo.id) ? '2.5px solid #ef4444' : '1.5px solid #f3f4f6',
+                      boxShadow: selectedPhotos.includes(photo.id) ? '0 4px 16px rgba(239,68,68,0.10)' : '0 2px 8px rgba(0,0,0,0.04)'
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 12px 25px -3px rgba(0, 0, 0, 0.15)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                }}
-                >
+                    onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.035)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(239,68,68,0.13)'; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = selectedPhotos.includes(photo.id) ? '0 4px 16px rgba(239,68,68,0.10)' : '0 2px 8px rgba(0,0,0,0.04)'; }}
+                  >
+                    {/* Ảnh */}
                   <img
                     src={photo.url}
                     alt={photo.caption}
                     style={{
                       width: '100%',
-                      height: '160px',
-                      objectFit: 'cover'
-                    }}
-                  />
-                  <div style={{padding: '1.25rem'}}>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#111827',
-                      margin: '0 0 0.5rem 0',
-                      lineHeight: 1.4
-                    }}>
-                      {photo.caption}
-                    </p>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.5rem'
-                    }}>
-                      <div style={{
+                        height: '180px',
+                        objectFit: 'cover',
+                        display: 'block',
+                        background: '#f3f4f6',
+                        borderRadius: '1rem 1rem 0 0'
+                      }}
+                      onClick={() => openLightbox(photo.id)}
+                    />
+                    {/* Overlay caption/ngày/người đăng + nút tải */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        padding: '14px 18px 10px 16px',
+                        background: 'linear-gradient(0deg, rgba(255,255,255,0.85) 80%, rgba(255,255,255,0.0) 100%)',
+                        color: '#334155',
+                        fontSize: '1.05em',
+                        fontWeight: 600,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <CalendarDaysIcon style={{width: '0.875rem', height: '0.875rem', color: '#f59e0b'}} />
-                        <p style={{
-                          fontSize: '0.75rem',
-                          color: '#6b7280',
-                          margin: 0,
-                          fontWeight: 500
-                        }}>
-                          {new Date(photo.date).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                      {photo.isUploaded && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '0.375rem',
-                          border: '1px solid rgba(16, 185, 129, 0.2)'
-                        }}>
-                          <UsersIcon style={{width: '0.75rem', height: '0.75rem', color: '#10b981'}} />
-                          <p style={{
-                            fontSize: '0.625rem',
-                            color: '#10b981',
-                            margin: 0,
-                            fontWeight: 600
-                          }}>
-                            {photo.uploadedBy}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                        justifyContent: 'space-between',
+                        minHeight: '44px',
+                        borderRadius: '0 0 1rem 1rem',
+                        boxShadow: '0 -2px 8px rgba(239,68,68,0.08)'
+                      }}
+                    >
+                      <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60%'}}>
+                        {photo.caption}
+                      </span>
+                      <button
+                        onClick={e => { e.stopPropagation(); downloadPhoto(photo.url, photo.caption || 'photo.jpg'); }}
+                        style={{
+                          marginLeft: 8,
+                          background: 'transparent',
+                          border: '1.5px solid #93c5fd',
+                          borderRadius: 12,
+                          color: '#60a5fa',
+                          padding: '4px 10px',
+                          cursor: 'pointer',
+                          fontSize: '1em',
+                          fontWeight: 500,
+                          transition: 'background 0.2s, color 0.2s, border 0.2s'
+                        }}
+                        onMouseOver={e => {
+                          e.currentTarget.style.background = '#e0f2fe';
+                          e.currentTarget.style.color = '#2563eb';
+                          e.currentTarget.style.border = '1.5px solid #60a5fa';
+                        }}
+                        onMouseOut={e => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#60a5fa';
+                          e.currentTarget.style.border = '1.5px solid #93c5fd';
+                        }}
+                        title="Tải ảnh này"
+                      >
+                        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <rect x="4" y="18" width="16" height="2" rx="1" fill="#60a5fa"/>
+                        </svg>
+                      </button>
                   </div>
                 </div>
               ))}
             </div>
-            
+            </div>
+          ))
+        )}
+        {/* Lightbox xem ảnh lớn */}
+        {lightboxIndex !== null && filteredPhotos[lightboxIndex] && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(30,41,59,0.85)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.2s'
+          }}
+            onClick={closeLightbox}
+          >
+            <button onClick={closeLightbox} style={{position: 'absolute', top: 32, right: 48, background: 'rgba(255,255,255,0.18)', color: 'white', border: 'none', borderRadius: 16, fontSize: 36, cursor: 'pointer', zIndex: 10, padding: '0 18px', fontWeight: 700, boxShadow: '0 2px 8px rgba(239,68,68,0.10)'}}>×</button>
+            <img
+              src={filteredPhotos[lightboxIndex].url}
+              alt={filteredPhotos[lightboxIndex].caption}
+              style={{
+                maxWidth: '85vw',
+                maxHeight: '85vh',
+                borderRadius: 24,
+                boxShadow: '0 12px 48px rgba(0,0,0,0.30)',
+                background: '#fff',
+                objectFit: 'contain',
+                margin: '0 2.5rem'
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+            {/* Caption dưới ảnh lớn */}
             <div style={{
+              position: 'absolute',
+              bottom: 48,
+              left: 0,
+              right: 0,
+              textAlign: 'center',
               display: 'flex',
               justifyContent: 'center',
-              paddingTop: '1rem',
-              borderTop: '1px solid #e5e7eb'
+              pointerEvents: 'none'
             }}>
-              <button
-                onClick={() => setShowPhotosModal(false)}
-                style={{
-                  padding: '0.75rem 2rem',
-                  borderRadius: '0.75rem',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
-                }}
-              >
-                Đóng
-              </button>
+              <div style={{
+                background: 'rgba(30,41,59,0.65)',
+                borderRadius: 16,
+                padding: '18px 28px',
+                display: 'inline-block',
+                color: '#fff',
+                minWidth: 220,
+                fontWeight: 700,
+                textShadow: '0 2px 8px rgba(30,41,59,0.5)'
+              }}>
+                <div style={{fontSize: '1.25rem', fontWeight: 700, marginBottom: 8}}>{filteredPhotos[lightboxIndex].caption}</div>
+                {filteredPhotos[lightboxIndex].uploadedBy && (
+                  <div style={{fontSize: '1.05em', fontWeight: 500, opacity: 0.92, marginBottom: 4}}>Người gửi: {filteredPhotos[lightboxIndex].uploadedBy}</div>
+                )}
+                <div style={{fontSize: '1.05em', fontWeight: 500, opacity: 0.92}}>Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString('vi-VN')}</div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 

@@ -59,7 +59,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['staff'], color: '#f59e0b' },
       { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['staff'], color: '#8b5cf6' },
-      { name: 'Cổng gia đình', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
+      { name: 'Thông tin người thân', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
       { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'family'], color: '#6366f1' },
       
     ]
