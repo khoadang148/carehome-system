@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/lib/contexts/auth-context";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
@@ -18,8 +18,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   
   // Hiển thị header cho tất cả các trang trừ một số trang đặc biệt
   const shouldShowHeader = pathname !== "/welcome" && 
-                           pathname !== "/setup" && 
-                           pathname !== "/residents";
+                           pathname !== "/setup";
   
   // Enhanced loading spinner with beautiful design
   if (loading) {

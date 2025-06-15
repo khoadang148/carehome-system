@@ -13,7 +13,7 @@ import {
   BriefcaseIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 // Validation types
 interface ValidationErrors {

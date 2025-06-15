@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
-import { RESIDENTS_DATA } from '@/lib/residents-data';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { 
   BuildingLibraryIcon,
   DocumentPlusIcon,
@@ -589,16 +589,18 @@ export default function ServicesPage() {
         }}>
           <div style={{
             backgroundColor: 'white',
-            borderRadius: '12px',
-            width: '90%',
-            maxWidth: '500px',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+            borderRadius: '16px',
+            width: '95%',
+            maxWidth: '540px',
+            maxHeight: '90vh',
+            boxShadow: '0 10px 32px rgba(0, 0, 0, 0.18)',
+            border: '1.5px solid #e0e7ef',
+            padding: 0,
+            overflowY: 'auto'
           }}>
-            {/* Simple Header */}
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50">
-              <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-3">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -609,6 +611,7 @@ export default function ServicesPage() {
               <button
                 onClick={() => setShowServiceModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 text-gray-500 hover:text-gray-700"
+                aria-label="Đóng"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -616,18 +619,18 @@ export default function ServicesPage() {
               </button>
             </div>
 
-            {/* Multiple residents selector */}
+            {/* Selector nếu có nhiều người thân */}
             {(() => {
               const allPackages = getAllRegisteredServicePackages();
               if (allPackages.length > 1) {
                 return (
                   <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                    <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-1H21m0 0l-3 3m3-3l-3-3" />
                       </svg>
                       Chọn người thân:
-                    </p>
+                    </label>
                     <div className="flex gap-3 flex-wrap">
                       {allPackages.map((pkg: any, index: number) => (
                         <button
@@ -649,7 +652,7 @@ export default function ServicesPage() {
               return null;
             })()}
 
-            {/* Package Details */}
+            {/* Nội dung chi tiết */}
             {(() => {
               const registeredPackage = getRegisteredServicePackage();
               if (!registeredPackage) {
@@ -679,185 +682,126 @@ export default function ServicesPage() {
               if (registeredPackage?.residentInfo) {
                 const resident = registeredPackage.residentInfo;
                 return (
-                  <div className="p-6">
-                    {/* User Info */}
-                    <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg">
-                        {resident.name?.charAt(0) || 'N'}
+                  <div className="p-6 space-y-7">
+                    {/* Thông tin người thân */}
+                    <div className="border border-blue-100 rounded-2xl p-5 bg-gradient-to-r from-blue-50 to-indigo-50">
+                      <div className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Thông tin người thân
                       </div>
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-1">
-                          {resident.name}
-                        </h4>
-                        <p className="text-sm text-gray-600 flex items-center gap-2">
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {resident.age} tuổi • {resident.room}
-                        </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Họ tên</div>
+                          <div className="text-sm font-semibold text-gray-900">{resident.name || 'Chưa cập nhật'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Tuổi</div>
+                          <div className="text-sm font-semibold text-gray-900">{resident.age ? `${resident.age} tuổi` : 'Chưa cập nhật'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Phòng</div>
+                          <div className="text-sm font-semibold text-gray-900">{resident.room || 'Chưa cập nhật'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Trạng thái</div>
+                          <div className="text-sm font-semibold text-green-600 flex items-center gap-1">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block"></span>
+                            Đang hoạt động
+                          </div>
+                        </div>
                       </div>
-                      <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        Đang hoạt động
-                      </span>
                     </div>
 
-                    {/* Emergency Contact Info */}
-                    <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl border border-red-100">
-                      <h5 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <div className="w-5 h-5 bg-red-500 rounded-lg flex items-center justify-center">
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                        </div>
+                    {/* Thông tin liên hệ khẩn cấp */}
+                    <div className="border border-red-100 rounded-2xl p-5 bg-gradient-to-r from-red-50 to-pink-50">
+                      <div className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
                         Người liên hệ khẩn cấp
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-white rounded-xl p-3 border border-red-100">
-                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            Họ tên
-                          </p>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {resident.emergencyContact || 'Lê Thị Hoa'}
-                          </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Họ tên</div>
+                          <div className="text-sm font-semibold text-gray-900">{resident.emergencyContact || 'Chưa cập nhật'}</div>
                         </div>
-                        <div className="bg-white rounded-xl p-3 border border-red-100">
-                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                            </svg>
-                            Số điện thoại
-                          </p>
-                          <p className="text-sm font-semibold text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded border">
-                            {resident.contactPhone || '(028) 1234-5678'}
-                          </p>
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Số điện thoại</div>
+                          <div className="text-sm font-semibold text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded border">
+                            {resident.contactPhone || 'Chưa cập nhật'}
+                          </div>
                         </div>
                       </div>
                       <div className="mt-3 flex items-center gap-2 text-xs text-red-600">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                         <span>Liên hệ khi có tình huống khẩn cấp</span>
                       </div>
                     </div>
 
-                    {/* Package Info */}
-                    <div className="border border-gray-200 rounded-2xl mb-6 overflow-hidden shadow-sm">
-                      {/* Package Name & Price */}
-                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 border-b border-gray-200">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                              <div className="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                              {registeredPackage.packageType || 'Gói Cơ Bản'}
-                            </h4>
-                            <p className="text-3xl font-bold text-blue-600 flex items-baseline gap-2">
-                              {formatCurrency(registeredPackage.finalPrice || registeredPackage.price)}
-                              <span className="text-sm font-medium text-gray-500">
-                                /tháng
-                              </span>
-                            </p>
-                          </div>
-                          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
-                            Đã đăng ký
-                          </div>
-                        </div>
+                    {/* Thông tin gói dịch vụ */}
+                    <div className="border border-gray-200 rounded-2xl p-5 bg-gradient-to-r from-gray-50 to-gray-100">
+                      <div className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Thông tin gói dịch vụ
                       </div>
-
-                      {/* Package Details */}
-                      <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              Ngày bắt đầu
-                            </p>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {new Date(registeredPackage.startDate || '2024-06-07').toLocaleDateString('vi-VN')}
-                            </p>
-                          </div>
-
-                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                              </svg>
-                              Mã đăng ký
-                            </p>
-                            <p className="text-sm font-semibold text-gray-900 font-mono bg-white px-2 py-1 rounded border">
-                              {registeredPackage.registrationId || 'REG-1717423258-1'}
-                            </p>
-                          </div>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Tên gói</div>
+                          <div className="text-sm font-semibold text-blue-700">{registeredPackage.packageType || 'Chưa cập nhật'}</div>
                         </div>
-
-                        {/* Features */}
-                        {registeredPackage.features && registeredPackage.features.length > 0 && (
-                          <div className="mb-6">
-                            <p className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Dịch vụ bao gồm:
-                            </p>
-                            <div className="space-y-3">
-                              {registeredPackage.features.map((feature: string, index: number) => (
-                                <div key={index} className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                                  <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  </div>
-                                  <span className="text-sm text-gray-700 font-medium">{feature}</span>
-                                </div>
-                              ))}
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Giá</div>
+                          <div className="text-sm font-semibold text-blue-700">{formatCurrency(registeredPackage.finalPrice || registeredPackage.price)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 font-medium mb-1">Ngày bắt đầu</div>
+                          <div className="text-sm font-semibold text-gray-900">{registeredPackage.startDate ? new Date(registeredPackage.startDate).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}</div>
+                        </div>
+                       
+                      </div>
+                      {/* Dịch vụ bao gồm */}
+                      <div className="mb-4">
+                        <div className="text-xs text-gray-500 font-medium mb-1">Dịch vụ bao gồm</div>
+                        <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+                          {registeredPackage.features?.map((f: string, i: number) => <li key={i}>{f}</li>)}
+                        </ul>
+                      </div>
+                      {/* Khuyến mãi */}
+                      {registeredPackage.discount > 0 && (
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mt-2">
+                          <div className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wide flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                            </svg>
+                            Khuyến mãi đặc biệt
+                          </div>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Giá gốc:</span>
+                              <span className="font-medium text-gray-900">{formatCurrency(Number(registeredPackage.price) || 15000000)}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-b border-green-200 pb-1">
+                              <span className="text-gray-600">Giảm giá ({registeredPackage.discount}%):</span>
+                              <span className="font-medium text-green-600">-{formatCurrency(Number(registeredPackage.discountAmount) || 0)}</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-white rounded-lg px-3 border border-green-100 mt-1">
+                              <span className="font-semibold text-gray-900">Thành tiền:</span>
+                              <span className="font-bold text-green-600 text-lg">{formatCurrency(registeredPackage.finalPrice)}</span>
                             </div>
                           </div>
-                        )}
-
-                        {/* Pricing Details */}
-                        {registeredPackage.discount > 0 && (
-                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
-                            <p className="text-xs font-semibold text-green-700 mb-3 uppercase tracking-wide flex items-center gap-2">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                              </svg>
-                              Khuyến mãi đặc biệt
-                            </p>
-                            <div className="space-y-3 text-sm">
-                              <div className="flex justify-between items-center py-2">
-                                <span className="text-gray-600">Giá gốc:</span>
-                                <span className="font-medium text-gray-900">{formatCurrency(Number(registeredPackage.price) || 15000000)}</span>
-                              </div>
-                              <div className="flex justify-between items-center py-2 border-b border-green-200">
-                                <span className="text-gray-600">Giảm giá ({registeredPackage.discount}%):</span>
-                                <span className="font-medium text-green-600">
-                                  -{formatCurrency(Number(registeredPackage.discountAmount) || 0)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center py-2 bg-white rounded-lg px-3 border border-green-100">
-                                <span className="font-semibold text-gray-900">Thành tiền:</span>
-                                <span className="font-bold text-green-600 text-lg">
-                                  {formatCurrency(registeredPackage.finalPrice)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Close Button */}
-                    <div className="px-6 pb-6">
+                    {/* Button đóng */}
+                    <div>
                       <button
                         onClick={() => setShowServiceModal(false)}
-                        className="w-full bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 hover:border-gray-400 flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 hover:border-gray-400 flex items-center justify-center gap-2 mt-2"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

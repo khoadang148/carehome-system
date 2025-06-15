@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "@/components/layout/ClientLayout";
-import { AuthProvider } from "@/lib/auth-context";
-import { ResidentsProvider } from "@/lib/residents-context";
-import { ActivitiesProvider } from "@/lib/activities-context";
+import { AuthProvider } from "@/lib/contexts/auth-context";
+import { ResidentsProvider } from "@/lib/contexts/residents-context";
+import { ActivitiesProvider } from "@/lib/contexts/activities-context";
 
 const inter = Inter({ subsets: ["latin"] });
 

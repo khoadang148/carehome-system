@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { useMemo } from 'react';
 
 export interface PermissionConfig {

@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import { Menu, Transition } from '@headlessui/react';
 import { BellIcon, UserCircleIcon, HomeIcon } from '@heroicons/react/24/outline';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 
 interface Notification {

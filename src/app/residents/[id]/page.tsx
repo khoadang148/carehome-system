@@ -15,8 +15,8 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/residents-data';
-import { useAuth } from '@/lib/auth-context';
+import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   SparklesIcon,
   UserIcon,
@@ -14,14 +14,16 @@ import {
   AdjustmentsHorizontalIcon,
   ChartBarIcon,
   EyeIcon,
-  PlusIcon
+  PlusIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { 
   aiRecommendationEngine, 
   convertToAIProfile, 
   AIRecommendation 
 } from '@/lib/ai-recommendations';
-import { RESIDENTS_DATA } from '@/lib/residents-data';
+import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+
 
 export default function AIRecommendationsPage() {
   const router = useRouter();
@@ -42,7 +44,7 @@ export default function AIRecommendationsPage() {
       return;
     }
     
-    if (!['admin', 'staff'].includes(user.role)) {
+    if (!user.role || !['admin', 'staff'].includes(user.role)) {
       router.push('/');
       return;
     }
@@ -181,6 +183,28 @@ export default function AIRecommendationsPage() {
         position: 'relative',
         zIndex: 1
       }}>
+
+        <button
+          onClick={() => router.push('/')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
         {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -229,7 +253,7 @@ export default function AIRecommendationsPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Hệ thống AI phân tích sở thích và tình trạng sức khỏe để đưa ra gợi ý chương trình phù hợp
+                  Hệ thống sẽ phân tích sở thích và tình trạng sức khỏe để đưa ra gợi ý chương trình phù hợp
                 </p>
               </div>
             </div>
@@ -265,7 +289,7 @@ export default function AIRecommendationsPage() {
                 transition: 'all 0.2s ease'
               }}
             >
-              Gợi ý cá nhân
+              Gợi ý theo cá nhân
             </button>
             <button
               onClick={() => setActiveTab('group')}
@@ -282,7 +306,7 @@ export default function AIRecommendationsPage() {
                 transition: 'all 0.2s ease'
               }}
             >
-              Gợi ý nhóm
+              Gợi ý theo nhóm
             </button>
           </div>
 
@@ -389,7 +413,7 @@ export default function AIRecommendationsPage() {
                 ) : (
                   <>
                     <SparklesIcon style={{ width: '1rem', height: '1rem' }} />
-                    Tạo gợi ý AI
+                    Tạo hoạt động
                   </>
                 )}
               </button>

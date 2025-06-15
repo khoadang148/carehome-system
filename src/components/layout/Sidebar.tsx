@@ -20,9 +20,11 @@ import {
   SparklesIcon,
   DocumentTextIcon,
   ClipboardDocumentCheckIcon,
-  HeartIcon
+  HeartIcon,
+  PhotoIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
-import { useAuth, UserRole } from '@/lib/auth-context';
+import { useAuth, UserRole } from '@/lib/contexts/auth-context';
 
 interface MenuItem {
   name: string;
@@ -45,13 +47,15 @@ const menuGroups: MenuGroup[] = [
     items: [
       { name: 'Tổng quan', href: '/', icon: HomeIcon, roles: ['admin','staff'], color: '#667eea' },
       { name: 'Người cao tuổi', href: '/residents', icon: UserIcon, roles: ['admin', 'staff'], color: '#10b981' },
-      { name: 'Đội ngũ nhân viên chăm sóc', href: '/staff', icon: UsersIcon, roles: ['admin'], color: '#3b82f6' },
+      { name: 'Nhân viên', href: '/staff', icon: UsersIcon, roles: ['admin'], color: '#3b82f6' },
     ]
   },
   {
     title: "Lối tắt chăm sóc",
     items: [
       { name: 'Nhật ký theo dõi', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
+      { name: 'Đăng ảnh người cao tuổi', href: '/residents?action=upload', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
+      
     ]
   },
   {
@@ -67,15 +71,17 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Dữ liệu & Báo cáo",
     items: [
-      { name: 'Tài chính', href: '/finance', icon: BanknotesIcon, roles: ['admin', 'family'], color: '#16a34a' }
+      { name: 'Tài chính', href: '/finance', icon: BanknotesIcon, roles: ['family'], color: '#16a34a' },
+      { name: 'Tài chính', href: '/admin/financial-reports', icon: BanknotesIcon, roles: ['admin'], color: '#16a34a' }
+
     ]
   },
   {
     title: "Hệ thống",
     items: [
       { name: 'Tài khoản nhân viên', href: '/permissions', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' },
-      { name: 'Tài khoản người thân', href: '/permissions/family/register', icon: UserGroupIcon, roles: [], color: '#a21caf' }
-    ]
+      { name: 'Tài khoản gia đình', href: '/admin/family-accounts', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' }
+   ]
   }
 ];
 

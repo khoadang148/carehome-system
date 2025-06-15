@@ -11,7 +11,7 @@ import {
   InformationCircleIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 // Mock notifications data
 const mockNotifications = [
@@ -23,7 +23,8 @@ const mockNotifications = [
     isRead: false,
     type: 'medication',
     priority: 'cao',
-    category: 'Chăm sóc y tế'
+    category: 'Chăm sóc y tế',
+    roles: ['staff', 'admin']
   },
   {
     id: 2,
@@ -33,7 +34,8 @@ const mockNotifications = [
     isRead: false,
     type: 'meeting',
     priority: 'trung bình',
-    category: 'Cuộc họp'
+    category: 'Cuộc họp',
+    roles: ['staff', 'admin']
   },
   {
     id: 3,
@@ -43,7 +45,8 @@ const mockNotifications = [
     isRead: true,
     type: 'report',
     priority: 'low',
-    category: 'Báo cáo'
+    category: 'Báo cáo',
+    roles: ['admin']
   },
   {
     id: 4,
@@ -53,7 +56,8 @@ const mockNotifications = [
     isRead: true,
     type: 'health',
     priority: 'medium',
-    category: 'Chăm sóc y tế'
+    category: 'Chăm sóc y tế',
+    roles: ['staff', 'admin']
   },
   {
     id: 5,
@@ -63,7 +67,8 @@ const mockNotifications = [
     isRead: false,
     type: 'system',
     priority: 'high',
-    category: 'Hệ thống'
+    category: 'Hệ thống',
+    roles: ['admin']
   },
   {
     id: 6,
@@ -73,7 +78,8 @@ const mockNotifications = [
     isRead: true,
     type: 'activity',
     priority: 'low',
-    category: 'Hoạt động'
+    category: 'Hoạt động',
+    roles: ['staff', 'family']
   },
   {
     id: 7,
@@ -83,7 +89,8 @@ const mockNotifications = [
     isRead: false,
     type: 'medication',
     priority: 'high',
-    category: 'Chăm sóc y tế'
+    category: 'Chăm sóc y tế',
+    roles: ['staff', 'admin']
   },
   {
     id: 8,
@@ -93,7 +100,8 @@ const mockNotifications = [
     isRead: true,
     type: 'finance',
     priority: 'medium',
-    category: 'Tài chính'
+    category: 'Tài chính',
+    roles: ['family', 'admin']
   }
 ];
 
@@ -108,6 +116,8 @@ export default function NotificationsPage() {
   // Filter notifications based on search and filters
   const filteredNotifications = useMemo(() => {
     return notifications.filter(notification => {
+      // Lọc theo role
+      const matchesRole = !notification.roles || notification.roles.includes(user?.role || '');
       const matchesSearch = notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            notification.message.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || notification.category === selectedCategory;
@@ -115,10 +125,9 @@ export default function NotificationsPage() {
       const matchesRead = showReadFilter === 'all' || 
                          (showReadFilter === 'unread' && !notification.isRead) ||
                          (showReadFilter === 'read' && notification.isRead);
-      
-      return matchesSearch && matchesCategory && matchesPriority && matchesRead;
+      return matchesRole && matchesSearch && matchesCategory && matchesPriority && matchesRead;
     });
-  }, [notifications, searchTerm, selectedCategory, selectedPriority, showReadFilter]);
+  }, [notifications, searchTerm, selectedCategory, selectedPriority, showReadFilter, user?.role]);
 
   const handleMarkAsRead = (notificationId: number) => {
     setNotifications(prev => 

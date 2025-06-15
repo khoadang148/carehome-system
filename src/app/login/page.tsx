@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   LockClosedIcon, 
   EnvelopeIcon, 
@@ -10,7 +10,10 @@ import {
   UserIcon,
   HomeIcon,
   EyeIcon,
-  EyeSlashIcon
+  EyeSlashIcon,
+  BuildingOffice2Icon,
+  ShieldCheckIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
@@ -48,24 +51,27 @@ export default function LoginPage() {
   const roleOptions = [
     { 
       value: 'admin', 
-      label: 'Quản trị viên', 
+      label: 'Quản trị hệ thống', 
       icon: UserIcon,
-      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      lightBg: 'rgba(102, 126, 234, 0.1)'
+      description: 'Toàn quyền quản lý',
+      color: '#1e40af',
+      lightBg: '#eff6ff'
     },
     { 
       value: 'staff', 
-      label: 'Nhân viên', 
+      label: 'Nhân viên y tế', 
       icon: UserIcon,
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      lightBg: 'rgba(16, 185, 129, 0.1)'
+      description: 'Điều dưỡng, bác sĩ',
+      color: '#047857',
+      lightBg: '#ecfdf5'
     },
     { 
       value: 'family', 
       label: 'Gia đình', 
       icon: HomeIcon,
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-      lightBg: 'rgba(245, 158, 11, 0.1)'
+      description: 'Theo dõi thông tin',
+      color: '#b45309',
+      lightBg: '#fffbeb'
     }
   ];
 
@@ -73,262 +79,289 @@ export default function LoginPage() {
     <div style={{ 
       minHeight: '100vh',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem',
-      position: 'relative',
-      overflow: 'hidden'
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     }}>
-      {/* Background decorations */}
       <div style={{
-        position: 'absolute',
-        top: '-50%',
-        left: '-50%',
-        width: '200%',
-        height: '200%',
-        background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-        animation: 'rotate 30s linear infinite'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        top: '10%',
-        right: '10%',
-        width: '20rem',
-        height: '20rem',
-        background: 'radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%)',
-        borderRadius: '50%',
-        filter: 'blur(40px)'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        bottom: '10%',
-        left: '10%',
-        width: '15rem',
-        height: '15rem',
-        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%)',
-        borderRadius: '50%',
-        filter: 'blur(40px)'
-      }} />
-
-      {/* Login Card */}
-      <div style={{
-        width: '100%',
-        maxWidth: '32rem',
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: '1.5rem',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.2)',
-        overflow: 'hidden',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        position: 'relative',
-        zIndex: 1
+  flex: '1',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '100vh', // Đảm bảo chiếm toàn bộ chiều cao
+  background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+  color: 'white',
+  position: 'relative'
       }}>
-        {/* Header */}
+        {/* Subtle background pattern */}
         <div style={{
-          padding: '2.5rem 2rem 1.5rem 2rem',
-          textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
-          position: 'relative'
-        }}>
-          {/* CareHome Logo */}
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
+          pointerEvents: 'none'
+        }} />
+        
+        <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+          {/* Professional Logo */}
           <div style={{
-            width: '4.5rem',
-            height: '4.5rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '1.25rem',
+            width: '5rem',
+            height: '5rem',
+            background: 'rgba(255, 255, 255, 0.15)',
+            borderRadius: '1rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 1.5rem auto',
-            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
-            position: 'relative'
+            margin: '0 auto 2rem auto',
+            border: '2px solid rgba(255, 255, 255, 0.2)'
           }}>
-            {/* Sparkles/Stars icon */}
-            <div style={{
-              position: 'relative',
-              width: '2.5rem',
-              height: '2.5rem'
-            }}>
-              {/* Main star */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '1.5rem',
-                height: '1.5rem',
-                background: 'white',
-                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
-              }} />
-              
-              {/* Small stars */}
-              <div style={{
-                position: 'absolute',
-                top: '0.2rem',
-                right: '0.2rem',
-                width: '0.6rem',
-                height: '0.6rem',
-                background: 'white',
-                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
-              }} />
-              
-              <div style={{
-                position: 'absolute',
-                bottom: '0.2rem',
-                left: '0.2rem',
-                width: '0.5rem',
-                height: '0.5rem',
-                background: 'white',
-                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
-              }} />
-            </div>
+            <BuildingOffice2Icon style={{ width: '2.5rem', height: '2.5rem', color: 'white' }} />
           </div>
           
           <h1 style={{
-            fontSize: '2.25rem',
-            fontWeight: 700,
-            color: '#667eea',
-            margin: '0 0 0.5rem 0',
+            fontSize: '2.5rem',
+            fontWeight: 800,
+            margin: '0 0 1rem 0',
             letterSpacing: '-0.025em'
           }}>
             CareHome
           </h1>
-          <p style={{
-            fontSize: '1.125rem',
-            fontWeight: 500,
-            color: '#64748b',
-            margin: 0
-          }}>
-            Hệ thống quản lý viện dưỡng lão
-          </p>
-        </div>
-        
-        {/* Form */}
-        <div style={{ padding: '2rem' }}>
-          {error && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem',
-              background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-              color: '#dc2626',
-              borderRadius: '0.75rem',
-              marginBottom: '1.5rem',
-              fontSize: '0.875rem',
-              border: '1px solid #fca5a5',
-              fontWeight: 500
-            }}>
-              <ExclamationTriangleIcon style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
-              <p style={{margin: 0}}>{error}</p>
-            </div>
-          )}
           
-          <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-            {/* Role Selection */}
-            <div>
+          <p style={{
+            fontSize: '1.25rem',
+            margin: '0 0 2rem 0',
+            opacity: 0.9,
+            fontWeight: 500
+          }}>
+            Hệ thống quản lý viện dưỡng lão chuyên nghiệp
+          </p>
+          
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '1rem',
+            padding: '2rem',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)'
+          }}>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              margin: '0 0 1.5rem 0'
+            }}>
+              Tính năng hệ thống
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', opacity: 0.8 }} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>
+                  Bảo mật thông tin cư dân
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <ClockIcon style={{ width: '1.25rem', height: '1.25rem', opacity: 0.8 }} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>
+                  Theo dõi sức khỏe 24/7
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <UserIcon style={{ width: '1.25rem', height: '1.25rem', opacity: 0.8 }} />
+                <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>
+                  Quản lý nhân viên y tế
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel - Login Form */}
+      <div style={{
+        flex: '1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '28rem',
+          background: 'white',
+          borderRadius: '1rem',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          border: '1px solid #e5e7eb'
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '2rem 2rem 1rem 2rem',
+            borderBottom: '1px solid #f3f4f6'
+          }}>
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              margin: '0 0 0.5rem 0',
+              textAlign: 'center'
+            }}>
+              Đăng nhập hệ thống
+            </h2>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: 0,
+              textAlign: 'center'
+            }}>
+              Vui lòng chọn loại tài khoản và đăng nhập để tiếp tục
+            </p>
+          </div>
+          
+          {/* Form */}
+          <div style={{ padding: '2rem' }}>
+            {error && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '1rem',
+                background: '#fef2f2',
+                color: '#dc2626',
+                borderRadius: '0.5rem',
+                marginBottom: '1.5rem',
+                fontSize: '0.875rem',
+                border: '1px solid #fecaca',
+                fontWeight: 500
+              }}>
+                <ExclamationTriangleIcon style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
+                <p style={{margin: 0}}>{error}</p>
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+              {/* Role Selection */}
+              <div>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
-                fontWeight: 600,
+                  fontWeight: 600,
                   color: '#374151',
-                marginBottom: '0.75rem'
+                  marginBottom: '1rem'
                 }}>
-                Chọn loại tài khoản
+                  Loại tài khoản
                 </label>
                 <div style={{ 
-                  display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '0.75rem'
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
                 }}>
-                {roleOptions.map((option) => (
-                  <button 
-                    key={option.value}
-                    type="button"
-                    onClick={() => setRole(option.value as any)}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '1rem 0.75rem',
-                      borderRadius: '0.75rem',
-                      border: '2px solid',
-                      borderColor: role === option.value ? option.gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || '#667eea' : '#e2e8f0',
-                      background: role === option.value ? option.lightBg : 'white',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseOver={(e) => {
-                      if (role !== option.value) {
-                        e.currentTarget.style.borderColor = option.gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || '#667eea' + '40';
-                        e.currentTarget.style.background = option.lightBg;
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (role !== option.value) {
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.background = 'white';
-                      }
-                    }}
-                  >
-                    <div style={{
-                      width: '2rem',
-                      height: '2rem',
-                      background: role === option.value ? option.gradient : '#e2e8f0',
-                      borderRadius: '0.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease-in-out'
-                    }}>
-                      <option.icon style={{
-                        width: '1rem', 
-                        height: '1rem', 
-                        color: role === option.value ? 'white' : '#64748b'
-                      }} />
-                    </div>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: role === option.value ? option.gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || '#667eea' : '#64748b',
-                      textAlign: 'center'
-                    }}>
-                      {option.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                  {roleOptions.map((option) => (
+                    <button 
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRole(option.value as any)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        padding: '1rem',
+                        borderRadius: '0.5rem',
+                        border: '2px solid',
+                        borderColor: role === option.value ? option.color : '#e5e7eb',
+                        background: role === option.value ? option.lightBg : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'left'
+                      }}
+                      onMouseOver={(e) => {
+                        if (role !== option.value) {
+                          e.currentTarget.style.borderColor = option.color + '40';
+                          e.currentTarget.style.background = option.lightBg;
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (role !== option.value) {
+                          e.currentTarget.style.borderColor = '#e5e7eb';
+                          e.currentTarget.style.background = 'white';
+                        }
+                      }}
+                    >
+                      <div style={{
+                        width: '2.5rem',
+                        height: '2.5rem',
+                        background: role === option.value ? option.color : '#f3f4f6',
+                        borderRadius: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <option.icon style={{
+                          width: '1.25rem', 
+                          height: '1.25rem', 
+                          color: role === option.value ? 'white' : '#6b7280'
+                        }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: role === option.value ? option.color : '#374151',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {option.label}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          {option.description}
+                        </div>
+                      </div>
+                      {role === option.value && (
+                        <div style={{
+                          width: '1rem',
+                          height: '1rem',
+                          background: option.color,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <div style={{
+                            width: '0.25rem',
+                            height: '0.25rem',
+                            background: 'white',
+                            borderRadius: '50%'
+                          }} />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
               
-            {/* Email Input */}
-            <div>
+              {/* Email Input */}
+              <div>
                 <label 
                   htmlFor="email" 
                   style={{
                     display: 'block',
                     fontSize: '0.875rem',
-                  fontWeight: 600,
+                    fontWeight: 600,
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}
                 >
-                  Email
+                  Địa chỉ email
                 </label>
                 <div style={{ position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
-                  top: '50%',
-                  left: '1rem',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  zIndex: 1
+                    top: '50%',
+                    left: '0.875rem',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    zIndex: 1
                   }}>
-                    <EnvelopeIcon style={{ width: '1.25rem', height: '1.25rem', color: '#9ca3af' }} />
+                    <EnvelopeIcon style={{ width: '1.125rem', height: '1.125rem', color: '#9ca3af' }} />
                   </div>
                   <input
                     id="email"
@@ -339,35 +372,35 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     style={{
                       width: '100%',
-                    padding: '0.875rem 1rem 0.875rem 3rem',
+                      padding: '0.75rem 0.875rem 0.75rem 2.5rem',
                       fontSize: '0.875rem',
-                    color: '#1e293b',
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    border: '2px solid #e2e8f0',
-                    boxSizing: 'border-box',
-                    transition: 'all 0.2s ease-in-out'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#667eea';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
+                      color: '#1e293b',
+                      background: 'white',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#047857';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(4, 120, 87, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
               </div>
               
-            {/* Password Input */}
-            <div>
+              {/* Password Input */}
+              <div>
                 <label 
                   htmlFor="password" 
                   style={{
                     display: 'block',
                     fontSize: '0.875rem',
-                  fontWeight: 600,
+                    fontWeight: 600,
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}
@@ -377,137 +410,134 @@ export default function LoginPage() {
                 <div style={{ position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
-                  top: '50%',
-                  left: '1rem',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  zIndex: 1
+                    top: '50%',
+                    left: '0.875rem',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    zIndex: 1
                   }}>
-                    <LockClosedIcon style={{ width: '1.25rem', height: '1.25rem', color: '#9ca3af' }} />
+                    <LockClosedIcon style={{ width: '1.125rem', height: '1.125rem', color: '#9ca3af' }} />
                   </div>
                   <input
                     id="password"
                     name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Nhập mật khẩu của bạn"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Nhập mật khẩu của bạn"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     style={{
                       width: '100%',
-                    padding: '0.875rem 3rem 0.875rem 3rem',
+                      padding: '0.75rem 2.5rem 0.75rem 2.5rem',
                       fontSize: '0.875rem',
-                    color: '#1e293b',
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    border: '2px solid #e2e8f0',
-                    boxSizing: 'border-box',
-                    transition: 'all 0.2s ease-in-out'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#667eea';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                    position: 'absolute',
-                    top: '50%',
-                    right: '1rem',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#9ca3af',
-                    padding: 0
-                  }}
-                >
-                  {showPassword ? 
-                    <EyeSlashIcon style={{ width: '1.25rem', height: '1.25rem' }} /> :
-                    <EyeIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-                  }
-                </button>
-              </div>
+                      color: '#1e293b',
+                      background: 'white',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#047857';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(4, 120, 87, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      right: '0.875rem',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#9ca3af',
+                      padding: 0
+                    }}
+                  >
+                    {showPassword ? 
+                      <EyeSlashIcon style={{ width: '1.125rem', height: '1.125rem' }} /> :
+                      <EyeIcon style={{ width: '1.125rem', height: '1.125rem' }} />
+                    }
+                  </button>
+                </div>
               </div>
               
-            {/* Submit Button */}
+              {/* Security Notice */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <ShieldCheckIcon style={{ width: '1rem', height: '1rem', color: '#047857', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Dữ liệu được mã hóa và bảo mật theo tiêu chuẩn y tế
+                </span>
+              </div>
+              
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
                 style={{
                   width: '100%',
-                padding: '0.875rem',
-                fontSize: '0.875rem',
-                fontWeight: 600,
+                  padding: '0.875rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
                   color: 'white',
-                background: isLoading 
-                  ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '0.75rem',
+                  background: isLoading 
+                    ? '#9ca3af'
+                    : '#047857',
+                  borderRadius: '0.5rem',
                   border: 'none',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: isLoading 
-                  ? 'none'
-                  : '0 4px 6px -1px rgba(102, 126, 234, 0.25)',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onMouseOver={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 8px 16px -4px rgba(102, 126, 234, 0.4)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(102, 126, 234, 0.25)';
-                }
-              }}
-            >
-              {isLoading ? (
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}>
-                  <div style={{
-                    width: '1rem',
-                    height: '1rem',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderTopColor: 'white',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                  Đang đăng nhập...
-                </div>
-              ) : (
-                'Đăng nhập'
-              )}
+                  transition: 'all 0.2s ease',
+                  marginTop: '0.5rem'
+                }}
+                onMouseOver={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.background = '#065f46';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.background = '#047857';
+                  }
+                }}
+              >
+                {isLoading ? (
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}>
+                    <div style={{
+                      width: '1rem',
+                      height: '1rem',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Đang xác thực...
+                  </div>
+                ) : (
+                  'Đăng nhập'
+                )}
               </button>
-          </form>
-          
-          {/* Demo Info */}
-          <div style={{
-            marginTop: '2rem',
-            padding: '1rem',
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-            borderRadius: '0.75rem',
-            border: '1px solid #e2e8f0'
-          }}>
+            </form>
+            
           </div>
         </div>
       </div>
       
       <style jsx>{`
         @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes rotate {
           to {
             transform: rotate(360deg);
           }

@@ -18,7 +18,7 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { useEffect } from 'react';
 
 // Mock user data
@@ -551,7 +551,7 @@ export default function PermissionsPage() {
             <table style={{minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
               <thead>
                 <tr style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+                  background: 'linear-gradient(135deg,rgba(124, 58, 237, 0.55) 100%, #e2e8f0 100%)'
                 }}>
                   <th style={{
                     padding: '1rem 2rem', 

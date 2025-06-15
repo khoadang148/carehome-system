@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   ChatBubbleLeftRightIcon, 
   CalendarDaysIcon, 
@@ -760,7 +760,7 @@ export default function FamilyPortalPage() {
                         {resident.name}
                       </div>
                       <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem'}}>
-                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age}
+                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age} tuổi
                       </div>
                       <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
                         <span style={{fontWeight: 600}}>Phòng:</span> {resident.room} • <span style={{fontWeight: 600}}>Trạng thái sức khỏe:</span> {resident.status}
@@ -820,7 +820,7 @@ export default function FamilyPortalPage() {
                   <span style={{fontWeight: 600, color: '#374151'}}>Phòng: </span>{selectedResident.room}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 600, color: '#374151'}}>Tuổi: </span>{selectedResident.age}
+                  <span style={{fontWeight: 600, color: '#374151'}}>Tuổi: </span>{selectedResident.age} tuổi
                 </div>
                 <div style={{marginBottom: '1.5rem'}}>
                   <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
@@ -1011,7 +1011,7 @@ export default function FamilyPortalPage() {
                         </div>
                       </div>
                       <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
-                        <span style={{fontWeight: 600}}>Trạng thái sức khỏe: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
+                        <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
                       </span>
                     </div>
                   ))}
@@ -1048,7 +1048,7 @@ export default function FamilyPortalPage() {
                         return (
                           <tr key={note.id} style={{borderTop: '1px solid #e5e7eb'}}>
                             <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}><span style={{fontWeight: 600}}></span>{new Date(note.date).toLocaleDateString('vi-VN')}</td>
-                            <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}><span style={{fontWeight: 600}}>Nội dung: </span>{note.note}</td>
+                            <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}><span style={{fontWeight: 600}}></span>{note.note}</td>
                             <td style={{padding: '0.75rem', fontSize: '0.95em'}}><span style={{fontWeight: 600}}></span><span style={{fontWeight: 700, color: '#8b5cf6'}}>{staffName}</span>{staffRole && (<span style={{fontWeight: 500, color: '#6366f1', fontSize: '0.85em', marginLeft: 4}}>&nbsp;({staffRole})</span>)}</td>
                           </tr>
                         );
@@ -1192,7 +1192,7 @@ export default function FamilyPortalPage() {
                 ))}
               </select>
               <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                💡 Chọn người thân để trao đổi về vấn đề sức khỏe....
+                 Chọn người thân để trao đổi về vấn đề sức khỏe....
               </p>
             </div>
 
@@ -1243,7 +1243,7 @@ export default function FamilyPortalPage() {
                 ))}
               </select>
               <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                💡 Chọn nhân viên phù hợp với nhu cầu của bạn (ví dụ: y tá cho vấn đề sức khỏe, nhân viên chăm sóc cho hoạt động hàng ngày)
+                Chọn nhân viên phù hợp với nhu cầu của bạn (ví dụ: y tá cho vấn đề sức khỏe, nhân viên chăm sóc cho hoạt động hàng ngày)
               </p>
             </div>
             
@@ -1287,7 +1287,7 @@ export default function FamilyPortalPage() {
                 }}
               />
               <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem', margin: '0.5rem 0 0 0'}}>
-                💡 Nhân viên sẽ liên hệ lại trong vòng 30 phút đến 2 giờ. Vui lòng cung cấp thông tin chi tiết để nhân viên có thể hỗ trợ tốt nhất.
+                 Nhân viên sẽ liên hệ lại trong vòng 30 phút đến 2 giờ. Vui lòng cung cấp thông tin chi tiết để nhân viên có thể hỗ trợ tốt nhất.
               </p>
             </div>
             

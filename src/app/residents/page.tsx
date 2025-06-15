@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   MagnifyingGlassIcon, 
   FunnelIcon, 
@@ -13,27 +13,17 @@ import {
   UserGroupIcon,
   PhotoIcon,
   XMarkIcon,
-  CloudArrowUpIcon
+  CloudArrowUpIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/residents-data';
-import { useAuth } from '@/lib/auth-context';
+import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { useAuth } from '@/lib/contexts/auth-context';
+
 
 export default function ResidentsPage() {
   const { user } = useAuth();
   const router = useRouter();
-  
-  // Check access permissions
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    
-    if (!['admin', 'staff'].includes(user.role)) {
-      router.push('/');
-      return;
-    }
-  }, [user, router]);
+  const searchParams = useSearchParams();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCareLevel, setFilterCareLevel] = useState('');
@@ -53,6 +43,27 @@ export default function ResidentsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [shareWithFamily, setShareWithFamily] = useState(true);
+  
+  // Check access permissions and URL parameters
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+    
+    // Check if the upload modal should be opened from URL parameter
+    const action = searchParams.get('action');
+    if (action && action === 'upload') {
+      setShowUploadModal(true);
+      // Remove the query parameter to avoid reopening on refresh
+      router.replace('/residents');
+    }
+  }, [user, router, searchParams]);
   
   // Professional constants for nursing home operations
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
@@ -332,6 +343,30 @@ export default function ResidentsPage() {
     setShowDeleteModal(false);
     setResidentToDelete(null);
   };
+
+
+  useEffect(() => {
+    console.log('Modal states:', { showUploadModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showUploadModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showUploadModal]);
+
+
   
   return (
     <div style={{
@@ -339,6 +374,28 @@ export default function ResidentsPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
+      <button
+          onClick={() => router.push('/')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
+
       {/* Background decorations */}
       <div style={{
         position: 'absolute',
@@ -409,40 +466,13 @@ export default function ResidentsPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {residentsData.length} người cao tuổituổi
+                  Tổng số: {residentsData.length} người cao tuổi
                 </p>
               </div>
             </div>
             
             <div style={{display: 'flex', gap: '1rem'}}>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                title="Đăng tải ảnh hoạt động của người cao tuổi để chia sẻ với gia đình"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  border: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
-                }}
-              >
-                <PhotoIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Đăng ảnh Người cao tuổi    </button>
+              
 
               <Link 
                 href="/residents/add" 

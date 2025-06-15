@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import StaffDashboardWidgets from '@/components/staff/StaffDashboardWidgets';
 import FamilyDashboardWidgets from '@/components/family/FamilyDashboardWidgets';
 import { useRouter } from 'next/navigation';
@@ -14,7 +14,12 @@ import {
   CubeIcon,
   ShieldCheckIcon,
   HomeIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  BuildingOfficeIcon,
+  ClipboardDocumentCheckIcon,
+  ArchiveBoxIcon,
+  UserPlusIcon,
+  KeyIcon
 } from '@heroicons/react/24/outline';
 
 interface DashboardCard {
@@ -40,21 +45,60 @@ const ROLE_DASHBOARDS = {
         stats: '45 người'
       },
       {
-        title: 'Đội ngũ chăm sóc',
-        description: 'Thông tin và hồ sơ nhân viên',
-        icon: UserGroupIcon,
+        title: 'Quản lý nhân viên',
+        description: 'Tạo, cập nhật, xóa hồ sơ nhân viên',
+        icon: UserPlusIcon,
         href: '/staff',
         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         stats: '28 thành viên'
       },
-    
       {
-        title: 'Báo cáo tài chính',
-        description: 'Quản lý thu chi và doanh thu',
+        title: 'Lịch trình ca làm việc',
+        description: 'Lập lịch và phân công ca làm việc',
+        icon: CalendarDaysIcon,
+        href: '/admin/staff-schedule',
+        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        stats: '12 ca hôm nay'
+      },
+      {
+        title: 'Phê duyệt thăm viếng',
+        description: 'Phê duyệt yêu cầu thăm người thân',
+        icon: ClipboardDocumentCheckIcon,
+        href: '/admin/visit-approvals',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        stats: '5 yêu cầu chờ'
+      },
+      {
+        title: 'Thống kê tài chính',
+        description: 'Quản lý tiền ra, tiền vào và báo cáo',
         icon: CurrencyDollarIcon,
-        href: '/finance',
+        href: '/admin/financial-reports',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
         stats: 'Tháng này'
+      },
+      {
+        title: 'Quản lý phòng/giường',
+        description: 'Phân chia phòng, giường theo dịch vụ',
+        icon: BuildingOfficeIcon,
+        href: '/admin/room-management',
+        gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+        stats: '24 phòng'
+      },
+      {
+        title: 'Quản lý kho',
+        description: 'Tồn kho thiết bị y tế, thuốc, dụng cụ',
+        icon: ArchiveBoxIcon,
+        href: '/inventory',
+        gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+        stats: '150 sản phẩm'
+      },
+      {
+        title: 'Tài khoản gia đình',
+        description: 'Quản lý tài khoản đăng nhập người thân',
+        icon: KeyIcon,
+        href: '/admin/family-accounts',
+        gradient: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+        stats: '67 tài khoản'
       }
     ]
   },
@@ -63,27 +107,75 @@ const ROLE_DASHBOARDS = {
     description: 'Công cụ đồng hành cùng người cao tuổi',
     cards: [
       {
-        title: 'Người cao tuổi',
-        description: 'Thông tin được phân công chăm sóc',
+        title: 'Hồ sơ cá nhân',
+        description: 'Xem và cập nhật thông tin cá nhân',
         icon: UsersIcon,
-        href: '/residents',
+        href: '/staff/profile',
         gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        stats: '12 người phụ trách'
+        stats: 'Cập nhật hôm nay'
       },
       {
-        title: 'Chương trình hôm nay',
-        description: 'Lịch sinh hoạt và nhiệm vụ',
-        icon: ClipboardDocumentListIcon,
-        href: '/activities',
+        title: 'Lịch làm việc',
+        description: 'Xem ca làm việc và nhiệm vụ',
+        icon: CalendarDaysIcon,
+        href: '/staff/schedule',
         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-        stats: '8 chương trình'
+        stats: 'Ca hôm nay: 8h-16h'
+      },
+      {
+        title: 'Nhiệm vụ được giao',
+        description: 'Thực hiện và báo cáo nhiệm vụ',
+        icon: ClipboardDocumentListIcon,
+        href: '/staff/tasks',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        stats: '5 nhiệm vụ hôm nay'
+      },
+      {
+        title: 'Dấu hiệu sinh tồn',
+        description: 'Theo dõi và ghi nhận chỉ số sức khỏe',
+        icon: HeartIcon,
+        href: '/staff/vital-signs',
+        gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        stats: '8 ghi nhận hôm nay'
+      },
+      {
+        title: 'Quản lý thuốc',
+        description: 'Lịch uống thuốc và phát thuốc',
+        icon: CubeIcon,
+        href: '/staff/medication',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        stats: '15 lần uống hôm nay'
+      },
+      {
+        title: 'Hoạt động sinh hoạt',
+        description: 'Tổ chức và giám sát hoạt động',
+        icon: UserGroupIcon,
+        href: '/activities',
+        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        stats: '8 chương trình hôm nay'
+      },
+      {
+        title: 'Tương tác gia đình',
+        description: 'Trả lời yêu cầu và chia sẻ thông tin',
+        icon: SparklesIcon,
+        href: '/staff/family-communication',
+        gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+        stats: '3 tin nhắn mới'
+      },
+      {
+        title: 'Hỗ trợ hành chính',
+        description: 'Báo cáo sự cố và kiểm kê kho',
+        icon: CubeIcon,
+        href: '/staff/administrative',
+        gradient: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)',
+        stats: '2 báo cáo chờ'
       },
       {
         title: 'Trợ lý thông minh',
-        description: 'Gợi ý sinh hoạt cho người cao tuổi',
+        description: 'Gợi ý chăm sóc thông minh',
         icon: SparklesIcon,
         href: '/ai-recommendations',
-        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        gradient: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
         stats: '5 gợi ý mới'
       }
     ]
@@ -99,6 +191,22 @@ const ROLE_DASHBOARDS = {
         href: '/family',
         gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
         stats: 'Cập nhật hôm nay'
+      },
+      {
+        title: 'Dấu hiệu sinh tồn',
+        description: 'Theo dõi chỉ số sức khỏe người thân',
+        icon: HeartIcon,
+        href: '/family/vital-signs',
+        gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        stats: 'Ghi nhận mới nhất'
+      },
+      {
+        title: 'Thông tin thuốc',
+        description: 'Lịch uống thuốc và tình trạng sử dụng',
+        icon: CubeIcon,
+        href: '/family/medication',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        stats: '3 loại thuốc'
       },
       {
         title: 'Chương trình sinh hoạt',

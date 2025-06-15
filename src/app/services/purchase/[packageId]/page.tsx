@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import Link from 'next/link';
-import { RESIDENTS_DATA } from '@/lib/residents-data';
+import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 
 // Sử dụng lại dữ liệu gói từ trang services
 const carePackages = [
@@ -683,7 +683,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
             color: '#3b3b3b',
             textShadow: 'none'
           }}>
-            {user?.role === 'family' ? 'Đăng Ký Chăm Sóc Cho Người Thân' : 'Xác Nhận Đăng Ký Dịch Vụ'}
+            {user?.role === 'family' ? 'Đăng Ký Gói Dịch Vụ' : 'Xác Nhận Đăng Ký Dịch Vụ'}
           </h1>
           <p style={{
             fontSize: '1.1rem',
@@ -823,7 +823,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                 color: '#374151',
                 marginBottom: '1.2rem'
               }}>
-                👤 {user?.role === 'family' ? 'Chọn người thân cần chăm sóc' : 'Chọn người cần chăm sóc'}
+                👤 {user?.role === 'family' ? 'Chọn người thụ hưởng gói dịch vụ' : 'Chọn người thụ hưởng gói dịch vụ'}
               </h3>
 
               {user?.role === 'family' ? (
@@ -947,7 +947,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                   transform: (!selectedResident || loading) ? 'none' : 'translateY(-2px)'
                 }}
               >
-                {loading ? 'Đang xử lý...' : (user?.role === 'family' ? 'Đăng Ký Cho Người Thân' : 'Xác Nhận Đăng Ký')}
+                {loading ? 'Đang xử lý...' : (user?.role === 'family' ? 'Đăng Ký ' : 'Xác Nhận Đăng Ký')}
               </button>
             </div>
           </div>
@@ -1086,7 +1086,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                                  fontSize: '0.85rem',
                                  color: '#059669'
                                }}>
-                                 ⭐ <strong>Ưu đãi cao tuổi:</strong> Được giảm 5% phí dịch vụ do trên 80 tuổi
+                                 <strong>Ưu đãi cao tuổi:</strong> Được giảm 5% phí dịch vụ do trên 80 tuổi
                                </div>
                              </div>
                            )}
@@ -1100,9 +1100,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                      <div className="space-y-3">
                        <div className="flex justify-between items-center">
                          <div className="flex items-center gap-2">
-                           <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                           </svg>
+                           
                            <span className="font-medium text-gray-700">Giá gốc:</span>
                          </div>
                          <span className="font-semibold text-gray-900">{selectedPackage?.price.toLocaleString('vi-VN')} VND/tháng</span>
@@ -1154,9 +1152,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                          <div className="flex justify-between items-center">
                            <div className="flex items-center gap-2">
-                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                             </svg>
+                             
                              <span className="text-lg font-bold text-blue-900">Tổng thanh toán:</span>
                            </div>
                            <span className="text-xl font-bold text-blue-600">
@@ -1173,7 +1169,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
               <div style={{ display: 'grid', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
-                    📅 Ngày bắt đầu dịch vụ *
+                    Ngày bắt đầu dịch vụ *
                   </label>
                   <input
                     type="date"
@@ -1197,14 +1193,14 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                   />
                   {validationErrors.startDate && (
                     <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem', margin: '0.25rem 0 0 0' }}>
-                      ⚠️ {validationErrors.startDate}
+                      {validationErrors.startDate}
                     </p>
                   )}
                 </div>
 
                                                   <div>
                   <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
-                    📞 Thông tin liên hệ khẩn cấp *
+                    Thông tin liên hệ khẩn cấp *
                   </label>
                   
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -1255,15 +1251,15 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                   
                   {(validationErrors.emergencyContact || validationErrors.emergencyPhone) && (
                     <div style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-                      {validationErrors.emergencyContact && <p style={{ margin: '0.25rem 0' }}>⚠️ {validationErrors.emergencyContact}</p>}
-                      {validationErrors.emergencyPhone && <p style={{ margin: '0.25rem 0' }}>⚠️ {validationErrors.emergencyPhone}</p>}
+                      {validationErrors.emergencyContact && <p style={{ margin: '0.25rem 0' }}> {validationErrors.emergencyContact}</p>}
+                      {validationErrors.emergencyPhone && <p style={{ margin: '0.25rem 0' }}>{validationErrors.emergencyPhone}</p>}
                     </div>
                   )}
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
-                    🏥 Ghi chú y tế {validationErrors.medicalNotes ? '*' : '(nếu có)'}
+                     Ghi chú y tế {validationErrors.medicalNotes ? '*' : '(nếu có)'}
                   </label>
                   <textarea
                     value={medicalNotes}
@@ -1288,7 +1284,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                   />
                   {validationErrors.medicalNotes && (
                     <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem', margin: '0.25rem 0 0 0' }}>
-                      ⚠️ {validationErrors.medicalNotes}
+                       {validationErrors.medicalNotes}
                     </p>
                   )}
                 </div>

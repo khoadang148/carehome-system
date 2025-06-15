@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon } from '@heroicons/react/24/outline';
-import { useActivities } from '@/lib/activities-context';
+import { useActivities } from '@/lib/contexts/activities-context';
 
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();

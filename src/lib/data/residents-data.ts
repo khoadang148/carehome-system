@@ -90,53 +90,5 @@ export const RESIDENTS_DATA = [
       status: 'pending_approval',
       registrationId: 'REG-1717235258-2'
     }
-  },
-  { 
-    id: 3, 
-    name: 'Lê Văn C', 
-    age: 85, 
-    room: '103', 
-    careLevel: 'Cao cấp', 
-
-    medicalConditions: ['Alzheimer', 'Loãng xương'],
-    medications: ['Donepezil', 'Thuốc bổ sung Canxi'],
-    allergies: ['Cao su tự nhiên'],
-    emergencyContact: 'Lê Thị D',
-    contactPhone: '(555) 345-6789',
-    personalNotes: 'Cần được định hướng thường xuyên. Thích liệu pháp âm nhạc.',
-    dietaryRestrictions: 'Thức ăn mềm',
-    mobilityStatus: 'Xe lăn'
-  },
-  { 
-    id: 4, 
-    name: 'Hoàng Văn D', 
-    age: 76, 
-    room: '104', 
-    careLevel: 'Nâng cao', 
-
-    medicalConditions: ['COPD', 'Viêm khớp'],
-    medications: ['Albuterol', 'Acetaminophen'],
-    allergies: ['Aspirin'],
-    emergencyContact: 'Hoàng Thị E',
-    contactPhone: '(555) 456-7890',
-    personalNotes: 'Cựu thợ mộc. Thích làm đồ gỗ khi có thể.',
-    dietaryRestrictions: 'Không có',
-    mobilityStatus: 'Sử dụng gậy'
-  },
-  { 
-    id: 5, 
-    name: 'Phạm Thị E', 
-    age: 81, 
-    room: '105', 
-    careLevel: 'Cơ bản', 
-
-    medicalConditions: ['Tăng huyết áp', 'Trầm cảm'],
-    medications: ['Amlodipine', 'Sertraline'],
-    allergies: ['Không có'],
-    emergencyContact: 'Phạm Văn F',
-    contactPhone: '(555) 567-8901',
-    personalNotes: 'Cựu giáo viên. Thích làm thủ công và giao lưu.',
-    dietaryRestrictions: 'Ăn chay',
-    mobilityStatus: 'Độc lập'
-  },
+  }
 ]; 

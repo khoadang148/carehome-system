@@ -14,7 +14,7 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { useEffect } from 'react';
 
 // Mock report data

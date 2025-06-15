@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
-import { useActivities } from '@/lib/activities-context';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { useActivities } from '@/lib/contexts/activities-context';
 import { 
   ArrowLeftIcon,
   CalendarIcon,

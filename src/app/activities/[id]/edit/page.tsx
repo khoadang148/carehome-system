@@ -24,6 +24,7 @@ type ActivityFormData = {
   status: string;
 };
 
+
 const categories = ['Thể chất', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục'];
 const locations = ['Phòng sinh hoạt chung', 'Phòng hoạt động', 'Khu vườn', 'Phòng giải trí', 'Phòng ăn', 'Sân thượng'];
 const facilitators = ['David Wilson', 'Emily Parker', 'Robert Johnson', 'Sarah Thompson', 'Michael Chen'];
