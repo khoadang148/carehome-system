@@ -600,41 +600,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Register Family Button */}
-          <div style={{
-            background: 'white',
-            borderRadius: '0.5rem',
-            padding: '1.5rem',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-            border: '1px solid #e5e7eb',
-            marginBottom: '1rem'
-          }}>
-            <h3 style={{
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              color: '#111827',
-              margin: '0 0 1rem 0'
-            }}>
-              Quản lý người dùng
-            </h3>
-            
-            <button
-              onClick={handleRegisterFamily}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
-                color: 'white',
-                fontWeight: 600,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(139, 92, 246, 0.1)',
-                transition: 'all 0.2s'
-              }}
-            >
-              Đăng ký người thân
-            </button>
-          </div>
+          
         </div>
       </div>
     </>

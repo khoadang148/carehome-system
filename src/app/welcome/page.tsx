@@ -26,7 +26,7 @@ export default function WelcomePage() {
     }}>
       {/* Header */}
       <header style={{
-        background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white',
         padding: '1rem 0',
         boxShadow: '0 2px 10px rgba(6, 95, 70, 0.15)'
@@ -445,7 +445,7 @@ export default function WelcomePage() {
 
       {/* CTA Section */}
       <section style={{
-        background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white',
         padding: '4rem 0',
         textAlign: 'center'

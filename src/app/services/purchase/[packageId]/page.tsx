@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import Link from 'next/link';
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 // Sử dụng lại dữ liệu gói từ trang services
 const carePackages = [
@@ -666,91 +667,146 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      {/* Hero Section */}
-      <div style={{
-        background: 'white',
-        color: '#1e293b',
-        padding: '2.5rem 1rem 1.5rem',
+<div style={{
+  maxWidth: '900px',
+  margin: '1.5rem auto 1.5rem auto',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  position: 'relative',
+  zIndex: 2
+}}>
+  <button
+    onClick={() => router.push('/services')}
+    title="Quay lại trang dịch vụ"
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      padding: '0.65rem 1.2rem',
+      background: '#fff',
+      color: '#374151',
+      border: '1.2px solid #e5e7eb',
+      borderRadius: '0.7rem',
+      fontSize: '1.05rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      outline: 'none',
+      minWidth: '110px',
+      whiteSpace: 'nowrap',
+      boxShadow: '0 1px 4px rgba(30,41,59,0.04)',
+      marginLeft: 0
+    }}
+    onMouseOver={e => {
+      e.currentTarget.style.background = '#f3f4f6';
+      e.currentTarget.style.borderColor = '#c7d2fe';
+      e.currentTarget.style.color = '#6366f1';
+    }}
+    onMouseOut={e => {
+      e.currentTarget.style.background = '#fff';
+      e.currentTarget.style.borderColor = '#e5e7eb';
+      e.currentTarget.style.color = '#374151';
+    }}
+  >
+    <ArrowLeftIcon style={{ width: '1.15rem', height: '1.15rem' }}/>
+    Quay lại
+  </button>
+</div>
+
+{/* Hero Section */}
+<div style={{  
+  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+  borderRadius: '1.5rem',
+  maxWidth: '900px',
+  margin: '0 auto 0.5rem',
+  padding: '1.5rem 0.4em',
+  transform: 'translateY(-1.5rem)', 
+  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)', 
+  border: '1px solid rgba(255, 255, 255, 0.2)', 
+  backdropFilter: 'blur(10px)', 
+  color: '#1e293b'
+}}>
+  <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
+    <h1 style={{  
+      fontSize: '2.2rem',
+      fontWeight: 700,
+      marginBottom: '1rem',
+      color: '#3b3b3b'
+    }}>
+      {user?.role === 'family' ? 'Đăng Ký Gói Dịch Vụ' : 'Xác Nhận Đăng Ký Dịch Vụ'}
+    </h1>
+    <p style={{  
+      fontSize: '1.1rem',
+      color: '#475569',
+      maxWidth: '500px',
+      margin: '0 auto',
+      lineHeight: 1.6,
+     opacity: 0.95
+    }}>
+      {user?.role === 'family'
+        ? 'Xác nhận gói chăm sóc phù hợp nhất cho người thân yêu quý của bạn'
+        : 'Hoàn tất đăng ký gói dịch vụ chăm sóc cho người thân của bạn'}
+    </p>
+  </div>
+</div>
+
+{/* Main Content */}
+<div style={{ 
+  maxWidth: '900px',
+  margin: '0 auto',
+  padding: '2.5rem 1rem',
+  transform: 'translateY(-1.5rem)' 
+}}>
+  <div style={{ 
+    background: 'white',
+    borderRadius: '20px',
+    overflow: 'hidden',
+    boxShadow: '0 6px 24px rgba(0,0,0,0.07)', 
+    border: '1px solid #e5e7eb'
+  }}>
+    {/* Package Header with Image */}
+    <div style={{ 
+      height: '220px',
+      backgroundImage: `url(${selectedPackage.image})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      <div style={{ 
         textAlign: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        borderBottom: '1px solid #e5e7eb'
+        color: '#1e293b',
+        background: 'rgba(255, 255, 255, 0.85)', 
+        borderRadius: '12px',
+        padding: '1rem 2rem'
       }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <h1 style={{
-            fontSize: '2.2rem',
-            fontWeight: 700,
-            marginBottom: '1rem',
-            color: '#3b3b3b',
-            textShadow: 'none'
+        <h2 style={{  
+          fontSize: '2rem',
+          fontWeight: 700,
+          marginBottom: '0.5rem',
+          color: '#1e293b'
+        }}>
+          {selectedPackage.name}
+        </h2>
+        <div style={{ 
+          fontSize: '1.5rem',
+          fontWeight: 600,
+          color: '#059669'
+        }}>
+          {new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(selectedPackage.price)}
+          <span style={{ 
+            fontSize:'1rem',
+            color:'#64748b',
+            marginLeft:'0.5rem'
           }}>
-            {user?.role === 'family' ? 'Đăng Ký Gói Dịch Vụ' : 'Xác Nhận Đăng Ký Dịch Vụ'}
-          </h1>
-          <p style={{
-            fontSize: '1.1rem',
-            opacity: 0.95,
-            maxWidth: '500px',
-            margin: '0 auto',
-            lineHeight: 1.6,
-            color: '#475569'
-          }}>
-            {user?.role === 'family' 
-              ? 'Xác nhận gói chăm sóc phù hợp nhất cho người thân yêu quý của bạn'
-              : 'Hoàn tất đăng ký gói dịch vụ chăm sóc cho người thân của bạn'
-            }
-          </p>
+            /tháng
+          </span>
         </div>
       </div>
-
-      {/* Main Content */}
-      <div style={{
-        maxWidth: '900px',
-        margin: '0 auto',
-        padding: '2.5rem 1rem',
-        transform: 'translateY(-1.5rem)'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '20px',
-          overflow: 'hidden',
-          boxShadow: '0 6px 24px rgba(0,0,0,0.07)',
-          border: '1px solid #e5e7eb'
-        }}>
-          {/* Package Header with Image */}
-          <div style={{
-            height: '220px',
-            backgroundImage: `url(${selectedPackage.image})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <div style={{ textAlign: 'center', color: '#1e293b', background: 'rgba(255,255,255,0.85)', borderRadius: '12px', padding: '1rem 2rem' }}>
-              <h2 style={{
-                fontSize: '2rem',
-                fontWeight: 700,
-                margin: 0,
-                textShadow: 'none',
-                marginBottom: '0.5rem',
-                color: '#1e293b'
-              }}>
-                {selectedPackage.name}
-              </h2>
-              <div style={{
-                fontSize: '1.5rem',
-                fontWeight: 600,
-                color: '#059669',
-                textShadow: 'none'
-              }}>
-                {new Intl.NumberFormat('vi-VN', {
-                  style: 'currency',
-                  currency: 'VND'
-                }).format(selectedPackage.price)}
-                <span style={{ fontSize: '1rem', opacity: 0.9, color: '#64748b' }}>/tháng</span>
-              </div>
-            </div>
-          </div>
+    </div>
 
           {/* Content */}
           <div style={{ padding: '2rem' }}>

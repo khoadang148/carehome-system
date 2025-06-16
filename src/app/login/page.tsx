@@ -89,7 +89,7 @@ export default function LoginPage() {
   alignItems: 'center',
   justifyContent: 'center',
   minHeight: '100vh', // Đảm bảo chiếm toàn bộ chiều cao
-  background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   color: 'white',
   position: 'relative'
       }}>

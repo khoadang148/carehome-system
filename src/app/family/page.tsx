@@ -1126,6 +1126,7 @@ export default function FamilyPortalPage() {
                 </p>
               </div>
               <button
+                title="Thoát khỏi trang này"
                 onClick={() => setShowContactModal(false)}
                 style={{
                   padding: '0.5rem',
@@ -1617,6 +1618,7 @@ export default function FamilyPortalPage() {
                 </p>
               </div>
               <button
+                title="Thoát khỏi trang này"
                 onClick={() => setShowScheduleModal(false)}
                 style={{
                   padding: '0.5rem',

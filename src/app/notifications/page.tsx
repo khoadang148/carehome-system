@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   BellIcon,
   FunnelIcon,
@@ -9,9 +9,16 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  PlusIcon,
+  TrashIcon,
+  UserGroupIcon,
+  HeartIcon,
+  CogIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 
 // Mock notifications data
 const mockNotifications = [
@@ -105,17 +112,93 @@ const mockNotifications = [
   }
 ];
 
+// Lấy notifications từ localStorage nếu có, nếu không thì dùng mockNotifications
+const getInitialNotifications = () => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('notifications');
+    if (saved) return JSON.parse(saved);
+  }
+  return mockNotifications;
+};
+
 export default function NotificationsPage() {
+  const router = useRouter();
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState(getInitialNotifications);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPriority, setSelectedPriority] = useState('all');
   const [showReadFilter, setShowReadFilter] = useState('all');
 
+  // Lưu notifications vào localStorage mỗi khi thay đổi
+  useEffect(() => {
+    localStorage.setItem('notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  // Theme configurations for different roles
+  const getThemeConfig = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return {
+          primary: '#3b82f6',
+          primaryDark: '#1d4ed8',
+          secondary: '#1e40af',
+          accent: '#6366f1',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+          cardBg: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          shadow: 'rgba(59, 130, 246, 0.3)',
+          icon: CogIcon,
+          title: 'Bảng điều khiển thông báo',
+          subtitle: 'Quản lý và theo dõi tất cả thông báo hệ thống'
+        };
+      case 'staff':
+        return {
+          primary: '#10b981',
+          primaryDark: '#059669',
+          secondary: '#065f46',
+          accent: '#34d399',
+          background: 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)',
+          cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%)',
+          shadow: 'rgba(16, 185, 129, 0.3)',
+          icon: UserGroupIcon,
+          title: 'Thông báo công việc',
+          subtitle: 'Cập nhật về chăm sóc bệnh nhân và lịch làm việc'
+        };
+      case 'family':
+        return {
+          primary: '#8b5cf6',
+          primaryDark: '#7c3aed',
+          secondary: '#6d28d9',
+          accent: '#a78bfa',
+          background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+          cardBg: 'linear-gradient(135deg, #ffffff 0%, #faf5ff 100%)',
+          shadow: 'rgba(139, 92, 246, 0.3)',
+          icon: HeartIcon,
+          title: 'Tin tức về người thân',
+          subtitle: 'Cập nhật tình hình sức khỏe và hoạt động của người thân'
+        };
+      default:
+        return {
+          primary: '#6b7280',
+          primaryDark: '#4b5563',
+          secondary: '#374151',
+          accent: '#9ca3af',
+          background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+          cardBg: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
+          shadow: 'rgba(107, 114, 128, 0.3)',
+          icon: BellIcon,
+          title: 'Thông báo',
+          subtitle: 'Xem các thông báo mới nhất'
+        };
+    }
+  };
+
+  const theme = getThemeConfig(user?.role || 'guest');
+  const IconComponent = theme.icon;
+
   // Filter notifications based on search and filters
   const filteredNotifications = useMemo(() => {
-    return notifications.filter(notification => {
+    return notifications.filter((notification: typeof notifications[0]) => {
       // Lọc theo role
       const matchesRole = !notification.roles || notification.roles.includes(user?.role || '');
       const matchesSearch = notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -130,8 +213,8 @@ export default function NotificationsPage() {
   }, [notifications, searchTerm, selectedCategory, selectedPriority, showReadFilter, user?.role]);
 
   const handleMarkAsRead = (notificationId: number) => {
-    setNotifications(prev => 
-      prev.map(notif => 
+    setNotifications((prev: typeof notifications) => 
+      prev.map((notif: typeof notifications[0]) => 
         notif.id === notificationId 
           ? { ...notif, isRead: true }
           : notif
@@ -140,8 +223,8 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAsUnread = (notificationId: number) => {
-    setNotifications(prev => 
-      prev.map(notif => 
+    setNotifications((prev: typeof notifications) => 
+      prev.map((notif: typeof notifications[0]) => 
         notif.id === notificationId 
           ? { ...notif, isRead: false }
           : notif
@@ -150,10 +233,116 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notif => ({ ...notif, isRead: true }))
+    setNotifications((prev: typeof notifications) => 
+      prev.map((notif: typeof notifications[0]) => ({ ...notif, isRead: true }))
     );
   };
+
+  const handleDeleteNotification = (notificationId: number) => {
+    setNotifications((prev: typeof notifications) => 
+      prev.filter((notif: typeof notifications[0]) => notif.id !== notificationId)
+    );
+  };
+
+  // Role-specific components
+  const AdminControls = () => (
+    <div style={{
+      display: 'flex',
+      gap: '1rem',
+      flexWrap: 'wrap'
+    }}>
+      <button
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`,
+          color: 'white',
+          padding: '0.875rem 1.5rem',
+          borderRadius: '0.75rem',
+          border: 'none',
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          boxShadow: `0 4px 12px ${theme.shadow}`,
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <PlusIcon style={{width: '1.125rem', height: '1.125rem'}} />
+        Tạo thông báo mới
+      </button>
+      
+      <button 
+        onClick={handleMarkAllAsRead}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          padding: '0.875rem 1.5rem',
+          borderRadius: '0.75rem',
+          border: 'none',
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <CheckIcon style={{width: '1.125rem', height: '1.125rem'}} />
+        Đánh dấu tất cả đã đọc
+      </button>
+    </div>
+  );
+
+  const StaffControls = () => (
+    <button 
+      onClick={handleMarkAllAsRead}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`,
+        color: 'white',
+        padding: '0.875rem 1.5rem',
+        borderRadius: '0.75rem',
+        border: 'none',
+        fontWeight: 600,
+        fontSize: '0.875rem',
+        cursor: 'pointer',
+        boxShadow: `0 4px 12px ${theme.shadow}`,
+        transition: 'all 0.3s ease'
+      }}
+    >
+      <CheckIcon style={{width: '1.125rem', height: '1.125rem'}} />
+      Đánh dấu tất cả đã đọc
+    </button>
+  );
+
+  const FamilyControls = () => (
+    <button 
+      onClick={handleMarkAllAsRead}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`,
+        color: 'white',
+        padding: '0.875rem 1.5rem',
+        borderRadius: '0.75rem',
+        border: 'none',
+        fontWeight: 600,
+        fontSize: '0.875rem',
+        cursor: 'pointer',
+        boxShadow: `0 4px 12px ${theme.shadow}`,
+        transition: 'all 0.3s ease'
+      }}
+    >
+      <CheckIcon style={{width: '1.125rem', height: '1.125rem'}} />
+      Đánh dấu tất cả đã đọc
+    </button>
+  );
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -193,14 +382,14 @@ export default function NotificationsPage() {
     }
   };
 
-  const categories = ['all', ...Array.from(new Set(notifications.map(n => n.category)))];
+  const categories = ['all', ...Array.from(new Set(notifications.map((n: typeof notifications[0]) => n.category)))];
   const priorities = ['all', 'high', 'medium', 'low'];
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n: typeof notifications[0]) => !n.isRead).length;
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      background: theme.background,
       position: 'relative'
     }}>
       {/* Background decorations */}
@@ -225,9 +414,33 @@ export default function NotificationsPage() {
         position: 'relative',
         zIndex: 1
       }}>
+      
+      <button
+          onClick={() => router.push('/')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
+
+
         {/* Header Section */}
         <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          background: theme.cardBg,
           borderRadius: '1.5rem',
           padding: '2rem',
           marginBottom: '2rem',
@@ -246,212 +459,369 @@ export default function NotificationsPage() {
               <div style={{
                 width: '3.5rem',
                 height: '3.5rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`,
                 borderRadius: '1rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                boxShadow: `0 4px 12px ${theme.shadow}`
               }}>
-                <BellIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+                <IconComponent style={{width: '2rem', height: '2rem', color: 'white'}} />
               </div>
               <div>
                 <h1 style={{
                   fontSize: '2rem', 
                   fontWeight: 700, 
                   margin: 0,
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
+                  color: theme.primary,
                   letterSpacing: '-0.025em'
                 }}>
-                  Thông báo
+                  {theme.title}
                 </h1>
                 <p style={{
-                  fontSize: '1rem',
+                  fontSize: '0.875rem',
                   color: '#64748b',
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  {unreadCount} thông báo chưa đọc từ tổng số {notifications.length}
+                  {theme.subtitle}
+                </p>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: theme.primary,
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 600
+                }}>
+                  {unreadCount} thông báo chưa đọc từ tổng số {filteredNotifications.length}
                 </p>
               </div>
             </div>
             
-            <button 
-              onClick={handleMarkAllAsRead}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                padding: '0.875rem 1.5rem',
-                borderRadius: '0.75rem',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-              }}
-            >
-              <CheckIcon style={{width: '1.125rem', height: '1.125rem'}} />
-              Đánh dấu tất cả đã đọc
-            </button>
+            {user?.role === 'admin' && <AdminControls />}
+            {user?.role === 'staff' && <StaffControls />}
+            {user?.role === 'family' && <FamilyControls />}
           </div>
         </div>
 
-        {/* Filters Section */}
+        {/* Filters Section - Different for each role */}
         <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          background: theme.cardBg,
           borderRadius: '1rem',
           padding: '1.5rem',
           marginBottom: '2rem',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
-            alignItems: 'end'
-          }}>
-            {/* Search */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Tìm kiếm
-              </label>
-              <div style={{position: 'relative'}}>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Tìm theo tiêu đề hoặc nội dung..."
+          {/* Filters based on role */}
+          {user?.role === 'admin' ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem',
+              alignItems: 'end'
+            }}>
+              {/* Search */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Tìm kiếm
+                </label>
+                <div style={{position: 'relative'}}>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Tìm theo tiêu đề hoặc nội dung..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 0.75rem 0.75rem 2.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <MagnifyingGlassIcon style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '1rem',
+                    height: '1rem',
+                    color: '#6b7280'
+                  }} />
+                </div>
+              </div>
+
+              {/* Category Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Danh mục
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.75rem 0.75rem 0.75rem 2.5rem',
+                    padding: '0.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid #e2e8f0',
                     fontSize: '0.875rem'
                   }}
-                />
-                <MagnifyingGlassIcon style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '1rem',
-                  height: '1rem',
-                  color: '#6b7280'
-                }} />
+                >
+                  {(categories as string[]).map((category: string) => (
+                    <option key={String(category)} value={String(category)}>
+                      {category === 'all' ? 'Tất cả danh mục' : category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Priority Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Mức độ ưu tiên
+                </label>
+                <select
+                  value={selectedPriority}
+                  onChange={(e) => setSelectedPriority(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {priorities.map(priority => (
+                    <option key={priority} value={priority}>
+                      {priority === 'all' ? 'Tất cả mức độ' : 
+                       priority === 'high' ? 'Cao' :
+                       priority === 'medium' ? 'Trung bình' : 'Thấp'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Read Status Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Trạng thái
+                </label>
+                <select
+                  value={showReadFilter}
+                  onChange={(e) => setShowReadFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="unread">Chưa đọc</option>
+                  <option value="read">Đã đọc</option>
+                </select>
               </div>
             </div>
+          ) : user?.role === 'staff' ? (
+            // Simplified filters for staff
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1rem',
+              alignItems: 'end'
+            }}>
+              {/* Search */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Tìm kiếm thông báo
+                </label>
+                <div style={{position: 'relative'}}>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Tìm thông báo công việc..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 0.75rem 0.75rem 2.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <MagnifyingGlassIcon style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '1rem',
+                    height: '1rem',
+                    color: '#6b7280'
+                  }} />
+                </div>
+              </div>
 
-            {/* Category Filter */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Danh mục
-              </label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem'
-                }}
-              >
-                {categories.map(category => (
-                  <option key={category} value={category}>
-                    {category === 'all' ? 'Tất cả danh mục' : category}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {/* Priority Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Mức độ ưu tiên
+                </label>
+                <select
+                  value={selectedPriority}
+                  onChange={(e) => setSelectedPriority(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Tất cả mức độ</option>
+                  <option value="high">Khẩn cấp</option>
+                  <option value="medium">Bình thường</option>
+                </select>
+              </div>
 
-            {/* Priority Filter */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Mức độ ưu tiên
-              </label>
-              <select
-                value={selectedPriority}
-                onChange={(e) => setSelectedPriority(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem'
-                }}
-              >
-                {priorities.map(priority => (
-                  <option key={priority} value={priority}>
-                    {priority === 'all' ? 'Tất cả mức độ' : 
-                     priority === 'high' ? 'Cao' :
-                     priority === 'medium' ? 'Trung bình' : 'Thấp'}
-                  </option>
-                ))}
-              </select>
+              {/* Read Status Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Trạng thái
+                </label>
+                <select
+                  value={showReadFilter}
+                  onChange={(e) => setShowReadFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="unread">Chưa đọc</option>
+                  <option value="read">Đã đọc</option>
+                </select>
+              </div>
             </div>
+          ) : (
+            // Simple filters for family
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '1rem',
+              alignItems: 'end'
+            }}>
+              {/* Search */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Tìm kiếm tin tức
+                </label>
+                <div style={{position: 'relative'}}>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Tìm tin tức về người thân..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 0.75rem 0.75rem 2.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <MagnifyingGlassIcon style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '1rem',
+                    height: '1rem',
+                    color: '#6b7280'
+                  }} />
+                </div>
+              </div>
 
-            {/* Read Status Filter */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Trạng thái
-              </label>
-              <select
-                value={showReadFilter}
-                onChange={(e) => setShowReadFilter(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem'
-                }}
-              >
-                <option value="all">Tất cả</option>
-                <option value="unread">Chưa đọc</option>
-                <option value="read">Đã đọc</option>
-              </select>
+              {/* Simple Status Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Hiển thị
+                </label>
+                <select
+                  value={showReadFilter}
+                  onChange={(e) => setShowReadFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="all">Tất cả tin tức</option>
+                  <option value="unread">Tin tức mới</option>
+                  <option value="read">Đã xem</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Notifications List */}
@@ -462,14 +832,14 @@ export default function NotificationsPage() {
         }}>
           {filteredNotifications.length === 0 ? (
             <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              background: theme.cardBg,
               borderRadius: '1rem',
               padding: '3rem',
               textAlign: 'center',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
-              <BellIcon style={{
+              <IconComponent style={{
                 width: '3rem',
                 height: '3rem',
                 color: '#9ca3af',
@@ -481,18 +851,22 @@ export default function NotificationsPage() {
                 color: '#374151',
                 margin: '0 0 0.5rem 0'
               }}>
-                Không có thông báo
+                {user?.role === 'family' ? 'Không có tin tức mới' : 'Không có thông báo'}
               </h3>
               <p style={{
                 fontSize: '0.875rem',
                 color: '#6b7280',
                 margin: 0
               }}>
-                Không tìm thấy thông báo nào phù hợp với bộ lọc của bạn.
+                {user?.role === 'family' 
+                  ? 'Hiện tại chưa có tin tức mới về người thân của bạn.'
+                  : user?.role === 'staff'
+                  ? 'Không có thông báo công việc nào phù hợp với bộ lọc.'
+                  : 'Không tìm thấy thông báo nào phù hợp với bộ lọc của bạn.'}
               </p>
             </div>
           ) : (
-            filteredNotifications.map((notification) => {
+            filteredNotifications.map((notification: typeof notifications[0]) => {
               const priorityColors = getPriorityColor(notification.priority);
               return (
                 <div
@@ -500,13 +874,14 @@ export default function NotificationsPage() {
                   style={{
                     background: notification.isRead 
                       ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
-                      : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                      : theme.cardBg,
                     borderRadius: '1rem',
                     padding: '1.5rem',
                     boxShadow: notification.isRead 
                       ? '0 2px 4px rgba(0, 0, 0, 0.05)'
                       : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     border: `1px solid ${notification.isRead ? '#e2e8f0' : 'rgba(255, 255, 255, 0.2)'}`,
+                    borderLeft: `4px solid ${theme.primary}`,
                     transition: 'all 0.2s ease'
                   }}
                 >
@@ -613,7 +988,7 @@ export default function NotificationsPage() {
                       </div>
                     </div>
                     
-                    {/* Actions */}
+                    {/* Actions - Different for each role */}
                     <div style={{
                       display: 'flex',
                       gap: '0.5rem',
@@ -632,15 +1007,15 @@ export default function NotificationsPage() {
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.background = '#f0f9ff';
-                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.borderColor = theme.primary;
                           }}
                           onMouseOut={(e) => {
                             e.currentTarget.style.background = 'white';
                             e.currentTarget.style.borderColor = '#e2e8f0';
                           }}
-                          title="Đánh dấu đã đọc"
+                          title={user?.role === 'family' ? 'Đánh dấu đã xem' : 'Đánh dấu đã đọc'}
                         >
-                          <CheckIcon style={{width: '1rem', height: '1rem', color: '#3b82f6'}} />
+                          <CheckIcon style={{width: '1rem', height: '1rem', color: theme.primary}} />
                         </button>
                       ) : (
                         <button
@@ -661,9 +1036,35 @@ export default function NotificationsPage() {
                             e.currentTarget.style.background = 'white';
                             e.currentTarget.style.borderColor = '#e2e8f0';
                           }}
-                          title="Đánh dấu chưa đọc"
+                          title={user?.role === 'family' ? 'Đánh dấu chưa xem' : 'Đánh dấu chưa đọc'}
                         >
                           <XMarkIcon style={{width: '1rem', height: '1rem', color: '#f59e0b'}} />
+                        </button>
+                      )}
+                      
+                      {/* Admin can delete notifications */}
+                      {user?.role === 'admin' && (
+                        <button
+                          onClick={() => handleDeleteNotification(notification.id)}
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e2e8f0',
+                            background: 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#fef2f2';
+                            e.currentTarget.style.borderColor = '#ef4444';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'white';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                          }}
+                          title="Xóa thông báo"
+                        >
+                          <TrashIcon style={{width: '1rem', height: '1rem', color: '#ef4444'}} />
                         </button>
                       )}
                     </div>

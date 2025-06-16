@@ -2102,7 +2102,6 @@ export default function FinancePage() {
                   }}>
                     <div>
                                              <p style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                         <BuildingLibraryIcon style={{width: '1rem', height: '1rem', color: '#166534'}} />
                          Phí chăm sóc hàng tháng
                        </p>
                       <p style={{fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
@@ -2127,7 +2126,7 @@ export default function FinancePage() {
                     }}>
                       <div>
                         <p style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0}}>
-                          🩺 {service.name}
+                           {service.name}
                         </p>
                         <p style={{fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
                           Tần suất: {service.frequency}
@@ -2158,7 +2157,7 @@ export default function FinancePage() {
                   alignItems: 'center',
                   gap: '0.5rem'
                 }}>
-                  💰 Chi tiết thanh toán
+                   Chi tiết thanh toán
                 </h4>
                 
                 <div style={{background: 'white', borderRadius: '0.75rem', border: '1px solid #d1d5db', overflow: 'hidden'}}>

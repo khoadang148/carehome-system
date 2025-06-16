@@ -11,9 +11,11 @@ import {
   MapPinIcon,
   CalendarIcon,
   BriefcaseIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 
 // Validation types
 interface ValidationErrors {
@@ -52,6 +54,7 @@ const familyMembers = [
 ];
 
 export default function ProfilePage() {
+  const router = useRouter();
   const { user } = useAuth();
   const [selectedFamilyMember, setSelectedFamilyMember] = useState(familyMembers[0]);
   const [isEditing, setIsEditing] = useState(false);
@@ -340,101 +343,132 @@ export default function ProfilePage() {
         maxWidth: '800px',
         margin: '0 auto'
       }}>
-        {/* Header */}
-          <div style={{
-            display: 'flex', 
-            justifyContent: 'space-between', 
+       <button
+          onClick={() => router.push('/')}
+          style={{
+            display: 'flex',
             alignItems: 'center',
-          marginBottom: '2rem',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-              <div>
-                <h1 style={{
-              fontSize: '1.875rem',
-                  fontWeight: 700, 
-              color: '#111827',
-              margin: '0 0 0.25rem 0'
-                }}>
-                  Hồ sơ cá nhân
-                </h1>
-                <p style={{
-              fontSize: '0.875rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              Quản lý thông tin tài khoản
-            </p>
-            </div>
-            
-            {!isEditing ? (
-              <button 
-                onClick={() => setIsEditing(true)}
-                style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: '#6366f1',
-                color: 'white',
-                padding: '0.75rem 1.25rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                fontWeight: 500,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
-              onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
-            >
-              <PencilIcon style={{width: '1rem', height: '1rem'}} />
-              Chỉnh sửa
-            </button>
-          ) : (
-            <div style={{display: 'flex', gap: '0.5rem'}}>
-              <button 
-                onClick={handleSave}
-                disabled={isSubmitting}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  background: isSubmitting ? '#9ca3af' : '#10b981',
-                  color: 'white',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.875rem',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  opacity: isSubmitting ? 0.6 : 1
-                }}
-              >
-                <CheckIcon style={{width: '1rem', height: '1rem'}} />
-                {isSubmitting ? 'Đang lưu...' : 'Lưu'}
-                </button>
-                <button 
-                  onClick={handleCancel}
-                  style={{
-                  display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                  background: '#ef4444',
-                    color: 'white',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.5rem',
-                    border: 'none',
-                  fontWeight: 500,
-                    fontSize: '0.875rem',
-                  cursor: 'pointer'
-                  }}
-                >
-                <XMarkIcon style={{width: '1rem', height: '1rem'}} />
-                  Hủy
-                </button>
-              </div>
-            )}
-        </div>
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
+
+        <div style={{
+  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  marginBottom: '2rem',
+  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  backdropFilter: 'blur(10px)'
+}}>
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '1rem'
+  }}>
+    <div>
+      <h1 style={{
+        fontSize: '1.875rem',
+        fontWeight: 700,
+        color: '#111827',
+        margin: '0 0 0.25rem 0'
+      }}>
+        Hồ sơ cá nhân
+      </h1>
+      <p style={{
+        fontSize: '0.875rem',
+        color: '#6b7280',
+        margin: 0
+      }}>
+        Quản lý thông tin tài khoản
+      </p>
+    </div>
+    
+    {!isEditing ? (
+      <button
+        onClick={() => setIsEditing(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: '#6366f1',
+          color: 'white',
+          padding: '0.75rem 1.25rem',
+          borderRadius: '0.5rem',
+          border: 'none',
+          fontWeight: 500,
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          transition: 'background 0.2s'
+        }}
+        onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
+        onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
+      >
+        <PencilIcon style={{width: '1rem', height: '1rem'}} />
+        Chỉnh sửa
+      </button>
+    ) : (
+      <div style={{display: 'flex', gap: '0.5rem'}}>
+        <button
+          onClick={handleSave}
+          disabled={isSubmitting}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: isSubmitting ? '#9ca3af' : '#10b981',
+            color: 'white',
+            padding: '0.75rem 1rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: 500,
+            fontSize: '0.875rem',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            opacity: isSubmitting ? 0.6 : 1
+          }}
+        >
+          <CheckIcon style={{width: '1rem', height: '1rem'}} />
+          {isSubmitting ? 'Đang lưu...' : 'Lưu'}
+        </button>
+        <button
+          onClick={handleCancel}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: '#ef4444',
+            color: 'white',
+            padding: '0.75rem 1rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: 500,
+            fontSize: '0.875rem',
+            cursor: 'pointer'
+          }}
+        >
+          <XMarkIcon style={{width: '1rem', height: '1rem'}} />
+          Hủy
+        </button>
+      </div>
+    )}
+  </div>
+</div>
+
 
         {/* Profile Card */}
         <div style={{
@@ -725,7 +759,7 @@ export default function ProfilePage() {
                     <div>
                       <label style={{
                         fontSize: '0.75rem',
-                      fontWeight: 500,
+                        fontWeight: 500,
                         color: '#6b7280',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
@@ -733,15 +767,15 @@ export default function ProfilePage() {
                         display: 'block'
                       }}>
                         Mối quan hệ
-                    </label>
-                    {isEditing ? (
+                      </label>
+                      {(isEditing && user?.role && user.role === 'admin') ? (
                         <div>
                           <select
                             name="relationship"
                             value={formData.relationship}
                             onChange={(e) => handleInputChange('relationship', e.target.value)}
-                        style={{
-                          width: '100%',
+                            style={{
+                              width: '100%',
                               padding: '0.5rem',
                               borderRadius: '0.375rem',
                               border: `1px solid ${touched.relationship && errors.relationship ? '#dc2626' : '#d1d5db'}`,
@@ -771,10 +805,13 @@ export default function ProfilePage() {
                           </select>
                           <ErrorMessage error={touched.relationship ? errors.relationship : undefined} />
                         </div>
-                    ) : (
-                      <div style={{
+                      ) : (
+                        <div style={{
                           fontSize: '0.875rem',
-                          color: '#111827'
+                          color: '#111827',
+                          background: isEditing ? '#f3f4f6' : undefined,
+                          borderRadius: isEditing ? '0.375rem' : undefined,
+                          padding: isEditing ? '0.5rem' : undefined
                         }}>
                           {formData.relationship}
                         </div>
@@ -847,3 +884,4 @@ export default function ProfilePage() {
     </div>
   );
 } 
+
