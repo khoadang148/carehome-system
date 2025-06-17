@@ -80,7 +80,7 @@ const mockNotifications = [
   {
     id: 6,
     title: 'Hoạt động giải trí buổi chiều',
-    message: 'Hoạt động ca hát và đọc sách cho các cư dân vào lúc 4:00 PM tại phòng sinh hoạt.',
+    message: 'Hoạt động ca hát và đọc sách cho các người cao tuổi vào lúc 4:00 PM tại phòng sinh hoạt.',
     time: '2023-05-14T13:15:00',
     isRead: true,
     type: 'activity',

@@ -164,7 +164,7 @@ const ROLE_DASHBOARDS = {
       },
       {
         title: 'Hỗ trợ hành chính',
-        description: 'Báo cáo sự cố và kiểm kê kho',
+        description: 'Kiểm kê kho',
         icon: CubeIcon,
         href: '/staff/administrative',
         gradient: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)',

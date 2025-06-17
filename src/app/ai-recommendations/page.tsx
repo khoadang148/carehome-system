@@ -107,7 +107,7 @@ export default function AIRecommendationsPage() {
 
   const generateGroupRecommendations = async () => {
     if (selectedResidents.length < 2) {
-      alert('Vui lòng chọn ít nhất 2 cư dân để tạo gợi ý nhóm');
+      alert('Vui lòng chọn ít nhất 2 người cao tuổi để tạo gợi ý nhóm');
       return;
     }
     
@@ -431,7 +431,7 @@ export default function AIRecommendationsPage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Chọn cư dân (tối thiểu 2 người)
+                  Chọn người cao tuổi (tối thiểu 2 người)
                 </label>
                 <div style={{
                   display: 'grid',
@@ -683,7 +683,7 @@ export default function AIRecommendationsPage() {
                           color: '#374151',
                           marginBottom: '0.5rem'
                         }}>
-                          Cư dân tham gia:
+                          người cao tuổi tham gia:
                         </h4>
                         <div style={{
                           display: 'flex',
@@ -703,7 +703,7 @@ export default function AIRecommendationsPage() {
                                   fontSize: '0.75rem'
                                 }}
                               >
-                                {participant?.name || `Cư dân ${participantId}`}
+                                {participant?.name || `người cao tuổi ${participantId}`}
                               </span>
                             );
                           })}
@@ -965,7 +965,7 @@ export default function AIRecommendationsPage() {
                   color: '#9ca3af',
                   margin: 0
                 }}>
-                  Chọn cư dân và nhấn "Tạo gợi ý AI" để nhận được các hoạt động phù hợp
+                  Chọn người cao tuổi và nhấn "Tạo gợi ý AI" để nhận được các hoạt động phù hợp
                 </p>
               </div>
             </div>

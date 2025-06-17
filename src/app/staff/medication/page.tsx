@@ -14,6 +14,7 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import NoteModal from '@/components/NoteModal';
 
 interface MedicationRecord {
   id: number;
@@ -53,6 +54,10 @@ export default function StaffMedicationPage() {
   const [selectedResident, setSelectedResident] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'schedule' | 'records'>('schedule');
   const [loading, setLoading] = useState(true);
+  // Modal state
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [noteModalType, setNoteModalType] = useState<'administered' | 'missed' | 'refused' | null>(null);
+  const [noteModalLogId, setNoteModalLogId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -102,7 +107,7 @@ export default function StaffMedicationPage() {
         status: 'administered',
         administeredBy: user?.name || 'Staff',
         date: currentDate,
-        notes: 'Cư dân uống thuốc bình thường'
+        notes: 'người cao tuổi uống thuốc bình thường'
       },
       {
         id: 2,
@@ -181,6 +186,30 @@ export default function StaffMedicationPage() {
   const residents = Array.from(new Set(medicationRecords.map(r => ({ id: r.residentId, name: r.residentName }))))
     .filter((resident, index, self) => self.findIndex(r => r.id === resident.id) === index);
 
+  // Mở modal với loại hành động và logId
+  const openNoteModal = (type: 'administered' | 'missed' | 'refused', logId: number) => {
+    setNoteModalType(type);
+    setNoteModalLogId(logId);
+    setNoteModalOpen(true);
+  };
+
+  // Xử lý lưu ghi chú từ modal
+  const handleNoteModalSave = (note: string) => {
+    if (noteModalLogId && noteModalType) {
+      handleAdministerMedication(noteModalLogId, noteModalType, note);
+    }
+    setNoteModalOpen(false);
+    setNoteModalType(null);
+    setNoteModalLogId(null);
+  };
+
+  // Xử lý đóng modal
+  const handleNoteModalClose = () => {
+    setNoteModalOpen(false);
+    setNoteModalType(null);
+    setNoteModalLogId(null);
+  };
+
   if (loading) {
     return (
       <div style={{
@@ -252,7 +281,7 @@ export default function StaffMedicationPage() {
               Quản Lý Thuốc
             </h1>
             <p style={{ color: '#6b7280', margin: 0 }}>
-              Theo dõi lịch uống thuốc và ghi nhận việc phát thuốc cho cư dân
+              Theo dõi lịch uống thuốc và ghi nhận việc phát thuốc cho người cao tuổi
             </p>
           </div>
         </div>
@@ -426,7 +455,7 @@ export default function StaffMedicationPage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Cư dân
+                    Người cao tuổi
                   </label>
                   <select
                     value={selectedResident || ''}
@@ -440,7 +469,7 @@ export default function StaffMedicationPage() {
                       background: 'white'
                     }}
                   >
-                    <option value="">Tất cả cư dân</option>
+                    <option value="">Tất cả người cao tuổi</option>
                     {residents.map(resident => (
                       <option key={resident.id} value={resident.id}>
                         {resident.name}
@@ -514,10 +543,7 @@ export default function StaffMedicationPage() {
                       {log.status === 'scheduled' && (
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
-                            onClick={() => {
-                              const notes = prompt('Ghi chú (nếu có):');
-                              handleAdministerMedication(log.id, 'administered', notes || undefined);
-                            }}
+                            onClick={() => openNoteModal('administered', log.id)}
                             style={{
                               padding: '0.5rem 1rem',
                               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -532,12 +558,7 @@ export default function StaffMedicationPage() {
                             Đã phát
                           </button>
                           <button
-                            onClick={() => {
-                              const reason = prompt('Lý do bỏ lỡ:');
-                              if (reason) {
-                                handleAdministerMedication(log.id, 'missed', reason);
-                              }
-                            }}
+                            onClick={() => openNoteModal('missed', log.id)}
                             style={{
                               padding: '0.5rem 1rem',
                               background: '#f59e0b',
@@ -552,12 +573,7 @@ export default function StaffMedicationPage() {
                             Bỏ lỡ
                           </button>
                           <button
-                            onClick={() => {
-                              const reason = prompt('Lý do từ chối:');
-                              if (reason) {
-                                handleAdministerMedication(log.id, 'refused', reason);
-                              }
-                            }}
+                            onClick={() => openNoteModal('refused', log.id)}
                             style={{
                               padding: '0.5rem 1rem',
                               background: '#ef4444',
@@ -721,7 +737,7 @@ export default function StaffMedicationPage() {
                         color: '#6b7280',
                         margin: 0
                       }}>
-                        Cư dân: {record.residentName} • Bác sĩ kê: {record.prescribedBy}
+                        Người cao tuổi: {record.residentName} • Bác sĩ kê: {record.prescribedBy}
                       </p>
                     </div>
                   </div>
@@ -851,6 +867,24 @@ export default function StaffMedicationPage() {
           </div>
         )}
       </div>
+      {/* Modal nhập ghi chú */}
+      <NoteModal
+        open={noteModalOpen}
+        title={
+          noteModalType === 'administered' ? 'Nhập ghi chú hoàn thành' :
+          noteModalType === 'missed' ? 'Nhập lý do bỏ lỡ' :
+          noteModalType === 'refused' ? 'Nhập lý do từ chối' :
+          'Nhập ghi chú'
+        }
+        placeholder={
+          noteModalType === 'administered' ? 'Nhập ghi chú về quá trình phát thuốc...' :
+          noteModalType === 'missed' ? 'Nhập lý do bỏ lỡ phát thuốc...' :
+          noteModalType === 'refused' ? 'Nhập lý do từ chối phát thuốc...' :
+          'Nhập ghi chú...'
+        }
+        onClose={handleNoteModalClose}
+        onSave={handleNoteModalSave}
+      />
     </div>
   );
 } 

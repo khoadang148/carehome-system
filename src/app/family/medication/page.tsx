@@ -125,7 +125,7 @@ export default function FamilyMedicationPage() {
         status: 'administered',
         administeredBy: 'Y tá Nguyễn Văn A',
         date: selectedDate,
-        notes: 'Cư dân uống thuốc bình thường, không có phản ứng phụ'
+        notes: 'người cao tuổi uống thuốc bình thường, không có phản ứng phụ'
       },
       {
         id: 2,

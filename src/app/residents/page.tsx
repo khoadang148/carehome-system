@@ -388,7 +388,8 @@ export default function ResidentsPage() {
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
-            marginBottom: '1rem',
+            marginLeft: '2rem',
+            marginTop: '1rem',
             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
           }}
         >

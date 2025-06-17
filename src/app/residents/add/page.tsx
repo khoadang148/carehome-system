@@ -34,7 +34,7 @@ const validateAge = (dateOfBirth: string) => {
   const today = new Date();
   const birthDate = new Date(dateOfBirth);
   const age = today.getFullYear() - birthDate.getFullYear();
-  return age >= 50 || "Cư dân phải từ 50 tuổi trở lên";
+  return age >= 50 || "người cao tuổi phải từ 50 tuổi trở lên";
 };
 
 const validatePhone = (phone: string) => {
@@ -118,7 +118,7 @@ export default function AddResidentPage() {
             color: '#6b7280',
             marginBottom: '1.5rem'
           }}>
-            Cư dân mới đã được thêm vào hệ thống
+            người cao tuổi mới đã được thêm vào hệ thống
           </p>
           <div style={{
             width: '2rem',
@@ -195,14 +195,14 @@ export default function AddResidentPage() {
               margin: 0,
               marginBottom: '0.25rem'
             }}>
-              Thêm cư dân mới
+              Thêm người cao tuổi mới
             </h1>
             <p style={{
               color: '#6b7280',
               margin: 0,
               fontSize: '0.95rem'
             }}>
-              Điền thông tin chi tiết để đăng ký cư dân mới vào hệ thống
+              Điền thông tin chi tiết để đăng ký người cao tuổi mới vào hệ thống
             </p>
           </div>
         </div>
@@ -806,7 +806,7 @@ export default function AddResidentPage() {
                       animation: 'spin 1s linear infinite'
                     }} />
                   )}
-                  {isSubmitting ? 'Đang xử lý...' : 'Lưu thông tin cư dân'}
+                  {isSubmitting ? 'Đang xử lý...' : 'Lưu thông tin người cao tuổi'}
                 </button>
               </div>
             </div>

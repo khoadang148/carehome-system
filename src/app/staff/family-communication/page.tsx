@@ -188,7 +188,7 @@ export default function FamilyCommunicationPage() {
             </h1>
           </div>
           <p style={{ color: '#6b7280', margin: 0 }}>
-            Trả lời câu hỏi và chia sẻ thông tin với gia đình cư dân
+            Trả lời câu hỏi và chia sẻ thông tin với gia đình người cao tuổi
           </p>
         </div>
 
@@ -256,49 +256,43 @@ export default function FamilyCommunicationPage() {
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '1rem',
-                    marginBottom: '0.5rem'
+                    gap: '0.75rem',
+                    marginBottom: '1.25rem'
                   }}>
+                    <ChatBubbleLeftRightIcon style={{ width: '2.2rem', height: '2.2rem', color: '#3b82f6' }} />
                     <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 700,
-                      color: '#1f2937',
-                      margin: 0
+                      fontSize: '1.3rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      margin: 0,
+                      textShadow: '0 2px 8px rgba(59,130,246,0.08)'
                     }}>
                       {message.subject}
                     </h3>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      background: `${getPriorityColor(message.priority)}20`,
-                      color: getPriorityColor(message.priority)
-                    }}>
-                      {message.priority === 'urgent' ? 'Khẩn cấp' : 
-                       message.priority === 'high' ? 'Cao' :
-                       message.priority === 'medium' ? 'Trung bình' : 'Thấp'}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.95rem',
+                    marginBottom: '0.25rem'
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <UserGroupIcon style={{ width: '1rem', color: '#3b82f6' }} />
+                      <b>Từ:</b> {message.familyName}
                     </span>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      background: `${getStatusColor(message.status)}20`,
-                      color: getStatusColor(message.status)
-                    }}>
-                      {message.status === 'new' ? 'Mới' :
-                       message.status === 'replied' ? 'Đã trả lời' : 'Đã giải quyết'}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <UserGroupIcon style={{ width: '1rem', color: '#10b981' }} />
+                      <b>Người cao tuổi:</b> {message.residentName}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <ClockIcon style={{ width: '1rem', color: '#f59e0b' }} />
+                      <b>Thời gian gửi:</b> {new Date(message.createdAt).toLocaleString('vi-VN')}
                     </span>
                   </div>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    margin: 0
-                  }}>
-                    Từ: {message.familyName} • Cư dân: {message.residentName} • 
-                    {new Date(message.createdAt).toLocaleString('vi-VN')}
-                  </p>
                 </div>
               </div>
 
@@ -484,13 +478,14 @@ export default function FamilyCommunicationPage() {
 
               <div style={{
                 padding: '1rem',
-                background: '#f9fafb',
+                background: '#f3f6fd',
                 borderRadius: '0.5rem',
                 marginBottom: '1.5rem'
               }}>
                 <p style={{
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
+                  fontSize: '0.95rem',
+                  color: '#2563eb',
+                  fontWeight: 700,
                   margin: '0 0 0.5rem 0'
                 }}>
                   Tin nhắn gốc:
@@ -506,9 +501,9 @@ export default function FamilyCommunicationPage() {
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{
                   display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  color: '#059669',
                   marginBottom: '0.5rem'
                 }}>
                   Phản hồi của bạn:

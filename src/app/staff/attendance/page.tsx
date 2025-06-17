@@ -62,7 +62,7 @@ export default function AttendancePage() {
         staffId: 2,
         staffName: 'Trần Thị B',
         position: 'Người chăm sóc',
-        department: 'Chăm sóc cư dân',
+        department: 'Chăm sóc người cao tuổi',
         date: selectedDate,
         checkIn: '08:15',
         checkOut: null,
@@ -352,7 +352,7 @@ export default function AttendancePage() {
               >
                 <option value="">Tất cả phòng ban</option>
                 <option value="Y tế">Y tế</option>
-                <option value="Chăm sóc cư dân">Chăm sóc cư dân</option>
+                <option value="Chăm sóc người cao tuổi">Chăm sóc người cao tuổi</option>
                 <option value="Phục hồi chức năng">Phục hồi chức năng</option>
                 <option value="Hoạt động">Hoạt động</option>
                 <option value="Quản lý">Quản lý</option>

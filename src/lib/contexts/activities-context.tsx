@@ -76,7 +76,7 @@ const INITIAL_ACTIVITIES: Activity[] = [
   { 
     id: 3, 
     name: 'Trò chơi bài cùng bạn', 
-    description: 'Trò chơi bài và cờ để giao lưu giữa các cư dân',
+    description: 'Trò chơi bài và cờ để giao lưu giữa các người cao tuổi',
     category: 'social', 
     location: 'Phòng giải trí',
     startTime: '14:00',

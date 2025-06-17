@@ -168,7 +168,7 @@ const validationRules = {
         return 'Ngày sinh không thể ở tương lai';
       }
       if (age < 50) {
-        return 'Cư dân phải ít nhất 50 tuổi để được nhận vào viện dưỡng lão';
+        return 'người cao tuổi phải ít nhất 50 tuổi để được nhận vào viện dưỡng lão';
       }
       if (age > 120) {
         return 'Tuổi không hợp lệ';
@@ -330,7 +330,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
 
       const savedResidents = localStorage.getItem('nurseryHomeResidents');
       if (!savedResidents) {
-        throw new Error('Không tìm thấy dữ liệu cư dân');
+        throw new Error('Không tìm thấy dữ liệu người cao tuổi');
       }
 
       const residents = JSON.parse(savedResidents);
@@ -338,7 +338,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       const residentIndex = residents.findIndex((r: any) => r.id === residentId);
       
       if (residentIndex === -1) {
-        throw new Error('Không tìm thấy cư dân');
+        throw new Error('Không tìm thấy người cao tuổi');
       }
 
       // Calculate age from date of birth
@@ -375,7 +375,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       // Trigger data update event
       window.dispatchEvent(new CustomEvent('dataUpdated'));
       
-      setSuccessMessage('Thông tin cư dân đã được cập nhật thành công!');
+      setSuccessMessage('Thông tin người cao tuổi đã được cập nhật thành công!');
       
       // Redirect back to detail page after short delay
       setTimeout(() => {
@@ -417,7 +417,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             margin: '0 auto 1rem'
           }} />
           <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-            Đang tải thông tin cư dân...
+            Đang tải thông tin người cao tuổi...
           </p>
         </div>
       </div>
@@ -454,14 +454,14 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             color: '#1f2937',
             margin: '0 0 0.5rem 0'
           }}>
-            Không tìm thấy cư dân
+            Không tìm thấy người cao tuổi
           </h2>
           <p style={{
             fontSize: '0.875rem',
             color: '#6b7280',
             margin: '0 0 1.5rem 0'
           }}>
-            Cư dân này có thể đã bị xóa hoặc không tồn tại
+            người cao tuổi này có thể đã bị xóa hoặc không tồn tại
           </p>
           <Link
             href="/residents"
@@ -709,7 +709,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                 margin: 0,
                 color: '#1e293b'
               }}>
-                Chỉnh sửa thông tin cư dân
+                Chỉnh sửa thông tin người cao tuổi
               </h1>
               <p style={{
                 fontSize: '1rem',
@@ -799,7 +799,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                       color: '#64748b',
                       margin: 0
                     }}>
-                      Thông tin cơ bản và nhân khẩu học của cư dân
+                      Thông tin cơ bản và nhân khẩu học của người cao tuổi
                     </p>
                   </div>
                 </div>
@@ -1105,7 +1105,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     color: '#475569',
                     lineHeight: '1.5'
                   }}>
-                    <li>Ghi rõ sở thích, thói quen của cư dân</li>
+                    <li>Ghi rõ sở thích, thói quen của người cao tuổi</li>
                     <li>Lưu ý các vấn đề cần quan tâm đặc biệt</li>
                     <li>Thông tin về gia đình, bạn bè thân thiết</li>
                     <li>Các hoạt động yêu thích hoặc không thích</li>

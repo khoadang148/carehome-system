@@ -84,7 +84,7 @@ export default function StaffOverviewPanel() {
         gap: '0.75rem'
       }}>
         <UserIcon style={{ width: '1.5rem', height: '1.5rem', color: '#3b82f6' }} />
-        Công cụ chăm sóc cư dân
+        Công cụ chăm sóc người cao tuổi
       </h2>
 
       {/* Search Residents */}
@@ -104,7 +104,7 @@ export default function StaffOverviewPanel() {
           }} />
           <input
             type="text"
-            placeholder="Tìm kiếm cư dân theo tên hoặc phòng..."
+            placeholder="Tìm kiếm người cao tuổi theo tên hoặc phòng..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -220,7 +220,7 @@ function ActionCard({
         color: '#6b7280',
         marginBottom: '1rem'
       }}>
-        Chọn cư dân:
+        Chọn người cao tuổi:
       </div>
       
       {residents.length > 0 ? (
@@ -269,7 +269,7 @@ function ActionCard({
           textAlign: 'center',
           padding: '1rem'
         }}>
-          {searchTerm ? 'Không tìm thấy cư dân phù hợp' : 'Đang tải danh sách cư dân...'}
+          {searchTerm ? 'Không tìm thấy người cao tuổi phù hợp' : 'Đang tải danh sách người cao tuổi...'}
         </div>
       )}
     </div>
@@ -295,7 +295,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
     
     // 1. Kiểm tra độ dài tối thiểu
     if (noteContent.length < 15) {
-      alert('⚠️ Nội dung nhật ký quá ngắn.\n\nVui lòng mô tả chi tiết:\n• Tình trạng hiện tại\n• Triệu chứng quan sát\n• Hoạt động thực hiện\n• Phản ứng của cư dân\n\n(Tối thiểu 15 ký tự)');
+      alert('⚠️ Nội dung nhật ký quá ngắn.\n\nVui lòng mô tả chi tiết:\n• Tình trạng hiện tại\n• Triệu chứng quan sát\n• Hoạt động thực hiện\n• Phản ứng của người cao tuổi\n\n(Tối thiểu 15 ký tự)');
       return;
     }
 
@@ -517,7 +517,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={5}
-              placeholder="VD: Cư dân có biểu hiện đau đầu nhẹ từ 14:30. Huyết áp 130/80 mmHg. Đã uống paracetamol 500mg. Tâm trạng ổn định, ăn uống bình thường. Theo dõi tiếp diễn biến..."
+              placeholder="VD: người cao tuổi có biểu hiện đau đầu nhẹ từ 14:30. Huyết áp 130/80 mmHg. Đã uống paracetamol 500mg. Tâm trạng ổn định, ăn uống bình thường. Theo dõi tiếp diễn biến..."
               style={{
                 width: '100%',
                 padding: '0.75rem',

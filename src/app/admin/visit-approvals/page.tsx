@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   CheckCircleIcon,
   XCircleIcon,
@@ -101,6 +101,22 @@ export default function VisitApprovalsPage() {
     
     return matchesSearch && matchesStatus;
   });
+
+  useEffect(() => {
+    console.log('Modal states:', { showDetailModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showDetailModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showDetailModal]);
 
   const handleApprove = (id: string) => {
     setRequests(requests.map(request => 
@@ -340,10 +356,12 @@ export default function VisitApprovalsPage() {
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
+                        
                           onClick={() => {
                             setSelectedRequest(request);
                             setShowDetailModal(true);
                           }}
+                          title = "Chi tiết yêu cầu thăm viếng"
                           style={{
                             background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                             color: 'white',
@@ -359,6 +377,7 @@ export default function VisitApprovalsPage() {
                           <>
                             <button
                               onClick={() => handleApprove(request.id)}
+                              title = "Phê duyệt yêu cầu thăm viếng"
                               style={{
                                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                 color: 'white',
@@ -372,6 +391,7 @@ export default function VisitApprovalsPage() {
                             </button>
                             <button
                               onClick={() => handleReject(request.id)}
+                              title = "Từ chối yêu cầu thăm viếng"
                               style={{
                                 background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                                 color: 'white',
@@ -417,7 +437,9 @@ export default function VisitApprovalsPage() {
               maxHeight: '90vh',
               overflowY: 'auto'
             }}>
-              <h2 style={{ marginBottom: '1.5rem', color: '#1f2937' }}>Chi tiết Yêu cầu Thăm viếng</h2>
+              <h2 className="mb-7 text-green-600">
+              Chi tiết Yêu cầu Thăm viếng
+              </h2>
               
               <div style={{ display: 'grid', gap: '1.5rem' }}>
                 {/* Visitor Info */}
@@ -426,7 +448,7 @@ export default function VisitApprovalsPage() {
                   borderRadius: '0.75rem',
                   padding: '1.5rem'
                 }}>
-                  <h3 style={{ marginBottom: '1rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ marginBottom: '1rem', color: 'red', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <UserIcon style={{ width: '1.25rem', height: '1.25rem' }} />
                     Thông tin người thăm
                   </h3>
@@ -462,7 +484,7 @@ export default function VisitApprovalsPage() {
                   borderRadius: '0.75rem',
                   padding: '1.5rem'
                 }}>
-                  <h3 style={{ marginBottom: '1rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ marginBottom: '1rem', color: 'red', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <CalendarDaysIcon style={{ width: '1.25rem', height: '1.25rem' }} />
                     Thông tin thăm viếng
                   </h3>
@@ -504,7 +526,7 @@ export default function VisitApprovalsPage() {
                   borderRadius: '0.75rem',
                   padding: '1.5rem'
                 }}>
-                  <h3 style={{ marginBottom: '1rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ marginBottom: '1rem', color: 'red', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <ClockIcon style={{ width: '1.25rem', height: '1.25rem' }} />
                     Trạng thái xử lý
                   </h3>

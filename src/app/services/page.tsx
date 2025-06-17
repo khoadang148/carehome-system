@@ -8,7 +8,9 @@ import {
   BuildingLibraryIcon,
   DocumentPlusIcon,
   CalendarDaysIcon,
-  XMarkIcon
+  XMarkIcon,
+  CheckCircleIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 
 const carePackages = [
@@ -85,20 +87,118 @@ export default function ServicesPage() {
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedResidentIndex, setSelectedResidentIndex] = useState(0);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [pendingPackages, setPendingPackages] = useState<any[]>([]);
+  
+  const loadPendingPackages = () => {
+    try {
+      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      if (savedResidents) {
+        const residents = JSON.parse(savedResidents);
+        const pending = residents
+          .filter((r: any) => r.carePackage && r.carePackage.status === 'pending_approval')
+          .map((r: any) => ({
+            ...r.carePackage,
+            residentName: r.name,
+            residentId: r.id,
+            residentAge: r.age,
+            residentRoom: r.room
+          }));
+        setPendingPackages(pending);
+      }
+    } catch (error) {
+      console.error('Error loading pending packages:', error);
+    }
+  };
+
+  // Load pending packages when component mounts (for admin)
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      loadPendingPackages();
+    }
+  }, [user]);
+
+  // Handle approve/reject service packages
+  const handleApprovePackage = (registrationId: string) => {
+    try {
+      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      if (savedResidents) {
+        const residents = JSON.parse(savedResidents);
+        const updatedResidents = residents.map((r: any) => {
+          if (r.carePackage && r.carePackage.registrationId === registrationId) {
+            return {
+              ...r,
+              carePackage: {
+                ...r.carePackage,
+                status: 'active',
+                approvedDate: new Date().toISOString(),
+                approvedBy: 'Nhân viên quản lý'
+              }
+            };
+          }
+          return r;
+        });
+        
+        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+        loadPendingPackages(); // Reload pending packages
+        alert('✅ Đã duyệt gói dịch vụ thành công!');
+      }
+    } catch (error) {
+      console.error('Error approving package:', error);
+      alert('❌ Có lỗi xảy ra khi duyệt gói dịch vụ!');
+    }
+  };
+
+  const handleRejectPackage = (registrationId: string) => {
+    const reason = prompt('Nhập lý do từ chối:');
+    if (!reason) return;
+
+    try {
+      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      if (savedResidents) {
+        const residents = JSON.parse(savedResidents);
+        const updatedResidents = residents.map((r: any) => {
+          if (r.carePackage && r.carePackage.registrationId === registrationId) {
+            return {
+              ...r,
+              carePackage: {
+                ...r.carePackage,
+                status: 'rejected',
+                rejectedDate: new Date().toISOString(),
+                rejectedBy: 'Nhân viên quản lý',
+                rejectionReason: reason
+              }
+            };
+          }
+          return r;
+        });
+        
+        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+        loadPendingPackages(); // Reload pending packages
+        alert('❌ Đã từ chối gói dịch vụ!');
+      }
+    } catch (error) {
+      console.error('Error rejecting package:', error);
+      alert('❌ Có lỗi xảy ra khi từ chối gói dịch vụ!');
+    }
+  };
 
   // Hide header when modals are open
   useEffect(() => {
-    if (showServiceModal) {
+    if (showServiceModal || showApprovalModal) {
       document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
     } else {
       document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
     }
 
     // Cleanup on unmount
     return () => {
       document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
     };
-  }, [showServiceModal]);
+  }, [showServiceModal, showApprovalModal]);
 
   const handlePackageSelect = (packageId: number) => {
     if (!user) {
@@ -209,9 +309,10 @@ export default function ServicesPage() {
             }
           </p>
 
-          {/* View Registered Package Button */}
-          {user?.role === 'family' && (
-            <div style={{ marginTop: '2rem' }}>
+          {/* Action Buttons */}
+          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {/* View Registered Package Button for Family */}
+            {user?.role === 'family' && (
               <button
                 onClick={handleViewServicePackage}
                 style={{
@@ -285,8 +386,75 @@ export default function ServicesPage() {
                   return null;
                 })()}
               </button>
-            </div>
-          )}
+            )}
+            
+            {/* Service Package Approval Button for Admin */}
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => setShowApprovalModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '1rem 2rem',
+                  background: pendingPackages.length > 0 
+                    ? 'rgba(245, 158, 11, 0.2)' 
+                    : 'rgba(107, 114, 128, 0.2)',
+                  color: 'white',
+                  border: pendingPackages.length > 0 
+                    ? '2px solid rgba(245, 158, 11, 0.5)' 
+                    : '2px solid rgba(107, 114, 128, 0.3)',
+                  borderRadius: '50px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = pendingPackages.length > 0 
+                    ? 'rgba(245, 158, 11, 0.3)' 
+                    : 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = pendingPackages.length > 0 
+                    ? 'rgba(245, 158, 11, 0.2)' 
+                    : 'rgba(107, 114, 128, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                <svg style={{width: '1.25rem', height: '1.25rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Duyệt gói dịch vụ
+                {pendingPackages.length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-0.5rem',
+                    right: '-0.5rem',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    border: '2px solid white'
+                  }}>
+                    {pendingPackages.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -801,6 +969,316 @@ export default function ServicesPage() {
               }
               return null;
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Service Package Approval Modal */}
+      {showApprovalModal && (
+        <div className="modal-backdrop" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div className="modal-container" style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1rem',
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            width: '800px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)',
+              borderTopLeftRadius: '1rem',
+              borderTopRightRadius: '1rem',
+              padding: '2rem 2.5rem 1.25rem 2.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #fde68a',
+            }}>
+              <div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#92400e', margin: 0 }}>
+                  🔍 Duyệt gói dịch vụ chờ phê duyệt
+                </h3>
+                <p style={{ fontSize: '0.95rem', color: '#b45309', margin: 0, fontWeight: 500 }}>
+                  Có {pendingPackages.length} gói dịch vụ đang chờ duyệt
+                </p>
+              </div>
+              <button
+                onClick={() => setShowApprovalModal(false)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  borderRadius: '50%',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#92400e',
+                  fontSize: '1.5rem',
+                  position: 'absolute',
+                  top: '1.25rem',
+                  right: '1.25rem',
+                  zIndex: 2,
+                  transition: 'background-color 0.15s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(254, 243, 199, 0.8)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                aria-label="Đóng"
+              >
+                <XMarkIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div style={{ padding: '2rem 2.5rem', maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
+              {pendingPackages.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280' }}>
+                  <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#d1d5db' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#374151' }}>
+                    Không có gói dịch vụ nào chờ duyệt
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.95rem' }}>
+                    Tất cả các gói dịch vụ đã được xử lý
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {pendingPackages.map((pkg, index) => (
+                    <div key={pkg.registrationId} style={{ 
+                      background: 'white',
+                      borderRadius: '1rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)', 
+                      padding: '2rem 1.5rem',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {/* Tiêu đề gói dịch vụ */}
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '1.5rem'
+                      }}>
+                        <div>
+                          <h2 style={{
+                            fontSize: '1.35rem',
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            margin: 0,
+                            letterSpacing: '-0.01em'
+                          }}>
+                            {pkg.name}
+                          </h2>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: '0.5rem',
+                            fontSize: '1rem',
+                            color: '#334155',
+                            marginTop: 8
+                          }}>
+                            <div><strong>Người thụ hưởng:</strong> {pkg.residentName}</div>
+                            <div><strong>Tuổi:</strong> {pkg.residentAge} tuổi</div>
+                            <div><strong>Phòng:</strong> {pkg.residentRoom}</div>
+                            <div><strong>Mã đăng ký:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{pkg.registrationId}</span></div>
+                          </div>
+                        </div>
+                        <div style={{
+                          background: '#fef3c7',
+                          border: '1px solid #fbbf24',
+                          borderRadius: '1rem',
+                          padding: '0.5rem 1.25rem',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          color: '#92400e',
+                          marginLeft: 16,
+                          minWidth: 120,
+                          textAlign: 'center'
+                        }}>
+                          CHỜ DUYỆT
+                        </div>
+                      </div>
+                      
+                      {/* Thông tin thanh toán & thời gian */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                        gap: '1.5rem',
+                        marginBottom: '1.5rem'
+                      }}>
+                        <div style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          boxShadow: '0 2px 8px rgba(16,185,129,0.06)'
+                        }}>
+                          <div style={{ fontWeight: 600, color: '#059669', marginBottom: 8 }}>Thông tin thanh toán</div>
+                          <div style={{ color: '#334155', fontSize: '1rem', lineHeight: 1.6 }}>
+                            <div>Giá gốc: <span style={{ fontWeight: 500 }}>{formatCurrency(pkg.price)}</span></div>
+                            {pkg.discount > 0 && (
+                              <div style={{ color: '#059669' }}>Giảm giá: -{formatCurrency(pkg.discountAmount)} ({pkg.discount}%)</div>
+                            )}
+                            <div style={{ fontWeight: 700, color: '#059669', fontSize: '1.1rem' }}>
+                              Thành tiền: {formatCurrency(pkg.finalPrice)}/tháng
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          boxShadow: '0 2px 8px rgba(59,130,246,0.06)'
+                        }}>
+                          <div style={{ fontWeight: 600, color: '#1d4ed8', marginBottom: 8 }}>Thông tin thời gian</div>
+                          <div style={{ color: '#334155', fontSize: '1rem', lineHeight: 1.6 }}>
+                            <div>Ngày đăng ký: <strong>{new Date(pkg.purchaseDate).toLocaleDateString('vi-VN')}</strong></div>
+                            {pkg.startDate && (
+                              <div>Ngày bắt đầu: <strong>{new Date(pkg.startDate).toLocaleDateString('vi-VN')}</strong></div>
+                            )}
+                            <div>Phương thức: <strong>{pkg.paymentMethod === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt'}</strong></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Ghi chú y tế */}
+                      {pkg.medicalNotes && (
+                        <div style={{
+                          background: '#fefce8',
+                          border: '1px solid #fde047',
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          marginTop: '1rem',
+                          color: '#a16207',
+                          fontSize: '1rem'
+                        }}>
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Ghi chú y tế</div>
+                          <div style={{ color: '#374151', fontWeight: 400 }}>{pkg.medicalNotes}</div>
+                        </div>
+                      )}
+                      
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb', marginTop: '2rem' }}>
+                        <button
+                          onClick={() => handleRejectPackage(pkg.registrationId)}
+                          style={{
+                            minWidth: 120,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '0.625rem 1.25rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #ef4444',
+                            backgroundColor: 'white',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '0.875rem',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fef2f2';
+                            e.currentTarget.style.borderColor = '#dc2626';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = 'white';
+                            e.currentTarget.style.borderColor = '#ef4444';
+                          }}
+                        >
+                          <XMarkIcon style={{ width: '1.1em', height: '1.1em', color: '#ef4444' }} />
+                          Từ chối
+                        </button>
+                        <button
+                          onClick={() => handleApprovePackage(pkg.registrationId)}
+                          style={{
+                            minWidth: 120,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '0.625rem 1.25rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            fontSize: '0.875rem',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+                          }}
+                        >
+                          <CheckCircleIcon style={{ width: '1.1em', height: '1.1em', color: 'white' }} />
+                          Duyệt
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div style={{ 
+              padding: '1.25rem 2.5rem', 
+              background: '#f9fafb', 
+              borderRadius: '0 0 1rem 1rem', 
+              borderTop: '1px solid #e5e7eb', 
+              display: 'flex', 
+              justifyContent: 'flex-end' 
+            }}>
+              <button
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  loadPendingPackages(); // Refresh data when closing
+                }}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                }}
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

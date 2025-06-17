@@ -180,7 +180,7 @@ export default function WelcomePage() {
             
             <div style={{ display: 'grid', gap: '1rem' }}>
               {[
-                { label: 'Cư dân đang chăm sóc', value: '847', unit: 'người' },
+                { label: 'người cao tuổi đang chăm sóc', value: '847', unit: 'người' },
                 { label: 'Nhân viên y tế', value: '156', unit: 'người' },
                 { label: 'Bác sĩ chuyên khoa', value: '28', unit: 'người' },
                 { label: 'Tỷ lệ hài lòng', value: '98.2', unit: '%' }

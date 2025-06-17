@@ -41,7 +41,7 @@ const quickNoteTemplates = [
   'Tham gia hoạt động nhóm tích cực',
   'Ngủ đầy đủ, không có vấn đề gì',
   'Cần theo dõi thêm về tình trạng sức khỏe',
-  'Gia đình đến thăm, cư dân rất vui',
+  'Gia đình đến thăm, người cao tuổi rất vui',
   'Uống thuốc đầy đủ theo đơn',
   'Có biểu hiện không thoải mái, cần chú ý'
 ];
@@ -183,7 +183,7 @@ export default function NewCareNotePage() {
                 margin: '0.25rem 0 0 0',
                 fontWeight: 500
               }}>
-                {searchParams?.get('residentName') || 'Chọn cư dân'}
+                {searchParams?.get('residentName') || 'Chọn người cao tuổi'}
               </p>
             </div>
           </div>
@@ -214,10 +214,10 @@ export default function NewCareNotePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Tên cư dân *
+                  Tên người cao tuổi *
                 </label>
                 <input
-                  {...register('residentName', { required: 'Vui lòng nhập tên cư dân' })}
+                  {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
@@ -227,7 +227,7 @@ export default function NewCareNotePage() {
                     outline: 'none',
                     backgroundColor: '#f9fafb'
                   }}
-                  placeholder="Nhập tên cư dân"
+                  placeholder="Nhập tên người cao tuổi"
                 />
                 {errors.residentName && (
                   <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
@@ -398,7 +398,7 @@ export default function NewCareNotePage() {
                   outline: 'none',
                   resize: 'vertical'
                 }}
-                placeholder="Nhập chi tiết về tình trạng, hoạt động, và quan sát của cư dân..."
+                placeholder="Nhập chi tiết về tình trạng, hoạt động, và quan sát của người cao tuổi..."
               />
               {errors.noteContent && (
                 <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>

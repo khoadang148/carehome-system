@@ -152,7 +152,7 @@ export default function TrainingPage() {
         staffId: 2,
         staffName: 'Trần Thị B',
         position: 'Người chăm sóc',
-        department: 'Chăm sóc cư dân',
+        department: 'Chăm sóc người cao tuổi',
         programId: 2,
         programTitle: 'An toàn lao động và phòng chống nhiễm khuẩn',
         enrollmentDate: '2024-01-15',

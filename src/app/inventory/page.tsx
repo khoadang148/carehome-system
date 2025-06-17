@@ -106,6 +106,20 @@ const STATUSES = [
   { value: 'expired', label: 'Hết hạn' }
 ];
 
+interface ValidationErrors {
+  name?: string;
+  category?: string;
+  sku?: string;
+  currentStock?: string;
+  minStock?: string;
+  maxStock?: string;
+  unit?: string;
+  costPerUnit?: string;
+  supplier?: string;
+  location?: string;
+  expiryDate?: string;
+}
+
 export default function InventoryPage() {
 
   const router = useRouter();
@@ -115,7 +129,45 @@ export default function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [formData, setFormData] = useState<Partial<InventoryItem>>({
+    name: '',
+    category: 'medication',
+    sku: '',
+    currentStock: 0,
+    minStock: 0,
+    maxStock: 0,
+    unit: '',
+    costPerUnit: 0,
+    supplier: '',
+    expiryDate: '',
+    location: '',
+    description: ''
+  });
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  
+  useEffect(() => {
+    console.log('Modal states:', { showAddModal, showViewModal, showEditModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showAddModal || showViewModal || showEditModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showAddModal, showViewModal, showEditModal]);
 
   // Check access permissions
   useEffect(() => {
@@ -178,6 +230,186 @@ export default function InventoryPage() {
     const diffTime = expiry.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 30 && diffDays > 0;
+  };
+
+  // Validate form data
+  const validateForm = (data: Partial<InventoryItem>): ValidationErrors => {
+    const errors: ValidationErrors = {};
+
+    // Validate name
+    if (!data.name?.trim()) {
+      errors.name = 'Tên vật tư không được để trống';
+    } else if (data.name.length > 100) {
+      errors.name = 'Tên vật tư không được vượt quá 100 ký tự';
+    }
+
+    // Validate category
+    if (!data.category) {
+      errors.category = 'Vui lòng chọn danh mục';
+    }
+
+    // Validate SKU
+    if (!data.sku?.trim()) {
+      errors.sku = 'Mã SKU không được để trống';
+    } else if (!/^[A-Z0-9-]+$/.test(data.sku)) {
+      errors.sku = 'Mã SKU chỉ được chứa chữ hoa, số và dấu gạch ngang';
+    }
+
+    // Validate current stock
+    if (data.currentStock === undefined || data.currentStock === null) {
+      errors.currentStock = 'Số lượng tồn kho không được để trống';
+    } else if (data.currentStock < 0) {
+      errors.currentStock = 'Số lượng tồn kho không được âm';
+    }
+
+    // Validate min stock
+    if (data.minStock === undefined || data.minStock === null) {
+      errors.minStock = 'Số lượng tối thiểu không được để trống';
+    } else if (data.minStock < 0) {
+      errors.minStock = 'Số lượng tối thiểu không được âm';
+    }
+
+    // Validate max stock
+    if (data.maxStock === undefined || data.maxStock === null) {
+      errors.maxStock = 'Số lượng tối đa không được để trống';
+    } else if (data.maxStock < 0) {
+      errors.maxStock = 'Số lượng tối đa không được âm';
+    }
+
+    // Validate min/max stock relationship
+    if (data.minStock !== undefined && data.maxStock !== undefined && data.minStock > data.maxStock) {
+      errors.minStock = 'Số lượng tối thiểu không được lớn hơn số lượng tối đa';
+      errors.maxStock = 'Số lượng tối đa không được nhỏ hơn số lượng tối thiểu';
+    }
+
+    // Validate current stock against min/max
+    if (data.currentStock !== undefined && data.minStock !== undefined && data.maxStock !== undefined) {
+      if (data.currentStock < data.minStock) {
+        errors.currentStock = 'Số lượng tồn kho không được nhỏ hơn số lượng tối thiểu';
+      } else if (data.currentStock > data.maxStock) {
+        errors.currentStock = 'Số lượng tồn kho không được lớn hơn số lượng tối đa';
+      }
+    }
+
+    // Validate unit
+    if (!data.unit?.trim()) {
+      errors.unit = 'Đơn vị không được để trống';
+    }
+
+    // Validate cost per unit
+    if (data.costPerUnit === undefined || data.costPerUnit === null) {
+      errors.costPerUnit = 'Giá nhập không được để trống';
+    } else if (data.costPerUnit < 0) {
+      errors.costPerUnit = 'Giá nhập không được âm';
+    }
+
+    // Validate supplier
+    if (!data.supplier?.trim()) {
+      errors.supplier = 'Nhà cung cấp không được để trống';
+    }
+
+    // Validate location
+    if (!data.location?.trim()) {
+      errors.location = 'Vị trí lưu trữ không được để trống';
+    }
+
+    // Validate expiry date if provided
+    if (data.expiryDate) {
+      const expiryDate = new Date(data.expiryDate);
+      const today = new Date();
+      if (expiryDate < today) {
+        errors.expiryDate = 'Ngày hết hạn không được trong quá khứ';
+      }
+    }
+
+    return errors;
+  };
+
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Clear validation error for the field being changed
+    if (validationErrors[name as keyof ValidationErrors]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: undefined
+      }));
+    }
+  };
+
+  // Handle add new item
+  const handleAddItem = () => {
+    const errors = validateForm(formData);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    const newItem: InventoryItem = {
+      id: inventory.length + 1,
+      ...formData as Omit<InventoryItem, 'id' | 'status' | 'lastUpdated'>,
+      status: 'in_stock',
+      lastUpdated: new Date().toISOString().split('T')[0]
+    };
+    setInventory(prev => [...prev, newItem]);
+    setShowAddModal(false);
+    setFormData({
+      name: '',
+      category: 'medication',
+      sku: '',
+      currentStock: 0,
+      minStock: 0,
+      maxStock: 0,
+      unit: '',
+      costPerUnit: 0,
+      supplier: '',
+      expiryDate: '',
+      location: '',
+      description: ''
+    });
+    setValidationErrors({});
+  };
+
+  // Handle edit item
+  const handleEditItem = () => {
+    if (!selectedItem) return;
+
+    const errors = validateForm(formData);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
+    const updatedItem = {
+      ...selectedItem,
+      ...formData,
+      lastUpdated: new Date().toISOString().split('T')[0]
+    };
+    
+    setInventory(prev => prev.map(item => 
+      item.id === selectedItem.id ? updatedItem : item
+    ));
+    setShowEditModal(false);
+    setSelectedItem(null);
+    setValidationErrors({});
+  };
+
+  // Open edit modal
+  const handleEditClick = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setFormData(item);
+    setShowEditModal(true);
+  };
+
+  // Open view modal
+  const handleViewClick = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setShowViewModal(true);
   };
 
   return (
@@ -550,7 +782,7 @@ export default function InventoryPage() {
                       <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
-                            onClick={() => setSelectedItem(item)}
+                            onClick={() => handleViewClick(item)}
                             style={{
                               padding: '0.5rem',
                               borderRadius: '0.375rem',
@@ -564,6 +796,7 @@ export default function InventoryPage() {
                             <EyeIcon style={{ width: '1rem', height: '1rem' }} />
                           </button>
                           <button
+                            onClick={() => handleEditClick(item)}
                             style={{
                               padding: '0.5rem',
                               borderRadius: '0.375rem',
@@ -610,6 +843,1203 @@ export default function InventoryPage() {
           )}
         </div>
       </div>
+
+      {/* Add Modal */}
+      {showAddModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0
+              }}>
+                Thêm vật tư mới
+              </h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem'
+                }}
+              >
+                <XMarkIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Tên vật tư *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: validationErrors.name ? '1px solid #dc2626' : '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                  placeholder="Nhập tên vật tư"
+                />
+                {validationErrors.name && (
+                  <p style={{
+                    color: '#dc2626',
+                    fontSize: '0.75rem',
+                    marginTop: '0.25rem'
+                  }}>
+                    {validationErrors.name}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Danh mục *
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {CATEGORIES.filter(cat => cat.value !== 'all').map(cat => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Mã SKU *
+                  </label>
+                  <input
+                    type="text"
+                    name="sku"
+                    value={formData.sku}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    placeholder="Nhập mã SKU"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Đơn vị *
+                  </label>
+                  <input
+                    type="text"
+                    name="unit"
+                    value={formData.unit}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    placeholder="Nhập đơn vị"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho hiện tại *
+                  </label>
+                  <input
+                    type="number"
+                    name="currentStock"
+                    value={formData.currentStock}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho tối thiểu *
+                  </label>
+                  <input
+                    type="number"
+                    name="minStock"
+                    value={formData.minStock}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho tối đa *
+                  </label>
+                  <input
+                    type="number"
+                    name="maxStock"
+                    value={formData.maxStock}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Giá nhập *
+                  </label>
+                  <input
+                    type="number"
+                    name="costPerUnit"
+                    value={formData.costPerUnit}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Ngày hết hạn
+                  </label>
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    value={formData.expiryDate}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Nhà cung cấp *
+                </label>
+                <input
+                  type="text"
+                  name="supplier"
+                  value={formData.supplier}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                  placeholder="Nhập tên nhà cung cấp"
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Vị trí lưu trữ *
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                  placeholder="Nhập vị trí lưu trữ"
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Mô tả
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    minHeight: '100px',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Nhập mô tả chi tiết"
+                />
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              marginTop: '2rem'
+            }}>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAddItem}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: '#16a34a',
+                  color: 'white',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Thêm vật tư
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Modal */}
+      {showViewModal && selectedItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0
+              }}>
+                Chi tiết vật tư
+              </h2>
+              <button
+                onClick={() => setShowViewModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem'
+                }}
+              >
+                <XMarkIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+              <div>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 0.5rem 0'
+                }}>
+                  {selectedItem.name}
+                </h3>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span style={{
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    background: '#e0e7ff',
+                    color: '#3730a3'
+                  }}>
+                    {getCategoryLabel(selectedItem.category)}
+                  </span>
+                  <span style={{
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    background: getStatusInfo(selectedItem.status).bg,
+                    color: getStatusInfo(selectedItem.status).color
+                  }}>
+                    {getStatusInfo(selectedItem.status).text}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Mã SKU
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedItem.sku}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Đơn vị
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedItem.unit}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho hiện tại
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedItem.currentStock} {selectedItem.unit}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho tối thiểu
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedItem.minStock} {selectedItem.unit}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho tối đa
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedItem.maxStock} {selectedItem.unit}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Giá nhập
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {formatCurrency(selectedItem.costPerUnit)}/{selectedItem.unit}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Ngày hết hạn
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedItem.expiryDate || 'Không có'}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Nhà cung cấp
+                </label>
+                <div style={{
+                  padding: '0.75rem',
+                  background: '#f9fafb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827'
+                }}>
+                  {selectedItem.supplier}
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Vị trí lưu trữ
+                </label>
+                <div style={{
+                  padding: '0.75rem',
+                  background: '#f9fafb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827'
+                }}>
+                  {selectedItem.location}
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Mô tả
+                </label>
+                <div style={{
+                  padding: '0.75rem',
+                  background: '#f9fafb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827',
+                  minHeight: '100px'
+                }}>
+                  {selectedItem.description}
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Cập nhật lần cuối
+                </label>
+                <div style={{
+                  padding: '0.75rem',
+                  background: '#f9fafb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827'
+                }}>
+                  {selectedItem.lastUpdated}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              marginTop: '2rem'
+            }}>
+              <button
+                onClick={() => {
+                  setShowViewModal(false);
+                  handleEditClick(selectedItem);
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: '#f59e0b',
+                  color: 'white',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                Chỉnh sửa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0
+              }}>
+                Chỉnh sửa vật tư
+              </h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem'
+                }}
+              >
+                <XMarkIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Tên vật tư *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: validationErrors.name ? '1px solid #dc2626' : '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+                {validationErrors.name && (
+                  <p style={{
+                    color: '#dc2626',
+                    fontSize: '0.75rem',
+                    marginTop: '0.25rem'
+                  }}>
+                    {validationErrors.name}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Danh mục *
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {CATEGORIES.filter(cat => cat.value !== 'all').map(cat => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Mã SKU *
+                  </label>
+                  <input
+                    type="text"
+                    name="sku"
+                    value={formData.sku}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Đơn vị *
+                  </label>
+                  <input
+                    type="text"
+                    name="unit"
+                    value={formData.unit}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho hiện tại *
+                  </label>
+                  <input
+                    type="number"
+                    name="currentStock"
+                    value={formData.currentStock}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho tối thiểu *
+                  </label>
+                  <input
+                    type="number"
+                    name="minStock"
+                    value={formData.minStock}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Tồn kho tối đa *
+                  </label>
+                  <input
+                    type="number"
+                    name="maxStock"
+                    value={formData.maxStock}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Giá nhập *
+                  </label>
+                  <input
+                    type="number"
+                    name="costPerUnit"
+                    value={formData.costPerUnit}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Ngày hết hạn
+                  </label>
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    value={formData.expiryDate}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Nhà cung cấp *
+                </label>
+                <input
+                  type="text"
+                  name="supplier"
+                  value={formData.supplier}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Vị trí lưu trữ *
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Mô tả
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    minHeight: '100px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              marginTop: '2rem'
+            }}>
+              <button
+                onClick={() => setShowEditModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleEditItem}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: '#f59e0b',
+                  color: 'white',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

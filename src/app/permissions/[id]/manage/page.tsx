@@ -63,9 +63,9 @@ const getUserById = (id: string) => {
 const modules = [
   {
     id: 'residents',
-    name: 'Quản lý cư dân',
+    name: 'Quản lý người cao tuổi',
     icon: UsersIcon,
-    description: 'Quản lý thông tin cư dân, hồ sơ y tế, chăm sóc'
+    description: 'Quản lý thông tin người cao tuổi, hồ sơ y tế, chăm sóc'
   },
   {
     id: 'staff',

@@ -33,7 +33,7 @@ const initialStaffMembers = [
     firstName: 'Sarah',
     lastName: 'Johnson',
     position: 'Người chăm sóc', 
-    department: 'Chăm sóc cư dân', 
+    department: 'Chăm sóc người cao tuổi', 
     shiftType: 'Chiều', 
     hireDate: '2022-05-20',
     dateOfBirth: '1990-04-23',
@@ -44,7 +44,7 @@ const initialStaffMembers = [
     address: '456 Oak Avenue, Hometown',
     emergencyContact: 'Robert Johnson',
     emergencyPhone: '555-876-5432',
-    notes: 'Tốt nghiệp xuất sắc ngành điều dưỡng. Khả năng giao tiếp tốt với cư dân.'
+    notes: 'Tốt nghiệp xuất sắc ngành điều dưỡng. Khả năng giao tiếp tốt với người cao tuổi.'
   },
   { 
     id: 3, 
@@ -71,7 +71,7 @@ const initialStaffMembers = [
     firstName: 'Emily',
     lastName: 'Davis',
     position: 'Trợ lý y tá', 
-    department: 'Chăm sóc cư dân', 
+    department: 'Chăm sóc người cao tuổi', 
     shiftType: 'Đêm', 
     hireDate: '2023-01-05',
     dateOfBirth: '1992-12-18',
@@ -82,7 +82,7 @@ const initialStaffMembers = [
     address: '321 Cedar Lane, Townsville',
     emergencyContact: 'Mark Davis',
     emergencyPhone: '555-654-3210',
-    notes: 'Có kinh nghiệm chăm sóc ban đêm. Đặc biệt giỏi trong việc giúp cư dân có giấc ngủ ngon.'
+    notes: 'Có kinh nghiệm chăm sóc ban đêm. Đặc biệt giỏi trong việc giúp người cao tuổi có giấc ngủ ngon.'
   },
   { 
     id: 5, 
@@ -101,11 +101,11 @@ const initialStaffMembers = [
     address: '654 Birch Street, Villagetown',
     emergencyContact: 'Linda Wilson',
     emergencyPhone: '555-543-2109',
-    notes: 'Rất sáng tạo trong việc phát triển các hoạt động giải trí cho cư dân. Đặc biệt giỏi về âm nhạc và nghệ thuật.'
+    notes: 'Rất sáng tạo trong việc phát triển các hoạt động giải trí cho người cao tuổi. Đặc biệt giỏi về âm nhạc và nghệ thuật.'
   },
 ];
 
-const departments = ['Y tế', 'Chăm sóc cư dân', 'Phục hồi chức năng', 'Hoạt động', 'Quản lý'];
+const departments = ['Y tế', 'Chăm sóc người cao tuổi', 'Phục hồi chức năng', 'Hoạt động', 'Quản lý'];
 const shifts = ['Sáng', 'Chiều', 'Đêm', 'Ngày'];
 
 type StaffFormData = {
@@ -141,8 +141,16 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
     reset
   } = useForm<StaffFormData>();
   
+  // Lấy staff từ localStorage khi mount
   useEffect(() => {
-    // Resolve params Promise
+    const savedStaff = localStorage.getItem('nurseryHomeStaff');
+    if (savedStaff) {
+      setStaffMembers(JSON.parse(savedStaff));
+    }
+  }, []); // chỉ chạy 1 lần khi mount
+  
+  // Resolve params Promise
+  useEffect(() => {
     const resolveParams = async () => {
       const resolved = await params;
       setResolvedParams(resolved);
@@ -150,26 +158,17 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
     resolveParams();
   }, [params]);
   
+  // Fetch staff khi đã có resolvedParams
   useEffect(() => {
     if (!resolvedParams) return;
-    
-    // Check if there's saved staff data in localStorage
-    const savedStaff = localStorage.getItem('nurseryHomeStaff');
-    if (savedStaff) {
-      setStaffMembers(JSON.parse(savedStaff));
-    }
-    
+
     // Simulate API call to fetch staff data
     const fetchStaff = async () => {
       try {
-        // In a real application, you would fetch from an API endpoint
         const staffId = parseInt(resolvedParams.id);
-        
-        // Use the staff data from state (which might be from localStorage)
         const foundStaff = staffMembers.find(s => s.id === staffId);
-        
+
         if (foundStaff) {
-          // Format data for the form
           reset({
             firstName: foundStaff.firstName,
             lastName: foundStaff.lastName,
@@ -187,7 +186,6 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
             notes: foundStaff.notes || ''
           });
         } else {
-          // Staff not found
           setNotFound(true);
         }
       } catch (error) {
@@ -196,9 +194,10 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
         setLoading(false);
       }
     };
-    
+
     fetchStaff();
-  }, [resolvedParams, reset, staffMembers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedParams, reset]);
   
   const onSubmit = async (data: StaffFormData) => {
     if (!resolvedParams) return;
@@ -268,8 +267,28 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
     );
   }
   
+  const handleGoBack = () => {
+    try {
+      router.push('/staff');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback navigation
+      window.location.href = '/staff';
+    }
+  };
+
   return (
+    <div>
+      <button
+        onClick={handleGoBack}
+        className="flex items-center gap-2 px-4 py-3 mb-4 ml-24 mt-4 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+      >
+        <ArrowLeftIcon className="w-4 h-4" />
+        Quay lại
+      </button>
+    
     <div className="max-w-5xl mx-auto mt-8 p-8 bg-white rounded-3xl shadow-lg">
+      
       {/* Tiêu đề */}
       <div className="flex items-center mb-2">
         <div className="bg-blue-100 p-2 rounded-full mr-3">
@@ -499,22 +518,24 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
           </div>
         {/* Nút action */}
         <div className="flex justify-end gap-4 mt-8">
-            <Link 
-              href={`/staff/${resolvedParams.id}`} 
-            className="px-6 py-3 rounded-xl border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition"
-          >
-            Huỷ bỏ
-            </Link>
+            <button 
+              type="button"
+              onClick={handleGoBack}
+              className="px-6 py-3 rounded-xl border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition"
+            >
+              Hủy bỏ
+            </button>
             <button
               type="submit"
               disabled={isSubmitting}
-            className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold flex items-center gap-2 hover:bg-green-700 transition disabled:opacity-60"
-          >
-            <CheckCircleIcon className="w-5 h-5" />
-            {isSubmitting ? 'Đang lưu...' : 'Cập nhật thông tin'}
+              className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold flex items-center gap-2 hover:bg-green-700 transition disabled:opacity-60"
+            >
+              <CheckCircleIcon className="w-5 h-5" />
+              {isSubmitting ? 'Đang lưu...' : 'Cập nhật thông tin'}
             </button>
           </div>
         </form>
+    </div>
     </div>
   );
 } 

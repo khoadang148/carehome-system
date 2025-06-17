@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   UserIcon, 
   PlusIcon, 
@@ -97,6 +97,22 @@ export default function FamilyAccountsPage() {
     emergencyContact: '',
     address: ''
   });
+
+  useEffect(() => {
+    console.log('Modal states:', { showModal, showDetailModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showModal || showDetailModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+  }, [showModal, showDetailModal]);
 
   const resetForm = () => {
     setFormData({
@@ -312,53 +328,66 @@ export default function FamilyAccountsPage() {
         <div style={{
           background: 'white',
           borderRadius: '1rem',
-          padding: '1.5rem',
+          padding: '1.25rem 1.5rem',
           marginBottom: '2rem',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
-              <MagnifyingGlassIcon style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '1.25rem',
-                height: '1.25rem',
-                color: '#9ca3af'
-              }} />
-              <input
-                type="text"
-                placeholder="Tìm kiếm theo tên, username, email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  paddingLeft: '2.5rem',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '1rem'
-                }}
-              />
+          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1 }}>
+              <label style={{ fontSize: '0.92rem', color: '#9ca3af', fontWeight: 500, marginBottom: '0.1rem' }} htmlFor="search-account">Tìm kiếm</label>
+              <div style={{ position: 'relative' }}>
+                <MagnifyingGlassIcon style={{
+                  position: 'absolute',
+                  left: '0.7rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '1rem',
+                  height: '1rem',
+                  color: '#cbd5e1'
+                }} />
+                <input
+                  id="search-account"
+                  type="text"
+                  placeholder="Nhập tên, username, email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    paddingLeft: '2.5rem',
+                    padding: '0.55rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '1rem',
+                    color: '#374151',
+                    background: '#fff',
+                    outline: 'none'
+                  }}
+                />
+              </div>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                minWidth: '150px'
-              }}
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Không hoạt động</option>
-              <option value="suspended">Tạm khóa</option>
-            </select>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: '160px' }}>
+              <label style={{ fontSize: '0.92rem', color: '#9ca3af', fontWeight: 500, marginBottom: '0.1rem' }} htmlFor="status-filter">Trạng thái</label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  padding: '0.55rem',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0.5rem',
+                  fontSize: '1rem',
+                  background: 'white',
+                  color: '#374151',
+                  outline: 'none'
+                }}
+              >
+                <option value="all">Tất cả</option>
+                <option value="active">Hoạt động</option>
+                <option value="inactive">Không hoạt động</option>
+                <option value="suspended">Tạm khóa</option>
+              </select>
+            </div>
+            <div style={{ fontSize: '0.95rem', color: '#6b7280', textAlign: 'right', minWidth: '140px' }}>
               Hiển thị {filteredAccounts.length} / {accounts.length} tài khoản
             </div>
           </div>
@@ -383,91 +412,87 @@ export default function FamilyAccountsPage() {
                 borderRadius: '0.75rem',
                 background: '#f9fafb'
               }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr auto', gap: '1.5rem', alignItems: 'center' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600, color: '#1f2937' }}>
-                        {account.fullName}
-                      </h3>
-                      <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        @{account.username}
-                      </span>
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        background: `${getStatusColor(account.status)}20`,
-                        color: getStatusColor(account.status)
-                      }}>
-                        {getStatusLabel(account.status)}
-                      </span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Email: </span>
-                        <span style={{ fontWeight: 600 }}>{account.email}</span>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Điện thoại: </span>
-                        <span style={{ fontWeight: 600 }}>{account.phone}</span>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Quan hệ: </span>
-                        <span style={{ fontWeight: 600 }}>{account.relationship}</span>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Người thân: </span>
-                        <span style={{ fontWeight: 600 }}>{account.residentName}</span>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Đăng nhập cuối: </span>
-                        <span style={{ fontWeight: 600 }}>
-                          {account.lastLogin ? new Date(account.lastLogin).toLocaleString('vi-VN') : 'Chưa đăng nhập'}
-                        </span>
-                      </div>
-                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Họ và tên</div>
+                    <div style={{ fontWeight: 600, fontSize: '1.1rem', color: '#1f2937' }}>{account.fullName}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Tên đăng nhập</div>
+                    <div style={{ color: '#374151' }}>@{account.username}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Trạng thái</div>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      background: `${getStatusColor(account.status)}20`,
+                      color: getStatusColor(account.status)
+                    }}>
+                      {getStatusLabel(account.status)}
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Quan hệ</div>
+                    <div style={{ color: '#374151' }}>{account.relationship}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                       onClick={() => {
                         setSelectedAccount(account);
                         setShowDetailModal(true);
                       }}
                       style={{
-                        padding: '0.5rem',
+                        padding: '0.5rem 0.9rem',
                         background: '#3b82f6',
                         color: 'white',
                         border: 'none',
                         borderRadius: '0.5rem',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        fontSize: '0.95rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
                       }}
                       title="Xem chi tiết"
                     >
                       <EyeIcon style={{ width: '1rem', height: '1rem' }} />
+                      
                     </button>
                     <button
                       onClick={() => handleEdit(account)}
                       style={{
-                        padding: '0.5rem',
+                        padding: '0.5rem 0.9rem',
                         background: '#f59e0b',
                         color: 'white',
                         border: 'none',
                         borderRadius: '0.5rem',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        fontSize: '0.95rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
                       }}
                       title="Chỉnh sửa"
                     >
                       <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                    
                     </button>
                     <select
                       value={account.status}
                       onChange={(e) => handleStatusChange(account.id, e.target.value as FamilyAccount['status'])}
                       style={{
-                        padding: '0.5rem',
+                        padding: '0.45rem',
                         border: '1px solid #d1d5db',
                         borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
+                        fontSize: '0.85rem',
+                        background: 'white',
+                        color: '#374151',
+                        outline: 'none'
                       }}
                     >
                       <option value="active">Hoạt động</option>
@@ -477,16 +502,22 @@ export default function FamilyAccountsPage() {
                     <button
                       onClick={() => handleDelete(account.id)}
                       style={{
-                        padding: '0.5rem',
+                        padding: '0.5rem 0.9rem',
                         background: '#ef4444',
                         color: 'white',
                         border: 'none',
                         borderRadius: '0.5rem',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        fontSize: '0.95rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
                       }}
                       title="Xóa"
                     >
                       <TrashIcon style={{ width: '1rem', height: '1rem' }} />
+                      
                     </button>
                   </div>
                 </div>
@@ -516,10 +547,30 @@ export default function FamilyAccountsPage() {
               width: '90%',
               maxWidth: '600px',
               maxHeight: '90vh',
-              overflowY: 'auto'
+              overflowY: 'auto',
+              borderTop: editingAccount ? '6px solid #f59e0b' : '6px solid #10b981',
+              boxShadow: '0 8px 32px rgba(16,185,129,0.08)'
             }}>
-              <h2 style={{ margin: '0 0 1.5rem 0', color: '#1f2937' }}>
-                {editingAccount ? 'Chỉnh sửa tài khoản' : 'Thêm tài khoản mới'}
+              <h2 style={{
+                margin: '0 0 1.5rem 0',
+                color: editingAccount ? '#f59e0b' : '#10b981',
+                fontWeight: 700,
+                fontSize: '1.35rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                {editingAccount ? (
+                  <>
+                    <PencilIcon style={{ width: '1.5rem', height: '1.5rem', color: '#f59e0b' }} />
+                    Chỉnh sửa tài khoản
+                  </>
+                ) : (
+                  <>
+                    <PlusIcon style={{ width: '1.5rem', height: '1.5rem', color: '#10b981' }} />
+                    Thêm tài khoản mới
+                  </>
+                )}
               </h2>
 
               <div style={{ display: 'grid', gap: '1rem' }}>
@@ -717,7 +768,7 @@ export default function FamilyAccountsPage() {
                   onClick={handleSubmit}
                   style={{
                     flex: 1,
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: editingAccount ? 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '0.5rem',
@@ -752,62 +803,58 @@ export default function FamilyAccountsPage() {
               borderRadius: '1rem',
               padding: '2rem',
               width: '90%',
-              maxWidth: '600px'
+              maxWidth: '600px',
+              borderTop: '6px solid #3b82f6',
+              boxShadow: '0 8px 32px rgba(59,130,246,0.08)'
             }}>
-              <h2 style={{ marginBottom: '1.5rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <UserIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+              <h2 style={{
+                marginBottom: '1.5rem',
+                color: '#3b82f6',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontWeight: 700,
+                fontSize: '1.35rem'
+              }}>
+                <UserIcon style={{ width: '1.5rem', height: '1.5rem', color: '#3b82f6' }} />
                 Chi tiết tài khoản
               </h2>
               
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Mã tài khoản
-                    </label>
-                    <div style={{ color: '#1f2937' }}>{selectedAccount.id}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Mã tài khoản</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.id}</div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Tên đăng nhập
-                    </label>
-                    <div style={{ color: '#1f2937' }}>{selectedAccount.username}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Tên đăng nhập</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.username}</div>
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                    Họ và tên
-                  </label>
-                  <div style={{ color: '#1f2937' }}>{selectedAccount.fullName}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Họ và tên</div>
+                  <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.fullName}</div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Email
-                    </label>
-                    <div style={{ color: '#1f2937' }}>{selectedAccount.email}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Email</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.email}</div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Điện thoại
-                    </label>
-                    <div style={{ color: '#1f2937' }}>{selectedAccount.phone}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Điện thoại</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.phone}</div>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Quan hệ
-                    </label>
-                    <div style={{ color: '#1f2937' }}>{selectedAccount.relationship}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Quan hệ</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.relationship}</div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Trạng thái
-                    </label>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Trạng thái</div>
                     <span style={{
                       padding: '0.25rem 0.75rem',
                       borderRadius: '0.375rem',
@@ -822,40 +869,32 @@ export default function FamilyAccountsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                    Người cao tuổi
-                  </label>
-                  <div style={{ color: '#1f2937' }}>{selectedAccount.residentName} (ID: {selectedAccount.residentId})</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Người cao tuổi</div>
+                  <div style={{ fontWeight: 600, color: '#1f2937' }}>
+                    {selectedAccount.residentName} (ID: {selectedAccount.residentId})
+                  </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                    Liên hệ khẩn cấp
-                  </label>
-                  <div style={{ color: '#1f2937' }}>{selectedAccount.emergencyContact}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Liên hệ khẩn cấp</div>
+                  <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.emergencyContact}</div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                    Địa chỉ
-                  </label>
-                  <div style={{ color: '#1f2937' }}>{selectedAccount.address}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Địa chỉ</div>
+                  <div style={{ fontWeight: 600, color: '#1f2937' }}>{selectedAccount.address}</div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Ngày tạo
-                    </label>
-                    <div style={{ color: '#1f2937' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Ngày tạo</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>
                       {new Date(selectedAccount.createdDate).toLocaleString('vi-VN')}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600, color: '#374151' }}>
-                      Đăng nhập cuối
-                    </label>
-                    <div style={{ color: '#1f2937' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Đăng nhập cuối</div>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>
                       {selectedAccount.lastLogin ? new Date(selectedAccount.lastLogin).toLocaleString('vi-VN') : 'Chưa đăng nhập'}
                     </div>
                   </div>

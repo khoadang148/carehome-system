@@ -154,7 +154,7 @@ export default function LoginPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', opacity: 0.8 }} />
                 <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>
-                  Bảo mật thông tin cư dân
+                  Bảo mật thông tin người cao tuổi
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

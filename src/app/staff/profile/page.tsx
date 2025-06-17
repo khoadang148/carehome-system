@@ -140,7 +140,12 @@ export default function StaffProfilePage() {
   // Define which fields staff can edit
   const editableFieldsList = ['phone', 'address', 'emergencyContact', 'emergencyPhone', 'specializations'];
   
-  const canEdit = (field: string) => editableFieldsList.includes(field);
+  const canEdit = (field: string) => {
+    if (field === 'specializations') {
+      return user?.role === 'admin';
+    }
+    return editableFieldsList.includes(field);
+  };
 
   if (loading) {
     return (
@@ -365,7 +370,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Họ và tên
+                  Họ và tên {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -387,7 +396,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Ngày sinh
+                  Ngày sinh {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -408,7 +421,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  CCCD/CMND
+                  CCCD/CMND {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -453,7 +470,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Email
+                  Email {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -475,7 +496,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Số điện thoại {canEdit('phone') && editMode && <span style={{ color: '#10b981' }}>✓ Có thể chỉnh sửa</span>}
+                  Số điện thoại {editMode && (
+                    canEdit('phone')
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 {editMode && canEdit('phone') ? (
                   <input
@@ -511,7 +536,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Địa chỉ {canEdit('address') && editMode && <span style={{ color: '#10b981' }}>✓ Có thể chỉnh sửa</span>}
+                  Địa chỉ {editMode && (
+                    canEdit('address')
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 {editMode && canEdit('address') ? (
                   <textarea
@@ -572,7 +601,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Người liên hệ {canEdit('emergencyContact') && editMode && <span style={{ color: '#10b981' }}>✓ Có thể chỉnh sửa</span>}
+                  Người liên hệ {editMode && (
+                    canEdit('emergencyContact')
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 {editMode && canEdit('emergencyContact') ? (
                   <input
@@ -608,7 +641,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Số điện thoại khẩn cấp {canEdit('emergencyPhone') && editMode && <span style={{ color: '#10b981' }}>✓ Có thể chỉnh sửa</span>}
+                  Số điện thoại khẩn cấp {editMode && (
+                    canEdit('emergencyPhone')
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 {editMode && canEdit('emergencyPhone') ? (
                   <input
@@ -667,7 +704,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Chức vụ
+                  Chức vụ {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -688,7 +729,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Phòng ban
+                  Phòng ban {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -710,7 +755,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Ngày vào làm
+                  Ngày vào làm {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -732,7 +781,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Chứng chỉ
+                  Chứng chỉ {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -755,7 +808,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Kinh nghiệm làm việc
+                  Kinh nghiệm làm việc {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 <div style={{
                   padding: '0.75rem 1rem',
@@ -777,7 +834,11 @@ export default function StaffProfilePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Chuyên môn {canEdit('specializations') && editMode && <span style={{ color: '#10b981' }}>✓ Có thể chỉnh sửa</span>}
+                  Chuyên môn {editMode && (
+                    user?.role === 'admin'
+                      ? <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                      : <span style={{ color: '#ef4444', marginLeft: 8 }}>✗ Chỉ QTV mới chỉnh sửa được</span>
+                  )}
                 </label>
                 {editMode && canEdit('specializations') ? (
                   <textarea
@@ -840,7 +901,9 @@ export default function StaffProfilePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Mức lương
+                    Mức lương {editMode && (
+                      <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ QTV có thể chỉnh sửa</span>
+                    )}
                   </label>
                   <div style={{
                     padding: '0.75rem 1rem',
@@ -861,7 +924,9 @@ export default function StaffProfilePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Đánh giá hiệu suất
+                    Đánh giá hiệu suất {editMode && (
+                      <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ admin có thể chỉnh sửa</span>
+                    )}
                   </label>
                   <div style={{
                     padding: '0.75rem 1rem',
@@ -882,7 +947,9 @@ export default function StaffProfilePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Ghi chú của quản lý
+                    Ghi chú của quản lý {editMode && (
+                      <span style={{ color: '#10b981', marginLeft: 8 }}>✓ Chỉ admin có thể chỉnh sửa</span>
+                    )}
                   </label>
                   <div style={{
                     padding: '0.75rem 1rem',

@@ -29,7 +29,7 @@ type StaffFormData = {
 
 const departments = [
   'Y tế',
-  'Chăm sóc cư dân',
+  'Chăm sóc người cao tuổi',
   'Phục hồi chức năng',
   'Hoạt động',
   'Quản lý',
@@ -134,6 +134,30 @@ export default function AddStaffPage() {
   
   return (
     <div style={{maxWidth: 1100, margin: '0 auto', marginTop: 32, marginBottom: 32}}>
+      <button
+          onClick={() => router.push('/staff')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginLeft: '0.5rem',
+            marginTop: '1rem',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
+      
       {/* Header lớn */}
       <div style={{
         background: 'linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%)',

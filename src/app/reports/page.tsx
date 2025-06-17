@@ -22,7 +22,7 @@ const reports = [
   { 
     id: 1, 
     title: 'Báo cáo hoạt động hàng ngày', 
-    description: 'Tổng quan về các hoạt động của cư dân trong ngày',
+    description: 'Tổng quan về các hoạt động của người cao tuổi trong ngày',
     category: 'Hoạt động', 
     generatedAt: '2023-05-10',
     format: 'PDF',
@@ -32,7 +32,7 @@ const reports = [
   { 
     id: 2, 
     title: 'Báo cáo sức khỏe tháng 5', 
-    description: 'Thống kê chi tiết sức khỏe tất cả cư dân',
+    description: 'Thống kê chi tiết sức khỏe tất cả người cao tuổi',
     category: 'Y tế', 
     generatedAt: '2023-05-08',
     format: 'XLSX',

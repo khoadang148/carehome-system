@@ -154,7 +154,7 @@ export default function CareNotesPage() {
             }} />
             <input
               type="text"
-              placeholder="Tìm kiếm cư dân theo tên hoặc phòng..."
+              placeholder="Tìm kiếm người cao tuổi theo tên hoặc phòng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -190,39 +190,26 @@ export default function CareNotesPage() {
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem',
+                gap: '0.5rem',
                 marginBottom: '1rem'
               }}>
                 <div style={{
-                  width: '3rem',
-                  height: '3rem',
+                  width: '2.2rem',
+                  height: '2.2rem',
                   background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  borderRadius: '0.75rem',
+                  borderRadius: '0.6rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <UserIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                  <UserIcon style={{ width: '1.1rem', height: '1.1rem', color: 'white' }} />
                 </div>
-                <div>
-                  <h3 style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 600,
-                    margin: 0,
-                    color: '#1e293b'
-                  }}>
-                    {resident.name}
-                  </h3>
-                  <div style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b',
-                    display: 'flex',
-                    gap: '1rem',
-                    marginTop: '0.25rem'
-                  }}>
-                    <span>Phòng {resident.room}</span>
-                    <span>{resident.age} tuổi</span>
-                  </div>
+                <div style={{ fontSize: '0.97rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Họ và tên:</span> <span style={{ fontWeight: 600 }}>{resident.name}</span></span>
+                  <span style={{ color: '#d1d5db' }}>|</span>
+                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Phòng:</span> {resident.room}</span>
+                  <span style={{ color: '#d1d5db' }}>|</span>
+                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Tuổi:</span> {resident.age}</span>
                 </div>
               </div>
 
@@ -237,12 +224,8 @@ export default function CareNotesPage() {
                 border: '1px solid #e2e8f0'
               }}>
                 <DocumentTextIcon style={{ width: '1rem', height: '1rem', color: '#6b7280' }} />
-                <span style={{
-                  fontSize: '0.875rem',
-                  color: '#475569'
-                }}>
-                  Ghi chú gần nhất: {resident.lastNote}
-                </span>
+                <span style={{ fontSize: '0.95rem', color: '#2563eb', fontWeight: 500 }}>Ghi chú gần nhất:</span>
+                <span style={{ fontSize: '0.875rem', color: '#475569' }}>{resident.lastNote}</span>
               </div>
 
               <div style={{
@@ -251,12 +234,8 @@ export default function CareNotesPage() {
                 justifyContent: 'space-between',
                 marginBottom: '1rem'
               }}>
-                <span style={{
-                  fontSize: '0.875rem',
-                  color: '#475569'
-                }}>
-                  Tổng ghi chú: {resident.notesCount || 0}
-                </span>
+                <span style={{ fontSize: '0.95rem', color: '#2563eb', fontWeight: 500 }}>Tổng ghi chú:</span>
+                <span style={{ fontSize: '0.875rem', color: '#475569' }}>{resident.notesCount || 0}</span>
               </div>
 
               <button

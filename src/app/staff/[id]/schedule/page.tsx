@@ -42,7 +42,7 @@ const initialStaffMembers = [
     firstName: 'Sarah',
     lastName: 'Johnson',
     position: 'Người chăm sóc', 
-    department: 'Chăm sóc cư dân', 
+    department: 'Chăm sóc người cao tuổi', 
     shiftType: 'Chiều', 
     hireDate: '2022-05-20',
     dateOfBirth: '1990-04-23',
@@ -53,7 +53,7 @@ const initialStaffMembers = [
     address: '456 Oak Avenue, Hometown',
     emergencyContact: 'Robert Johnson',
     emergencyPhone: '555-876-5432',
-    notes: 'Tốt nghiệp xuất sắc ngành điều dưỡng. Khả năng giao tiếp tốt với cư dân.'
+    notes: 'Tốt nghiệp xuất sắc ngành điều dưỡng. Khả năng giao tiếp tốt với người cao tuổi.'
   },
   { 
     id: 3, 
@@ -80,7 +80,7 @@ const initialStaffMembers = [
     firstName: 'Emily',
     lastName: 'Davis',
     position: 'Trợ lý y tá', 
-    department: 'Chăm sóc cư dân', 
+    department: 'Chăm sóc người cao tuổi', 
     shiftType: 'Đêm', 
     hireDate: '2023-01-05',
     dateOfBirth: '1992-12-18',
@@ -91,7 +91,7 @@ const initialStaffMembers = [
     address: '321 Cedar Lane, Townsville',
     emergencyContact: 'Mark Davis',
     emergencyPhone: '555-654-3210',
-    notes: 'Có kinh nghiệm chăm sóc ban đêm. Đặc biệt giỏi trong việc giúp cư dân có giấc ngủ ngon.'
+    notes: 'Có kinh nghiệm chăm sóc ban đêm. Đặc biệt giỏi trong việc giúp người cao tuổi có giấc ngủ ngon.'
   },
   { 
     id: 5, 
@@ -110,13 +110,13 @@ const initialStaffMembers = [
     address: '654 Birch Street, Villagetown',
     emergencyContact: 'Linda Wilson',
     emergencyPhone: '555-543-2109',
-    notes: 'Rất sáng tạo trong việc phát triển các hoạt động giải trí cho cư dân. Đặc biệt giỏi về âm nhạc và nghệ thuật.'
+    notes: 'Rất sáng tạo trong việc phát triển các hoạt động giải trí cho người cao tuổi. Đặc biệt giỏi về âm nhạc và nghệ thuật.'
   },
 ];
 
 // Mock schedule data
 const initialScheduleData: ScheduleEntry[] = [
-  { id: '1', staffId: 1, date: '2023-06-17', shift: 'morning', notes: 'Chăm sóc đặc biệt cho cư dân A' },
+  { id: '1', staffId: 1, date: '2023-06-17', shift: 'morning', notes: 'Chăm sóc đặc biệt cho người cao tuổi A' },
   { id: '2', staffId: 1, date: '2023-06-18', shift: 'night', notes: 'Trực đêm thay cho nhân viên nghỉ ốm' },
   { id: '3', staffId: 1, date: '2023-06-20', shift: 'afternoon', notes: 'Hỗ trợ hoạt động nhóm' },
   { id: '4', staffId: 2, date: '2023-06-17', shift: 'afternoon' },

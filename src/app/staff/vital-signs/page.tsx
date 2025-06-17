@@ -54,6 +54,28 @@ export default function StaffVitalSignsPage() {
     loadData();
   }, [currentDate]);
 
+  useEffect(() => {
+    console.log('Modal states:', { showAddForm });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showAddForm;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showAddForm]);
+
+
   const loadData = () => {
     // Mock residents data
     const mockResidents: Resident[] = [
@@ -236,7 +258,7 @@ export default function StaffVitalSignsPage() {
                 Theo Dõi Dấu Hiệu Sinh Tồn
               </h1>
               <p style={{ color: '#6b7280', margin: 0 }}>
-                Ghi nhận và theo dõi các chỉ số sinh hiệu của cư dân
+                Ghi nhận và theo dõi các chỉ số sinh hiệu của người cao tuổi
               </p>
             </div>
             <button
@@ -368,7 +390,7 @@ export default function StaffVitalSignsPage() {
                 color: '#374151',
                 marginBottom: '0.5rem'
               }}>
-                Cư dân
+                Người cao tuổi
               </label>
               <select
                 value={selectedResident || ''}
@@ -382,7 +404,7 @@ export default function StaffVitalSignsPage() {
                   background: 'white'
                 }}
               >
-                <option value="">Tất cả cư dân</option>
+                <option value="">Tất cả người cao tuổi</option>
                 {residents.map(resident => (
                   <option key={resident.id} value={resident.id}>
                     {resident.name} - {resident.room}
@@ -629,9 +651,13 @@ export default function StaffVitalSignsPage() {
               overflowY: 'auto'
             }}>
               <h2 style={{
-                fontSize: '1.25rem',
+                fontSize: '1.5rem',
                 fontWeight: 700,
-                color: '#1f2937',
+                margin: 0,
+                background: 'linear-gradient(90deg, #22c55e 0%, #64748b 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '0.01em' ,
                 marginBottom: '1.5rem'
               }}>
                 Ghi nhận dấu hiệu sinh tồn
@@ -670,7 +696,7 @@ export default function StaffVitalSignsPage() {
                       color: '#374151',
                       marginBottom: '0.5rem'
                     }}>
-                      Cư dân *
+                      Người cao tuổi *
                     </label>
                     <select
                       name="residentId" 
@@ -683,7 +709,7 @@ export default function StaffVitalSignsPage() {
                         fontSize: '0.875rem'
                       }}
                     >
-                      <option value="">Chọn cư dân</option>
+                      <option value="">Chọn người cao tuổi</option>
                       {residents.map(resident => (
                         <option key={resident.id} value={resident.id}>
                           {resident.name} - {resident.room}
@@ -971,7 +997,7 @@ export default function StaffVitalSignsPage() {
                   </label>
                   <textarea
                     name="notes"
-                    placeholder="Ghi chú về tình trạng cư dân..."
+                    placeholder="Ghi chú về tình trạng người cao tuổi..."
                     rows={3}
                     style={{
                       width: '100%',

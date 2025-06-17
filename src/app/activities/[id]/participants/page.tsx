@@ -378,7 +378,7 @@ export default function ActivityParticipantsPage({ params }: { params: { id: str
             <div style={{marginBottom: '1rem'}}>
               <input
                 type="text"
-                placeholder="Tìm kiếm cư dân..."
+                placeholder="Tìm kiếm người cao tuổi..."
                 style={{
                   width: '100%',
                   padding: '0.5rem 0.75rem',
@@ -459,7 +459,7 @@ export default function ActivityParticipantsPage({ params }: { params: { id: str
               ) : (
                 <div style={{textAlign: 'center', padding: '2rem 0'}}>
                   <p style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                    {searchTerm ? 'Không tìm thấy cư dân phù hợp' : 'Tất cả cư dân đã tham gia hoạt động này'}
+                    {searchTerm ? 'Không tìm thấy người cao tuổi phù hợp' : 'Tất cả người cao tuổi đã tham gia hoạt động này'}
                   </p>
                 </div>
               )}

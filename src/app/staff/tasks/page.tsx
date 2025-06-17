@@ -52,10 +52,35 @@ export default function StaffTasksPage() {
   const [filterType, setFilterType] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completionNoteValue, setCompletionNoteValue] = useState('');
+  const [completingTaskId, setCompletingTaskId] = useState<number|null>(null);
 
   useEffect(() => {
     loadTasks();
   }, []);
+
+  useEffect(() => {
+    console.log('Modal states:', { showDetailModal, showCompletionModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showDetailModal || showCompletionModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showDetailModal, showCompletionModal]);
+
 
   const loadTasks = () => {
     // Mock data - trong thực tế sẽ load từ API
@@ -63,7 +88,7 @@ export default function StaffTasksPage() {
       {
         id: 1,
         title: 'Đo chỉ số sinh hiệu buổi sáng',
-        description: 'Đo huyết áp, nhịp tim, nhiệt độ cho các cư dân trong ca sáng',
+        description: 'Đo huyết áp, nhịp tim, nhiệt độ cho các người cao tuổi trong ca sáng',
         type: 'care',
         priority: 'high',
         status: 'pending',
@@ -76,13 +101,13 @@ export default function StaffTasksPage() {
         residentName: 'Trần Văn B',
         location: 'Phòng 101-105',
         equipment: ['Máy đo huyết áp', 'Nhiệt kế', 'Máy đo SpO2'],
-        instructions: 'Đo chỉ số cho 5 cư dân theo thứ tự phòng. Ghi chú đặc biệt nếu có bất thường.',
+        instructions: 'Đo chỉ số cho 5 người cao tuổi theo thứ tự phòng. Ghi chú đặc biệt nếu có bất thường.',
         attachments: []
       },
       {
         id: 2,
         title: 'Phát thuốc buổi trưa',
-        description: 'Phát thuốc theo đơn cho cư dân, kiểm tra tuân thủ',
+        description: 'Phát thuốc theo đơn cho người cao tuổi, kiểm tra tuân thủ',
         type: 'medication',
         priority: 'urgent',
         status: 'in_progress',
@@ -94,13 +119,13 @@ export default function StaffTasksPage() {
         actualDuration: 20,
         location: 'Phòng thuốc',
         equipment: ['Xe đẩy thuốc', 'Danh sách thuốc'],
-        instructions: 'Kiểm tra kỹ tên, liều lượng trước khi phát. Ghi nhận nếu cư dân từ chối uống.',
+        instructions: 'Kiểm tra kỹ tên, liều lượng trước khi phát. Ghi nhận nếu người cao tuổi từ chối uống.',
         attachments: ['medication-list.pdf']
       },
       {
         id: 3,
         title: 'Tổ chức hoạt động thể dục',
-        description: 'Hướng dẫn bài tập thể dục nhẹ cho nhóm cư dân',
+        description: 'Hướng dẫn bài tập thể dục nhẹ cho nhóm người cao tuổi',
         type: 'activity',
         priority: 'medium',
         status: 'completed',
@@ -113,7 +138,7 @@ export default function StaffTasksPage() {
         location: 'Sân thể dục',
         equipment: ['Thảm tập', 'Loa di động', 'Bóng mềm'],
         instructions: 'Khởi động 10 phút, bài tập chính 40 phút, thư giãn 10 phút.',
-        completionNotes: 'Hoàn thành tốt. 8/10 cư dân tham gia tích cực.',
+        completionNotes: 'Hoàn thành tốt. 8/10 người cao tuổi tham gia tích cực.',
         completedAt: '2024-01-14T15:30:00',
         attachments: ['exercise-photos.jpg']
       },
@@ -137,7 +162,7 @@ export default function StaffTasksPage() {
       {
         id: 5,
         title: 'Xử lý tình huống khẩn cấp',
-        description: 'Hỗ trợ cư dân gặp vấn đề sức khỏe đột xuất',
+        description: 'Hỗ trợ người cao tuổi gặp vấn đề sức khỏe đột xuất',
         type: 'emergency',
         priority: 'urgent',
         status: 'completed',
@@ -152,7 +177,7 @@ export default function StaffTasksPage() {
         location: 'Phòng 203',
         equipment: ['Bộ dụng cụ sơ cấp cứu'],
         instructions: 'Đánh giá tình trạng, sơ cấp cứu ban đầu, liên hệ bác sĩ nếu cần.',
-        completionNotes: 'Cư dân bị choáng váng nhẹ. Đã ổn định và thông báo bác sĩ.',
+        completionNotes: 'người cao tuổi bị choáng váng nhẹ. Đã ổn định và thông báo bác sĩ.',
         completedAt: '2024-01-15T10:45:00',
         attachments: []
       }
@@ -244,22 +269,33 @@ export default function StaffTasksPage() {
   };
 
   const handleCompleteTask = (taskId: number) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      const completionNotes = prompt('Nhập ghi chú hoàn thành:');
-      if (completionNotes !== null) {
-        setTasks(prev => prev.map(t => 
-          t.id === taskId 
-            ? { 
-                ...t, 
-                status: 'completed' as const,
-                completionNotes,
-                completedAt: new Date().toISOString()
-              }
-            : t
-        ));
-      }
+    setCompletingTaskId(taskId);
+    setCompletionNoteValue('');
+    setShowCompletionModal(true);
+  };
+
+  const handleSaveCompletionNote = () => {
+    if (completingTaskId !== null) {
+      setTasks(prev => prev.map(t =>
+        t.id === completingTaskId
+          ? {
+              ...t,
+              status: 'completed' as const,
+              completionNotes: completionNoteValue,
+              completedAt: new Date().toISOString()
+            }
+          : t
+      ));
     }
+    setShowCompletionModal(false);
+    setCompletingTaskId(null);
+    setCompletionNoteValue('');
+  };
+
+  const handleCancelCompletionNote = () => {
+    setShowCompletionModal(false);
+    setCompletingTaskId(null);
+    setCompletionNoteValue('');
   };
 
   const getTaskStats = () => {
@@ -297,6 +333,7 @@ export default function StaffTasksPage() {
       </div>
     );
   }
+
 
   return (
     <div style={{
@@ -594,6 +631,7 @@ export default function StaffTasksPage() {
                     }}>
                       {task.title}
                     </h3>
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginRight: '0.25rem' }}>Loại:</span>
                     <span style={{
                       padding: '0.25rem 0.75rem',
                       borderRadius: '0.375rem',
@@ -604,6 +642,7 @@ export default function StaffTasksPage() {
                     }}>
                       {getTypeText(task.type)}
                     </span>
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginLeft: '0.75rem', marginRight: '0.25rem' }}>Ưu tiên:</span>
                     <span style={{
                       padding: '0.25rem 0.75rem',
                       borderRadius: '0.375rem',
@@ -614,6 +653,7 @@ export default function StaffTasksPage() {
                     }}>
                       {getPriorityText(task.priority)}
                     </span>
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginLeft: '0.75rem', marginRight: '0.25rem' }}>Trạng thái:</span>
                     <span style={{
                       padding: '0.25rem 0.75rem',
                       borderRadius: '0.375rem',
@@ -725,7 +765,7 @@ export default function StaffTasksPage() {
                         fontWeight: 500
                       }}>
                         <UserIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem' }} />
-                        Liên quan đến cư dân: {task.residentName}
+                        Liên quan đến người cao tuổi: {task.residentName}
                       </p>
                     </div>
                   )}
@@ -867,16 +907,19 @@ export default function StaffTasksPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            padding: '1rem'
+            padding: '1rem', 
+            marginLeft: '120px',
+          
           }}>
             <div style={{
-              background: 'white',
-              borderRadius: '1rem',
-              padding: '2rem',
+              background: '#f8fafc',
+              borderRadius: '1.5rem',
+              padding: '2.5rem',
               maxWidth: '800px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto'
+              overflowY: 'auto',
+              boxShadow: '0 8px 32px 0 rgba(16, 185, 129, 0.10)'
             }}>
               <div style={{
                 display: 'flex',
@@ -885,15 +928,18 @@ export default function StaffTasksPage() {
                 marginBottom: '2rem'
               }}>
                 <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: '#1f2937',
-                  margin: 0
+                  background: 'linear-gradient(90deg, #22c55e 0%, #64748b 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '0.01em',
+                  fontSize: '1.8rem',
                 }}>
                   Chi tiết nhiệm vụ
                 </h2>
+                
                 <button
                   onClick={() => setShowDetailModal(false)}
+                  title="Đóng"
                   style={{
                     padding: '0.5rem',
                     background: 'none',
@@ -907,38 +953,137 @@ export default function StaffTasksPage() {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gap: '2rem' }}>
-                <div>
-                  <h3 style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 600,
-                    color: '#1f2937',
-                    marginBottom: '1rem'
-                  }}>
-                    Hướng dẫn thực hiện
-                  </h3>
+              {/* General Info Table - Redesigned with gray/green */}
+              <div style={{
+                background: 'white',
+                borderRadius: '1rem',
+                padding: '2rem',
+                marginBottom: '2rem',
+                border: '1px solid #d1fae5',
+                boxShadow: '0 2px 8px 0 rgba(16,185,129,0.06)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.15rem',
+                  fontWeight: 700,
+                  color: '#22c55e',
+                  marginBottom: '1.5rem',
+                  letterSpacing: '0.01em',
+                  display: 'inline-block'
+                }}>
+                  Thông tin chung
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'max-content 1fr',
+                  rowGap: '1.1rem',
+                  columnGap: '2rem',
+                  alignItems: 'center',
+                  fontSize: '1rem'
+                }}>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Tên nhiệm vụ:</span>
+                  <span style={{color:'#1f2937'}}>{selectedTask.title}</span>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Mô tả:</span>
+                  <span style={{color:'#1f2937'}}>{selectedTask.description}</span>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Người giao việc:</span>
+                  <span style={{color:'#1f2937'}}>{selectedTask.assignedBy}</span>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Người nhận việc:</span>
+                  <span style={{color:'#1f2937'}}>{selectedTask.assignedTo}</span>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Địa điểm:</span>
+                  <span style={{color:'#1f2937'}}>{selectedTask.location}</span>
+                  {/* Type, Priority, Status as badges with labels */}
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Loại:</span>
+                  <span>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.85em',
+                      fontWeight: 600,
+                      background: '#dcfce7',
+                      color: '#16a34a',
+                      marginRight: '0.5rem',
+                      display: 'inline-block',
+                      border: '1px solid #bbf7d0'
+                    }}>{getTypeText(selectedTask.type)}</span>
+                  </span>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Ưu tiên:</span>
+                  <span>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.85em',
+                      fontWeight: 600,
+                      background: '#f0fdf4',
+                      color: '#22c55e',
+                      marginRight: '0.5rem',
+                      display: 'inline-block',
+                      border: '1px solid #bbf7d0'
+                    }}>{getPriorityText(selectedTask.priority)}</span>
+                  </span>
+                  <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Trạng thái:</span>
+                  <span>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.85em',
+                      fontWeight: 600,
+                      background: '#e0f2fe',
+                      color: '#22c55e',
+                      display: 'inline-block',
+                      border: '1px solid #bbf7d0'
+                    }}>{getStatusText(selectedTask.status)}</span>
+                  </span>
+                  {selectedTask.residentName && (
+                    <>
+                      <span style={{fontWeight:600, color:'#334155', textAlign:'right'}}>Người cao tuổi liên quan:</span>
+                      <span style={{color:'#1f2937'}}>{selectedTask.residentName}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 700,
+                  color: '#16a34a',
+                  marginBottom: '1rem'
+                }}>
+                  Hướng dẫn thực hiện
+                </h3>
+                <div style={{
+                  padding: '1rem',
+                  background: '#f0fdf4',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #bbf7d0'
+                }}>
                   <p style={{
                     color: '#374151',
                     lineHeight: 1.6,
-                    margin: 0,
-                    padding: '1rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem'
+                    margin: 0
                   }}>
                     {selectedTask.instructions}
                   </p>
                 </div>
+              </div>
 
-                {selectedTask.equipment && selectedTask.equipment.length > 0 && (
-                  <div>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: '1rem'
-                    }}>
-                      Thiết bị cần thiết
-                    </h3>
+              {/* Equipment */}
+              {selectedTask.equipment && selectedTask.equipment.length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 700,
+                    color: '#16a34a',
+                    marginBottom: '1rem'
+                  }}>
+                    Thiết bị cần thiết
+                  </h3>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#f0fdf4',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #bbf7d0'
+                  }}>
                     <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
                       {selectedTask.equipment.map((equipment, index) => (
                         <li key={index} style={{
@@ -950,114 +1095,169 @@ export default function StaffTasksPage() {
                       ))}
                     </ul>
                   </div>
-                )}
+                </div>
+              )}
 
-                {selectedTask.attachments && selectedTask.attachments.length > 0 && (
-                  <div>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: '1rem'
-                    }}>
-                      Tài liệu đính kèm
-                    </h3>
-                    <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
-                      {selectedTask.attachments.map((attachment, index) => (
-                        <li key={index} style={{
-                          color: '#3b82f6',
-                          marginBottom: '0.5rem'
-                        }}>
-                          <a href="#" style={{ color: '#3b82f6', textDecoration: 'underline' }}>
-                            {attachment}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
+              {/* Time Info */}
+              <div style={{
+                background: '#f8fafc',
+                borderRadius: '0.5rem',
+                padding: '1.5rem',
+                marginBottom: '2rem',
+                border: '1px solid #d1fae5'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 700,
+                  color: '#16a34a',
+                  marginBottom: '1rem'
+                }}>
+                  Thông tin thời gian
+                </h3>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '1rem',
-                  padding: '1rem',
-                  background: '#f9fafb',
-                  borderRadius: '0.5rem'
+                  gridTemplateColumns: 'max-content 1fr',
+                  rowGap: '0.75rem',
+                  columnGap: '1.5rem',
+                  alignItems: 'center'
                 }}>
-                  <div>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#6b7280',
-                      margin: '0 0 0.25rem 0'
-                    }}>
-                      Ngày giao việc
-                    </p>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      margin: 0
-                    }}>
-                      {new Date(selectedTask.assignedDate).toLocaleDateString('vi-VN')}
-                    </p>
-                  </div>
-                  <div>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#6b7280',
-                      margin: '0 0 0.25rem 0'
-                    }}>
-                      Hạn hoàn thành
-                    </p>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      margin: 0
-                    }}>
-                      {new Date(selectedTask.dueDate).toLocaleDateString('vi-VN')}
-                    </p>
-                  </div>
+                  <span style={{fontWeight:600, color:'#334155'}}>Ngày giao việc:</span>
+                  <span>{new Date(selectedTask.assignedDate).toLocaleDateString('vi-VN')}</span>
+                  <span style={{fontWeight:600, color:'#334155'}}>Hạn hoàn thành:</span>
+                  <span>{new Date(selectedTask.dueDate).toLocaleDateString('vi-VN')}</span>
                   {selectedTask.completedAt && (
-                    <div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        Thời gian hoàn thành
-                      </p>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {new Date(selectedTask.completedAt).toLocaleString('vi-VN')}
-                      </p>
-                    </div>
+                    <>
+                      <span style={{fontWeight:600, color:'#334155'}}>Thời gian hoàn thành:</span>
+                      <span>{new Date(selectedTask.completedAt).toLocaleString('vi-VN')}</span>
+                    </>
                   )}
                   {selectedTask.actualDuration && (
-                    <div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        Thời gian thực tế
-                      </p>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {selectedTask.actualDuration} phút
-                      </p>
-                    </div>
+                    <>
+                      <span style={{fontWeight:600, color:'#334155'}}>Thời gian thực tế:</span>
+                      <span>{selectedTask.actualDuration} phút</span>
+                    </>
                   )}
+                  <span style={{fontWeight:600, color:'#334155'}}>Thời gian dự kiến:</span>
+                  <span>{selectedTask.estimatedDuration} phút</span>
                 </div>
+              </div>
+
+              {/* Completion Notes */}
+              {selectedTask.completionNotes && (
+                <div style={{
+                  padding: '1.5rem',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '0.5rem',
+                  marginBottom: '1rem'
+                }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 700,
+                    color: '#16a34a',
+                    marginBottom: '1rem'
+                  }}>
+                    Ghi chú hoàn thành
+                  </h3>
+                  <p style={{
+                    fontSize: '0.95rem',
+                    color: '#047857',
+                    margin: 0,
+                    lineHeight: 1.6
+                  }}>
+                    {selectedTask.completionNotes}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showCompletionModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '1rem',
+              padding: '2rem',
+              maxWidth: '400px',
+              width: '100%',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
+            }}>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '1.5rem',
+                textAlign: 'center'
+              }}>
+                Nhập ghi chú hoàn thành
+              </h3>
+              <label htmlFor="completion-note" style={{
+                display: 'block',
+                fontWeight: 500,
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}>
+                Ghi chú (nếu có):
+              </label>
+              <textarea
+                id="completion-note"
+                value={completionNoteValue}
+                onChange={e => setCompletionNoteValue(e.target.value)}
+                rows={4}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.95rem',
+                  marginBottom: '1.5rem',
+                  resize: 'vertical',
+                  background: '#f9fafb'
+                }}
+                placeholder="Nhập ghi chú về quá trình hoàn thành nhiệm vụ..."
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button
+                  onClick={handleCancelCompletionNote}
+                  style={{
+                    padding: '0.5rem 1.25rem',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveCompletionNote}
+                  style={{
+                    padding: '0.5rem 1.25rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Lưu
+                </button>
               </div>
             </div>
           </div>

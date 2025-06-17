@@ -6,7 +6,8 @@ import {
   EyeSlashIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -198,35 +199,69 @@ export default function SettingsPage() {
 
   return (
     <>
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-      <div style={{
-        minHeight: '100vh',
-        background: '#f8fafc',
-        padding: '1.5rem 1rem'
-      }}>
-        <div style={{
-          maxWidth: '600px', 
-          margin: '0 auto'
-        }}>
-          {/* Header */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{
-              fontSize: '1.875rem', 
-              fontWeight: 700, 
-              color: '#111827',
-              margin: '0 0 0.25rem 0'
+      {/* Nút quay lại sticky trên cùng, sát mép trái */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          left: 0,
+          zIndex: 10,
+          background: '#f8fafc',
+          padding: '1.5rem 0 0 1.5rem'
+        }}
+      >
+        <button
+          onClick={() => router.push('/')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
+      </div>
+      {/* Nội dung chính */}
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#f8fafc',
+          padding: '0 1rem 1.5rem 1rem'
+        }}
+      >
+        <div style={{ maxWidth:'600px', margin:'0 auto' }}>
+          {/* Header Section */}
+          <div style={{ 
+            background:'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius:'1.5rem',
+            padding:'2rem',
+            marginBottom:'2rem',
+            boxShadow:'0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)', 
+            border:'1px solid rgba(255, 255, 255, 0.2)', 
+            backdropFilter:'blur(10px)', 
+          }}>
+            <h1 style={{ 
+              fontSize:'1.875rem',
+              fontWeight:'700',
+              color:'#111827',
+              margin:'0 0 0.25rem 0'
             }}>
               Cài đặt
             </h1>
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#6b7280',
-              margin: 0
+            <p style={{ 
+              fontSize:'0.875rem',
+              color:'#6b7280',
+              margin:'0'
             }}>
               Cài đặt cơ bản
             </p>

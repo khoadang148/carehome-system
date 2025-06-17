@@ -100,7 +100,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
             margin: '0 auto 1rem'
           }} />
           <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-            Đang tải thông tin cư dân...
+            Đang tải thông tin người cao tuổi...
           </p>
         </div>
       </div>
@@ -137,14 +137,14 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
             color: '#1f2937',
             margin: '0 0 0.5rem 0'
           }}>
-            Không tìm thấy cư dân
+            Không tìm thấy người cao tuổi
           </h2>
           <p style={{
             fontSize: '0.875rem',
             color: '#6b7280',
             margin: '0 0 1.5rem 0'
           }}>
-            Cư dân này có thể đã bị xóa hoặc không tồn tại
+            người cao tuổi này có thể đã bị xóa hoặc không tồn tại
           </p>
           <Link
             href="/residents"
@@ -220,7 +220,6 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
     { id: 'overview', label: 'Tổng quan', icon: UserIcon },
     { id: 'medical', label: 'Y tế', icon: HeartIcon },
     { id: 'contact', label: 'Liên hệ', icon: PhoneIcon },
-    { id: 'activities', label: 'Hoạt động', icon: CalendarIcon },
     { id: 'notes', label: 'Ghi chú', icon: ClipboardDocumentListIcon }
   ];
   
@@ -743,32 +742,6 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     {resident.contactPhone || 'Chưa cập nhật'}
                   </p>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Activities Tab */}
-          {activeTab === 'activities' && (
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              {/* Individual Appointments */}
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: '0 0 1rem 0',
-                  color: '#1e293b'
-                }}>
-                  Lịch hẹn riêng lẻ
-                </h3>
-                <AppointmentsDisplay
-                  appointments={resident.appointments || []}
-                  isStaff={user?.role === 'staff'}
-                />
               </div>
             </div>
           )}

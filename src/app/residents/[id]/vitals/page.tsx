@@ -167,7 +167,7 @@ export default function VitalsPage() {
   if (!resident) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>Không tìm thấy thông tin cư dân</p>
+        <p>Không tìm thấy thông tin người cao tuổi</p>
       </div>
     );
   }

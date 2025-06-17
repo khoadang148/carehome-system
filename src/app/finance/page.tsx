@@ -2038,7 +2038,7 @@ export default function FinancePage() {
                     color: '#1f2937',
                     margin: 0
                   }}>
-                    Thông tin cư dân
+                    Thông tin người cao tuổi
                   </h4>
                 </div>
                 <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
@@ -2049,7 +2049,7 @@ export default function FinancePage() {
                     </div>
                   </div>
                   <div>
-                    <span style={{color: '#6b7280'}}>Mã cư dân</span>
+                    <span style={{color: '#6b7280'}}>Mã người cao tuổi</span>
                     <div style={{fontWeight: 600, color: '#111827', fontFamily: 'monospace'}}>
                       {familyFinancialData[selectedResident]?.residentId || `RES001`}
                     </div>

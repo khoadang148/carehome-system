@@ -201,9 +201,9 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
     if (data.residents) {
       html += `
         <div class="metric">
-          <div class="metric-title">Thông tin cư dân</div>
+          <div class="metric-title">Thông tin người cao tuổi</div>
           <div class="metric-value">Tổng số: ${data.residents.total}</div>
-          ${data.residents.newAdmissions ? `<div>Cư dân mới: ${data.residents.newAdmissions}</div>` : ''}
+          ${data.residents.newAdmissions ? `<div>người cao tuổi mới: ${data.residents.newAdmissions}</div>` : ''}
           ${data.residents.occupancyRate ? `<div>Tỷ lệ lấp đầy: ${data.residents.occupancyRate}%</div>` : ''}
         </div>
       `;
@@ -355,7 +355,7 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
                       }}>
                         <UsersIcon style={{width: '1.25rem', height: '1.25rem', color: 'white'}} />
                       </div>
-                      <h4 style={{fontSize: '1rem', fontWeight: 600, color: '#0c4a6e', margin: 0}}>Cư dân</h4>
+                      <h4 style={{fontSize: '1rem', fontWeight: 600, color: '#0c4a6e', margin: 0}}>người cao tuổi</h4>
                     </div>
                     <div style={{display: 'grid', gap: '0.5rem'}}>
                       <div style={{display: 'flex', justifyContent: 'space-between'}}>
@@ -364,7 +364,7 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
                       </div>
                       {report.data.residents.newAdmissions && (
                         <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                          <span style={{fontSize: '0.875rem', color: '#075985'}}>Cư dân mới:</span>
+                          <span style={{fontSize: '0.875rem', color: '#075985'}}>người cao tuổi mới:</span>
                           <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#0c4a6e'}}>{report.data.residents.newAdmissions}</span>
                         </div>
                       )}
@@ -574,14 +574,14 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
               )}
               {report.data?.residents && (
                 <p style={{margin: '0 0 1rem 0'}}>
-                  <strong>Cư dân:</strong> Hiện có {report.data.residents.total} cư dân với tỷ lệ lấp đầy {report.data.residents.occupancyRate}%, 
+                  <strong>người cao tuổi:</strong> Hiện có {report.data.residents.total} người cao tuổi với tỷ lệ lấp đầy {report.data.residents.occupancyRate}%, 
                   đảm bảo sức chứa và chất lượng dịch vụ.
                 </p>
               )}
               {report.data?.activities && (
                 <p style={{margin: 0}}>
                   <strong>Hoạt động:</strong> Tổ chức {report.data.activities.totalActivities} hoạt động với tỷ lệ tham gia {report.data.activities.participationRate}%, 
-                  góp phần nâng cao chất lượng cuộc sống của cư dân.
+                  góp phần nâng cao chất lượng cuộc sống của người cao tuổi.
                 </p>
               )}
             </div>

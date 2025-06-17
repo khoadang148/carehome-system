@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 
 type ActivityFormData = {
   name: string;
@@ -52,7 +53,7 @@ const activitiesData = [
     facilitator: 'David Wilson',
     facilitatorId: 5,
     date: '2024-01-15',
-    notes: 'Cần chuẩn bị thảm tập yoga và nhạc nhẹ nhàng. Kiểm tra sức khỏe của các cư dân trước khi tham gia.',
+    notes: 'Cần chuẩn bị thảm tập yoga và nhạc nhẹ nhàng. Kiểm tra sức khỏe của các người cao tuổi trước khi tham gia.',
     materials: ['Thảm tập yoga', 'Loa phát nhạc', 'Nước uống', 'Khăn nhỏ'],
     benefits: ['Cải thiện khả năng vận động', 'Tăng cường sức khỏe tim mạch', 'Giảm căng thẳng', 'Cải thiện tâm trạng'],
     level: 'Dễ',
@@ -62,7 +63,7 @@ const activitiesData = [
   { 
     id: 2, 
     name: 'Mỹ thuật & Thủ công', 
-    description: 'Hoạt động vẽ tranh và làm đồ thủ công sáng tạo nhằm kích thích khả năng nghệ thuật và sáng tạo của cư dân.',
+    description: 'Hoạt động vẽ tranh và làm đồ thủ công sáng tạo nhằm kích thích khả năng nghệ thuật và sáng tạo của người cao tuổi.',
     category: 'Sáng tạo', 
     location: 'Phòng hoạt động',
     scheduledTime: '10:30', 
@@ -247,488 +248,316 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   }
   
   return (
-    <div style={{maxWidth: '1200px', margin: '0 auto', padding: '0 1rem'}}>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: '1.5rem'}}>
-        <Link href="/activities" style={{color: '#6b7280', display: 'flex', marginRight: '0.75rem'}}>
-          <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
-        </Link>
-        <h1 style={{fontSize: '1.5rem', fontWeight: 600, margin: 0}}>Chỉnh sửa hoạt động</h1>
-      </div>
+    <div className="min-h-screen bg-gray-50 pb-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <div style={{  
+  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  marginBottom: '2rem',
+  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)', 
+  border: '1px solid rgba(255, 255, 255, 0.2)', 
+  backdropFilter: 'blur(10px)', 
+}}>
+  <div className="flex items-center gap-3 mb-6 mt-2">
+    <Link 
+      href="/activities" 
+      title="Quay lại"
+      className="text-gray-500 hover:text-green-700 flex items-center transition-colors duration-200"
+    >
+      <ArrowLeftIcon className="w-5 h-5 mr-1" />
       
-      <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '1.5rem'}}>
-        <form onSubmit={handleSubmit(onSubmit)} style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
-          
-          {/* Basic Information */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin cơ bản
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem'}}>
-              <div>
-                <label htmlFor="name" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Tên hoạt động*
+    </Link>
+    <h1 
+      style={{ 
+        fontSize: '2rem', 
+        fontWeight: 800, 
+        color: '#16a34a',
+        margin: 0 
+      }}
+    >
+      Chỉnh sửa hoạt động
+    </h1>
+  </div>
+</div>
+
+        
+        <div className="bg-white rounded-xl shadow-md p-8">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-10">
+            {/* Basic Information */}
+            <section>
+              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-green-500" />
+                Thông tin cơ bản
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Tên hoạt động */}
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    Tên hoạt động <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    className={`block w-full rounded-lg border ${errors.name ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('name', { required: 'Tên hoạt động là bắt buộc' })}
+                  />
+                  {errors.name && (
+                    <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
+                  )}
+                </div>
+                {/* Loại hoạt động */}
+                <div>
+                  <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại hoạt động <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="category"
+                    className={`block w-full rounded-lg border ${errors.category ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('category', { required: 'Loại hoạt động là bắt buộc' })}
+                  >
+                    <option value="">Chọn loại hoạt động</option>
+                    {categories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                  {errors.category && (
+                    <p className="mt-1 text-xs text-red-600">{errors.category.message}</p>
+                  )}
+                </div>
+                {/* Địa điểm */}
+                <div>
+                  <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+                    Địa điểm <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="location"
+                    className={`block w-full rounded-lg border ${errors.location ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('location', { required: 'Địa điểm là bắt buộc' })}
+                  >
+                    <option value="">Chọn địa điểm</option>
+                    {locations.map(location => (
+                      <option key={location} value={location}>{location}</option>
+                    ))}
+                  </select>
+                  {errors.location && (
+                    <p className="mt-1 text-xs text-red-600">{errors.location.message}</p>
+                  )}
+                </div>
+                {/* Người hướng dẫn */}
+                <div>
+                  <label htmlFor="facilitator" className="block text-sm font-medium text-gray-700 mb-1">
+                    Người hướng dẫn <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="facilitator"
+                    className={`block w-full rounded-lg border ${errors.facilitator ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('facilitator', { required: 'Người hướng dẫn là bắt buộc' })}
+                  >
+                    <option value="">Chọn người hướng dẫn</option>
+                    {facilitators.map(facilitator => (
+                      <option key={facilitator} value={facilitator}>{facilitator}</option>
+                    ))}
+                  </select>
+                  {errors.facilitator && (
+                    <p className="mt-1 text-xs text-red-600">{errors.facilitator.message}</p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                  Mô tả hoạt động <span className="text-red-500">*</span>
                 </label>
-                <input
-                  id="name"
-                  type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.name ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('name', { required: 'Tên hoạt động là bắt buộc' })}
+                <textarea
+                  id="description"
+                  rows={3}
+                  className={`block w-full rounded-lg border ${errors.description ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                  {...register('description', { required: 'Mô tả hoạt động là bắt buộc' })}
                 />
-                {errors.name && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.name.message}</p>
+                {errors.description && (
+                  <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>
                 )}
               </div>
-              
-              <div>
-                <label htmlFor="category" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Loại hoạt động*
-                </label>
-                <select
-                  id="category"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.category ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('category', { required: 'Loại hoạt động là bắt buộc' })}
-                >
-                  <option value="">Chọn loại hoạt động</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-                {errors.category && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.category.message}</p>
-                )}
+            </section>
+            {/* Schedule Information */}
+            <section>
+              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-green-500" />
+                Thông tin lịch trình
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Ngày */}
+                <div>
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="date"
+                    type="date"
+                    className={`block w-full rounded-lg border ${errors.date ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('date', { required: 'Ngày là bắt buộc' })}
+                  />
+                  {errors.date && (
+                    <p className="mt-1 text-xs text-red-600">{errors.date.message}</p>
+                  )}
+                </div>
+                {/* Thời gian */}
+                <div>
+                  <label htmlFor="scheduledTime" className="block text-sm font-medium text-gray-700 mb-1">
+                    Thời gian <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="scheduledTime"
+                    type="time"
+                    className={`block w-full rounded-lg border ${errors.scheduledTime ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('scheduledTime', { required: 'Thời gian là bắt buộc' })}
+                  />
+                  {errors.scheduledTime && (
+                    <p className="mt-1 text-xs text-red-600">{errors.scheduledTime.message}</p>
+                  )}
+                </div>
+                {/* Thời lượng */}
+                <div>
+                  <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-1">
+                    Thời lượng (phút) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="duration"
+                    type="number"
+                    min="15"
+                    max="300"
+                    className={`block w-full rounded-lg border ${errors.duration ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('duration', {
+                      required: 'Thời lượng là bắt buộc',
+                      min: { value: 15, message: 'Thời lượng tối thiểu 15 phút' },
+                      max: { value: 300, message: 'Thời lượng tối đa 300 phút' }
+                    })}
+                  />
+                  {errors.duration && (
+                    <p className="mt-1 text-xs text-red-600">{errors.duration.message}</p>
+                  )}
+                </div>
+                {/* Sức chứa */}
+                <div>
+                  <label htmlFor="capacity" className="block text-sm font-medium text-gray-700 mb-1">
+                    Sức chứa <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="capacity"
+                    type="number"
+                    min="1"
+                    max="100"
+                    className={`block w-full rounded-lg border ${errors.capacity ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('capacity', {
+                      required: 'Sức chứa là bắt buộc',
+                      min: { value: 1, message: 'Sức chứa tối thiểu 1 người' },
+                      max: { value: 100, message: 'Sức chứa tối đa 100 người' }
+                    })}
+                  />
+                  {errors.capacity && (
+                    <p className="mt-1 text-xs text-red-600">{errors.capacity.message}</p>
+                  )}
+                </div>
+                {/* Mức độ */}
+                <div>
+                  <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-1">
+                    Mức độ
+                  </label>
+                  <select
+                    id="level"
+                    className="block w-full rounded-lg border border-gray-300 focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm"
+                    {...register('level')}
+                  >
+                    {levels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Lặp lại */}
+                <div>
+                  <label htmlFor="recurring" className="block text-sm font-medium text-gray-700 mb-1">
+                    Lặp lại
+                  </label>
+                  <select
+                    id="recurring"
+                    className="block w-full rounded-lg border border-gray-300 focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm"
+                    {...register('recurring')}
+                  >
+                    {recurringOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Trạng thái */}
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                    Trạng thái <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="status"
+                    className={`block w-full rounded-lg border ${errors.status ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
+                    {...register('status', { required: 'Trạng thái là bắt buộc' })}
+                  >
+                    {statusOptions.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                  {errors.status && (
+                    <p className="mt-1 text-xs text-red-600">{errors.status.message}</p>
+                  )}
+                </div>
               </div>
-              
-              <div>
-                <label htmlFor="location" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Địa điểm*
-                </label>
-                <select
-                  id="location"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.location ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('location', { required: 'Địa điểm là bắt buộc' })}
-                >
-                  <option value="">Chọn địa điểm</option>
-                  {locations.map(location => (
-                    <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
-                {errors.location && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.location.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="facilitator" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Người hướng dẫn*
-                </label>
-                <select
-                  id="facilitator"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.facilitator ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('facilitator', { required: 'Người hướng dẫn là bắt buộc' })}
-                >
-                  <option value="">Chọn người hướng dẫn</option>
-                  {facilitators.map(facilitator => (
-                    <option key={facilitator} value={facilitator}>{facilitator}</option>
-                  ))}
-                </select>
-                {errors.facilitator && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.facilitator.message}</p>
-                )}
-              </div>
-            </div>
-            
-            <div style={{marginTop: '1rem'}}>
-              <label htmlFor="description" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                Mô tả hoạt động*
-              </label>
-              <textarea
-                id="description"
-                rows={3}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  borderRadius: '0.375rem',
-                  border: `1px solid ${errors.description ? '#fca5a5' : '#d1d5db'}`,
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-                {...register('description', { required: 'Mô tả hoạt động là bắt buộc' })}
-              />
-              {errors.description && (
-                <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.description.message}</p>
-              )}
-            </div>
-          </div>
-          
-          {/* Schedule Information */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin lịch trình
-            </h2>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem'}}>
-              <div>
-                <label htmlFor="date" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ngày*
-                </label>
-                <input
-                  id="date"
-                  type="date"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.date ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('date', { required: 'Ngày là bắt buộc' })}
-                />
-                {errors.date && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.date.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="scheduledTime" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Thời gian*
-                </label>
-                <input
-                  id="scheduledTime"
-                  type="time"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.scheduledTime ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('scheduledTime', { required: 'Thời gian là bắt buộc' })}
-                />
-                {errors.scheduledTime && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.scheduledTime.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="duration" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Thời lượng (phút)*
-                </label>
-                <input
-                  id="duration"
-                  type="number"
-                  min="15"
-                  max="300"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.duration ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('duration', { 
-                    required: 'Thời lượng là bắt buộc',
-                    min: { value: 15, message: 'Thời lượng tối thiểu 15 phút' },
-                    max: { value: 300, message: 'Thời lượng tối đa 300 phút' }
-                  })}
-                />
-                {errors.duration && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.duration.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="capacity" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Sức chứa*
-                </label>
-                <input
-                  id="capacity"
-                  type="number"
-                  min="1"
-                  max="100"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.capacity ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('capacity', { 
-                    required: 'Sức chứa là bắt buộc',
-                    min: { value: 1, message: 'Sức chứa tối thiểu 1 người' },
-                    max: { value: 100, message: 'Sức chứa tối đa 100 người' }
-                  })}
-                />
-                {errors.capacity && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.capacity.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="level" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Mức độ
-                </label>
-                <select
-                  id="level"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('level')}
-                >
-                  {levels.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="recurring" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Lặp lại
-                </label>
-                <select
-                  id="recurring"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('recurring')}
-                >
-                  {recurringOptions.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="status" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Trạng thái*
-                </label>
-                <select
-                  id="status"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: `1px solid ${errors.status ? '#fca5a5' : '#d1d5db'}`,
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('status', { required: 'Trạng thái là bắt buộc' })}
-                >
-                  {statusOptions.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-                {errors.status && (
-                  <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#dc2626'}}>{errors.status.message}</p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Participant Management */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Quản lý người tham gia
-            </h2>
-            <div style={{marginBottom: '1rem'}}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: '1rem'
-              }}>
-                <span style={{
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  fontWeight: 500
-                }}>
+            </section>
+            {/* Participant Management */}
+            <section>
+              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-green-500" />
+                Quản lý người tham gia
+              </h2>
+              <div className="mb-4 flex items-center gap-3">
+                <span className="text-sm text-gray-600 font-medium">
                   Số lượng hiện tại: {participants.length}/{activity?.capacity || 0}
                 </span>
-                <span style={{
-                  fontSize: '0.75rem',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '9999px',
-                  background: participants.length >= (activity?.capacity || 0) ? 
-                    'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                  color: participants.length >= (activity?.capacity || 0) ? '#ef4444' : '#22c55e',
-                  fontWeight: 600
-                }}>
+                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${participants.length >= (activity?.capacity || 0) ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                   {participants.length >= (activity?.capacity || 0) ? 'Đã đầy' : 'Còn chỗ'}
                 </span>
               </div>
-              
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '1rem'
-              }}>
+              <div className="flex gap-2 mb-4">
                 <select
                   value={selectedResident}
-                  onChange={(e) => setSelectedResident(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    background: 'white'
-                  }}
+                  onChange={e => setSelectedResident(e.target.value)}
+                  className="flex-1 rounded-lg border border-gray-300 focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm bg-white"
                 >
                   <option value="">
-                    {availableResidents.length > 0 ? 'Chọn cư dân...' : 'Không còn cư dân nào'}
+                    {availableResidents.length > 0 ? 'Chọn người cao tuổi...' : 'Không còn người cao tuổi nào'}
                   </option>
                   {availableResidents.map((resident, index) => (
-                    <option key={index} value={resident}>
-                      {resident}
-                    </option>
+                    <option key={index} value={resident}>{resident}</option>
                   ))}
                 </select>
                 <button
                   type="button"
                   onClick={addParticipant}
                   disabled={!selectedResident || availableResidents.length === 0}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.375rem',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    cursor: !selectedResident || availableResidents.length === 0 ? 'not-allowed' : 'pointer',
-                    opacity: !selectedResident || availableResidents.length === 0 ? 0.5 : 1,
-                    transition: 'all 0.2s ease'
-                  }}
+                  className={`px-4 py-2 rounded-lg font-medium text-white bg-gradient-to-r from-green-500 to-green-700 shadow-sm transition-all ${(!selectedResident || availableResidents.length === 0) ? 'opacity-50 cursor-not-allowed' : 'hover:from-green-600 hover:to-green-800'}`}
                 >
                   Thêm
                 </button>
               </div>
-              
               {participants.length > 0 && (
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Danh sách người tham gia:
-                  </label>
-                  <div style={{
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    padding: '0.75rem'
-                  }}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Danh sách người tham gia:</label>
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
                     {participants.map((participant, index) => (
                       <div
                         key={index}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '0.5rem',
-                          marginBottom: '0.25rem',
-                          background: '#f9fafb',
-                          borderRadius: '0.375rem',
-                          border: '1px solid #e5e7eb'
-                        }}
+                        className="flex justify-between items-center py-2 px-2 mb-1 bg-white rounded-md border border-gray-200 shadow-sm"
                       >
-                        <span style={{
-                          fontSize: '0.875rem',
-                          color: '#374151',
-                          fontWeight: 500
-                        }}>
-                          {participant}
-                        </span>
+                        <span className="text-sm text-gray-800 font-medium">{participant}</span>
                         <button
                           type="button"
                           onClick={() => removeParticipant(participant)}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.25rem',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                            color: 'white',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
+                          className="px-2 py-1 rounded-md text-xs font-semibold text-white bg-gradient-to-r from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 shadow-sm transition-all"
                         >
                           Xóa
                         </button>
@@ -737,119 +566,69 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                   </div>
                 </div>
               )}
+            </section>
+            {/* Additional Information */}
+            <section>
+              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-green-500" />
+                Thông tin bổ sung
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="materials" className="block text-sm font-medium text-gray-700 mb-1">
+                    Dụng cụ cần thiết
+                  </label>
+                  <input
+                    id="materials"
+                    type="text"
+                    className="block w-full rounded-lg border border-gray-300 focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm"
+                    placeholder="Phân cách bằng dấu phẩy (VD: Thảm yoga, Loa nhạc, Nước uống)"
+                    {...register('materials')}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="benefits" className="block text-sm font-medium text-gray-700 mb-1">
+                    Lợi ích
+                  </label>
+                  <input
+                    id="benefits"
+                    type="text"
+                    className="block w-full rounded-lg border border-gray-300 focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm"
+                    placeholder="Phân cách bằng dấu phẩy (VD: Cải thiện sức khỏe, Giảm căng thẳng)"
+                    {...register('benefits')}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+                    Ghi chú
+                  </label>
+                  <textarea
+                    id="notes"
+                    rows={3}
+                    className="block w-full rounded-lg border border-gray-300 focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm"
+                    {...register('notes')}
+                  />
+                </div>
+              </div>
+            </section>
+            {/* Form Buttons */}
+            <div className="flex justify-end gap-3 mt-2">
+              <Link
+                href="/activities"
+                className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-100 transition-all"
+              >
+                Hủy
+              </Link>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`px-4 py-2 rounded-lg font-medium text-white bg-gradient-to-r from-green-600 to-green-800 shadow-sm text-sm transition-all ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-900'}`}
+              >
+                {isSubmitting ? 'Đang cập nhật...' : 'Cập nhật hoạt động'}
+              </button>
             </div>
-          </div>
-          
-          {/* Additional Information */}
-          <div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 600, color: '#111827', marginBottom: '1rem'}}>
-              Thông tin bổ sung
-            </h2>
-            <div style={{display: 'grid', gap: '1rem'}}>
-              <div>
-                <label htmlFor="materials" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Dụng cụ cần thiết
-                </label>
-                <input
-                  id="materials"
-                  type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  placeholder="Phân cách bằng dấu phẩy (VD: Thảm yoga, Loa nhạc, Nước uống)"
-                  {...register('materials')}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="benefits" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Lợi ích
-                </label>
-                <input
-                  id="benefits"
-                  type="text"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  placeholder="Phân cách bằng dấu phẩy (VD: Cải thiện sức khỏe, Giảm căng thẳng)"
-                  {...register('benefits')}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="notes" style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.25rem'}}>
-                  Ghi chú
-                </label>
-                <textarea
-                  id="notes"
-                  rows={3}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #d1d5db',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  {...register('notes')}
-                />
-              </div>
-            </div>
-          </div>
-          
-          {/* Form Buttons */}
-          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem'}}>
-            <Link 
-              href="/activities" 
-              style={{
-                padding: '0.5rem 1rem', 
-                border: '1px solid #d1d5db', 
-                borderRadius: '0.375rem', 
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                color: '#374151',
-                textDecoration: 'none'
-              }}
-            >
-              Hủy
-            </Link>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: '0.5rem 1rem', 
-                border: '1px solid transparent', 
-                borderRadius: '0.375rem', 
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                color: 'white', 
-                backgroundColor: '#16a34a',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.5 : 1
-              }}
-            >
-              {isSubmitting ? 'Đang cập nhật...' : 'Cập nhật hoạt động'}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
