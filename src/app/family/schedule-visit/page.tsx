@@ -47,53 +47,7 @@ export default function ScheduleVisitPage() {
       >
         <ArrowLeftIcon style={{ height: 20, width: 20 }} />
       </button>
-        {/* Cột trái: Thông tin người thân */}
-        <div style={{ minWidth: 320, maxWidth: 280, flex: 1, background: 'linear-gradient(135deg,rgb(170, 201, 233) 0%,rgb(212, 232, 245) 100%)', borderRadius: '1.5rem', boxShadow: '0 2px 12px rgba(59,130,246,0.07)', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{ textAlign: 'center', padding: '1.2rem 0 0.7rem 0' }}>
-            <img
-              src={selectedResident.avatar}
-              alt={selectedResident.name}
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2.5px solid #e0e7ef',
-                margin: '0 auto 0.7rem auto',
-                boxShadow: '0 2px 8px #e0e7ef55',
-                background: '#fff'
-              }}
-            />
-            <div style={{ fontWeight: 700, fontSize: '1.25rem', color: '#1e293b', marginBottom: 4 }}>{selectedResident.name}</div>
-            <div style={{ color: '#64748b', fontSize: '1.05rem', marginBottom: 10, fontWeight: 500 }}>
-              {selectedResident?.relationship ? selectedResident.relationship + ' của bạn' : ''}
-              {selectedResident?.relationship && selectedResident?.age ? ' • ' : ''}
-              {selectedResident?.age ? selectedResident.age + ' tuổi' : ''}
-            </div>
-            <div style={{ color: '#64748b', fontSize: '0.98rem', marginBottom: 8 }}>Phòng: <b>{selectedResident.room}</b></div>
-          </div>
-          {residents.length > 1 && (
-            <div style={{ width: '100%' }}>
-              <label style={{ fontWeight: 600, color: '#374151', fontSize: '0.95rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <UsersIcon style={{ width: 18, height: 18, color: '#3b82f6' }} />
-                Chọn người thân
-              </label>
-              <select
-                value={selectedResident.id}
-                onChange={e => {
-                  const found = residents.find(r => r.id === Number(e.target.value));
-                  console.log('Selected:', found);
-                  setSelectedResident(found!);
-                }}
-                style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1.5px solid #e0e7ef', fontSize: '0.95rem', background: 'white', marginTop: 4 }}
-              >
-                {residents.map(r => (
-                  <option key={r.id} value={r.id}>{r.name} (Phòng {r.room})</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
+       
         {/* Cột phải: Form đặt lịch */}
         <div style={{ flex: 2, minWidth: 320 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>

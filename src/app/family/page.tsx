@@ -100,6 +100,13 @@ const residents = [
     appointments: [
       { id: 1, type: 'Khám bác sĩ', date: '2024-05-15', time: '10:00', provider: 'BS. Trần Văn Nam' },
       { id: 2, type: 'Vật lý trị liệu', date: '2024-05-12', time: '14:30', provider: 'KTV. Phạm Văn Minh' }
+    ],
+    vitalHistory: [
+      { id: 1, date: '2024-05-10', time: '09:30', bloodPressure: '130/85', heartRate: 72, temperature: 36.8, weight: 65, notes: 'Chỉ số ổn định' },
+      { id: 2, date: '2024-05-09', time: '09:15', bloodPressure: '128/82', heartRate: 74, temperature: 36.7, weight: 65, notes: 'Tất cả trong giới hạn bình thường' },
+      { id: 3, date: '2024-05-08', time: '09:45', bloodPressure: '132/87', heartRate: 70, temperature: 36.9, weight: 65, notes: 'Huyết áp hơi cao, cần theo dõi' },
+      { id: 4, date: '2024-05-07', time: '09:30', bloodPressure: '125/80', heartRate: 73, temperature: 36.6, weight: 64.8, notes: 'Chỉ số tốt' },
+      { id: 5, date: '2024-05-06', time: '09:20', bloodPressure: '127/83', heartRate: 71, temperature: 36.8, weight: 64.9, notes: 'Ổn định' }
     ]
   },
   { 
@@ -135,6 +142,13 @@ const residents = [
     appointments: [
       { id: 1, type: 'Khám định kỳ', date: '2024-05-18', time: '09:00', provider: 'BS. Nguyễn Thị Minh' },
       { id: 2, type: 'Khám mắt', date: '2024-05-20', time: '15:00', provider: 'BS. Lê Văn Đức' }
+    ],
+    vitalHistory: [
+      { id: 1, date: '2024-05-10', time: '10:15', bloodPressure: '125/80', heartRate: 68, temperature: 36.6, weight: 58, notes: 'Chỉ số rất tốt' },
+      { id: 2, date: '2024-05-09', time: '10:00', bloodPressure: '123/78', heartRate: 70, temperature: 36.5, weight: 58.2, notes: 'Tất cả bình thường' },
+      { id: 3, date: '2024-05-08', time: '10:30', bloodPressure: '127/82', heartRate: 69, temperature: 36.7, weight: 58.1, notes: 'Ổn định' },
+      { id: 4, date: '2024-05-07', time: '10:15', bloodPressure: '124/79', heartRate: 67, temperature: 36.6, weight: 58, notes: 'Chỉ số lý tưởng' },
+      { id: 5, date: '2024-05-06', time: '10:45', bloodPressure: '126/81', heartRate: 71, temperature: 36.8, weight: 58.3, notes: 'Tốt' }
     ]
   }
 ];
@@ -797,7 +811,7 @@ export default function FamilyPortalPage() {
               </div>
               
               <div style={{
-                background: 'linear-gradient(135deg,rgb(207, 209, 212) 100%,rgb(207, 209, 212) 100%)',
+                background: 'linear-gradient(135deg,rgb(237, 237, 241) 100%,rgb(207, 209, 212) 100%)',
                 borderRadius: '1rem',
                 padding: '1.5rem',
                 flexShrink: 0,
@@ -876,6 +890,15 @@ export default function FamilyPortalPage() {
                 }`
               }>
                 Ghi chú chăm sóc
+              </Tab>
+              <Tab className={({ selected }) => 
+                `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                  selected 
+                    ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
+                }`
+              }>
+                Lịch sử chỉ số sức khỏe
               </Tab>
             </Tab.List>
             <Tab.Panels>
@@ -962,6 +985,146 @@ export default function FamilyPortalPage() {
                           </tr>
                         );
                       })}
+                    </tbody>
+                  </table>
+                </div>
+              </Tab.Panel>
+              
+              <Tab.Panel style={{padding: '2rem'}}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  marginBottom: '1.5rem'
+                }}>
+                  Lịch sử chỉ số sức khỏe
+                </h3>
+                <div style={{overflowX: 'auto'}}>
+                  <table style={{width: '100%', borderCollapse: 'collapse', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderRadius: '0.75rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}>
+                    <thead>
+                      <tr>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ngày</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Thời gian</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Huyết áp</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhịp tim</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhiệt độ</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Cân nặng</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedResident.vitalHistory.map((vital, index) => (
+                        <tr key={vital.id} style={{
+                          borderTop: index > 0 ? '1px solid #e5e7eb' : 'none',
+                          background: index % 2 === 0 ? 'white' : 'rgba(248, 250, 252, 0.5)'
+                        }}>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#374151', 
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {new Date(vital.date).toLocaleDateString('vi-VN')}
+                          </td>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#6b7280',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {vital.time}
+                          </td>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#374151',
+                            fontWeight: 600
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                              color: '#92400e',
+                              border: '1px solid #fbbf24'
+                            }}>
+                              {vital.bloodPressure} mmHg
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#374151',
+                            fontWeight: 600
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                              color: '#1e40af',
+                              border: '1px solid #60a5fa'
+                            }}>
+                              {vital.heartRate} bpm
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#374151',
+                            fontWeight: 600
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                              color: '#166534',
+                              border: '1px solid #86efac'
+                            }}>
+                              {vital.temperature}°C
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#374151',
+                            fontWeight: 600
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
+                              color: '#be185d',
+                              border: '1px solid #f9a8d4'
+                            }}>
+                              {vital.weight} kg
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '0.75rem', 
+                            fontSize: '0.95em', 
+                            color: '#6b7280',
+                            fontStyle: 'italic'
+                          }}>
+                            {vital.notes}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

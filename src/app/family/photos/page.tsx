@@ -18,6 +18,7 @@ export default function FamilyPhotosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [detailPhoto, setDetailPhoto] = useState<any | null>(null);
+  const [detailPhotoIndex, setDetailPhotoIndex] = useState<number | null>(null);
 
   // CSS animations
   const styles = `
@@ -49,7 +50,28 @@ export default function FamilyPhotosPage() {
     }
   `;
 
-  useEffect(() => {
+     useEffect(() => {
+     console.log('Modal states:', { detailPhoto});
+     // Only hide header for modals, not the main page
+     const hasModalOpen = detailPhoto;
+     
+     if (hasModalOpen) {
+       console.log('Modal is open - adding hide-header class');
+       document.body.classList.add('hide-header');
+       document.body.style.overflow = 'hidden';
+     } else {
+       console.log('No modal open - removing hide-header class');
+       document.body.classList.remove('hide-header');
+       document.body.style.overflow = 'unset';
+     }
+     
+     return () => {
+       document.body.classList.remove('hide-header');
+       document.body.style.overflow = 'unset';
+     };
+      }, [detailPhoto]);
+
+   useEffect(() => {
     try {
       const uploadedPhotos = localStorage.getItem("uploadedPhotos");
       if (uploadedPhotos) {
@@ -63,7 +85,8 @@ export default function FamilyPhotosPage() {
           isUploaded: true,
         }));
         const combinedPhotos = [...mockPhotos, ...residentPhotos];
-        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a).getTime());
+        // Sort: ảnh mới nhất (index 0) → ảnh cũ nhất (index max)  
+        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setAllPhotos(combinedPhotos);
       } else {
         setAllPhotos(mockPhotos);
@@ -119,6 +142,53 @@ export default function FamilyPhotosPage() {
     a.click();
     document.body.removeChild(a);
   };
+
+  // Keyboard navigation for photo modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard events when modal is open and filteredPhotos is available
+      if (!detailPhoto || detailPhotoIndex === null || !filteredPhotos || filteredPhotos.length === 0) return;
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          // Navigate to previous/newer photo
+          event.preventDefault();
+          if (detailPhotoIndex > 0) {
+            const newIndex = detailPhotoIndex - 1;
+            setDetailPhotoIndex(newIndex);
+            setDetailPhoto(filteredPhotos[newIndex]);
+          }
+          break;
+          
+        case 'ArrowRight':
+          // Navigate to next/older photo
+          event.preventDefault();
+          if (detailPhotoIndex < filteredPhotos.length - 1) {
+            const newIndex = detailPhotoIndex + 1;
+            setDetailPhotoIndex(newIndex);
+            setDetailPhoto(filteredPhotos[newIndex]);
+          }
+          break;
+          
+        case 'Escape':
+          // Close modal
+          event.preventDefault();
+          setDetailPhoto(null);
+          setDetailPhotoIndex(null);
+          break;
+      }
+    };
+
+    // Add event listener when modal is open and filteredPhotos is ready
+    if (detailPhoto && filteredPhotos && filteredPhotos.length > 0) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [detailPhoto, detailPhotoIndex, filteredPhotos]);
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", padding: "0", fontFamily: 'Inter, sans-serif' }}>
@@ -270,7 +340,11 @@ export default function FamilyPhotosPage() {
                     <img 
                       src={photo.url} 
                       alt={photo.caption} 
-                      onClick={() => setDetailPhoto(photo)}
+                      onClick={() => {
+                        const idx = filteredPhotos.findIndex((p: any) => p.id === photo.id);
+                        setDetailPhoto(photo);
+                        setDetailPhotoIndex(idx);
+                      }}
                       style={{ 
                         width: "100%", 
                         height: "220px", 
@@ -324,7 +398,11 @@ export default function FamilyPhotosPage() {
                     
                     {/* Nút xem chi tiết */}
                     <button
-                      onClick={() => setDetailPhoto(photo)}
+                      onClick={() => {
+                        const idx = filteredPhotos.findIndex((p: any) => p.id === photo.id);
+                        setDetailPhoto(photo);
+                        setDetailPhotoIndex(idx);
+                      }}
                       title="Xem chi tiết ảnh"
                       style={{ 
                         position: 'absolute', 
@@ -423,7 +501,7 @@ export default function FamilyPhotosPage() {
                 onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #ff5858 0%, #ffb347 100%)'; }}
                 title="Tải ảnh này"
               >
-                <ArrowDownTrayIcon style={{ width: 22, height: 22, marginRight: 10, verticalAlign: 'middle' }} /> Tải ảnh
+                <ArrowDownTrayIcon style={{ width: 16, height: 16, marginRight: 10, verticalAlign: 'middle' }} /> Tải ảnh
               </button>
             </div>
           </div>
@@ -439,123 +517,226 @@ export default function FamilyPhotosPage() {
             left: 0, 
             right: 0, 
             bottom: 0, 
-            background: 'rgba(15, 23, 42, 0.92)', 
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.93) 0%, rgba(15, 23, 42, 0.95) 50%, rgba(30, 41, 59, 0.97) 100%)', 
+            backdropFilter: 'blur(24px) saturate(120%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(120%)',
             zIndex: 3000, 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
-            animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-            padding: '20px',
+            animation: 'fadeIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1)', 
+            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            padding: '32px',
+            marginLeft: '15rem',
+           
           }}
         >
           <div 
             onClick={e => e.stopPropagation()} 
             style={{ 
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)', 
-              borderRadius: '20px', 
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)', 
+              background: 'rgba(255, 255, 255, 0.98)', 
+              borderRadius: '28px', 
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)', 
+              border: '1px solid rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(40px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(40px) saturate(180%)',
               padding: '0', 
-              minWidth: '360px', 
-              maxWidth: '450px', 
+              minWidth: '480px', 
+              maxWidth: '580px', 
               width: '100%', 
               position: 'relative', 
               display: 'flex', 
               flexDirection: 'column', 
               overflow: 'hidden',
-              transform: 'scale(0.95)',
-              animation: 'modalScale 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+              transform: 'scale(0.94)',
+              animation: 'modalScale 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}
           >
-            {/* Header với nút đóng */}
-            <div style={{ 
-              position: 'relative', 
-              padding: '18px 18px 0 18px', 
-              display: 'flex', 
-              justifyContent: 'flex-end' 
-            }}>
-              <button 
-                onClick={() => setDetailPhoto(null)} 
-                style={{ 
-                  background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', 
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '12px', 
-                  color: '#64748b', 
-                  padding: '8px', 
-                  cursor: 'pointer', 
-                  fontSize: '16px',
-                  fontWeight: 500,
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)', 
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }} 
-                title="Đóng"
-                onMouseOver={e => { 
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'; 
-                  e.currentTarget.style.color = '#fff'; 
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
-                }}
-                onMouseOut={e => { 
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)'; 
-                  e.currentTarget.style.color = '#64748b'; 
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                <XMarkIcon style={{ width: 20, height: 20 }} />
-            </button>
-            </div>
+                         {/* Professional Header với navigation */}
+             <div style={{ 
+               position: 'relative', 
+               padding: '20px 24px', 
+               display: 'flex', 
+               justifyContent: 'space-between',
+               alignItems: 'center',
+               background: 'rgba(255, 255, 255, 0.7)',
+               borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+               backdropFilter: 'blur(20px)'
+             }}>
+               {/* Counter và navigation buttons trái */}
+               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                   {/* Photo counter: ảnh mới nhất = 1, ảnh cũ nhất = max */}
+                  {detailPhotoIndex !== null && (
+                    <div style={{
+                      background: 'rgba(59, 130, 246, 0.9)',
+                      color: 'white',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)',
+                      letterSpacing: '0.02em',
+                      backdropFilter: 'blur(10px)'
+                    }}>
+                      {detailPhotoIndex + 1} / {filteredPhotos.length}
+                    </div>
+                  )}
+                 
+                                   {/* Navigation buttons: ← về ảnh mới hơn, → đến ảnh cũ hơn */}
+                  {detailPhotoIndex !== null && (
+                    <>
+                      <button 
+                        onClick={() => {
+                          if (detailPhotoIndex > 0) {
+                            const newIndex = detailPhotoIndex - 1;
+                            setDetailPhotoIndex(newIndex);
+                            setDetailPhoto(filteredPhotos[newIndex]);
+                          }
+                        }}
+                        disabled={detailPhotoIndex <= 0}
+                        style={{ 
+                          background: detailPhotoIndex > 0 ? 'rgba(99, 102, 241, 0.85)' : 'rgba(0, 0, 0, 0.08)',
+                          color: detailPhotoIndex > 0 ? 'white' : 'rgba(0, 0, 0, 0.4)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          padding: '8px',
+                          cursor: detailPhotoIndex > 0 ? 'pointer' : 'not-allowed',
+                          opacity: detailPhotoIndex > 0 ? 1 : 0.5,
+                          boxShadow: detailPhotoIndex > 0 ? '0 2px 8px rgba(99, 102, 241, 0.2)' : 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          backdropFilter: 'blur(10px)',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Ảnh mới hơn"
+                      >
+                        <ChevronLeftIcon style={{ width: 16, height: 16 }} />
+                      </button>
 
-            {/* Ảnh chính */}
-            <div style={{ padding: '0 18px', marginTop: '8px' }}>
+                      <button 
+                        onClick={() => {
+                          if (detailPhotoIndex < filteredPhotos.length - 1) {
+                            const newIndex = detailPhotoIndex + 1;
+                            setDetailPhotoIndex(newIndex);
+                            setDetailPhoto(filteredPhotos[newIndex]);
+                          }
+                        }}
+                        disabled={detailPhotoIndex >= filteredPhotos.length - 1}
+                        style={{ 
+                          background: detailPhotoIndex < filteredPhotos.length - 1 ? 'rgba(99, 102, 241, 0.85)' : 'rgba(0, 0, 0, 0.08)',
+                          color: detailPhotoIndex < filteredPhotos.length - 1 ? 'white' : 'rgba(0, 0, 0, 0.4)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          padding: '8px',
+                          cursor: detailPhotoIndex < filteredPhotos.length - 1 ? 'pointer' : 'not-allowed',
+                          opacity: detailPhotoIndex < filteredPhotos.length - 1 ? 1 : 0.5,
+                          boxShadow: detailPhotoIndex < filteredPhotos.length - 1 ? '0 2px 8px rgba(99, 102, 241, 0.2)' : 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          backdropFilter: 'blur(10px)',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Ảnh cũ hơn"
+                      >
+                        <ChevronRightIcon style={{ width: 16, height: 16 }} />
+                      </button>
+                    </>
+                  )}
+               </div>
+
+               {/* Close button phải */}
+               <button 
+                 onClick={() => {
+                   setDetailPhoto(null);
+                   setDetailPhotoIndex(null);
+                 }} 
+                 style={{ 
+                   background: 'rgba(0, 0, 0, 0.05)',
+                   border: 'none',
+                   borderRadius: '50%',
+                   color: 'rgba(0, 0, 0, 0.5)',
+                   padding: '8px',
+                   cursor: 'pointer',
+                   boxShadow: 'none',
+                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                   display: 'flex',
+                   alignItems: 'center',
+                   justifyContent: 'center',
+                   width: '36px',
+                   height: '36px',
+                   backdropFilter: 'blur(10px)'
+                 }} 
+                 title="Đóng"
+                 onMouseEnter={(e) => {
+                   e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
+                   e.currentTarget.style.color = 'white';
+                   e.currentTarget.style.transform = 'scale(1.1)';
+                 }}
+                 onMouseLeave={(e) => {
+                   e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+                   e.currentTarget.style.color = 'rgba(0, 0, 0, 0.5)';
+                   e.currentTarget.style.transform = 'scale(1)';
+                 }}
+               >
+                 <XMarkIcon style={{ width: 16, height: 16 }} />
+               </button>
+             </div>
+
+            {/* Enhanced Ảnh chính */}
+            <div style={{ padding: '0 24px', marginTop: '8px' }}>
               <div style={{ 
                 position: 'relative',
-                borderRadius: '14px',
+                borderRadius: '24px',
                 overflow: 'hidden',
-                boxShadow: '0 6px 24px rgba(0, 0, 0, 0.12)'
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)',
+                border: 'none'
               }}>
                 <img 
                   src={detailPhoto.url} 
                   alt={detailPhoto.caption} 
                   style={{ 
                     width: '100%', 
-                    maxHeight: '300px', 
+                    maxHeight: '360px', 
                     objectFit: 'cover', 
                     display: 'block',
-                    background: '#f1f5f9'
-                  }} 
+                    background: 'rgba(248, 250, 252, 0.8)',
+                    transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
                 />
-                {/* Gradient overlay subtle */}
+                {/* Enhanced gradient overlay */}
                 <div style={{
                   position: 'absolute',
-                  bottom: 0,
+                  top: 0,
                   left: 0,
                   right: 0,
-                  height: '60px',
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.1) 0%, transparent 100%)'
+                  bottom: 0,
+                  background: 'linear-gradient(to bottom, rgba(0,0,0,0.01) 0%, rgba(0,0,0,0.03) 100%)',
+                  pointerEvents: 'none'
                 }} />
               </div>
             </div>
 
-            {/* Thông tin ảnh */}
+            {/* Enhanced Thông tin ảnh */}
             <div style={{ 
-              padding: '20px 18px 18px 18px', 
+              padding: '24px 24px 24px 24px', 
               textAlign: 'center',
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)'
+              background: 'rgba(255, 255, 255, 0.6)'
             }}>
               <h3 style={{ 
-                fontWeight: 700, 
+                fontWeight: 600, 
                 fontSize: '1.3rem', 
                 marginBottom: '12px', 
-                color: '#0f172a', 
-                letterSpacing: '-0.025em', 
+                color: 'rgba(0, 0, 0, 0.8)', 
+                letterSpacing: '-0.02em', 
                 lineHeight: 1.3,
-                margin: '0 0 12px 0'
+                margin: '0 0 12px 0',
+                textShadow: 'none'
               }}>
                 {detailPhoto.caption}
               </h3>
@@ -564,84 +745,88 @@ export default function FamilyPhotosPage() {
                 display: 'flex', 
                 flexDirection: 'column', 
                 gap: '6px', 
-                marginBottom: '18px',
-                padding: '12px',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0'
+                marginBottom: '20px',
+                padding: '16px',
+                background: 'rgba(0, 0, 0, 0.02)',
+                borderRadius: '20px',
+                border: 'none',
+                boxShadow: 'none'
               }}>
                 <div style={{ 
-                  fontSize: '1rem', 
-                  color: '#475569', 
+                  fontSize: '0.95rem', 
+                  color: 'rgba(0, 0, 0, 0.6)', 
                   fontWeight: 500,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px'
+                  gap: '8px',
+                  letterSpacing: '0.01em'
                 }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
+                                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ opacity: 0.6 }}>
+                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                     <line x1="16" y1="2" x2="16" y2="6"/>
+                     <line x1="8" y1="2" x2="8" y2="6"/>
+                     <line x1="3" y1="10" x2="21" y2="10"/>
+                   </svg>
                   Ngày gửi: {new Date(detailPhoto.date).toLocaleDateString('vi-VN')}
                 </div>
                 
                 {detailPhoto.uploadedBy && (
-                  <div style={{ 
-                    fontSize: '1rem', 
-                    color: '#475569', 
-                    fontWeight: 500,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
-                    </svg>
-                    Người gửi: {detailPhoto.uploadedBy}
-                  </div>
+                                      <div style={{ 
+                     fontSize: '0.95rem', 
+                     color: 'rgba(0, 0, 0, 0.6)', 
+                     fontWeight: 500,
+                     display: 'flex',
+                     alignItems: 'center',
+                     justifyContent: 'center',
+                     gap: '8px',
+                     letterSpacing: '0.01em'
+                   }}>
+                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ opacity: 0.6 }}>
+                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                       <circle cx="12" cy="7" r="4"/>
+                     </svg>
+                     Người gửi: {detailPhoto.uploadedBy}
+                   </div>
                 )}
               </div>
 
-              {/* Nút tải ảnh */}
+              {/* Enhanced Nút tải ảnh */}
             <button
               onClick={() => downloadPhoto(detailPhoto.url, detailPhoto.caption || "photo.jpg")}
                 style={{ 
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                  background: 'rgba(59, 130, 246, 0.9)', 
                   color: 'white', 
                   border: 'none', 
-                  borderRadius: '12px', 
+                  borderRadius: '24px', 
                   padding: '12px 24px', 
-                  fontWeight: 600, 
-                  fontSize: '1rem', 
+                  fontWeight: 500, 
+                  fontSize: '0.95rem', 
                   cursor: 'pointer', 
-                  boxShadow: '0 3px 12px rgba(59, 130, 246, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1)', 
+                  boxShadow: '0 4px 16px rgba(59, 130, 246, 0.25)', 
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-                  letterSpacing: '0.025em',
+                  letterSpacing: '0.01em',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
                   margin: '0 auto',
-                  minWidth: '160px'
+                  minWidth: '160px',
+                  backdropFilter: 'blur(10px)'
                 }}
                 onMouseOver={e => { 
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)'; 
+                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.95)'; 
                   e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.35)';
                 }}
                 onMouseOut={e => { 
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'; 
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.9)'; 
                   e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.3), 0 2px 4px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.25)';
                 }}
                 title="Tải ảnh xuống máy"
               >
-                <ArrowDownTrayIcon style={{ width: 18, height: 18 }} />
+                <ArrowDownTrayIcon style={{ width: 16, height: 16 }} />
                 Tải ảnh xuống
             </button>
             </div>

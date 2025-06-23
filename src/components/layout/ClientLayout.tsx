@@ -17,8 +17,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const isLoginPage = pathname === "/login";
   
   // Hiển thị header cho tất cả các trang trừ một số trang đặc biệt
-  const shouldShowHeader = pathname !== "/setup" && pathname !== "/family/contact-staff";
-  const shouldShowSidebar = pathname !== "/family/contact-staff";
+  const shouldShowHeader = pathname !== "/setup";
+  const shouldShowSidebar = true;
   
   // Enhanced loading spinner with beautiful design
   if (loading) {

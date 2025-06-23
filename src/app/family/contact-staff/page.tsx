@@ -7,7 +7,6 @@ import {
   DocumentTextIcon, 
   XMarkIcon, 
   PaperAirplaneIcon,
-  ArrowLeftIcon,
   MagnifyingGlassIcon,
   PhoneIcon,
   VideoCameraIcon,
@@ -46,7 +45,6 @@ interface Message {
 }
 
 interface SidebarHeaderProps {
-  router: any;
   searchStaff: string;
   setSearchStaff: (value: string) => void;
 }
@@ -198,7 +196,7 @@ const mockMessages = [
 ];
 
 // Sidebar Header Component
-const SidebarHeader = ({ router, searchStaff, setSearchStaff }: SidebarHeaderProps) => {
+const SidebarHeader = ({ searchStaff, setSearchStaff }: SidebarHeaderProps) => {
   return (
     <div style={{
       padding: '1.25rem',
@@ -206,34 +204,9 @@ const SidebarHeader = ({ router, searchStaff, setSearchStaff }: SidebarHeaderPro
       color: '#1f2937',
       borderBottom: '1px solid #f3f4f6'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-        <button
-          onClick={() => router.push('/family')}
-          title='Quay lại'
-          style={{
-            padding: '0.5rem',
-            borderRadius: '0.5rem',
-            border: 'none',
-            background: '#f3f4f6',
-            color: '#6b7280',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseOver={e => {
-            e.currentTarget.style.background = '#e5e7eb';
-            e.currentTarget.style.color = '#374151';
-          }}
-          onMouseOut={e => {
-            e.currentTarget.style.background = '#f3f4f6';
-            e.currentTarget.style.color = '#6b7280';
-          }}
-        >
-          <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-        </button>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#111827' }}>Tin nhắn</h2>
-          <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>Trò chuyện với nhân viên</p>
-        </div>
+      <div style={{ marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#111827' }}>Tin nhắn</h2>
+        <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>Trò chuyện với nhân viên</p>
       </div>
       
       <div style={{ position: 'relative' }}>
@@ -573,58 +546,6 @@ const MessageInput = ({ messageInput, setMessageInput, sendMessage }: MessageInp
 };
 
 export default function ContactStaffPage() {
-  // Add styles chỉ cho trang contact-staff
-  if (typeof document !== 'undefined') {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Container chính của trang contact-staff */
-      .contact-staff-page {
-        overflow: hidden !important;
-        height: 100vh !important;
-        max-height: 100vh !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100vw !important;
-        z-index: 9999 !important;
-      }
-      
-      /* Ẩn scrollbar cho các phần tử con được phép scroll */
-      .hide-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .hide-scrollbar {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-      }
-    `;
-    if (!document.head.querySelector('style[data-contact-staff]')) {
-      style.setAttribute('data-contact-staff', 'true');
-      document.head.appendChild(style);
-    }
-  }
-
-  // Chỉ tắt scroll cho body khi ở trang contact-staff
-  useEffect(() => {
-    // Lưu trạng thái scroll ban đầu
-    const originalBodyOverflow = document.body.style.overflow;
-    const originalHtmlOverflow = document.documentElement.style.overflow;
-    
-    // Tắt scroll chỉ cho trang này
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    
-    // Cleanup khi rời khỏi trang - khôi phục scroll
-    return () => {
-      document.body.style.overflow = originalBodyOverflow;
-      document.documentElement.style.overflow = originalHtmlOverflow;
-    };
-  }, []);
-
   const router = useRouter();
   const [selectedResident, setSelectedResident] = useState(residents[0]);
   const [selectedStaff, setSelectedStaff] = useState(staffMembers[0]);
@@ -665,8 +586,8 @@ export default function ContactStaffPage() {
   );
 
   return (
-    <div className="contact-staff-page" style={{ 
-      height: '100vh', 
+    <div style={{ 
+      height: 'calc(100vh - 4.5rem)', // Trừ đi chiều cao của header
       width: '100%',
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflow: 'hidden',
@@ -674,7 +595,7 @@ export default function ContactStaffPage() {
     }}>
       {/* Main Container */}
       <div style={{
-        height: '100vh',
+        height: '100%',
         width: '100%',
         maxWidth: '100%',
         margin: '0 auto',
@@ -700,7 +621,6 @@ export default function ContactStaffPage() {
             zIndex: 20
           }}>
             <SidebarHeader 
-              router={router} 
               searchStaff={searchStaff} 
               setSearchStaff={setSearchStaff} 
             />
@@ -759,6 +679,17 @@ export default function ContactStaffPage() {
           </div>
         </div>
       </div>
+      
+      <style jsx>{`
+        /* Ẩn scrollbar cho các phần tử con được phép scroll */
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+      `}</style>
     </div>
   );
 } 
