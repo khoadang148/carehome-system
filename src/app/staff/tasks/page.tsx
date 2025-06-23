@@ -298,16 +298,7 @@ export default function StaffTasksPage() {
     setCompletionNoteValue('');
   };
 
-  const getTaskStats = () => {
-    const pending = tasks.filter(t => t.status === 'pending').length;
-    const inProgress = tasks.filter(t => t.status === 'in_progress').length;
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    const overdue = tasks.filter(t => t.status === 'overdue').length;
-    
-    return { pending, inProgress, completed, overdue };
-  };
 
-  const stats = getTaskStats();
 
   if (loading) {
     return (
@@ -389,85 +380,7 @@ export default function StaffTasksPage() {
           </p>
         </div>
 
-        {/* Statistics */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #fbbf2420'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <ClockIcon style={{ width: '1.5rem', height: '1.5rem', color: '#f59e0b' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Chờ thực hiện</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b', margin: 0 }}>
-                  {stats.pending}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #3b82f620'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <PlayIcon style={{ width: '1.5rem', height: '1.5rem', color: '#3b82f6' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Đang thực hiện</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#3b82f6', margin: 0 }}>
-                  {stats.inProgress}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #10b98120'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#10b981' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Hoàn thành</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-                  {stats.completed}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #ef444420'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <ExclamationTriangleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#ef4444' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Quá hạn</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444', margin: 0 }}>
-                  {stats.overdue}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Filters */}
         <div style={{

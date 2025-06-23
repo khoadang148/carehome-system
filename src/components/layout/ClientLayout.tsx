@@ -17,8 +17,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const isLoginPage = pathname === "/login";
   
   // Hiển thị header cho tất cả các trang trừ một số trang đặc biệt
-  const shouldShowHeader = pathname !== "/welcome" && 
-                           pathname !== "/setup";
+  const shouldShowHeader = pathname !== "/setup" && pathname !== "/family/contact-staff";
+  const shouldShowSidebar = pathname !== "/family/contact-staff";
   
   // Enhanced loading spinner with beautiful design
   if (loading) {
@@ -132,7 +132,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       height: '100vh', 
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
     }}>
-      <Sidebar />
+      {shouldShowSidebar && <Sidebar />}
       <div style={{
         flexGrow: 1,
         display: 'flex',
@@ -159,7 +159,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         {shouldShowHeader && <Header />}
         <main style={{
           flexGrow: 1,
-          overflowY: 'auto',
+          overflowY: pathname === "/family/contact-staff" ? 'hidden' : 'auto',
           overflowX: 'hidden',
           position: 'relative',
           zIndex: 10,

@@ -7,7 +7,8 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ShieldCheckIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  CogIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -26,8 +27,6 @@ interface PasswordStrength {
 
 export default function SettingsPage() {
   const router = useRouter();
-  // Email notifications setting
-  const [emailNotifications, setEmailNotifications] = useState(true);
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -193,19 +192,16 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRegisterFamily = () => {
-    router.push('/permissions/family/register');
-  };
+
 
   return (
     <>
       {/* Nút quay lại sticky trên cùng, sát mép trái */}
       <div
         style={{
-          position: 'sticky',
           top: 0,
           left: 0,
-          zIndex: 10,
+          zIndex: 50,
           background: '#f8fafc',
           padding: '1.5rem 0 0 1.5rem'
         }}
@@ -250,77 +246,44 @@ export default function SettingsPage() {
             border:'1px solid rgba(255, 255, 255, 0.2)', 
             backdropFilter:'blur(10px)', 
           }}>
-            <h1 style={{ 
-              fontSize:'1.875rem',
-              fontWeight:'700',
-              color:'#111827',
-              margin:'0 0 0.25rem 0'
-            }}>
-              Cài đặt
-            </h1>
-            <p style={{ 
-              fontSize:'0.875rem',
-              color:'#6b7280',
-              margin:'0'
-            }}>
-              Cài đặt cơ bản
-            </p>
-          </div>
-
-          {/* Email Notifications */}
-          <div style={{
-            background: 'white',
-            borderRadius: '0.5rem',
-            padding: '1.5rem',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-            border: '1px solid #e5e7eb',
-            marginBottom: '1rem'
-          }}>
-            <h3 style={{
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              color: '#111827',
-              margin: '0 0 1rem 0'
-            }}>
-              Thông báo
-            </h3>
-            
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '0.75rem 0'
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#374151' }}>
-                Thông báo qua email
-              </span>
-              <button
-                onClick={() => setEmailNotifications(!emailNotifications)}
-                style={{
-                  width: '3rem',
-                  height: '1.5rem',
-                  background: emailNotifications ? '#10b981' : '#d1d5db',
-                  borderRadius: '9999px',
-                  border: 'none',
-                  position: 'relative',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s'
-                }}
-              >
-                <div style={{
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  background: 'white',
-                  borderRadius: '50%',
-                  position: 'absolute',
-                  top: '0.125rem',
-                  left: emailNotifications ? '1.625rem' : '0.125rem',
-                  transition: 'left 0.2s',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
-                }} />
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
+              }}>
+                <CogIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+              </div>
+              <div>
+                <h1 style={{ 
+                  fontSize:'1.8rem',
+                  fontWeight:'800',
+                  color:'#1e40af',
+                  margin:'0',
+                  letterSpacing:'-0.025em',
+                  lineHeight:'1.2'
+                }}>
+                  Cài đặt hệ thống
+                </h1>
+                <p style={{ 
+                  fontSize:'0.9rem',
+                  color:'#64748b',
+                  margin:'0.75rem 0 0 0',
+                  fontWeight:'500',
+                  letterSpacing:'0.01em'
+                }}>
+                  Quản lý và thay đổi mật khẩu truy cập
+                </p>
+              </div>
             </div>
           </div>
+
+
 
           {/* Password Change */}
           <div style={{
@@ -373,6 +336,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     style={{
                       position: 'absolute',
                       right: '0.75rem',
@@ -436,6 +400,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
+                    title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     style={{
                       position: 'absolute',
                       right: '0.75rem',
@@ -531,6 +496,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     style={{
                       position: 'absolute',
                       right: '0.75rem',

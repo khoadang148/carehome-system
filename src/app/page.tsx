@@ -11,7 +11,7 @@ export default function Home() {
   
   useEffect(() => {
     if (!user) {
-      router.push('/welcome');
+      router.push('/login');
     } else if (user.role === 'family') {
       router.push('/family');
     }

@@ -1053,11 +1053,8 @@ export default function FinancePage() {
                         Mối quan hệ: {resident.relationship}
                       </p>
                       <div style={{fontSize: '0.875rem', color: '#374151'}}>
-                        <p style={{margin: '0 0 0.25rem 0'}}>
-                          Phí hàng tháng: <strong>{formatCurrency(resident.monthlyFee)}</strong>
-                        </p>
                         <p style={{margin: '0'}}>
-                          Còn phải trả: <strong style={{color: resident.totalDue > 0 ? '#dc2626' : '#16a34a'}}>
+                          Cần thanh toán: <strong style={{color: resident.totalDue > 0 ? '#dc2626' : '#16a34a'}}>
                             {formatCurrency(resident.totalDue)}
                           </strong>
                         </p>
@@ -1069,105 +1066,7 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Financial Summary for selected resident */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              border: '1px solid rgba(34, 197, 94, 0.2)'
-            }}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                <div>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0', fontWeight: 500}}>
-                    Đã thanh toán
-                  </p>
-                  <p style={{fontSize: '1.875rem', fontWeight: 700, color: '#16a34a', margin: 0}}>
-                    {formatCurrency(familyFinancialData[selectedResident]?.totalPaid || 0)}
-                  </p>
-                </div>
-                <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'rgba(34, 197, 94, 0.1)',
-                  borderRadius: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <ArrowTrendingUpIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
-                </div>
-              </div>
-            </div>
 
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)'
-            }}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                <div>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0', fontWeight: 500}}>
-                    Còn phải trả
-                  </p>
-                  <p style={{fontSize: '1.875rem', fontWeight: 700, color: '#dc2626', margin: 0}}>
-                    {formatCurrency(familyFinancialData[selectedResident]?.totalDue || 0)}
-                  </p>
-                </div>
-                <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  borderRadius: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <ArrowTrendingDownIcon style={{width: '1.5rem', height: '1.5rem', color: '#dc2626'}} />
-                </div>
-              </div>
-            </div>
-
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.2)'
-            }}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                <div>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0', fontWeight: 500}}>
-                    Lần thanh toán tiếp theo
-                  </p>
-                  <p style={{fontSize: '1.125rem', fontWeight: 600, color: '#3b82f6', margin: 0}}>
-                    {new Date(familyFinancialData[selectedResident]?.nextPaymentDate || '').toLocaleDateString('vi-VN')}
-                  </p>
-                </div>
-                <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  borderRadius: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <CalendarDaysIcon style={{width: '1.5rem', height: '1.5rem', color: '#3b82f6'}} />
-                </div>
-              </div>
-            </div>
-
-
-          </div>
 
           {/* Payment History for Family */}
           <div style={{
@@ -1184,29 +1083,121 @@ export default function FinancePage() {
             <div style={{overflowX: 'auto'}}>
               <table style={{width: '100%', borderCollapse: 'collapse'}}>
                 <thead>
-                  <tr style={{borderBottom: '1px solid #e5e7eb'}}>
-                    <th style={{textAlign: 'left', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '25%'}}>
+                  <tr style={{
+                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    borderBottom: '2px solid #0f172a',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <th style={{
+                      textAlign: 'left', 
+                      padding: '1.125rem 0.75rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#ffffff', 
+                      width: '25%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
                       Mô tả dịch vụ
                     </th>
-                    <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '12%'}}>
+                    <th style={{
+                      textAlign: 'center', 
+                      padding: '1.125rem 0.75rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#ffffff', 
+                      width: '12%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
                       Số tiền
                     </th>
-                    <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '12%'}}>
+                    <th style={{
+                      textAlign: 'center', 
+                      padding: '1.125rem 0.75rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#ffffff', 
+                      width: '12%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
                       Hạn thanh toán
                     </th>
-                    <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '12%'}}>
+                    <th style={{
+                      textAlign: 'center', 
+                      padding: '1.125rem 0.75rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#ffffff', 
+                      width: '12%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
                       Phương thức
                     </th>
-                    <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '15%'}}>
+                    <th style={{
+                      textAlign: 'center', 
+                      padding: '1.125rem 0.75rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#ffffff', 
+                      width: '15%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
                       Trạng thái
                     </th>
-                    <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '24%'}}>
+                    <th style={{
+                      textAlign: 'center', 
+                      padding: '1.125rem 0.75rem', 
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#ffffff', 
+                      width: '24%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
                       Thao tác
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {familyFinancialData[selectedResident]?.payments.map((payment) => (
+                  {familyFinancialData[selectedResident]?.payments
+                    .sort((a, b) => {
+                      const statusA = getPaymentStatus(a);
+                      const statusB = getPaymentStatus(b);
+                      
+                      // Priority order: overdue > grace_period > pending > processing > paid
+                      const statusPriority = {
+                        'overdue': 1,
+                        'grace_period': 2, 
+                        'pending': 3,
+                        'processing': 4,
+                        'paid': 5
+                      };
+                      
+                      // Sort by status priority first
+                      if (statusPriority[statusA] !== statusPriority[statusB]) {
+                        return statusPriority[statusA] - statusPriority[statusB];
+                      }
+                      
+                      // If same status, sort by date (newest first for unpaid, oldest first for paid)
+                      const dateA = new Date(a.dueDate || a.date);
+                      const dateB = new Date(b.dueDate || b.date);
+                      
+                      if (statusA === 'paid') {
+                        return dateB.getTime() - dateA.getTime(); // Newest paid first
+                      } else {
+                        return dateA.getTime() - dateB.getTime(); // Oldest unpaid first (more urgent)
+                      }
+                    })
+                    .map((payment) => (
                     <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
                       <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
                         {payment.description}
@@ -1214,34 +1205,28 @@ export default function FinancePage() {
                       <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
                         {formatCurrency(payment.amount)}
                       </td>
-                      <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem'}}>
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
+                      <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
                           <span style={{color: '#111827', fontWeight: 500}}>
                             {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
                           </span>
                           {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
                             <div style={{
-                              fontSize: '0.75rem',
-                              color: '#991b1b',
+                              fontSize: '0.65rem',
+                              color: '#dc2626',
                               fontWeight: 600,
-                              background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-                              padding: '0.375rem 0.75rem',
-                              borderRadius: '1rem',
+                              background: '#fef2f2',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.375rem',
                               border: '1px solid #fecaca',
                               width: 'fit-content',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '0.375rem',
-                              boxShadow: '0 1px 3px rgba(220, 38, 38, 0.1)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.025em'
+                              gap: '0.25rem',
+                              textTransform: 'none',
+                              letterSpacing: 'normal'
                             }}>
-                              <XMarkIcon style={{
-                                width: '0.875rem', 
-                                height: '0.875rem',
-                                color: '#dc2626',
-                                strokeWidth: 2
-                              }} />
+                              
                               Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
                             </div>
                           )}
@@ -1306,59 +1291,60 @@ export default function FinancePage() {
                               <span style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.375rem',
-                                padding: '0.5rem 1rem',
-                                borderRadius: '1.5rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
+                                gap: '0.25rem',
+                                padding: status === 'overdue' ? '0.375rem 0.625rem' : '0.3rem 0.65rem',
+                                borderRadius: '0.5rem',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
                                 background: status === 'overdue' 
-                                  ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)'
+                                  ? '#fef2f2'
                                   : status === 'grace_period'
-                                  ? 'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)'
-                                  : config.bg,
+                                  ? '#fff7ed'
+                                  : status === 'paid'
+                                  ? '#f0fdf4'
+                                  : status === 'processing'
+                                  ? '#eff6ff'
+                                  : '#fffbeb',
                                 color: status === 'overdue' 
-                                  ? '#991b1b'
+                                  ? '#dc2626'
                                   : status === 'grace_period'
-                                  ? '#9a3412'
-                                  : config.color,
-                                border: status === 'overdue' 
-                                  ? '1.5px solid #f87171'
-                                  : status === 'grace_period'
-                                  ? '1.5px solid #fb923c'
-                                  : `1px solid ${config.color}30`,
-                                boxShadow: status === 'overdue' 
-                                  ? '0 3px 6px rgba(220, 38, 38, 0.2)'
-                                  : status === 'grace_period'
-                                  ? '0 3px 6px rgba(234, 88, 12, 0.2)'
-                                  : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                textTransform: status === 'overdue' || status === 'grace_period' ? 'uppercase' : 'none',
-                                letterSpacing: status === 'overdue' || status === 'grace_period' ? '0.025em' : 'normal',
-                                minWidth: '120px',
-                                justifyContent: 'center'
+                                  ? '#ea580c'
+                                  : status === 'paid'
+                                  ? '#16a34a'
+                                  : status === 'processing'
+                                  ? '#2563eb'
+                                  : '#d97706',
+                                border: `1px solid ${
+                                  status === 'overdue' 
+                                    ? '#fecaca'
+                                    : status === 'grace_period'
+                                    ? '#fed7aa'
+                                    : status === 'paid'
+                                    ? '#bbf7d0'
+                                    : status === 'processing'
+                                    ? '#dbeafe'
+                                    : '#fef3c7'
+                                }`,
+                                textTransform: 'none',
+                                letterSpacing: 'normal',
+                                minWidth: 'auto',
+                                justifyContent: 'center',
+                                boxShadow: 'none'
                               }}>
                                 <span style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  strokeWidth: status === 'overdue' || status === 'grace_period' ? 2.5 : 2
+                                  strokeWidth: 2
                                 }}>
-                                  {config.icon}
+                                  {React.cloneElement(config.icon, {
+                                    style: {
+                                      width: '0.75rem',
+                                      height: '0.75rem'
+                                    }
+                                  })}
                                 </span>
                                 <span style={{whiteSpace: 'nowrap'}}>
-                                  {config.text}
-                                  {status === 'overdue' && payment.lateFee > 0 && (
-                                    <span style={{
-                                      marginLeft: '0.375rem', 
-                                      fontSize: '0.625rem',
-                                      fontWeight: 800,
-                                      color: '#dc2626',
-                                      background: '#ffffff',
-                                      padding: '0.125rem 0.375rem',
-                                      borderRadius: '0.75rem',
-                                      border: '1px solid #fca5a5'
-                                    }}>
-                                      +{formatCurrency(payment.lateFee).replace('.000', 'K')}
-                                    </span>
-                                  )}
+                                  {status === 'overdue' ? 'Quá hạn' : config.text}
                                 </span>
                               </span>
                             </div>
@@ -1402,21 +1388,6 @@ export default function FinancePage() {
                                   Chi tiết
                                 </button>
                                 
-                                <div style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.375rem',
-                                  padding: '0.25rem 0.75rem',
-                                  background: 'rgba(34, 197, 94, 0.1)',
-                                  color: '#16a34a',
-                                  borderRadius: '0.5rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  border: '1px solid rgba(34, 197, 94, 0.3)'
-                                }}>
-                                  <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                  Hoàn thành
-                                </div>
                               </div>
                             );
                           }
@@ -1998,7 +1969,7 @@ export default function FinancePage() {
                       margin: '0.125rem 0 0 0',
                       fontFamily: 'monospace'
                     }}>
-                      {selectedPayment.invoiceId || `INV202406${String(selectedPayment.id).padStart(3, '0')}`}
+                      
                     </p>
                   </div>
                 </div>
@@ -2043,27 +2014,21 @@ export default function FinancePage() {
                 </div>
                 <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
                   <div>
-                    <span style={{color: '#6b7280'}}>Họ và tên</span>
-                    <div style={{fontWeight: 600, color: '#111827'}}>
-                      {familyFinancialData[selectedResident]?.residentName}
+                    <span style={{color: '#6b7280', fontSize: '0.75rem'}}>Họ và tên</span>
+                    <div style={{fontWeight: 600, color: '#111827', fontSize: '0.875rem', marginTop: '0.25rem'}}>
+                      {familyFinancialData[selectedResident]?.residentName || 'Nguyễn Văn Nam'}
                     </div>
                   </div>
                   <div>
-                    <span style={{color: '#6b7280'}}>Mã người cao tuổi</span>
-                    <div style={{fontWeight: 600, color: '#111827', fontFamily: 'monospace'}}>
-                      {familyFinancialData[selectedResident]?.residentId || `RES001`}
+                    <span style={{color: '#6b7280', fontSize: '0.75rem'}}>Số phòng</span>
+                    <div style={{fontWeight: 600, color: '#3b82f6', fontSize: '0.875rem', marginTop: '0.25rem'}}>
+                      {familyFinancialData[selectedResident]?.roomNumber || 'P101'}
                     </div>
                   </div>
-                  <div>
-                    <span style={{color: '#6b7280'}}>Quan hệ</span>
-                    <div style={{fontWeight: 600, color: '#111827'}}>
-                      {familyFinancialData[selectedResident]?.relationship}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{color: '#6b7280'}}>Hợp đồng</span>
-                    <div style={{fontWeight: 600, color: '#111827', fontFamily: 'monospace'}}>
-                      {familyFinancialData[selectedResident]?.contractId || `CT2024001`}
+                  <div style={{gridColumn: 'span 2'}}>
+                    <span style={{color: '#6b7280', fontSize: '0.75rem'}}>Ngày sinh</span>
+                    <div style={{fontWeight: 600, color: '#111827', fontSize: '0.875rem', marginTop: '0.25rem'}}>
+                      {familyFinancialData[selectedResident]?.dateOfBirth || '15/03/1952'}
                     </div>
                   </div>
                 </div>
@@ -2422,11 +2387,8 @@ export default function FinancePage() {
                       {resident.relationship}
                     </p>
                     <div style={{fontSize: '0.875rem', color: '#374151'}}>
-                      <p style={{margin: '0 0 0.25rem 0'}}>
-                        Phí hàng tháng: <strong>{formatCurrency(resident.monthlyFee)}</strong>
-                      </p>
                       <p style={{margin: '0'}}>
-                        Còn phải trả: <strong style={{color: resident.totalDue > 0 ? '#dc2626' : '#16a34a'}}>
+                        Cần thanh toán: <strong style={{color: resident.totalDue > 0 ? '#dc2626' : '#16a34a'}}>
                           {formatCurrency(resident.totalDue)}
                         </strong>
                       </p>
@@ -2438,105 +2400,7 @@ export default function FinancePage() {
             </div>
           </div>
           
-        {/* Financial Summary for selected resident */}
-          <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '1rem',
-          marginBottom: '1.5rem'
-          }}>
-            <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(34, 197, 94, 0.2)'
-          }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-              <div>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0', fontWeight: 500}}>
-                  Đã thanh toán
-                </p>
-                <p style={{fontSize: '1.875rem', fontWeight: 700, color: '#16a34a', margin: 0}}>
-                  {formatCurrency(familyFinancialData[selectedResident]?.totalPaid || 0)}
-                </p>
-            </div>
-            <div style={{
-                width: '3rem',
-                height: '3rem',
-                background: 'rgba(34, 197, 94, 0.1)',
-                borderRadius: '0.75rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <ArrowTrendingUpIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
-            </div>
-          </div>
-        </div>
-        
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.2)'
-          }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-              <div>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0', fontWeight: 500}}>
-                  Còn phải trả
-                </p>
-                <p style={{fontSize: '1.875rem', fontWeight: 700, color: '#dc2626', margin: 0}}>
-                  {formatCurrency(familyFinancialData[selectedResident]?.totalDue || 0)}
-                </p>
-              </div>
-          <div style={{
-                width: '3rem',
-                height: '3rem',
-                background: 'rgba(239, 68, 68, 0.1)',
-                borderRadius: '0.75rem',
-              display: 'flex',
-              alignItems: 'center', 
-                justifyContent: 'center'
-              }}>
-                <ArrowTrendingDownIcon style={{width: '1.5rem', height: '1.5rem', color: '#dc2626'}} />
-                  </div>
-                </div>
-              </div>
-            
-                <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.2)'
-          }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-              <div>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0', fontWeight: 500}}>
-                  Lần thanh toán tiếp theo
-                </p>
-                <p style={{fontSize: '1.125rem', fontWeight: 600, color: '#3b82f6', margin: 0}}>
-                  {new Date(familyFinancialData[selectedResident]?.nextPaymentDate || '').toLocaleDateString('vi-VN')}
-                </p>
-              </div>
-              <div style={{
-                width: '3rem',
-                height: '3rem',
-                background: 'rgba(59, 130, 246, 0.1)',
-                borderRadius: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                justifyContent: 'center'
-                }}>
-                <CalendarDaysIcon style={{width: '1.5rem', height: '1.5rem', color: '#3b82f6'}} />
-                </div>
-              </div>
-            </div>
 
-
-          </div>
           
         {/* Payment History for Family */}
         <div style={{
@@ -2553,29 +2417,121 @@ export default function FinancePage() {
           <div style={{overflowX: 'auto'}}>
             <table style={{width: '100%', borderCollapse: 'collapse'}}>
               <thead>
-                <tr style={{borderBottom: '1px solid #e5e7eb'}}>
-                  <th style={{textAlign: 'left', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '25%'}}>
+                <tr style={{
+                  background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                  borderBottom: '2px solid #0f172a',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <th style={{
+                    textAlign: 'left', 
+                    padding: '1.125rem 0.75rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 700, 
+                    color: '#ffffff', 
+                    width: '25%',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
                     Mô tả dịch vụ
                   </th>
-                  <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '12%'}}>
+                  <th style={{
+                    textAlign: 'center', 
+                    padding: '1.125rem 0.75rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 700, 
+                    color: '#ffffff', 
+                    width: '12%',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
                     Số tiền
                   </th>
-                  <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '12%'}}>
+                  <th style={{
+                    textAlign: 'center', 
+                    padding: '1.125rem 0.75rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 700, 
+                    color: '#ffffff', 
+                    width: '12%',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
                     Hạn thanh toán
                   </th>
-                  <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '12%'}}>
+                  <th style={{
+                    textAlign: 'center', 
+                    padding: '1.125rem 0.75rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 700, 
+                    color: '#ffffff', 
+                    width: '12%',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
                     Phương thức
                   </th>
-                  <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '15%'}}>
+                  <th style={{
+                    textAlign: 'center', 
+                    padding: '1.125rem 0.75rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 700, 
+                    color: '#ffffff', 
+                    width: '15%',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
                     Trạng thái
                   </th>
-                  <th style={{textAlign: 'center', padding: '0.875rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: '24%'}}>
+                  <th style={{
+                    textAlign: 'center', 
+                    padding: '1.125rem 0.75rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: 700, 
+                    color: '#ffffff', 
+                    width: '24%',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
                     Thao tác
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {familyFinancialData[selectedResident]?.payments.map((payment) => (
+                {familyFinancialData[selectedResident]?.payments
+                  .sort((a, b) => {
+                    const statusA = getPaymentStatus(a);
+                    const statusB = getPaymentStatus(b);
+                    
+                    // Priority order: overdue > grace_period > pending > processing > paid
+                    const statusPriority = {
+                      'overdue': 1,
+                      'grace_period': 2, 
+                      'pending': 3,
+                      'processing': 4,
+                      'paid': 5
+                    };
+                    
+                    // Sort by status priority first
+                    if (statusPriority[statusA] !== statusPriority[statusB]) {
+                      return statusPriority[statusA] - statusPriority[statusB];
+                    }
+                    
+                    // If same status, sort by date (newest first for unpaid, oldest first for paid)
+                    const dateA = new Date(a.dueDate || a.date);
+                    const dateB = new Date(b.dueDate || b.date);
+                    
+                    if (statusA === 'paid') {
+                      return dateB.getTime() - dateA.getTime(); // Newest paid first
+                    } else {
+                      return dateA.getTime() - dateB.getTime(); // Oldest unpaid first (more urgent)
+                    }
+                  })
+                  .map((payment) => (
                   <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
                     <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
                       {payment.description}
@@ -2583,8 +2539,8 @@ export default function FinancePage() {
                     <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
                       {formatCurrency(payment.amount)}
                     </td>
-                    <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem'}}>
-                      <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
+                    <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
                         <span style={{color: '#111827', fontWeight: 500}}>
                           {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
                         </span>
@@ -2675,59 +2631,60 @@ export default function FinancePage() {
                       <span style={{
                         display: 'inline-flex', 
                               alignItems: 'center',
-                              gap: '0.375rem',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '1.5rem',
-                        fontSize: '0.75rem', 
-                      fontWeight: 700,
+                              gap: '0.25rem',
+                              padding: status === 'overdue' ? '0.375rem 0.625rem' : '0.3rem 0.65rem',
+                              borderRadius: '0.5rem',
+                        fontSize: '0.7rem', 
+                      fontWeight: 600,
                               background: status === 'overdue' 
-                                ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)'
+                                ? '#fef2f2'
                                 : status === 'grace_period'
-                                ? 'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)'
-                                : config.bg,
+                                ? '#fff7ed'
+                                : status === 'paid'
+                                ? '#f0fdf4'
+                                : status === 'processing'
+                                ? '#eff6ff'
+                                : '#fffbeb',
                               color: status === 'overdue' 
-                                ? '#991b1b'
+                                ? '#dc2626'
                                 : status === 'grace_period'
-                                ? '#9a3412'
-                                : config.color,
-                              border: status === 'overdue' 
-                                ? '1.5px solid #f87171'
-                                : status === 'grace_period'
-                                ? '1.5px solid #fb923c'
-                                : `1px solid ${config.color}30`,
-                              boxShadow: status === 'overdue' 
-                                ? '0 3px 6px rgba(220, 38, 38, 0.2)'
-                                : status === 'grace_period'
-                                ? '0 3px 6px rgba(234, 88, 12, 0.2)'
-                                : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              textTransform: status === 'overdue' || status === 'grace_period' ? 'uppercase' : 'none',
-                              letterSpacing: status === 'overdue' || status === 'grace_period' ? '0.025em' : 'normal',
-                              minWidth: '120px',
-                              justifyContent: 'center'
+                                ? '#ea580c'
+                                : status === 'paid'
+                                ? '#16a34a'
+                                : status === 'processing'
+                                ? '#2563eb'
+                                : '#d97706',
+                              border: `1px solid ${
+                                status === 'overdue' 
+                                  ? '#fecaca'
+                                  : status === 'grace_period'
+                                  ? '#fed7aa'
+                                  : status === 'paid'
+                                  ? '#bbf7d0'
+                                  : status === 'processing'
+                                  ? '#dbeafe'
+                                  : '#fef3c7'
+                              }`,
+                              textTransform: 'none',
+                              letterSpacing: 'normal',
+                              minWidth: 'auto',
+                              justifyContent: 'center',
+                              boxShadow: 'none'
                             }}>
                               <span style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                strokeWidth: status === 'overdue' || status === 'grace_period' ? 2.5 : 2
+                                strokeWidth: 2
                               }}>
-                                {config.icon}
+                                {React.cloneElement(config.icon, {
+                                  style: {
+                                    width: '0.75rem',
+                                    height: '0.75rem'
+                                  }
+                                })}
                               </span>
                               <span style={{whiteSpace: 'nowrap'}}>
-                                {config.text}
-                                {status === 'overdue' && payment.lateFee > 0 && (
-                      <span style={{
-                                    marginLeft: '0.375rem', 
-                                    fontSize: '0.625rem',
-                                    fontWeight: 800,
-                                    color: '#dc2626',
-                                    background: '#ffffff',
-                                    padding: '0.125rem 0.375rem',
-                                    borderRadius: '0.75rem',
-                                    border: '1px solid #fca5a5'
-                                  }}>
-                                    +{formatCurrency(payment.lateFee).replace('.000', 'K')}
-                      </span>
-                                )}
+                                {status === 'overdue' ? 'Quá hạn' : config.text}
                               </span>
                             </span>
                           </div>

@@ -16,7 +16,6 @@ const endpoints = {
   residents: '/residents',
   staff: '/staff',
   activities: '/activities',
-  schedules: '/schedules',
   medications: '/medications',
   careNotes: '/care-notes',
   appointments: '/appointments',
@@ -370,55 +369,4 @@ export const appointmentsAPI = {
   },
 };
 
-// Schedules API
-export const schedulesAPI = {
-  getAll: async () => {
-    try {
-      const response = await apiClient.get(endpoints.schedules);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching schedules:', error);
-      throw error;
-    }
-  },
 
-  getByStaffId: async (staffId: string) => {
-    try {
-      const response = await apiClient.get(`${endpoints.staff}/${staffId}/schedules`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching schedules for staff with ID ${staffId}:`, error);
-      throw error;
-    }
-  },
-
-  create: async (schedule: any) => {
-    try {
-      const response = await apiClient.post(endpoints.schedules, schedule);
-      return response.data;
-    } catch (error) {
-      console.error('Error creating schedule:', error);
-      throw error;
-    }
-  },
-
-  update: async (id: string, schedule: any) => {
-    try {
-      const response = await apiClient.put(`${endpoints.schedules}/${id}`, schedule);
-      return response.data;
-    } catch (error) {
-      console.error(`Error updating schedule with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  delete: async (id: string) => {
-    try {
-      const response = await apiClient.delete(`${endpoints.schedules}/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error deleting schedule with ID ${id}:`, error);
-      throw error;
-    }
-  },
-};

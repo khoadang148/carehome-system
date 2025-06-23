@@ -174,7 +174,7 @@ export default function NotificationsPage() {
           cardBg: 'linear-gradient(135deg, #ffffff 0%, #faf5ff 100%)',
           shadow: 'rgba(139, 92, 246, 0.3)',
           icon: HeartIcon,
-          title: 'Tin tức về người thân',
+          title: 'Tất cả thông báo',
           subtitle: 'Cập nhật tình hình sức khỏe và hoạt động của người thân'
         };
       default:
@@ -928,32 +928,36 @@ export default function NotificationsPage() {
                             {notification.title}
                           </h3>
                           
-                          {/* Priority Badge */}
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            background: priorityColors.bg,
-                            color: priorityColors.text,
-                            border: `1px solid ${priorityColors.border}`
-                          }}>
-                            {notification.priority === 'high' ? 'Cao' :
-                             notification.priority === 'medium' ? 'Trung bình' : 'Thấp'}
-                          </span>
+                          {/* Priority Badge - Hide for family role */}
+                          {user?.role !== 'family' && (
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: priorityColors.bg,
+                              color: priorityColors.text,
+                              border: `1px solid ${priorityColors.border}`
+                            }}>
+                              {notification.priority === 'high' ? 'Cao' :
+                               notification.priority === 'medium' ? 'Trung bình' : 'Thấp'}
+                            </span>
+                          )}
                           
-                          {/* Category Badge */}
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            background: '#e0e7ff',
-                            color: '#3730a3',
-                            border: '1px solid #c7d2fe'
-                          }}>
-                            {notification.category}
-                          </span>
+                          {/* Category Badge - Hide for family role */}
+                          {user?.role !== 'family' && (
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 500,
+                              background: '#e0e7ff',
+                              color: '#3730a3',
+                              border: '1px solid #c7d2fe'
+                            }}>
+                              {notification.category}
+                            </span>
+                          )}
                           
                           {!notification.isRead && (
                             <div style={{

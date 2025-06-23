@@ -1,37 +1,23 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { 
   UserCircleIcon,
-  PencilIcon,
-  CheckIcon,
-  XMarkIcon,
   PhoneIcon,
   EnvelopeIcon,
   MapPinIcon,
   CalendarIcon,
   BriefcaseIcon,
+  ArrowLeftIcon,
+  UserIcon,
+  CameraIcon,
+  XMarkIcon,
+  ArrowUpTrayIcon,
+  CheckIcon,
   ExclamationTriangleIcon,
-  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-
-// Validation types
-interface ValidationErrors {
-  [key: string]: string;
-}
-
-interface FormData {
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  dateOfBirth: string;
-  department: string;
-  startDate: string;
-  relationship: string;
-}
 
 // Family members data (matching family page)
 const familyMembers = [
@@ -57,9 +43,18 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user } = useAuth();
   const [selectedFamilyMember, setSelectedFamilyMember] = useState(familyMembers[0]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
+  const [avatarImage, setAvatarImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Static profile data
+  const profileData = {
     name: user?.name || '',
     email: user?.email || '',
     phone: '+84 123 456 789',
@@ -68,270 +63,129 @@ export default function ProfilePage() {
     department: user?.role === 'staff' ? 'Chăm sóc bệnh nhân' : '',
     startDate: '2020-01-15',
     relationship: user?.role === 'family' ? 'Con' : '',
-  });
-  const [errors, setErrors] = useState<ValidationErrors>({});
-  const [touched, setTouched] = useState<{[key: string]: boolean}>({});
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  // Validation functions
-  const validateField = (name: string, value: string): string => {
-    switch (name) {
-      case 'name':
-        if (!value.trim()) return 'Họ và tên là bắt buộc';
-        if (value.trim().length < 2) return 'Họ và tên phải có ít nhất 2 ký tự';
-        if (value.trim().length > 50) return 'Họ và tên không được vượt quá 50 ký tự';
-        if (!/^[a-zA-ZÀ-ỹ\s]+$/.test(value.trim())) return 'Họ và tên chỉ được chứa chữ cái và khoảng trắng';
-        return '';
-
-      case 'email':
-        if (!value.trim()) return 'Email là bắt buộc';
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value.trim())) return 'Định dạng email không hợp lệ';
-        return '';
-
-      case 'phone':
-        if (!value.trim()) return 'Số điện thoại là bắt buộc';
-        const phoneRegex = /^(\+84|84|0)(3|5|7|8|9)[0-9]{8}$/;
-        if (!phoneRegex.test(value.replace(/\s/g, ''))) return 'Số điện thoại không hợp lệ (VD: +84 987 654 321)';
-        return '';
-
-      case 'address':
-        if (!value.trim()) return 'Địa chỉ là bắt buộc';
-        if (value.trim().length < 5) return 'Địa chỉ phải có ít nhất 5 ký tự';
-        if (value.trim().length > 200) return 'Địa chỉ không được vượt quá 200 ký tự';
-        return '';
-
-      case 'dateOfBirth':
-        if (!value) return 'Ngày sinh là bắt buộc';
-        const birthDate = new Date(value);
-        const today = new Date();
-        const age = today.getFullYear() - birthDate.getFullYear();
-        if (age < 18) return 'Tuổi phải từ 18 trở lên';
-        if (age > 100) return 'Ngày sinh không hợp lệ';
-        return '';
-
-      case 'department':
-        if ((user?.role === 'staff' || user?.role === 'admin') && !value.trim()) {
-          return 'Phòng ban là bắt buộc';
-        }
-        if (value && value.trim().length > 100) return 'Tên phòng ban không được vượt quá 100 ký tự';
-        return '';
-
-      case 'relationship':
-        if (user?.role === 'family' && !value.trim()) {
-          return 'Mối quan hệ là bắt buộc';
-        }
-        return '';
-
-      default:
-        return '';
-    }
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: ValidationErrors = {};
-    const fields = ['name', 'email', 'phone', 'address', 'dateOfBirth'];
-    
-    // Add role-specific fields
-    if (user?.role === 'staff' || user?.role === 'admin') {
-      fields.push('department');
-    }
-    if (user?.role === 'family') {
-      fields.push('relationship');
+    // File validation
+  const validateFile = (file: File): string | null => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    if (!allowedTypes.includes(file.type)) {
+      return 'Chỉ hỗ trợ file ảnh định dạng JPG, PNG, WEBP';
     }
 
-    fields.forEach(field => {
-      const error = validateField(field, formData[field as keyof FormData]);
-      if (error) {
-        newErrors[field] = error;
-      }
-    });
+    if (file.size > maxSize) {
+      return 'Kích thước file không được vượt quá 10MB';
+    }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return null;
   };
 
-  const handleSave = async () => {
-    setTouched({
-      name: true,
-      email: true,
-      phone: true,
-      address: true,
-      dateOfBirth: true,
-      department: true,
-      relationship: true
-    });
-
-    if (!validateForm()) {
-      // Focus on first error field
-      const firstErrorField = Object.keys(errors)[0];
-      const element = document.querySelector(`[name="${firstErrorField}"]`) as HTMLElement;
-      element?.focus();
+    // Handle file selection
+  const handleFileSelect = (file: File) => {
+    const error = validateFile(file);
+    if (error) {
+      setUploadError(error);
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Saving profile data:', formData);
-    setIsEditing(false);
-      setTouched({});
-      // Show success message (could add toast notification here)
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      // Handle save error
-    } finally {
-      setIsSubmitting(false);
+    setUploadError(null);
+    setSelectedFile(file);
+    
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      console.log('Image loaded:', result?.substring(0, 50) + '...');
+      setPreviewUrl(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle drag and drop
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragIn = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  }, []);
+
+  const handleDragOut = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  }, []);
+
+  // Handle file input change
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
     }
   };
 
-  const handleCancel = () => {
-    setFormData({
-      name: user?.name || '',
-      email: user?.email || '',
-      phone: '+84 123 456 789',
-      address: '123 Đường ABC, Quận 1, TP.HCM',
-      dateOfBirth: '1985-06-15',
-      department: user?.role === 'staff' ? 'Chăm sóc bệnh nhân' : '',
-      startDate: '2020-01-15',
-      relationship: user?.role === 'family' ? 'Con' : '',
-    });
-    setIsEditing(false);
+  // Simulate upload with progress
+  const simulateUpload = async () => {
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    for (let i = 0; i <= 100; i += 10) {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      setUploadProgress(i);
+    }
+
+    // Simulate processing
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    if (previewUrl) {
+      setAvatarImage(previewUrl);
+    }
+    
+    setIsUploading(false);
+    setShowUploadModal(false);
+    resetUploadState();
+    
+    console.log('Avatar uploaded successfully:', selectedFile?.name);
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    // Real-time validation for touched fields
-    if (touched[field]) {
-      const error = validateField(field, value);
-      setErrors(prev => ({
-        ...prev,
-        [field]: error
-      }));
+  // Reset upload state
+  const resetUploadState = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setUploadError(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
-  const handleFieldBlur = (field: string) => {
-    setTouched(prev => ({
-      ...prev,
-      [field]: true
-    }));
-
-    const error = validateField(field, formData[field as keyof FormData]);
-    setErrors(prev => ({
-      ...prev,
-      [field]: error
-    }));
+  // Open upload modal
+  const openUploadModal = () => {
+    setShowUploadModal(true);
+    resetUploadState();
   };
 
-  const getRoleBadge = () => {
-    const roleConfig = {
-      admin: { label: 'Quản trị viên', color: '#3b82f6', bg: '#dbeafe' },
-      staff: { label: 'Nhân viên', color: '#059669', bg: '#dcfce7' },
-      family: { label: 'Người thân', color: '#d97706', bg: '#fef3c7' }
-    };
-    const config = roleConfig[user?.role as keyof typeof roleConfig] || roleConfig.family;
-    return (
-      <span style={{
-        display: 'inline-flex',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '1rem',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        background: config.bg,
-        color: config.color,
-        border: `1px solid ${config.color}20`
-      }}>
-        {config.label}
-      </span>
-    );
+  // Close upload modal
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    resetUploadState();
   };
 
-  // Error message component
-  const ErrorMessage = ({ error }: { error?: string }) => {
-    if (!error) return null;
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        marginTop: '0.25rem',
-        fontSize: '0.75rem',
-        color: '#dc2626'
-      }}>
-        <ExclamationTriangleIcon style={{ width: '0.875rem', height: '0.875rem' }} />
-        {error}
-      </div>
-    );
-  };
 
-  // Input field with validation
-  const renderInput = (
-    type: string,
-    name: string,
-    value: string,
-    placeholder?: string,
-    isTextarea?: boolean
-  ) => {
-    const hasError = touched[name] && errors[name];
-    const baseStyle = {
-      width: '100%',
-      padding: '0.5rem',
-      borderRadius: '0.375rem',
-      border: `1px solid ${hasError ? '#dc2626' : '#d1d5db'}`,
-      fontSize: '0.875rem',
-      transition: 'border-color 0.2s, box-shadow 0.2s',
-      outline: 'none'
-    };
-
-    const focusStyle = hasError ? {
-      borderColor: '#dc2626',
-      boxShadow: '0 0 0 3px rgba(220, 38, 38, 0.1)'
-    } : {
-      borderColor: '#6366f1',
-      boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)'
-    };
-
-    if (isTextarea) {
-      return (
-        <textarea
-          name={name}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => handleInputChange(name, e.target.value)}
-          onFocus={(e) => Object.assign(e.target.style, focusStyle)}
-          onBlur={(e) => {
-            handleFieldBlur(name);
-            e.target.style.borderColor = hasError ? '#dc2626' : '#d1d5db';
-            e.target.style.boxShadow = 'none';
-          }}
-          style={baseStyle}
-        />
-      );
-    }
-
-    return (
-      <input
-        type={type}
-        name={name}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => handleInputChange(name, e.target.value)}
-        onFocus={(e) => Object.assign(e.target.style, focusStyle)}
-        onBlur={(e) => {
-          handleFieldBlur(name);
-          e.target.style.borderColor = hasError ? '#dc2626' : '#d1d5db';
-          e.target.style.boxShadow = 'none';
-        }}
-        style={baseStyle}
-      />
-    );
-  };
 
   return (
     <div style={{
@@ -374,101 +228,42 @@ export default function ProfilePage() {
   border: '1px solid rgba(255, 255, 255, 0.2)',
   backdropFilter: 'blur(10px)'
 }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
   <div style={{
+      width: '3rem',
+      height: '3rem',
+      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+      borderRadius: '50%',
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '1rem'
+      justifyContent: 'center',
+      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
   }}>
+      <UserIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+    </div>
     <div>
       <h1 style={{
-        fontSize: '1.875rem',
-        fontWeight: 700,
-        color: '#111827',
-        margin: '0 0 0.25rem 0'
+        fontSize: '1.8rem',
+        fontWeight: '800',
+        color: '#4f46e5',
+        margin: '0',
+        letterSpacing: '-0.025em',
+        lineHeight: '1.2'
       }}>
         Hồ sơ cá nhân
       </h1>
       <p style={{
-        fontSize: '0.875rem',
-        color: '#6b7280',
-        margin: 0
+        fontSize: '0.9rem',
+        color: '#64748b',
+        margin: '0.75rem 0 0 0',
+        fontWeight: '500',
+        letterSpacing: '0.01em'
       }}>
-        Quản lý thông tin tài khoản
+        Thông tin tài khoản và cài đặt cá nhân
       </p>
     </div>
-    
-    {!isEditing ? (
-      <button
-        onClick={() => setIsEditing(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          background: '#6366f1',
-          color: 'white',
-          padding: '0.75rem 1.25rem',
-          borderRadius: '0.5rem',
-          border: 'none',
-          fontWeight: 500,
-          fontSize: '0.875rem',
-          cursor: 'pointer',
-          transition: 'background 0.2s'
-        }}
-        onMouseOver={(e) => e.currentTarget.style.background = '#4f46e5'}
-        onMouseOut={(e) => e.currentTarget.style.background = '#6366f1'}
-      >
-        <PencilIcon style={{width: '1rem', height: '1rem'}} />
-        Chỉnh sửa
-      </button>
-    ) : (
-      <div style={{display: 'flex', gap: '0.5rem'}}>
-        <button
-          onClick={handleSave}
-          disabled={isSubmitting}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            background: isSubmitting ? '#9ca3af' : '#10b981',
-            color: 'white',
-            padding: '0.75rem 1rem',
-            borderRadius: '0.5rem',
-            border: 'none',
-            fontWeight: 500,
-            fontSize: '0.875rem',
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            opacity: isSubmitting ? 0.6 : 1
-          }}
-        >
-          <CheckIcon style={{width: '1rem', height: '1rem'}} />
-          {isSubmitting ? 'Đang lưu...' : 'Lưu'}
-        </button>
-        <button
-          onClick={handleCancel}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            background: '#ef4444',
-            color: 'white',
-            padding: '0.75rem 1rem',
-            borderRadius: '0.5rem',
-            border: 'none',
-            fontWeight: 500,
-            fontSize: '0.875rem',
-            cursor: 'pointer'
-          }}
-        >
-          <XMarkIcon style={{width: '1rem', height: '1rem'}} />
-          Hủy
-        </button>
-      </div>
-    )}
   </div>
 </div>
-
 
         {/* Profile Card */}
         <div style={{
@@ -487,19 +282,85 @@ export default function ProfilePage() {
             flexWrap: 'wrap'
           }}>
             <div style={{
-              width: '5rem',
-              height: '5rem',
-              borderRadius: '1rem',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              position: 'relative',
+              flexShrink: 0
+          }}>
+                          <div style={{
+                width: '5rem',
+                height: '5rem',
+                borderRadius: '1rem',
+                backgroundImage: !avatarImage ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : undefined,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1.5rem',
+                fontWeight: 700,
+                border: avatarImage ? '2px solid #e5e7eb' : 'none',
+                overflow: 'hidden',
+                position: 'relative'
+              }}>
+                {avatarImage ? (
+                  <img 
+                    src={avatarImage}
+                    alt="Avatar"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center',
+                      borderRadius: '1rem'
+                    }}
+                  />
+                ) : (
+                  user?.name?.substring(0, 2).toUpperCase() || 'ND'
+                )}
+                {isUploading && (
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '1rem',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    zIndex: 10
+                  }}>
+                    Đang tải...
+                  </div>
+                )}
+              </div>
+              
+              {/* Upload button */}
+              <button
+                onClick={openUploadModal}
+                disabled={isUploading}
+                style={{
+                  position: 'absolute',
+                  bottom: '-0.25rem',
+                  right: '-0.25rem',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  background: '#6366f1',
+                  border: '3px solid white',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'white',
-              fontSize: '1.5rem',
-                  fontWeight: 700,
-              flexShrink: 0
-                }}>
-                  {user?.name?.substring(0, 2).toUpperCase() || 'ND'}
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+                  transition: 'all 0.2s',
+                  opacity: isUploading ? 0.6 : 1
+                }}
+                onMouseOver={(e) => !isUploading && (e.currentTarget.style.transform = 'scale(1.1)')}
+                onMouseOut={(e) => !isUploading && (e.currentTarget.style.transform = 'scale(1)')}
+                title="Thay đổi ảnh đại diện"
+              >
+                <CameraIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+              </button>
               </div>
               
             <div style={{ flex: 1, minWidth: '200px' }}>
@@ -507,11 +368,10 @@ export default function ProfilePage() {
                 fontSize: '1.25rem',
                 fontWeight: 600,
                 color: '#111827',
-                margin: '0 0 0.5rem 0'
+                margin: '0'
               }}>
-                {formData.name}
+                {profileData.name}
               </h2>
-              {getRoleBadge()}
             </div>
           </div>
 
@@ -549,12 +409,6 @@ export default function ProfilePage() {
                 }}>
                   Email
                 </label>
-                {isEditing ? (
-                    <div>
-                      {renderInput('email', 'email', formData.email, 'Nhập địa chỉ email')}
-                      <ErrorMessage error={touched.email ? errors.email : undefined} />
-                    </div>
-                ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -563,9 +417,8 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <EnvelopeIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                      {formData.email}
+                    {profileData.email}
                   </div>
-                )}
               </div>
 
               <div>
@@ -580,12 +433,6 @@ export default function ProfilePage() {
                 }}>
                   Số điện thoại
                 </label>
-                {isEditing ? (
-                    <div>
-                      {renderInput('tel', 'phone', formData.phone, 'Nhập số điện thoại')}
-                      <ErrorMessage error={touched.phone ? errors.phone : undefined} />
-                    </div>
-                ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -594,9 +441,8 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <PhoneIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                      {formData.phone}
+                    {profileData.phone}
                   </div>
-                )}
               </div>
 
               <div>
@@ -611,12 +457,6 @@ export default function ProfilePage() {
                 }}>
                   Địa chỉ
                 </label>
-                {isEditing ? (
-                    <div>
-                      {renderInput('text', 'address', formData.address, 'Nhập địa chỉ', true)}
-                      <ErrorMessage error={touched.address ? errors.address : undefined} />
-                    </div>
-                ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -625,9 +465,8 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <MapPinIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                      {formData.address}
+                    {profileData.address}
                   </div>
-                )}
               </div>
 
               <div>
@@ -642,12 +481,6 @@ export default function ProfilePage() {
                 }}>
                   Ngày sinh
                 </label>
-                {isEditing ? (
-                    <div>
-                      {renderInput('date', 'dateOfBirth', formData.dateOfBirth, '')}
-                      <ErrorMessage error={touched.dateOfBirth ? errors.dateOfBirth : undefined} />
-                    </div>
-                ) : (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -656,9 +489,8 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                      {new Date(formData.dateOfBirth).toLocaleDateString('vi-VN')}
+                    {new Date(profileData.dateOfBirth).toLocaleDateString('vi-VN')}
                   </div>
-                )}
                 </div>
               </div>
             </div>
@@ -717,7 +549,7 @@ export default function ProfilePage() {
                               borderRadius: '0.375rem',
                               border: '1px solid #d1d5db',
                               fontSize: '0.875rem',
-                              background: 'white',
+                              backgroundColor: 'white',
                               marginBottom: '0.5rem'
                             }}
                           >
@@ -768,54 +600,12 @@ export default function ProfilePage() {
                       }}>
                         Mối quan hệ
                       </label>
-                      {(isEditing && user?.role && user.role === 'admin') ? (
-                        <div>
-                          <select
-                            name="relationship"
-                            value={formData.relationship}
-                            onChange={(e) => handleInputChange('relationship', e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem',
-                              borderRadius: '0.375rem',
-                              border: `1px solid ${touched.relationship && errors.relationship ? '#dc2626' : '#d1d5db'}`,
-                              fontSize: '0.875rem',
-                              background: 'white',
-                              transition: 'border-color 0.2s, box-shadow 0.2s',
-                              outline: 'none'
-                            }}
-                            onFocus={(e) => {
-                              const hasError = touched.relationship && errors.relationship;
-                              e.target.style.borderColor = hasError ? '#dc2626' : '#6366f1';
-                              e.target.style.boxShadow = hasError ? '0 0 0 3px rgba(220, 38, 38, 0.1)' : '0 0 0 3px rgba(99, 102, 241, 0.1)';
-                            }}
-                            onBlur={(e) => {
-                              handleFieldBlur('relationship');
-                              const hasError = touched.relationship && errors.relationship;
-                              e.target.style.borderColor = hasError ? '#dc2626' : '#d1d5db';
-                              e.target.style.boxShadow = 'none';
-                            }}
-                          >
-                            <option value="">Chọn mối quan hệ</option>
-                            <option value="Con">Con</option>
-                            <option value="Cháu">Cháu</option>
-                            <option value="Anh/Chị/Em">Anh/Chị/Em</option>
-                            <option value="Vợ/Chồng">Vợ/Chồng</option>
-                            <option value="Người thân khác">Người thân khác</option>
-                          </select>
-                          <ErrorMessage error={touched.relationship ? errors.relationship : undefined} />
-                        </div>
-                      ) : (
                         <div style={{
                           fontSize: '0.875rem',
-                          color: '#111827',
-                          background: isEditing ? '#f3f4f6' : undefined,
-                          borderRadius: isEditing ? '0.375rem' : undefined,
-                          padding: isEditing ? '0.5rem' : undefined
+                      color: '#111827'
                         }}>
-                          {formData.relationship}
+                      {profileData.relationship}
                         </div>
-                      )}
                     </div>
                   </>
                 ) : (
@@ -832,12 +622,6 @@ export default function ProfilePage() {
                       }}>
                         Phòng ban
                       </label>
-                      {isEditing ? (
-                        <div>
-                          {renderInput('text', 'department', formData.department, 'Nhập tên phòng ban')}
-                          <ErrorMessage error={touched.department ? errors.department : undefined} />
-                        </div>
-                      ) : (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -846,9 +630,8 @@ export default function ProfilePage() {
                           color: '#111827'
                         }}>
                           <BriefcaseIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                          {formData.department}
+                      {profileData.department}
                       </div>
-                    )}
                   </div>
 
                   <div>
@@ -871,7 +654,7 @@ export default function ProfilePage() {
                         color: '#111827'
                       }}>
                         <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                        {new Date(formData.startDate).toLocaleDateString('vi-VN')}
+                        {new Date(profileData.startDate).toLocaleDateString('vi-VN')}
                     </div>
                   </div>
                 </>
@@ -880,6 +663,288 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Upload Modal */}
+        {showUploadModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '1rem',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              {/* Modal Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: 0
+                }}>
+                  Thay đổi ảnh đại diện
+                </h3>
+                <button
+                  onClick={closeUploadModal}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    color: '#6b7280'
+                  }}
+                >
+                  <XMarkIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+                </button>
+              </div>
+
+              {/* Upload Area */}
+              {!previewUrl && (
+                <div
+                  onDragEnter={handleDragIn}
+                  onDragLeave={handleDragOut}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  style={{
+                    border: `2px dashed ${dragActive ? '#6366f1' : '#d1d5db'}`,
+                    borderRadius: '0.75rem',
+                    padding: '3rem 1.5rem',
+                    textAlign: 'center',
+                    backgroundColor: dragActive ? '#f0f0ff' : '#f9fafb',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                    marginBottom: '1rem'
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ArrowUpTrayIcon style={{
+                    width: '3rem',
+                    height: '3rem',
+                    color: dragActive ? '#6366f1' : '#9ca3af',
+                    margin: '0 auto 1rem'
+                  }} />
+                  <p style={{
+                    fontSize: '1rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    margin: '0 0 0.5rem 0'
+                  }}>
+                    {dragActive ? 'Thả file ảnh vào đây' : 'Kéo thả ảnh hoặc click để chọn'}
+                  </p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: 0
+                  }}>
+                    Hỗ trợ JPG, PNG, WEBP (tối đa 10MB)
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleFileInputChange}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+              )}
+
+              {/* Preview Area */}
+              {previewUrl && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    margin: '0 0 1rem 0'
+                  }}>
+                    Xem trước
+                  </h4>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    padding: '1rem',
+                                         backgroundColor: '#f9fafb',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <div style={{
+                      width: '4rem',
+                      height: '4rem',
+                      borderRadius: '50%',
+                                           backgroundImage: `url(${previewUrl})`,
+                     backgroundSize: 'cover',
+                     backgroundPosition: 'center center',
+                     backgroundRepeat: 'no-repeat',
+                      border: '2px solid #e5e7eb'
+                    }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: '#111827',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        {selectedFile?.name}
+                      </p>
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#6b7280',
+                        margin: 0
+                      }}>
+                        {selectedFile && (selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <button
+                      onClick={resetUploadState}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.5rem',
+                        borderRadius: '0.375rem',
+                        color: '#ef4444'
+                      }}
+                    >
+                      <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {uploadError && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1rem',
+                                     backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.5rem',
+                  marginBottom: '1rem'
+                }}>
+                  <ExclamationTriangleIcon style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} />
+                  <span style={{ fontSize: '0.875rem', color: '#dc2626' }}>
+                    {uploadError}
+                  </span>
+                </div>
+              )}
+
+              {/* Upload Progress */}
+              {isUploading && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                      Đang tải lên...
+                    </span>
+                    <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                      {uploadProgress}%
+                    </span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '0.5rem',
+                                         backgroundColor: '#e5e7eb',
+                    borderRadius: '0.25rem',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${uploadProgress}%`,
+                      height: '100%',
+                                             backgroundImage: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={closeUploadModal}
+                  disabled={isUploading}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                                       border: '1px solid #d1d5db',
+                   backgroundColor: 'white',
+                   color: '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: isUploading ? 'not-allowed' : 'pointer',
+                    opacity: isUploading ? 0.6 : 1
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={simulateUpload}
+                  disabled={!selectedFile || isUploading}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    backgroundColor: (!selectedFile || isUploading) ? '#9ca3af' : '#6366f1',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: (!selectedFile || isUploading) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {isUploading ? (
+                    <>
+                      <div style={{
+                        width: '1rem',
+                        height: '1rem',
+                        border: '2px solid white',
+                        borderTop: '2px solid transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                      Đang tải...
+                    </>
+                  ) : (
+                    <>
+                      <CheckIcon style={{ width: '1rem', height: '1rem' }} />
+                      Xác nhận
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
