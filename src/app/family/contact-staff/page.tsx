@@ -204,9 +204,29 @@ const SidebarHeader = ({ searchStaff, setSearchStaff }: SidebarHeaderProps) => {
       color: '#1f2937',
       borderBottom: '1px solid #f3f4f6'
     }}>
-      <div style={{ marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#111827' }}>Tin nhắn</h2>
-        <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>Trò chuyện với nhân viên</p>
+      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.15)',
+          borderRadius: '16px',
+          padding: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+        }}>
+          <ChatBubbleLeftRightIcon style={{ 
+            width: '24px', 
+            height: '24px', 
+            color: 'white',
+            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+          }} />
+        </div>
+        <div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'white', textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}>Tin nhắn</h2>
+          <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.9)', margin: 0, textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)' }}>Trò chuyện với nhân viên y tế</p>
+        </div>
       </div>
       
       <div style={{ position: 'relative' }}>

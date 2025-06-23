@@ -1513,7 +1513,8 @@ export default function FinancePage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            backdropFilter: 'blur(8px)'
+            backdropFilter: 'blur(8px)',
+            marginLeft: '12rem'
           }}>
             <div style={{
               background: 'white',
@@ -1534,22 +1535,7 @@ export default function FinancePage() {
                 color: 'white',
                 position: 'relative'
               }}>
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  style={{
-                    position: 'absolute',
-                    top: '1rem',
-                    right: '1rem',
-                    padding: '0.5rem',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    color: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <XMarkIcon style={{width: '1rem', height: '1rem'}} />
-                </button>
+                
                 
                 <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem'}}>
                   <div style={{
@@ -1842,50 +1828,7 @@ export default function FinancePage() {
                     <XMarkIcon style={{width: '0.875rem', height: '0.875rem'}} />
                     Đóng
                   </button>
-                  <button
-                    onClick={handleProcessPayment}
-                    disabled={isProcessingPayment}
-                    style={{
-                      flex: 2,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      padding: '0.75rem',
-                      background: isProcessingPayment 
-                        ? '#d1d5db' 
-                        : 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: isProcessingPayment 
-                        ? 'none' 
-                        : '0 4px 10px 0 rgba(13, 148, 136, 0.3)'
-                    }}
-                  >
-                    {isProcessingPayment ? (
-                      <>
-                        <div style={{
-                          width: '1rem',
-                          height: '1rem',
-                          border: '2px solid rgba(255, 255, 255, 0.3)',
-                          borderTop: '2px solid white',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} />
-                        Đang xử lý...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircleIcon style={{width: '1rem', height: '1rem'}} />
-                        Tôi đã thanh toán
-                      </>
-                    )}
-                  </button>
+                  
                 </div>
                 
                 <div style={{
@@ -1907,7 +1850,7 @@ export default function FinancePage() {
           </div>
         )}
 
-        {/* Invoice Detail Modal - Simplified & Business Logic Enhanced */}
+        {/* Enhanced Professional Invoice Detail Modal */}
         {showInvoiceModal && selectedPayment && (
           <div style={{
             position: 'fixed',
@@ -1915,348 +1858,416 @@ export default function FinancePage() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            backdropFilter: 'blur(8px)'
+            backdropFilter: 'blur(12px)',
+            marginLeft: '12rem'
           }}>
             <div style={{
               background: 'white',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              maxWidth: '32rem',
-              width: '90%',
-              maxHeight: '85vh',
+              borderRadius: '1.5rem',
+              maxWidth: '42rem',
+              width: '95%',
+              maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              position: 'relative'
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+              position: 'relative',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
-              {/* Simplified Header */}
+              {/* Refined Header */}
               <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem',
-                paddingBottom: '1rem',
-                borderBottom: '1px solid #e5e7eb'
+                background: 'linear-gradient(135deg,rgb(59, 70, 86) 0%, #475569 100%)',
+                borderTopLeftRadius: '1.5rem',
+                borderTopRightRadius: '1.5rem',
+                padding: '1.25rem 1.75rem',
+                position: 'relative'
               }}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                  <div style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    borderRadius: '0.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <DocumentPlusIcon style={{width: '1.25rem', height: '1.25rem', color: 'white'}} />
-                  </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
                   <div>
-                    <h3 style={{
-                      fontSize: '1.25rem',
-                      fontWeight: 600,
-                      color: '#111827',
-                      margin: 0
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
                     }}>
-                      Chi tiết hóa đơn
-                    </h3>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10,9 9,9 8,9"></polyline>
+                      </svg>
+                      <h2 style={{
+                        fontSize: '1.7rem',
+                        fontWeight: 600,
+                        color: 'white',
+                        margin: 0
+                      }}>
+                        Chi tiết hóa đơn
+                      </h2>
+                    </div>
                     <p style={{
                       fontSize: '0.75rem',
-                      color: '#6b7280',
-                      margin: '0.125rem 0 0 0',
-                      fontFamily: 'monospace'
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      margin: 0,
+                      fontWeight: 400
                     }}>
-                      
+                      • Mã hóa đơn: {selectedPayment.invoiceId || `INV-${selectedPayment.id}`} 
                     </p>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      margin: 0,
+                      fontWeight: 400
+                    }}>
+                       • Ngày: {new Date().toLocaleDateString('vi-VN')}
+                    </p>
+
                   </div>
+                  <button
+                    onClick={() => setShowInvoiceModal(false)}
+                    title="Đóng"
+                    style={{
+                      padding: '0.5rem',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontSize: '0.875rem',
+                      width: '1.75rem',
+                      height: '1.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowInvoiceModal(false)}
-                  style={{
-                    padding: '0.5rem',
-                    background: '#f3f4f6',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    color: '#6b7280',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <XMarkIcon style={{width: '1rem', height: '1rem'}} />
-                </button>
               </div>
 
-              {/* Customer Information - Clean Layout */}
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                marginBottom: '1rem'
-              }}>
+              <div style={{padding: '1.5rem'}}>
+                {/* Customer Information */}
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem'
+                  background: '#f8fafc',
+                  borderRadius: '0.75rem',
+                  padding: '1.25rem',
+                  marginBottom: '1.25rem',
+                  border: '1px solid #e2e8f0'
                 }}>
-                  <UserGroupIcon style={{width: '1rem', height: '1rem', color: '#3b82f6'}} />
-                  <h4 style={{
+                  <h3 style={{
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    color: '#1f2937',
-                    margin: 0
-                  }}>
-                    Thông tin người cao tuổi
-                  </h4>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
-                  <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem'}}>Họ và tên</span>
-                    <div style={{fontWeight: 600, color: '#111827', fontSize: '0.875rem', marginTop: '0.25rem'}}>
-                      {familyFinancialData[selectedResident]?.residentName || 'Nguyễn Văn Nam'}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem'}}>Số phòng</span>
-                    <div style={{fontWeight: 600, color: '#3b82f6', fontSize: '0.875rem', marginTop: '0.25rem'}}>
-                      {familyFinancialData[selectedResident]?.roomNumber || 'P101'}
-                    </div>
-                  </div>
-                  <div style={{gridColumn: 'span 2'}}>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem'}}>Ngày sinh</span>
-                    <div style={{fontWeight: 600, color: '#111827', fontSize: '0.875rem', marginTop: '0.25rem'}}>
-                      {familyFinancialData[selectedResident]?.dateOfBirth || '15/03/1952'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Services Detail */}
-              <div style={{
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '2px solid #bbf7d0',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                marginBottom: '1.5rem'
-              }}>
-                <h4 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#166534',
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                                 }}>
-                   <DocumentPlusIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                   Dịch vụ đã đăng ký
-                 </h4>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
-                  {/* Monthly Care Fee */}
-                  <div style={{
-                    background: 'white',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.75rem',
-                    padding: '1rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                                             <p style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                         Phí chăm sóc hàng tháng
-                       </p>
-                      <p style={{fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
-                        Dịch vụ chăm sóc toàn diện 24/7
-                      </p>
-                    </div>
-                    <p style={{fontSize: '1rem', fontWeight: 700, color: '#166534', margin: 0}}>
-                      {formatCurrency(familyFinancialData[selectedResident]?.monthlyFee || 0)}
-                    </p>
-                  </div>
-
-                  {/* Additional Services */}
-                  {familyFinancialData[selectedResident]?.additionalServices?.map((service, index) => (
-                    <div key={index} style={{
-                      background: 'white',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <div>
-                        <p style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0}}>
-                           {service.name}
-                        </p>
-                        <p style={{fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>
-                          Tần suất: {service.frequency}
-                        </p>
-                      </div>
-                      <p style={{fontSize: '1rem', fontWeight: 700, color: '#166534', margin: 0}}>
-                        {formatCurrency(service.amount)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payment Breakdown */}
-              <div style={{
-                background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)',
-                border: '2px solid #fde68a',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                marginBottom: '1.5rem'
-              }}>
-                <h4 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#92400e',
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                   Chi tiết thanh toán
-                </h4>
-                
-                <div style={{background: 'white', borderRadius: '0.75rem', border: '1px solid #d1d5db', overflow: 'hidden'}}>
-                  {/* Row Items */}
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid #f3f4f6'}}>
-                    <span style={{fontSize: '0.875rem', color: '#6b7280'}}>Mô tả dịch vụ:</span>
-                    <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827'}}>{selectedPayment.description}</span>
-                  </div>
-                  
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid #f3f4f6'}}>
-                    <span style={{fontSize: '0.875rem', color: '#6b7280'}}>Số tiền gốc:</span>
-                    <span style={{fontSize: '1rem', fontWeight: 600, color: '#111827'}}>{formatCurrency(selectedPayment.originalAmount || selectedPayment.amount)}</span>
-                  </div>
-
-                  {selectedPayment.lateFee > 0 && (
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid #f3f4f6', background: '#fef2f2'}}>
-                      <span style={{fontSize: '0.875rem', color: '#dc2626', fontWeight: 500}}>🚨 Phí trễ hạn:</span>
-                      <span style={{fontSize: '1rem', fontWeight: 600, color: '#dc2626'}}>+{formatCurrency(selectedPayment.lateFee)}</span>
-                    </div>
-                  )}
-
-                  {selectedPayment.discount > 0 && (
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid #f3f4f6', background: '#f0fdf4'}}>
-                      <span style={{fontSize: '0.875rem', color: '#16a34a', fontWeight: 500}}>🎉 Giảm giá:</span>
-                      <span style={{fontSize: '1rem', fontWeight: 600, color: '#16a34a'}}>-{formatCurrency(selectedPayment.discount)}</span>
-                    </div>
-                  )}
-                  
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid #f3f4f6'}}>
-                    <span style={{fontSize: '0.875rem', color: '#6b7280'}}>Hạn thanh toán:</span>
-                    <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827'}}>{new Date(selectedPayment.dueDate || selectedPayment.date).toLocaleDateString('vi-VN')}</span>
-                  </div>
-
-                  {selectedPayment.paidDate && (
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid #f3f4f6'}}>
-                      <span style={{fontSize: '0.875rem', color: '#6b7280'}}>Ngày thanh toán:</span>
-                      <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#16a34a'}}>{new Date(selectedPayment.paidDate).toLocaleDateString('vi-VN')}</span>
-                    </div>
-                  )}
-                  
-                  {/* Total */}
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: '#f9fafb'}}>
-                    <span style={{fontSize: '1.125rem', color: '#111827', fontWeight: 700}}>Tổng cộng:</span>
-                    <span style={{fontSize: '1.5rem', fontWeight: 800, color: '#dc2626'}}>{formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Status */}
-              {selectedPayment.status === 'paid' && (
-                <div style={{
-                  background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                  border: '2px solid #86efac',
-                  borderRadius: '1rem',
-                  padding: '1.5rem',
-                  marginBottom: '1.5rem'
-                }}>
-                  <h4 style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 600,
-                    color: '#166534',
+                    color: '#475569',
                     margin: '0 0 1rem 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
+                    paddingBottom: '0.5rem',
+                    borderBottom: '1px solid #e2e8f0'
                   }}>
-                    ✅ Thông tin giao dịch
-                  </h4>
+                    Thông tin khách hàng
+                  </h3>
                   
-                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem'}}>
                     <div>
-                      <p style={{fontSize: '0.75rem', color: '#166534', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
-                        Mã giao dịch
+                      <p style={{fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.025em', fontWeight: 500}}>
+                        Họ và tên
                       </p>
-                      <p style={{fontSize: '0.875rem', color: '#111827', margin: 0, fontWeight: 600, fontFamily: 'monospace'}}>
-                        {selectedPayment.transactionId || `TXN${selectedPayment.id}`}
+                      <p style={{fontSize: '0.875rem', color: '#0f172a', margin: 0, fontWeight: 600}}>
+                        {familyFinancialData[selectedResident]?.residentName || 'Nguyễn Văn Nam'}
                       </p>
                     </div>
                     
-                    {selectedPayment.bankReference && (
-                      <div>
-                        <p style={{fontSize: '0.75rem', color: '#166534', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
-                          Mã ngân hàng
-                        </p>
-                        <p style={{fontSize: '0.875rem', color: '#111827', margin: 0, fontWeight: 600, fontFamily: 'monospace'}}>
-                          {selectedPayment.bankReference}
-                        </p>
+                    <div>
+                      <p style={{fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.025em', fontWeight: 500}}>
+                        Số phòng
+                      </p>
+                      <p style={{fontSize: '0.875rem', color: '#2563eb', margin: 0, fontWeight: 600}}>
+                        {familyFinancialData[selectedResident]?.roomNumber || 'P101'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <p style={{fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.025em', fontWeight: 500}}>
+                        Ngày sinh
+                      </p>
+                      <p style={{fontSize: '0.875rem', color: '#0f172a', margin: 0, fontWeight: 600}}>
+                        {familyFinancialData[selectedResident]?.dateOfBirth || '15/03/1952'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Services Section */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '0.75rem',
+                  padding: '1.25rem',
+                  marginBottom: '1.25rem',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <h3 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#475569',
+                    margin: '0 0 1rem 0',
+                    paddingBottom: '0.5rem',
+                    borderBottom: '1px solid #f1f5f9'
+                  }}>
+                    Dịch vụ đã sử dụng
+                  </h3>
+                  
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                    {/* Main Service */}
+                    <div style={{
+                      background: '#f0f9ff',
+                      borderRadius: '0.5rem',
+                      padding: '1rem',
+                      border: '1px solid #e0f2fe'
+                    }}>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <div>
+                          <h4 style={{fontSize: '0.875rem', fontWeight: 600, color: '#0c4a6e', margin: '0 0 0.25rem 0'}}>
+                            Phí chăm sóc hàng tháng
+                          </h4>
+                          <p style={{fontSize: '0.75rem', color: '#64748b', margin: 0}}>
+                            Dịch vụ chăm sóc toàn diện 24/7
+                          </p>
+                        </div>
+                        <div style={{textAlign: 'right'}}>
+                          <p style={{fontSize: '0.95rem', fontWeight: 700, color: '#0c4a6e', margin: 0}}>
+                            {formatCurrency(familyFinancialData[selectedResident]?.monthlyFee || 15000000)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Additional Services */}
+                    {familyFinancialData[selectedResident]?.additionalServices?.map((service, index) => (
+                      <div key={index} style={{
+                        background: '#fefce8',
+                        borderRadius: '0.5rem',
+                        padding: '1rem',
+                        border: '1px solid #fef3c7'
+                      }}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                          <div>
+                            <h4 style={{fontSize: '0.875rem', fontWeight: 600, color: '#92400e', margin: '0 0 0.25rem 0'}}>
+                              {service.name}
+                            </h4>
+                            <p style={{fontSize: '0.75rem', color: '#64748b', margin: 0}}>
+                              Tần suất: {service.frequency}
+                            </p>
+                          </div>
+                          <div style={{textAlign: 'right'}}>
+                            <p style={{fontSize: '0.95rem', fontWeight: 700, color: '#92400e', margin: 0}}>
+                              {formatCurrency(service.amount)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Payment Summary */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '0.75rem',
+                  padding: '0',
+                  marginBottom: '1.25rem',
+                  border: '1px solid #e2e8f0',
+                  overflow: 'hidden',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <div style={{
+                    background: '#f8fafc',
+                    padding: '1rem 1.25rem',
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    <h3 style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#475569',
+                      margin: 0
+                    }}>
+                      Tóm tắt thanh toán
+                    </h3>
+                  </div>
+
+                  <div style={{padding: '0'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.875rem 1.25rem', borderBottom: '1px solid #f1f5f9'}}>
+                      <span style={{fontSize: '0.8rem', color: '#64748b', fontWeight: 500}}>Tổng dịch vụ</span>
+                      <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#0f172a'}}>{formatCurrency(selectedPayment.originalAmount || selectedPayment.amount)}</span>
+                    </div>
+
+                    {selectedPayment.lateFee > 0 && (
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.875rem 1.25rem', borderBottom: '1px solid #f1f5f9', background: '#fef2f2'}}>
+                        <span style={{fontSize: '0.8rem', color: '#dc2626', fontWeight: 600}}>Phí trễ hạn</span>
+                        <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#dc2626'}}>+{formatCurrency(selectedPayment.lateFee)}</span>
+                      </div>
+                    )}
+
+                    {selectedPayment.discount > 0 && (
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.875rem 1.25rem', borderBottom: '1px solid #f1f5f9', background: '#f0fdf4'}}>
+                        <span style={{fontSize: '0.8rem', color: '#16a34a', fontWeight: 600}}>Giảm giá</span>
+                        <span style={{fontSize: '0.875rem', fontWeight: 600, color: '#16a34a'}}>-{formatCurrency(selectedPayment.discount)}</span>
                       </div>
                     )}
                     
-                    <div>
-                      <p style={{fontSize: '0.75rem', color: '#166534', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
-                        Phương thức
-                      </p>
-                      <p style={{fontSize: '0.875rem', color: '#111827', margin: 0, fontWeight: 600}}>
-                        {getPaymentMethodName(selectedPayment.method)}
-                      </p>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.875rem 1.25rem', borderBottom: '1px solid #f1f5f9'}}>
+                      <span style={{fontSize: '0.8rem', color: '#64748b', fontWeight: 500}}>Hạn thanh toán</span>
+                      <span style={{fontSize: '0.8rem', fontWeight: 600, color: '#0f172a'}}>{new Date(selectedPayment.dueDate || selectedPayment.date).toLocaleDateString('vi-VN')}</span>
                     </div>
+
+                    {selectedPayment.paidDate && (
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.875rem 1.25rem', borderBottom: '1px solid #f1f5f9'}}>
+                        <span style={{fontSize: '0.8rem', color: '#64748b', fontWeight: 500}}>Ngày thanh toán</span>
+                        <span style={{fontSize: '0.8rem', fontWeight: 600, color: '#16a34a'}}>{new Date(selectedPayment.paidDate).toLocaleDateString('vi-VN')}</span>
+                      </div>
+                    )}
                     
-                    <div>
-                      <p style={{fontSize: '0.75rem', color: '#166534', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
-                        Trạng thái
-                      </p>
-                      <p style={{fontSize: '0.875rem', color: '#166534', margin: 0, fontWeight: 600}}>
-                        ✅ Đã thanh toán thành công
-                      </p>
+                    {/* Total Amount */}
+                    <div style={{
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '1.25rem 1.25rem',
+                      background: 'linear-gradient(135deg, #475569 0%, #64748b 100%)',
+                      color: 'white'
+                    }}>
+                      <span style={{fontSize: '0.95rem', fontWeight: 700}}>Tổng cộng</span>
+                      <span style={{fontSize: '1.125rem', fontWeight: 800}}>
+                        {formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}
+                      </span>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: '1rem',
-                justifyContent: 'flex-end'
-              }}>
-                <button
-                  onClick={() => setShowInvoiceModal(false)}
-                  style={{
-                    padding: '0.875rem 1.5rem',
-                    background: 'rgba(107, 114, 128, 0.1)',
-                    border: '1px solid rgba(107, 114, 128, 0.2)',
-                    borderRadius: '0.75rem',
-                    color: '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  Đóng
-                </button>
-                
+                {/* Payment Status */}
+                {selectedPayment.status === 'paid' && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                    borderRadius: '1.25rem',
+                    padding: '2rem',
+                    marginBottom: '2rem',
+                    border: '2px solid #86efac'
+                  }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: 600,
+                      color: '#166534',
+                      margin: '0 0 1.5rem 0',
+                      paddingBottom: '0.75rem',
+                      borderBottom: '2px solid rgba(22, 101, 52, 0.2)'
+                    }}>
+                      Thông tin giao dịch
+                    </h3>
+                    
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem'}}>
+                      <div>
+                        <p style={{fontSize: '0.8rem', color: '#059669', margin: '0 0 0.5rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
+                          Mã giao dịch
+                        </p>
+                        <p style={{fontSize: '0.95rem', color: '#0f172a', margin: 0, fontWeight: 600, fontFamily: 'monospace'}}>
+                          {selectedPayment.transactionId || `TXN${selectedPayment.id}`}
+                        </p>
+                      </div>
+                      
+                      {selectedPayment.bankReference && (
+                        <div>
+                          <p style={{fontSize: '0.8rem', color: '#059669', margin: '0 0 0.5rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
+                            Mã ngân hàng
+                          </p>
+                          <p style={{fontSize: '0.95rem', color: '#0f172a', margin: 0, fontWeight: 600, fontFamily: 'monospace'}}>
+                            {selectedPayment.bankReference}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <p style={{fontSize: '0.8rem', color: '#059669', margin: '0 0 0.5rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
+                          Phương thức
+                        </p>
+                        <p style={{fontSize: '0.95rem', color: '#0f172a', margin: 0, fontWeight: 600}}>
+                          {getPaymentMethodName(selectedPayment.method)}
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <p style={{fontSize: '0.8rem', color: '#059669', margin: '0 0 0.5rem 0', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600}}>
+                          Trạng thái
+                        </p>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          background: 'rgba(22, 101, 52, 0.1)',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.75rem',
+                          border: '1px solid rgba(22, 101, 52, 0.2)'
+                        }}>
+                          <div style={{
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            background: '#16a34a',
+                            borderRadius: '50%'
+                          }} />
+                          <span style={{fontSize: '0.9rem', color: '#166534', fontWeight: 600}}>
+                            Đã thanh toán
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'flex',
+                  gap: '1rem',
+                  justifyContent: 'flex-end',
+                  paddingTop: '1rem'
+                }}>
+                  <button
+                    onClick={() => setShowInvoiceModal(false)}
+                    style={{
+                      padding: '1rem 2rem',
+                      background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                      border: 'none',
+                      borderRadius: '1rem',
+                      color: 'white',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 6px -1px rgba(100, 116, 139, 0.3)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(100, 116, 139, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(100, 116, 139, 0.3)';
+                    }}
+                  >
+                    Đóng
+                  </button>
+                </div>
               </div>
             </div>
           </div>
