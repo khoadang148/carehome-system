@@ -1802,33 +1802,38 @@ export default function FinancePage() {
                 flexDirection: 'column',
                 gap: '1rem'
               }}>
-                <div style={{
+                 {/* Action Buttons */}
+                 <div style={{
                   display: 'flex',
-                  gap: '0.75rem'
+                  gap: '1rem',
+                  justifyContent: 'flex-end',
+                  paddingTop: '1rem'
                 }}>
                   <button
                     onClick={() => setShowPaymentModal(false)}
                     style={{
-                      flex: 1,
-                      padding: '0.75rem',
-                      background: '#f1f5f9',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '0.5rem',
-                      color: '#475569',
-                      fontSize: '0.85rem',
+                      padding: '1rem 2rem',
+                      background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                      border: 'none',
+                      borderRadius: '1rem',
+                      color: 'white',
+                      fontSize: '0.95rem',
                       fontWeight: 600,
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.375rem'
+                      boxShadow: '0 4px 6px -1px rgba(100, 116, 139, 0.3)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(100, 116, 139, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(100, 116, 139, 0.3)';
                     }}
                   >
-                    <XMarkIcon style={{width: '0.875rem', height: '0.875rem'}} />
                     Đóng
                   </button>
-                  
                 </div>
                 
                 <div style={{

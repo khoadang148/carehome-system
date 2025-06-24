@@ -249,7 +249,7 @@ export default function PhotoUploadPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg,rgb(243, 237, 204) 0%,rgb(243, 237, 226) 100%)',
+      background: 'linear-gradient(135deg,rgb(251, 251, 248) 0%,rgb(249, 247, 243) 100%)',
       padding: '2rem 1rem'
     }}>
       <div style={{
@@ -286,12 +286,17 @@ export default function PhotoUploadPage() {
               <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
             </button>
             <div>
-              <h1 style={{fontSize: '2rem', fontWeight: 700, margin: 0}}>
-                📸 Đăng ảnh của người cao tuổi
-              </h1>
-              <p style={{fontSize: '1rem', margin: '0.5rem 0 0 0', opacity: 0.9}}>
-                Ghi lại những khoảnh khắc đáng nhớ và chia sẻ với gia đình
-              </p>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                <PhotoIcon style={{width: '2.5rem', height: '2.5rem', color: 'white'}} />
+                <div>
+                  <h1 style={{fontSize: '1.8rem', fontWeight: 700, margin: 0}}>
+                     Đăng ảnh của người cao tuổi
+                  </h1>
+                  <p style={{fontSize: '0.9rem', margin: '0.5rem 0 0 0', opacity: 0.9}}>
+                    Ghi lại những khoảnh khắc đáng nhớ và chia sẻ với gia đình
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -716,9 +721,36 @@ export default function PhotoUploadPage() {
             justifyContent: 'space-between', 
             gap: '1rem',
             paddingTop: '1rem',
-            borderTop: '1px solid #e5e7eb',
-            marginLeft: '18rem',
+            borderTop: '1px solid #e5e7eb'
           }}>
+            <button
+              onClick={() => router.push('/residents/photos/gallery')}
+              style={{
+                padding: '0.875rem 2rem',
+                borderRadius: '0.75rem',
+                border: '1px solid #d97706',
+                background: 'white',
+                color: '#d97706',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#f59e0b';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.color = '#d97706';
+              }}
+            >
+              <PhotoIcon style={{width: '1.25rem', height: '1.25rem'}} />
+              Xem thư viện ảnh
+            </button>
             
             <button
               onClick={handleUploadPhotos}

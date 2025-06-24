@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeftIcon, PencilIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { useActivities } from '@/lib/contexts/activities-context';
 
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -355,7 +355,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         }}>
           {/* Activity Header */}
           <div style={{
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
             padding: '2rem'
           }}>
@@ -366,22 +366,46 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               marginBottom: '1.5rem'
             }}>
               <div style={{ flex: 1 }}>
-                <h2 style={{
-                  fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)',
-                  fontWeight: 700, 
-                  margin: '0 0 0.75rem 0',
-                  lineHeight: 1.2
-                }}>
-                  {activity.name}
-                </h2>
-                <p style={{
-                  fontSize: '1.125rem', 
-                  margin: 0, 
-                  opacity: 0.95,
-                  lineHeight: 1.5
-                }}>
-                {activity.description}
-              </p>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <label style={{
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    opacity: 0.8,
+                    display: 'block',
+                    marginBottom: '0.25rem'
+                  }}>
+                    Tên hoạt động:
+                  </label>
+                  <h2 style={{
+                    fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)',
+                    fontWeight: 700, 
+                    margin: 0,
+                    lineHeight: 1.2,
+                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    {activity.name}
+                  </h2>
+                </div>
+                <div>
+                  <label style={{
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    opacity: 0.8,
+                    display: 'block',
+                    marginBottom: '0.25rem'
+                  }}>
+                    Mô tả:
+                  </label>
+                  <p style={{
+                    fontSize: '1.125rem', 
+                    margin: 0, 
+                    opacity: 0.95,
+                    lineHeight: 1.5,
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    {activity.description}
+                  </p>
+                </div>
               </div>
               <div style={{
                 display: 'flex', 
@@ -390,8 +414,61 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 marginLeft: '1.5rem',
                 alignItems: 'flex-end'
               }}>
-                {renderCategory(activity.category)}
-                {renderStatus(activity.status)}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  alignItems: 'flex-end'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: '0.375rem'
+                  }}>
+                    <label style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'white',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                    }}>
+                      Danh mục
+                    </label>
+                    <div style={{
+                      transform: 'scale(1.1)',
+                      filter: 'brightness(1.2) contrast(1.3)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                    }}>
+                      {renderCategory(activity.category)}
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: '0.375rem'
+                  }}>
+                    <label style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'white',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                    }}>
+                      Trạng thái
+                    </label>
+                    <div style={{
+                      transform: 'scale(1.1)',
+                      filter: 'brightness(1.2) contrast(1.3)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                    }}>
+                      {renderStatus(activity.status)}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -407,49 +484,65 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.15)',
+                background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
                 borderRadius: '0.75rem',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
               }}>
                 <CalendarIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span>{new Date(activity.date).toLocaleDateString('vi-VN')}</span>
+                <div>
+                  <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Ngày:</label>
+                  <span>{new Date(activity.date).toLocaleDateString('vi-VN')}</span>
+                </div>
               </div>
               <div style={{
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.15)',
+                background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
                 borderRadius: '0.75rem',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
               }}>
                 <ClockIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span><strong>Thời gian:</strong> {activity.scheduledTime} - {activity.endTime}</span>
+                <div>
+                  <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Thời gian:</label>
+                  <span>{activity.scheduledTime} - {activity.endTime}</span>
+                </div>
               </div>
               <div style={{
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.15)',
+                background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
                 borderRadius: '0.75rem',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
               }}>
                 <MapPinIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span><strong>Địa điểm:</strong> {activity.location}</span>
+                <div>
+                  <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Địa điểm:</label>
+                  <span>{activity.location}</span>
+                </div>
               </div>
               <div style={{
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.15)',
+                background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
                 borderRadius: '0.75rem',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
               }}>
                 <UserGroupIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span><strong>Số người tham gia:</strong> {activity.participants?.length || 0}/{activity.capacity} người</span>
+                <div>
+                  <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Số người tham gia:</label>
+                  <span>{activity.participants?.length || 0}/{activity.capacity} người</span>
+                </div>
             </div>
           </div>
         </div>
@@ -693,10 +786,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   fontWeight: 600, 
                   color: '#111827', 
                   marginTop: 0, 
-                  marginBottom: '1.25rem'
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                 }}>
-                Lợi ích & Dụng cụ
-              </h3>
+                  <SparklesIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
+                  Lợi ích & Dụng cụ
+                </h3>
               
                 <div style={{
                   display: 'grid',
@@ -713,7 +810,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                       alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      ✨ Lợi ích
+                      Lợi ích:
                 </h4>
                     <div style={{
                       background: '#f9fafb',
@@ -745,7 +842,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                       alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      🛠️ Dụng cụ cần thiết
+                      Dụng cụ cần thiết:
                 </h4>
                     <div style={{
                       background: '#f9fafb',
@@ -787,7 +884,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   marginTop: 0, 
                   marginBottom: '1.25rem'
                 }}>
-                  👥 Danh sách tham gia ({activity.participants.length}/{activity.capacity})
+                   Danh sách tham gia ({activity.participants.length}/{activity.capacity})
             </h3>
             
                 <div style={{
@@ -831,9 +928,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   fontWeight: 600, 
                   color: '#111827', 
                   marginTop: 0, 
-                  marginBottom: '1rem'
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                 }}>
-                  📝 Ghi chú
+                  <ClipboardDocumentListIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
+                  Ghi chú:
               </h3>
                 <div style={{
                   background: '#f9fafb',

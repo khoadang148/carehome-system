@@ -4,8 +4,13 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { 
+  ArrowLeftIcon, 
+  InformationCircleIcon, 
+  CalendarIcon, 
+  UserGroupIcon,
+  PencilSquareIcon
+} from '@heroicons/react/24/outline';
 
 type ActivityFormData = {
   name: string;
@@ -248,48 +253,162 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 pb-10">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-      <div style={{  
-  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-  borderRadius: '1.5rem',
-  padding: '2rem',
-  marginBottom: '2rem',
-  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)', 
-  border: '1px solid rgba(255, 255, 255, 0.2)', 
-  backdropFilter: 'blur(10px)', 
-}}>
-  <div className="flex items-center gap-3 mb-6 mt-2">
-    <Link 
-      href="/activities" 
-      title="Quay lại"
-      className="text-gray-500 hover:text-green-700 flex items-center transition-colors duration-200"
-    >
-      <ArrowLeftIcon className="w-5 h-5 mr-1" />
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      position: 'relative'
+    }}>
+      {/* Background decorations */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(245, 158, 11, 0.03) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none'
+      }} />
       
-    </Link>
-    <h1 
-      style={{ 
-        fontSize: '2rem', 
-        fontWeight: 800, 
-        color: '#16a34a',
-        margin: 0 
-      }}
-    >
-      Chỉnh sửa hoạt động
-    </h1>
-  </div>
-</div>
+      <div style={{
+        maxWidth: '1400px', 
+        margin: '0 auto', 
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Header Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              <Link
+                href="/activities"
+                style={{
+                  width: '3rem',
+                  height: '3rem',
+                  background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                  borderRadius: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem', color: '#64748b'}} />
+              </Link>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    borderRadius: '0.75rem',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                  }}>
+                    <PencilSquareIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                  </div>
+                  <div>
+                    <h1 style={{
+                      fontSize: '2.25rem',
+                      fontWeight: 800,
+                      color: '#065f46',
+                      margin: 0,
+                      letterSpacing: '-0.025em'
+                    }}>
+                      Chỉnh sửa hoạt động
+                    </h1>
+                    <p style={{
+                      fontSize: '1rem',
+                      color: '#059669',
+                      margin: '0.25rem 0 0 0',
+                      fontWeight: 500
+                    }}>
+                      Cập nhật thông tin chi tiết hoạt động
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         
-        <div className="bg-white rounded-xl shadow-md p-8">
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-10">
+        {/* Main Form Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2.5rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
             {/* Basic Information */}
             <section>
-              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
-                <InformationCircleIcon className="w-5 h-5 text-green-500" />
-                Thông tin cơ bản
-              </h2>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                marginBottom: '1.5rem',
+                padding: '1rem 1.5rem',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                borderRadius: '1rem',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
+              }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '0.5rem',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <InformationCircleIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  margin: 0,
+                  letterSpacing: '-0.025em'
+                }}>
+                  Thông tin cơ bản
+                </h2>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Tên hoạt động */}
                 <div>
@@ -381,10 +500,37 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             </section>
             {/* Schedule Information */}
             <section>
-              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
-                <InformationCircleIcon className="w-5 h-5 text-green-500" />
-                Thông tin lịch trình
-              </h2>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                marginBottom: '1.5rem',
+                padding: '1rem 1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '1rem',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
+              }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '0.5rem',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CalendarIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  margin: 0,
+                  letterSpacing: '-0.025em'
+                }}>
+                  Thông tin lịch trình
+                </h2>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Ngày */}
                 <div>
@@ -510,10 +656,37 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             </section>
             {/* Participant Management */}
             <section>
-              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
-                <InformationCircleIcon className="w-5 h-5 text-green-500" />
-                Quản lý người tham gia
-              </h2>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                marginBottom: '1.5rem',
+                padding: '1rem 1.5rem',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                borderRadius: '1rem',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.15)'
+              }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '0.5rem',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  margin: 0,
+                  letterSpacing: '-0.025em'
+                }}>
+                  Quản lý người tham gia
+                </h2>
+              </div>
               <div className="mb-4 flex items-center gap-3">
                 <span className="text-sm text-gray-600 font-medium">
                   Số lượng hiện tại: {participants.length}/{activity?.capacity || 0}
@@ -569,10 +742,37 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             </section>
             {/* Additional Information */}
             <section>
-              <h2 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
-                <InformationCircleIcon className="w-5 h-5 text-green-500" />
-                Thông tin bổ sung
-              </h2>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                marginBottom: '1.5rem',
+                padding: '1rem 1.5rem',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                borderRadius: '1rem',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)'
+              }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '0.5rem',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <InformationCircleIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  margin: 0,
+                  letterSpacing: '-0.025em'
+                }}>
+                  Thông tin bổ sung
+                </h2>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label htmlFor="materials" className="block text-sm font-medium text-gray-700 mb-1">
@@ -612,17 +812,81 @@ export default function EditActivityPage({ params }: { params: { id: string } })
               </div>
             </section>
             {/* Form Buttons */}
-            <div className="flex justify-end gap-3 mt-2">
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              marginTop: '2rem',
+              padding: '1.5rem 0',
+              borderTop: '1px solid #e5e7eb'
+            }}>
               <Link
                 href="/activities"
-                className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-100 transition-all"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.75rem 1.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  background: 'white',
+                  textDecoration: 'none',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#9ca3af';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                }}
               >
                 Hủy
               </Link>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-4 py-2 rounded-lg font-medium text-white bg-gradient-to-r from-green-600 to-green-800 shadow-sm text-sm transition-all ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-900'}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: 'white',
+                  background: isSubmitting 
+                    ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' 
+                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  boxShadow: isSubmitting 
+                    ? '0 2px 4px rgba(0, 0, 0, 0.05)' 
+                    : '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.2s ease',
+                  transform: isSubmitting ? 'none' : 'translateY(0)'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSubmitting) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSubmitting) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                  }
+                }}
               >
                 {isSubmitting ? 'Đang cập nhật...' : 'Cập nhật hoạt động'}
               </button>

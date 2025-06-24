@@ -229,36 +229,7 @@ export default function ResidentsPage() {
               </div>
             </div>
             
-            <div style={{display: 'flex', gap: '1rem'}}>
-              <Link 
-                href="/residents/photos" 
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                  color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
-                  transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(34, 197, 94, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.3)';
-                }}
-              >
-                <PhotoIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Đăng ảnh hoạt động
-              </Link>
-
+            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
               <Link 
                 href="/residents/add" 
                 style={{

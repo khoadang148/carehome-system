@@ -761,11 +761,11 @@ export default function FamilyPortalPage() {
         {/* Resident Overview */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          borderRadius: '0.75rem',
+          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.06)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
-          padding: '2rem',
-          marginBottom: '2rem'
+          padding: '1rem',
+          marginBottom: '1rem'
         }}>
           <div style={{display: 'flex', flexDirection: 'column', gap: '3rem', alignItems: 'flex-start'}}>
             <div style={{display: 'flex', flexWrap: 'wrap', gap: '3.5rem', alignItems: 'center', width: '100%'}}>
@@ -811,47 +811,118 @@ export default function FamilyPortalPage() {
               </div>
               
               <div style={{
-                background: 'linear-gradient(135deg,rgb(237, 237, 241) 100%,rgb(207, 209, 212) 100%)',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 borderRadius: '1rem',
-                padding: '1.5rem',
+                padding: '0.125rem',
                 flexShrink: 0,
-                maxWidth: '320px',
+                maxWidth: '300px',
                 width: '100%',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                marginRight: '2.5rem'
+                marginRight: '4rem'
               }}>
-                <h3 style={{
-                  fontSize: '0.875rem', 
-                  fontWeight: 600, 
-                  color: '#374151', 
-                  margin: '0 0 0.5rem 0'
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.95) 100%)',
+                  borderRadius: '0.875rem',
+                  padding: '1.25rem',
+                  backdropFilter: 'blur(10px)'
                 }}>
-                  Chỉ số sức khỏe của {selectedResident.name}
-                </h3>
-                <p style={{
-                  fontSize: '0.75rem', 
-                  color: '#6b7280', 
-                  margin: '0 0 1rem 0'
-                }}>
-                  Cập nhật lần cuối: {selectedResident.vitals.lastUpdated}
-                </p>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', fontSize: '0.875rem'}}>
-                  <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Huyết áp</span>
-                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.bloodPressure} mmHg</span>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: '0.75rem',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{
+                      width: '1.5rem',
+                      height: '1.5rem',
+                      background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                      borderRadius: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <svg style={{width: '0.875rem', height: '0.875rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                    </div>
+                    <h3 style={{
+                      fontSize: '0.875rem', 
+                      fontWeight: 700, 
+                      color: '#1f2937', 
+                      margin: 0
+                    }}>
+                      Chỉ số sức khỏe của {selectedResident.name}
+                    </h3>
                   </div>
-                  <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Nhịp tim</span>
-                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.heartRate} nhịp/phút</span>
+                  
+                  <p style={{
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    margin: '0 0 1rem 0'
+                  }}>
+                    <span style={{fontWeight: 600}}>Lần cập nhật gần nhất:</span> {selectedResident.vitals.lastUpdated}
+                  </p>
+                  
+                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
+                    <div style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(239, 68, 68, 0.2)'
+                    }}>
+                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Huyết áp (mmHg)</div>
+                      <div style={{fontWeight: 700, color: '#ef4444', fontSize: '0.8rem'}}>{selectedResident.vitals.bloodPressure}</div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                    }}>
+                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Nhịp tim (bpm)</div>
+                      <div style={{fontWeight: 700, color: '#10b981', fontSize: '0.8rem'}}>{selectedResident.vitals.heartRate}</div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'rgba(245, 158, 11, 0.1)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(245, 158, 11, 0.2)'
+                    }}>
+                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Nhiệt độ cơ thể</div>
+                      <div style={{fontWeight: 700, color: '#f59e0b', fontSize: '0.8rem'}}>{selectedResident.vitals.temperature}°C</div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(99, 102, 241, 0.2)'
+                    }}>
+                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Cân nặng hiện tại</div>
+                      <div style={{fontWeight: 700, color: '#6366f1', fontSize: '0.8rem'}}>{selectedResident.vitals.weight} kg</div>
+                    </div>
                   </div>
-                  <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Nhiệt độ</span>
-                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.temperature}°C</span>
-                  </div>
-                  <div>
-                    <span style={{color: '#6b7280', fontSize: '0.75rem', display: 'block'}}>Cân nặng</span>
-                    <span style={{fontWeight: 600, color: '#111827'}}>{selectedResident.vitals.weight} kg</span>
+                  
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.5rem',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{
+                      width: '0.375rem',
+                      height: '0.375rem',
+                      background: '#10b981',
+                      borderRadius: '50%'
+                    }} />
+                    <span style={{fontSize: '0.7rem', color: '#059669', fontWeight: 600}}>
+                      Tình trạng: Tất cả chỉ số đều bình thường
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1004,7 +1075,7 @@ export default function FamilyPortalPage() {
                     <thead>
                       <tr>
                         <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ngày</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Thời gian</th>
+                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Thời gian đo</th>
                         <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Huyết áp</th>
                         <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhịp tim</th>
                         <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhiệt độ</th>
