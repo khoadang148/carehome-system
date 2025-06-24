@@ -256,8 +256,8 @@ function ActionCard({
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
-              <span style={{ fontWeight: 500, color: '#111827' }}>{resident.name}</span>
-              <span style={{ color: '#6b7280' }}>Phòng {resident.room}</span>
+                                      <span style={{ fontWeight: 500, color: '#111827' }}><strong>Tên:</strong> {resident.name}</span>
+                        <span style={{ color: '#6b7280' }}><strong>Phòng:</strong> {resident.room}</span>
             </button>
           ))}
         </div>

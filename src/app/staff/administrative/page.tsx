@@ -189,238 +189,221 @@ export default function StaffAdministrativePage() {
           </p>
         </div>
 
-        {/* Inventory Stats */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #ef444420'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <ExclamationTriangleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#ef4444' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Hết hàng</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444', margin: 0 }}>
-                  {inventory.filter(i => i.status === 'out_of_stock').length}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #f59e0b20'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <ClockIcon style={{ width: '1.5rem', height: '1.5rem', color: '#f59e0b' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Sắp hết</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b', margin: 0 }}>
-                  {inventory.filter(i => i.status === 'low').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #10b98120'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#10b981' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Đủ hàng</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-                  {inventory.filter(i => i.status === 'sufficient').length}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Inventory List */}
         <div style={{
           background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          borderRadius: '0.75rem',
+          overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #f1f5f9'
         }}>
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            {inventory.map((item) => (
+          {/* Table Header */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '2.5fr 120px 120px 180px 140px 120px',
+            gap: '1rem',
+            padding: '1rem 1.5rem',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            color: '#475569',
+            alignItems: 'center'
+          }}>
+            <div>Sản phẩm</div>
+            <div style={{ textAlign: 'center' }}>Tồn kho</div>
+            <div style={{ textAlign: 'center' }}>Tối thiểu</div>
+            <div style={{ textAlign: 'center' }}>Vị trí</div>
+            <div style={{ textAlign: 'center' }}>Kiểm tra cuối</div>
+            <div style={{ textAlign: 'center' }}>Thao tác</div>
+          </div>
+
+          {/* Table Body */}
+          <div>
+            {inventory.map((item, index) => (
               <div key={item.id} style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr auto auto',
-                gap: '2rem',
+                gridTemplateColumns: '2.5fr 120px 120px 180px 140px 120px',
+                gap: '1rem',
                 alignItems: 'center',
-                padding: '1.5rem',
-                background: '#f9fafb',
-                borderRadius: '0.75rem',
-                border: `2px solid ${getStatusColor(item.status)}20`
-              }}>
-                <div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 700,
-                      color: '#1f2937',
-                      margin: 0
-                    }}>
-                      {item.name}
-                    </h3>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      background: `${getStatusColor(item.status)}20`,
-                      color: getStatusColor(item.status)
-                    }}>
-                      {item.status === 'sufficient' ? 'Đủ hàng' :
-                       item.status === 'low' ? 'Sắp hết' : 'Hết hàng'}
-                    </span>
-                  </div>
+                padding: '1rem 1.5rem',
+                borderBottom: index < inventory.length - 1 ? '1px solid #f1f5f9' : 'none',
+                transition: 'background-color 0.15s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fafbfc'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                                 {/* Product Info */}
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minHeight: '3rem' }}>
+                   <div style={{
+                     width: '0.375rem',
+                     height: '2.5rem',
+                     borderRadius: '0.1875rem',
+                     background: getStatusColor(item.status),
+                     flexShrink: 0
+                   }} />
+                   <div style={{ flex: 1, minWidth: 0 }}>
+                     <h3 style={{
+                       fontSize: '0.9375rem',
+                       fontWeight: 600,
+                       color: '#1e293b',
+                       margin: '0 0 0.375rem 0',
+                       lineHeight: 1.2,
+                       whiteSpace: 'nowrap',
+                       overflow: 'hidden',
+                       textOverflow: 'ellipsis'
+                     }}>
+                       {item.name}
+                     </h3>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'nowrap' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                         <span style={{
+                           fontSize: '0.6875rem',
+                           color: '#9ca3af',
+                           fontWeight: 500,
+                           whiteSpace: 'nowrap'
+                         }}>
+                           Loại:
+                         </span>
+                         <span style={{
+                           fontSize: '0.75rem',
+                           color: '#64748b',
+                           fontWeight: 600,
+                           whiteSpace: 'nowrap'
+                         }}>
+                           {item.category}
+                         </span>
+                       </div>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                         <span style={{
+                           fontSize: '0.6875rem',
+                           color: '#9ca3af',
+                           fontWeight: 500,
+                           whiteSpace: 'nowrap'
+                         }}>
+                           Trạng thái:
+                         </span>
+                         <span style={{
+                           padding: '0.125rem 0.5rem',
+                           borderRadius: '0.375rem',
+                           fontSize: '0.6875rem',
+                           fontWeight: 600,
+                           background: `${getStatusColor(item.status)}15`,
+                           color: getStatusColor(item.status),
+                           textTransform: 'uppercase',
+                           letterSpacing: '0.025em',
+                           whiteSpace: 'nowrap',
+                           flexShrink: 0
+                         }}>
+                           {item.status === 'sufficient' ? 'Đủ hàng' :
+                            item.status === 'low' ? 'Sắp hết' : 'Hết hàng'}
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
 
+                {/* Current Stock */}
+                <div style={{ textAlign: 'center' }}>
                   <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                    gap: '1rem'
-                  }}>
-                    <div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        Tồn kho
-                      </p>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {item.currentStock} {item.unit}
-                      </p>
-                    </div>
-                    <div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        Tối thiểu
-                      </p>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {item.minimumStock} {item.unit}
-                      </p>
-                    </div>
-                    <div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        Vị trí
-                      </p>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {item.location}
-                      </p>
-                    </div>
-                    <div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        Kiểm tra cuối
-                      </p>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {new Date(item.lastChecked).toLocaleDateString('vi-VN')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{
-                  textAlign: 'center',
-                  padding: '1rem',
-                  background: 'white',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <p style={{
-                    fontSize: '1.5rem',
+                    fontSize: '1.125rem',
                     fontWeight: 700,
                     color: getStatusColor(item.status),
-                    margin: 0
+                    lineHeight: 1
                   }}>
                     {item.currentStock}
-                  </p>
-                  <p style={{
+                  </div>
+                  <div style={{
                     fontSize: '0.75rem',
-                    color: '#6b7280',
-                    margin: 0
+                    color: '#64748b',
+                    marginTop: '0.125rem'
                   }}>
                     {item.unit}
-                  </p>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setSelectedItem(item);
-                    setShowInventoryUpdate(true);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.75rem 1rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
+                {/* Minimum Stock */}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    fontSize: '0.9375rem',
                     fontWeight: 600,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  <ClipboardDocumentCheckIcon style={{ width: '1rem', height: '1rem' }} />
-                  Cập nhật
-                </button>
+                    color: '#475569'
+                  }}>
+                    {item.minimumStock}
+                  </div>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#64748b',
+                    marginTop: '0.125rem'
+                  }}>
+                    {item.unit}
+                  </div>
+                </div>
+
+                                 {/* Location */}
+                 <div style={{ textAlign: 'center' }}>
+                   <div style={{
+                     fontSize: '0.8125rem',
+                     fontWeight: 500,
+                     color: '#475569',
+                     lineHeight: 1.3,
+                     whiteSpace: 'nowrap',
+                     overflow: 'hidden',
+                     textOverflow: 'ellipsis'
+                   }}>
+                     {item.location}
+                   </div>
+                 </div>
+
+                {/* Last Checked */}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                    color: '#475569'
+                  }}>
+                    {new Date(item.lastChecked).toLocaleDateString('vi-VN')}
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <div style={{ textAlign: 'center' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setShowInventoryUpdate(true);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                      padding: '0.5rem 0.875rem',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#2563eb';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#3b82f6';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <ClipboardDocumentCheckIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+                    Cập nhật
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -448,14 +431,17 @@ export default function StaffAdministrativePage() {
               maxWidth: '500px',
               width: '100%'
             }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                color: '#1f2937',
-                marginBottom: '1.5rem'
-              }}>
-                Cập nhật tồn kho
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <CubeIcon style={{ width: '1.5rem', height: '1.5rem', color: '#3b82f6' }} />
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: '#3b82f6',
+                  margin: 0
+                }}>
+                  Cập nhật tồn kho
+                </h2>
+              </div>
 
               <div style={{ marginBottom: '1rem' }}>
                 <p style={{

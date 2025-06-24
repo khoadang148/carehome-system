@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeftIcon, PencilIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PencilIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { useActivities } from '@/lib/contexts/activities-context';
 
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -275,26 +275,48 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               >
                 <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
           </Link>
-              <div>
-                <h1 style={{
-                  fontSize: 'clamp(1.5rem, 3vw, 2rem)',
-                  fontWeight: 700,
-                  margin: 0,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.025em'
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '3.5rem',
+                  height: '3.5rem',
+                  borderRadius: '1rem',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  boxShadow: '0 8px 20px -5px rgba(245, 158, 11, 0.3)'
                 }}>
-                  Chi tiết hoạt động
-                </h1>
-                <p style={{
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: 500
-                }}>
-                  Thông tin đầy đủ về chương trình sinh hoạt
-                </p>
+                  <EyeIcon style={{ 
+                    width: '2rem', 
+                    height: '2rem',
+                    color: 'white'
+                  }} />
+                </div>
+                <div>
+                  <h1 style={{
+                    fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+                    fontWeight: 700,
+                    margin: 0,
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Chi tiết hoạt động
+                  </h1>
+                  <p style={{
+                    fontSize: '1rem',
+                    color: '#92400e',
+                    margin: '0.25rem 0 0 0',
+                    fontWeight: 500
+                  }}>
+                    Thông tin đầy đủ về chương trình sinh hoạt
+                  </p>
+                </div>
               </div>
         </div>
         
@@ -403,7 +425,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 backdropFilter: 'blur(10px)'
               }}>
                 <ClockIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span>{activity.scheduledTime} - {activity.endTime}</span>
+                <span><strong>Thời gian:</strong> {activity.scheduledTime} - {activity.endTime}</span>
               </div>
               <div style={{
                 display: 'flex', 
@@ -415,7 +437,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 backdropFilter: 'blur(10px)'
               }}>
                 <MapPinIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span>{activity.location}</span>
+                <span><strong>Địa điểm:</strong> {activity.location}</span>
               </div>
               <div style={{
                 display: 'flex', 
@@ -427,7 +449,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 backdropFilter: 'blur(10px)'
               }}>
                 <UserGroupIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                <span>{activity.participants?.length || 0}/{activity.capacity} người</span>
+                <span><strong>Số người tham gia:</strong> {activity.participants?.length || 0}/{activity.capacity} người</span>
             </div>
           </div>
         </div>

@@ -1023,7 +1023,8 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          backdropFilter: 'blur(5px)'
+          backdropFilter: 'blur(5px)',
+          marginLeft: '12rem'
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -1385,7 +1386,8 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
            justifyContent: 'center',
            zIndex: 1001,
            backdropFilter: 'blur(10px)',
-           animation: 'fadeIn 0.4s ease-out'
+           animation: 'fadeIn 0.4s ease-out',
+           marginLeft: '12rem'
          }}>
            <div style={{
              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',

@@ -330,8 +330,8 @@ export default function ActivityCalendarPage() {
                       </span>
                     </div>
                     <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#6b7280'}}>
-                      <span>{activity.scheduledTime}</span>
-                      <span>{activity.duration} phút</span>
+                      <span><strong>Thời gian:</strong> {activity.scheduledTime}</span>
+                      <span><strong>Thời lượng:</strong> {activity.duration} phút</span>
                     </div>
                   </Link>
                 ))

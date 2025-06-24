@@ -17,7 +17,8 @@ import {
   ClockIcon,
   MapPinIcon,
   ListBulletIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -700,14 +701,14 @@ export default function ActivitiesPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                marginBottom: '1rem'
+                marginBottom: '0.75rem'
               }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, paddingRight: '1rem' }}>
                   <h3 style={{
                     fontSize: '1.125rem',
                     fontWeight: 600,
                     color: '#111827',
-                        margin: '0 0 0.25rem 0',
+                        margin: '0 0 0.5rem 0',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem'
@@ -729,110 +730,111 @@ export default function ActivitiesPage() {
                         {activity.description}
                       </p>
                 </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      background: statusColor.bg,
-                      color: statusColor.text,
-                      border: `1px solid ${statusColor.border}`,
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {activity.status}
+                <div style={{ flexShrink: 0 }}>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.375rem 0.875rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: statusColor.bg,
+                    color: statusColor.text,
+                    border: `1px solid ${statusColor.border}`,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {activity.status}
+                  </span>
                 </div>
               </div>
 
-                  {/* Date, Time & Location */}
+                  {/* Compact Info Grid */}
                 <div style={{
                   display: 'grid',
-                    gridTemplateColumns: viewMode === 'calendar' ? '1fr' : '1fr 1fr',
-                    gap: '1rem',
-                  marginBottom: '1rem'
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem',
+                  padding: '0.75rem',
+                  background: '#f8fafc',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e2e8f0'
                 }}>
-                    {viewMode === 'calendar' && (
-                      <div style={{
-                        display: 'flex',
-                      alignItems: 'center',
-                        gap: '0.5rem',
-                      fontSize: '0.875rem',
-                        color: '#6b7280'
-                    }}>
-                        <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
-                        <span>{new Date(activity.date).toLocaleDateString('vi-VN')}</span>
+                  {/* Time */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    <ClockIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Thời gian</div>
+                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.startTime} - {activity.endTime}</div>
+                    </div>
                   </div>
-                    )}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                      <span>{activity.startTime} - {activity.endTime} ({activity.duration} phút)</span>
+                  
+                  {/* Location */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    <MapPinIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Địa điểm</div>
+                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.location}</div>
+                    </div>
                   </div>
+                  
+                  {/* Category */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
                     <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <MapPinIcon style={{ width: '1rem', height: '1rem' }} />
-                      <span>{activity.location}</span>
+                      width: '1rem',
+                      height: '1rem',
+                      borderRadius: '0.25rem',
+                      background: categoryColor
+                    }} />
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Danh mục</div>
+                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.category}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Participants */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    <UserGroupIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Số lượng</div>
+                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.participants}/{activity.capacity}</div>
+                    </div>
                   </div>
                 </div>
 
-                  {/* Category & Participants */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  marginBottom: '1rem'
-                }}>
-                    <span style={{
-                      background: `${categoryColor}20`,
-                      color: categoryColor,
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600
-                    }}>
-                      {activity.category}
-                    </span>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <UserGroupIcon style={{ width: '1rem', height: '1rem' }} />
-                      <span>{activity.participants}/{activity.capacity}</span>
-                  </div>
-                  </div>
-
                   {/* Facilitator */}
                   <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
                     background: 'rgba(59, 130, 246, 0.1)',
                     borderRadius: '0.5rem',
-                    padding: '0.75rem',
-                    marginBottom: '1rem'
+                    padding: '0.625rem',
+                    marginBottom: '0.75rem'
                   }}>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#374151',
-                      margin: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      <strong>Hướng dẫn viên:</strong> {activity.facilitator}
-                    </p>
+                    <UserIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />
+                    <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Hướng dẫn viên:</span>
+                    <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>{activity.facilitator}</span>
         </div>
 
               {/* Actions */}

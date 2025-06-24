@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -1035,7 +1035,7 @@ export default function LoginPage() {
           {/* Header */}
           <div style={{
               padding: '2.5rem 2.5rem 1.5rem 2.5rem',
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              background: 'linear-gradient(135deg,rgb(153, 228, 203) 0%,rgb(136, 209, 240) 100%)',
               borderBottom: '1px solid #f3f4f6',
               position: 'relative'
           }}>

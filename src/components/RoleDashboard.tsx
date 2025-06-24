@@ -116,14 +116,6 @@ const ROLE_DASHBOARDS = {
         stats: '8 ghi nhận hôm nay'
       },
       {
-        title: 'Quản lý thuốc',
-        description: 'Lịch uống thuốc và phát thuốc',
-        icon: CubeIcon,
-        href: '/staff/medication',
-        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        stats: '15 lần uống hôm nay'
-      },
-      {
         title: 'Hỗ trợ',
         description: 'Kiểm kê kho',
         icon: CubeIcon,

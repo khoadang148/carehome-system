@@ -54,7 +54,7 @@ const menuGroups: MenuGroup[] = [
     title: "Lối tắt chăm sóc",
     items: [
       { name: 'Nhật ký theo dõi', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
-      { name: 'Đăng ảnh người cao tuổi', href: '/residents?action=upload', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
+      { name: 'Đăng ảnh người cao tuổi', href: '/residents/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
       { name: 'Tương tác gia đình', href: '/staff/family-communication', icon: ChatBubbleLeftRightIcon, roles: ['staff'], color: '#f59e0b' },
       
     ]
@@ -67,7 +67,7 @@ const menuGroups: MenuGroup[] = [
       { name: 'Thông tin người thân', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
       { name: 'Liên hệ với nhân viên', href: '/family/contact-staff', icon: ChatBubbleLeftRightIcon, roles: ['family'], color: '#6366f1' },
       { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1' },
-      { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['staff','family'], color: '#6366f1' },
+      { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1' },
       { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'family'], color: '#6366f1' },
       
     ]

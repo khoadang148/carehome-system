@@ -271,15 +271,15 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
               <div style={{display: 'grid', gap: '1.1rem'}}>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Ngày sinh:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}><strong>Ngày sinh:</strong> {staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Giới tính:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Khác'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}><strong>Giới tính:</strong> {staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Khác'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Địa chỉ:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.address || 'N/A'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}><strong>Địa chỉ:</strong> {staff.address || 'N/A'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Chứng chỉ:</span>

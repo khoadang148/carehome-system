@@ -266,19 +266,34 @@ export default function StaffVitalSignsPage() {
             alignItems: 'center'
           }}>
             <div>
-              <h1 style={{
-                fontSize: '1.875rem',
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                margin: '0 0 0.5rem 0'
-              }}>
-                Theo Dõi Các Chỉ Số Sinh Hiệu
-              </h1>
-              <p style={{ color: '#6b7280', margin: 0 }}>
-                Ghi nhận và theo dõi các thông số sinh lý quan trọng của người cao tuổi
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  borderRadius: '1rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                }}>
+                  <HeartIconSolid style={{ width: '2rem', height: '2rem', color: 'white' }} />
+                </div>
+                <div>
+                  <h1 style={{
+                    fontSize: '1.875rem',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    margin: '0 0 0.5rem 0'
+                  }}>
+                    Theo Dõi Các Chỉ Số Sức Khỏe
+                  </h1>
+                  <p style={{ color: '#6b7280', margin: 0 }}>
+                    Ghi nhận và theo dõi các thông số sinh lý quan trọng của người cao tuổi
+                  </p>
+                </div>
+              </div>
             </div>
             <button
               onClick={() => setShowAddForm(true)}
@@ -297,7 +312,7 @@ export default function StaffVitalSignsPage() {
               }}
             >
               <PlusIcon style={{ width: '1rem', height: '1rem' }} />
-              Đo đạc mới
+              Thêm chỉ số sức khỏe
             </button>
           </div>
         </div>
@@ -403,196 +418,155 @@ export default function StaffVitalSignsPage() {
                       marginBottom: '0.5rem'
                     }}>
                       <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
-                      <h3 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: 700,
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {record.residentName}
-                      </h3>
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        background: `${getStatusColor(record.status)}20`,
-                        color: getStatusColor(record.status)
-                      }}>
-                        {record.status === 'normal' ? 'Ổn định' :
-                         record.status === 'warning' ? 'Bất thường' : 'Nguy kịch'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Người cao tuổi:</span>
+                        <h3 style={{
+                          fontSize: '1.125rem',
+                          fontWeight: 700,
+                          color: '#1f2937',
+                          margin: 0
+                        }}>
+                          {record.residentName}
+                        </h3>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Tình trạng:</span>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: `${getStatusColor(record.status)}20`,
+                          color: getStatusColor(record.status)
+                        }}>
+                          {record.status === 'normal' ? 'Ổn định' :
+                           record.status === 'warning' ? 'Bất thường' : 'Nguy kịch'}
+                        </span>
+                      </div>
                     </div>
-                    <p style={{
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
                       fontSize: '0.875rem',
-                      color: '#6b7280',
-                      margin: 0
+                      color: '#6b7280'
                     }}>
-                      {new Date(record.date).toLocaleDateString('vi-VN')} • {record.time} • 
-                      Đo đạc bởi: {record.recordedBy}
-                    </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ fontWeight: 500 }}>Ngày:</span>
+                        <span>{new Date(record.date).toLocaleDateString('vi-VN')}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ fontWeight: 500 }}>Giờ:</span>
+                        <span>{record.time}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ fontWeight: 500 }}>Đo đạc bởi:</span>
+                        <span>{record.recordedBy}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '1.2rem',
-                  marginBottom: '1.5rem'
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))',
+                  gap: '0.5rem',
+                  marginBottom: '1rem'
                 }}>
                   {/* Blood Pressure */}
                   <div style={{
-                    padding: '1.2rem',
-                    background: 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)',
-                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                    background: '#fef2f2',
+                    borderRadius: '0.375rem',
                     textAlign: 'center',
-                    border: '1px solid #fecaca',
-                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.1)'
+                    border: '1px solid #fecaca'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                      <HeartIconSolid style={{ width: '1.75rem', height: '1.75rem', color: '#ef4444' }} />
-                    </div>
-                    <p style={{ fontSize: '0.875rem', color: '#991b1b', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                      HUYẾT ÁP ĐỘNG MẠCH
+                    <p style={{ fontSize: '0.625rem', color: '#991b1b', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
+                      Huyết áp
                     </p>
-                    <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
                       {record.bloodPressureSystolic}/{record.bloodPressureDiastolic}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>mmHg</p>
-                    <p style={{ fontSize: '0.6875rem', color: '#ef4444', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
-                      Tâm thu / Tâm trương
                     </p>
                   </div>
 
                   {/* Heart Rate */}
                   <div style={{
-                    padding: '1.2rem',
-                    background: 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)',
-                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                    background: '#fef2f2',
+                    borderRadius: '0.375rem',
                     textAlign: 'center',
-                    border: '1px solid #fca5a5',
-                    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.1)'
+                    border: '1px solid #fca5a5'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                      <div style={{
-                        width: '1.75rem',
-                        height: '1.75rem',
-                        background: '#dc2626',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        animation: 'pulse 1.5s infinite'
-                      }}>
-                        <HeartIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
-                      </div>
-                    </div>
-                    <p style={{ fontSize: '0.875rem', color: '#991b1b', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                      MẠCH ĐẬP
+                    <p style={{ fontSize: '0.625rem', color: '#991b1b', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
+                      Mạch
                     </p>
-                    <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                      {record.heartRate}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>bpm</p>
-                    <p style={{ fontSize: '0.6875rem', color: '#dc2626', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
-                      Tần số/phút
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                      {record.heartRate} bpm
                     </p>
                   </div>
 
                   {/* Temperature */}
                   <div style={{
-                    padding: '1.2rem',
-                    background: 'linear-gradient(135deg, #fef3c7 0%, #ffffff 100%)',
-                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                    background: '#fef3c7',
+                    borderRadius: '0.375rem',
                     textAlign: 'center',
-                    border: '1px solid #fde68a',
-                    boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)'
+                    border: '1px solid #fde68a'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                      <FireIconSolid style={{ width: '1.75rem', height: '1.75rem', color: '#f59e0b' }} />
-                    </div>
-                    <p style={{ fontSize: '0.875rem', color: '#92400e', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                      THÂN NHIỆT
+                    <p style={{ fontSize: '0.625rem', color: '#92400e', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
+                      Nhiệt độ
                     </p>
-                    <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                      {record.temperature}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>°C</p>
-                    <p style={{ fontSize: '0.6875rem', color: '#f59e0b', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
-                      Thang đo Celsius
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                      {record.temperature}°C
                     </p>
                   </div>
 
                   {/* Oxygen Saturation */}
                   <div style={{
-                    padding: '1.2rem',
-                    background: 'linear-gradient(135deg, #dbeafe 0%, #ffffff 100%)',
-                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                    background: '#dbeafe',
+                    borderRadius: '0.375rem',
                     textAlign: 'center',
-                    border: '1px solid #bfdbfe',
-                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.1)'
+                    border: '1px solid #bfdbfe'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                      <CloudIconSolid style={{ width: '1.75rem', height: '1.75rem', color: '#3b82f6' }} />
-                    </div>
-                    <p style={{ fontSize: '0.875rem', color: '#1e40af', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                      ĐỘ BÃO HÒA OXY MÁU
-                    </p>
-                    <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                      {record.oxygenSaturation}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>%</p>
-                    <p style={{ fontSize: '0.6875rem', color: '#3b82f6', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
+                    <p style={{ fontSize: '0.625rem', color: '#1e40af', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
                       SpO₂
+                    </p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                      {record.oxygenSaturation}%
                     </p>
                   </div>
 
                   {/* Respiratory Rate */}
                   <div style={{
-                    padding: '1.2rem',
-                    background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)',
-                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                    background: '#ecfdf5',
+                    borderRadius: '0.375rem',
                     textAlign: 'center',
-                    border: '1px solid #a7f3d0',
-                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.1)'
+                    border: '1px solid #a7f3d0'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                      <HandRaisedIcon style={{ width: '1.75rem', height: '1.75rem', color: '#10b981' }} />
-                    </div>
-                    <p style={{ fontSize: '0.875rem', color: '#065f46', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                      NHỊP THỞ
+                    <p style={{ fontSize: '0.625rem', color: '#065f46', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
+                      Nhịp thở
                     </p>
-                    <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                      {record.respiratoryRate}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>lần/phút</p>
-                    <p style={{ fontSize: '0.6875rem', color: '#10b981', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
-                      Tần số hô hấp
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                      {record.respiratoryRate}/phút
                     </p>
                   </div>
 
                   {/* Weight */}
                   {record.weight && (
                     <div style={{
-                      padding: '1.2rem',
-                      background: 'linear-gradient(135deg, #f3e8ff 0%, #ffffff 100%)',
-                      borderRadius: '0.75rem',
+                      padding: '0.5rem',
+                      background: '#f3e8ff',
+                      borderRadius: '0.375rem',
                       textAlign: 'center',
-                      border: '1px solid #c4b5fd',
-                      boxShadow: '0 2px 4px rgba(139, 92, 246, 0.1)'
+                      border: '1px solid #c4b5fd'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                        <ScaleIcon style={{ width: '1.75rem', height: '1.75rem', color: '#8b5cf6' }} />
-                      </div>
-                      <p style={{ fontSize: '0.875rem', color: '#6b21a8', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                        KHỐI LƯỢNG CƠ THỂ
+                      <p style={{ fontSize: '0.625rem', color: '#6b21a8', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
+                        Cân nặng
                       </p>
-                      <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                        {record.weight}
-                      </p>
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>kg</p>
-                      <p style={{ fontSize: '0.6875rem', color: '#8b5cf6', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
-                        Đơn vị kilogram
+                      <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                        {record.weight}kg
                       </p>
                     </div>
                   )}
@@ -600,25 +574,17 @@ export default function StaffVitalSignsPage() {
                   {/* Blood Sugar */}
                   {record.bloodSugar && (
                     <div style={{
-                      padding: '1.2rem',
-                      background: 'linear-gradient(135deg, #fdf4ff 0%, #ffffff 100%)',
-                      borderRadius: '0.75rem',
+                      padding: '0.5rem',
+                      background: '#fdf4ff',
+                      borderRadius: '0.375rem',
                       textAlign: 'center',
-                      border: '1px solid #f3e8ff',
-                      boxShadow: '0 2px 4px rgba(168, 85, 247, 0.1)'
+                      border: '1px solid #f3e8ff'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                        <BeakerIcon style={{ width: '1.75rem', height: '1.75rem', color: '#a855f7' }} />
-                      </div>
-                      <p style={{ fontSize: '0.875rem', color: '#7c2d92', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-                        GLUCOSE MÁU
+                      <p style={{ fontSize: '0.625rem', color: '#7c2d92', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
+                        Glucose
                       </p>
-                      <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                        {record.bloodSugar}
-                      </p>
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, fontWeight: 500 }}>mg/dL</p>
-                      <p style={{ fontSize: '0.6875rem', color: '#a855f7', margin: '0.25rem 0 0 0', fontWeight: 500 }}>
-                        Đường huyết mao mạch
+                      <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                        {record.bloodSugar}mg/dL
                       </p>
                     </div>
                   )}
@@ -696,18 +662,35 @@ export default function StaffVitalSignsPage() {
               maxHeight: '90vh',
               overflowY: 'auto'
             }}>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 700,
-                margin: 0,
-                background: 'linear-gradient(90deg, #22c55e 0%, #64748b 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                letterSpacing: '0.01em' ,
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
                 marginBottom: '1.5rem'
               }}>
-                Đo đạc các chỉ số sinh lý
-              </h2>
+                <div style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  borderRadius: '0.75rem',
+                  padding: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                }}>
+                  <HeartIconSolid style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '0.01em'
+                }}>
+                  Đo đạc các chỉ số sức khỏe
+                </h2>
+              </div>
 
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -778,6 +761,8 @@ export default function StaffVitalSignsPage() {
                       type="date"
                       name="date"
                       defaultValue={currentDate}
+                      min={new Date().toISOString().split('T')[0]}
+                      max={new Date().toISOString().split('T')[0]}
                       required
                       style={{
                         width: '100%',

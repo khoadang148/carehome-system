@@ -420,7 +420,7 @@ export default function StaffDashboardWidgets() {
                   fontSize: '0.75rem',
                   color: '#6b7280'
                 }}>
-                  {appointment.type} • {appointment.time}
+                  <strong>Loại:</strong> {appointment.type} • <strong>Thời gian:</strong> {appointment.time}
                 </div>
               </div>
             ))
@@ -502,7 +502,7 @@ export default function StaffDashboardWidgets() {
                   fontSize: '0.625rem',
                   color: '#6b7280'
                 }}>
-                  {new Date(note.timestamp).toLocaleString('vi-VN')}
+                  <strong>Thời gian:</strong> {new Date(note.timestamp).toLocaleString('vi-VN')}
                 </div>
               </div>
             ))

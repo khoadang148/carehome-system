@@ -230,7 +230,7 @@ export default function FamilyDashboardWidgets() {
                     fontSize: '0.75rem',
                     color: '#64748b'
                   }}>
-                    Cập nhật: {member.lastUpdate}
+                    <strong>Cập nhật:</strong> {member.lastUpdate}
                   </div>
                 </div>
                 <div style={{
@@ -308,7 +308,7 @@ export default function FamilyDashboardWidgets() {
                     fontSize: '0.75rem',
                     color: '#64748b'
                   }}>
-                    {activity.activity} - {activity.time}
+                    <strong>Hoạt động:</strong> {activity.activity} - <strong>Thời gian:</strong> {activity.time}
                   </div>
                 </div>
                 <div style={{
@@ -406,7 +406,7 @@ export default function FamilyDashboardWidgets() {
                   fontSize: '0.6875rem',
                   color: '#64748b'
                 }}>
-                  {new Date(note.date).toLocaleDateString('vi-VN')}
+                  <strong>Ngày:</strong> {new Date(note.date).toLocaleDateString('vi-VN')}
                 </div>
               </div>
             ))
