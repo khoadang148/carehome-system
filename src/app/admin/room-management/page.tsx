@@ -245,10 +245,7 @@ export default function RoomManagementPage() {
     }
   };
 
-  const totalRooms = rooms.length;
-  const availableRooms = rooms.filter(r => r.status === 'available').length;
-  const occupiedRooms = rooms.filter(r => r.status === 'occupied').length;
-  const maintenanceRooms = rooms.filter(r => r.status === 'maintenance').length;
+
 
   const hasModalOpen = showDetailModal || showTransferModal || showAddResidentModal;
   const headerRef = useRef<HTMLDivElement>(null);
@@ -301,71 +298,56 @@ export default function RoomManagementPage() {
         
         {/* Header */}
         <div ref={headerRef} style={{
+          background: 'linear-gradient(135deg,rgb(251, 252, 253) 0%,rgb(251, 254, 255) 100%)',
+          borderRadius: '1.5rem',
+          padding: '1.8rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '1rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)'
+                }}>
+                  <BuildingOfficeIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+                </div>
+                <div>
+                  <h1 style={{
+                    fontSize: '2rem',
+                    fontWeight: 700,
+                    margin: '0 0 0.5rem 0',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}>
+                    Quản lý Phòng & Giường
+                  </h1>
+                  <p style={{ color: '#64748b', margin: 0 }}>
+                    Phân chia phòng, giường theo dịch vụ và tình trạng sức khỏe
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+
+
+
+          {/* Filters */}
+          <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
           padding: '2rem',
           marginBottom: '2rem',
           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div>
-              <h1 style={{
-                fontSize: '2rem',
-                fontWeight: 700,
-                margin: '0 0 0.5rem 0',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}>
-                Quản lý Phòng & Giường
-              </h1>
-              <p style={{ color: '#64748b', margin: 0 }}>
-                Phân chia phòng, giường theo dịch vụ và tình trạng sức khỏe
-              </p>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{totalRooms}</div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Tổng phòng</div>
-            </div>
-            <div style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{availableRooms}</div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Phòng trống</div>
-            </div>
-            <div style={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{occupiedRooms}</div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Đã thuê</div>
-            </div>
-            <div style={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 700 }}>{maintenanceRooms}</div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Bảo trì</div>
-            </div>
-          </div>
-
-          {/* Filters */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto auto', gap: '1rem', alignItems: 'end' }}>
             <div style={{ position: 'relative' }}>
               <label style={{ 
@@ -414,7 +396,7 @@ export default function RoomManagementPage() {
                 marginBottom: '0.5rem', 
                 fontWeight: 600, 
                 color: '#374151',
-                fontSize: '0.875rem'
+                fontSize: '0.875rem',
               }}>
                 Tầng
               </label>
@@ -545,7 +527,7 @@ export default function RoomManagementPage() {
         {/* Rooms Grid */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
           gap: '1.5rem'
         }}>
           {filteredRooms.map((room) => (
@@ -553,27 +535,28 @@ export default function RoomManagementPage() {
               key={room.id}
               style={{
                 background: 'white',
-                borderRadius: '1.25rem',
+                borderRadius: '1rem',
                 padding: '1.5rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                position: 'relative'
+                border: '1px solid #e5e7eb',
+                position: 'relative',
+                transition: 'all 0.2s ease'
               }}
             >
               {/* Room Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <h3 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 700,
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
                     margin: '0 0 0.25rem 0',
                     color: '#1f2937'
                   }}>
                     Phòng {room.number}
                   </h3>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    <span style={{ fontWeight: 600 }}>Tầng:</span> {room.floor} • 
-                    <span style={{ fontWeight: 600, marginLeft: '0.5rem' }}>Loại:</span> {getRoomTypeLabel(room.type)}
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', display: 'flex', gap: '1rem' }}>
+                    <span><span style={{ fontWeight: 500 }}>Tầng:</span> {room.floor}</span>
+                    <span><span style={{ fontWeight: 500 }}>Loại:</span> {getRoomTypeLabel(room.type)}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -583,20 +566,28 @@ export default function RoomManagementPage() {
                       setShowDetailModal(true);
                     }}
                     style={{
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      padding: '0.75rem',
+                      background: '#f8fafc',
+                      color: '#6366f1',
+                      border: '1px solid #e0e7ff',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontWeight: 600
+                      transition: 'all 0.2s ease'
                     }}
-                    title="Xem chi tiết phòng"
+                    title="Xem chi tiết"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#6366f1';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f8fafc';
+                      e.currentTarget.style.color = '#6366f1';
+                    }}
                   >
-                    <EyeIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                    <EyeIcon style={{ width: '1rem', height: '1rem' }} />
                   </button>
                   <button
                     onClick={() => {
@@ -606,48 +597,70 @@ export default function RoomManagementPage() {
                       setSelectedAddBed('');
                     }}
                     style={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      padding: '0.75rem',
+                      background: '#f0fdf4',
+                      color: '#16a34a',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontWeight: 600
+                      transition: 'all 0.2s ease'
                     }}
-                    title="Thêm người cao tuổi vào phòng"
+                    title="Thêm người cao tuổi"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#16a34a';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f0fdf4';
+                      e.currentTarget.style.color = '#16a34a';
+                    }}
                   >
-                    <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>+</span>
+                    <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>+</span>
                   </button>
                 </div>
               </div>
 
-              {/* Room Status */}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, color: '#374151' }}>Trạng thái:</span>
+              {/* Status and Service Package */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '1rem', 
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                background: '#f9fafb',
+                borderRadius: '0.5rem'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem', fontWeight: 500 }}>
+                    Trạng thái
+                  </div>
                   <span style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '1rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
                     backgroundColor: getStatusColor(room.status),
-                    color: 'white'
+                    color: 'white',
+                    display: 'inline-block'
                   }}>
                     {getStatusLabel(room.status)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
-                  <span style={{ fontWeight: 600, color: '#374151' }}>Gói dịch vụ:</span>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem', fontWeight: 500 }}>
+                    Gói dịch vụ
+                  </div>
                   <span style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '1rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
                     backgroundColor: '#f3f4f6',
-                    color: '#374151'
+                    color: '#374151',
+                    display: 'inline-block'
                   }}>
                     {getServicePackageLabel(room.servicePackage)}
                   </span>
@@ -657,30 +670,30 @@ export default function RoomManagementPage() {
               {/* Room Info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                    <span style={{ fontWeight: 600 }}>Sức chứa:</span>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem', fontWeight: 500 }}>
+                    Sức chứa
                   </div>
-                  <div style={{ fontWeight: 600, color: '#1f2937' }}>
+                  <div style={{ fontWeight: 600, color: '#1f2937', fontSize: '0.875rem' }}>
                     {room.currentOccupancy}/{room.capacity} người
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                    <span style={{ fontWeight: 600 }}>Giá thuê/tháng:</span>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem', fontWeight: 500 }}>
+                    Giá thuê/tháng
                   </div>
-                  <div style={{ fontWeight: 600, color: '#1f2937' }}>
+                  <div style={{ fontWeight: 600, color: '#1f2937', fontSize: '0.875rem' }}>
                     {room.monthlyRate.toLocaleString('vi-VN')} VNĐ
                   </div>
                 </div>
               </div>
 
               {/* Beds */}
-              <div>
+              <div style={{ marginBottom: '1rem' }}>
                 <div style={{ 
                   fontSize: '0.875rem', 
                   fontWeight: 600, 
                   color: '#374151', 
-                  marginBottom: '0.5rem',
+                  marginBottom: '0.75rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -688,56 +701,64 @@ export default function RoomManagementPage() {
                   <UserGroupIcon style={{ width: '1rem', height: '1rem' }} />
                   Danh sách giường ({room.beds.length})
                 </div>
-                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
                   {room.beds.map((bed) => (
                     <div
                       key={bed.id}
                       style={{
-                        background: '#f8fafc',
+                        background: bed.residentName ? '#fefefe' : '#f8fafc',
                         borderRadius: '0.5rem',
                         padding: '0.75rem',
-                        border: '1px solid #e5e7eb'
+                        border: bed.residentName ? '1px solid #e0e7ff' : '1px solid #e5e7eb'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ 
-                            fontWeight: 600, 
-                            color: '#1f2937', 
-                            fontSize: '0.875rem',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem'
+                            gap: '0.5rem',
+                            marginBottom: '0.5rem'
                           }}>
-                            <span>Giường {bed.number}</span>
+                            <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
+                              Giường
+                            </div>
+                            <span style={{ fontWeight: 600, color: '#1f2937', fontSize: '0.875rem' }}>
+                              {bed.number}
+                            </span>
                             <span style={{
-                              width: '8px',
-                              height: '8px',
+                              width: '6px',
+                              height: '6px',
                               borderRadius: '50%',
                               backgroundColor: getStatusColor(bed.status)
                             }} />
                           </div>
+                          
                           {bed.residentName ? (
-                            <div>
-                              <div style={{ 
-                                fontSize: '0.875rem', 
-                                color: '#374151', 
-                                fontWeight: 600,
-                                marginTop: '0.5rem'
-                              }}>
-                                <span style={{ color: '#6b7280' }}>Người cao tuổi:</span> {bed.residentName}
+                            <div style={{ display: 'grid', gap: '0.25rem' }}>
+                              <div>
+                                <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Người cao tuổi: </span>
+                                <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 600 }}>
+                                  {bed.residentName}
+                                </span>
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                <span style={{ fontWeight: 600 }}>Ngày vào:</span> {bed.assignedDate && new Date(bed.assignedDate).toLocaleDateString('vi-VN')}
+                              <div>
+                                <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Ngày vào: </span>
+                                <span style={{ fontSize: '0.75rem', color: '#374151' }}>
+                                  {bed.assignedDate && new Date(bed.assignedDate).toLocaleDateString('vi-VN')}
+                                </span>
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                <span style={{ fontWeight: 600 }}>Mức độ chăm sóc:</span> {getCareLevelLabel(bed.careLevel)}
+                              <div>
+                                <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Mức độ chăm sóc: </span>
+                                <span style={{ fontSize: '0.75rem', color: '#374151', fontWeight: 500 }}>
+                                  {getCareLevelLabel(bed.careLevel)}
+                                </span>
                               </div>
                               {bed.healthCondition && (
                                 <div style={{ marginTop: '0.25rem' }}>
                                   <span style={{ 
                                     fontSize: '0.75rem', 
-                                    fontWeight: 600, 
+                                    fontWeight: 500, 
                                     color: '#6b7280',
                                     marginRight: '0.5rem'
                                   }}>
@@ -747,7 +768,7 @@ export default function RoomManagementPage() {
                                     padding: '0.125rem 0.5rem',
                                     borderRadius: '0.75rem',
                                     fontSize: '0.75rem',
-                                    fontWeight: 600,
+                                    fontWeight: 500,
                                     backgroundColor: getHealthConditionColor(bed.healthCondition),
                                     color: 'white',
                                     display: 'inline-block'
@@ -758,12 +779,11 @@ export default function RoomManagementPage() {
                               )}
                             </div>
                           ) : (
-                            <div style={{ 
-                              fontSize: '0.875rem', 
-                              color: '#6b7280',
-                              marginTop: '0.5rem'
-                            }}>
-                              <span style={{ fontWeight: 600 }}>Trạng thái:</span> Giường trống
+                            <div>
+                              <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Trạng thái: </span>
+                              <span style={{ fontSize: '0.875rem', color: '#6b7280', fontStyle: 'italic' }}>
+                                Giường trống
+                              </span>
                             </div>
                           )}
                         </div>
@@ -775,16 +795,25 @@ export default function RoomManagementPage() {
                               setShowTransferModal(true);
                             }}
                             style={{
-                              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '0.25rem',
-                              padding: '0.25rem',
-                              cursor: 'pointer'
+                              background: '#dbeafe',
+                              color: '#3b82f6',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '0.375rem',
+                              padding: '0.375rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
                             }}
                             title="Chuyển phòng"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#3b82f6';
+                              e.currentTarget.style.color = 'white';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#dbeafe';
+                              e.currentTarget.style.color = '#3b82f6';
+                            }}
                           >
-                            <ArrowRightIcon style={{ width: '0.75rem', height: '0.75rem' }} />
+                            <ArrowRightIcon style={{ width: '0.875rem', height: '0.875rem' }} />
                           </button>
                         )}
                       </div>
@@ -795,7 +824,7 @@ export default function RoomManagementPage() {
 
               {/* Amenities */}
               {room.amenities.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
+                <div>
                   <div style={{ 
                     fontSize: '0.875rem', 
                     fontWeight: 600, 
@@ -808,16 +837,17 @@ export default function RoomManagementPage() {
                     <HomeIcon style={{ width: '1rem', height: '1rem' }} />
                     Tiện nghi phòng
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
                     {room.amenities.map((amenity, index) => (
                       <span
                         key={index}
                         style={{
                           padding: '0.25rem 0.5rem',
-                          borderRadius: '0.5rem',
+                          borderRadius: '0.375rem',
                           fontSize: '0.75rem',
-                          backgroundColor: '#e5e7eb',
-                          color: '#374151'
+                          backgroundColor: '#f3f4f6',
+                          color: '#374151',
+                          fontWeight: 500
                         }}
                       >
                         {amenity}

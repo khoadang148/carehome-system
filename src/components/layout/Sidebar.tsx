@@ -83,8 +83,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Hệ thống",
     items: [
-      { name: 'Tài khoản nhân viên', href: '/permissions', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' },
-      { name: 'Tài khoản gia đình', href: '/admin/family-accounts', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' }
+      { name: 'Quản lý tài khoản', href: '/admin/account-management', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' }
    ]
   }
 ];

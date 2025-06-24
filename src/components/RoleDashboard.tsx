@@ -36,38 +36,14 @@ const ROLE_DASHBOARDS = {
     title: 'Trung tâm Điều hành',
     description: 'Hệ thống quản lý toàn diện viện dưỡng lão',
     cards: [
+     
       {
-        title: 'Người cao tuổi',
-        description: 'Thông tin và hồ sơ chăm sóc người cao tuổituổi',
-        icon: UsersIcon,
-        href: '/residents',
-        gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        stats: '45 người'
-      },
-      {
-        title: 'Quản lý nhân viên',
-        description: 'Quản lý hồ sơ nhân viên',
-        icon: UserPlusIcon,
-        href: '/staff',
-        gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-        stats: '28 thành viên'
-      },
-
-      {
-        title: 'Phê duyệt thăm viếng',
-        description: 'Phê duyệt yêu cầu thăm người thân',
+        title: 'Phê duyệt hoạt động',
+        description: 'Phê duyệt yêu cầu thăm và đăng kí dịch vụ',
         icon: ClipboardDocumentCheckIcon,
-        href: '/admin/visit-approvals',
+        href: '/admin/activity-approvals',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         stats: '5 yêu cầu chờ'
-      },
-      {
-        title: 'Thống kê tài chính',
-        description: 'Quản lý tài chính viện dưỡng lão',
-        icon: CurrencyDollarIcon,
-        href: '/admin/financial-reports',
-        gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-        stats: 'Tháng này'
       },
       {
         title: 'Quản lý phòng/giường',
@@ -84,14 +60,6 @@ const ROLE_DASHBOARDS = {
         href: '/inventory',
         gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
         stats: '150 sản phẩm'
-      },
-      {
-        title: 'Tài khoản gia đình',
-        description: 'Quản lý tài khoản đăng nhập người thân',
-        icon: KeyIcon,
-        href: '/admin/family-accounts',
-        gradient: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
-        stats: '67 tài khoản'
       }
     ]
   },

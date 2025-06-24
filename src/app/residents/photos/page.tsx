@@ -268,23 +268,7 @@ export default function PhotoUploadPage() {
           color: 'white'
         }}>
           <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem'}}>
-            <button
-              onClick={handleGoBack}
-              style={{
-                padding: '0.75rem',
-                border: 'none',
-                background: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: '0.75rem',
-                cursor: 'pointer',
-                color: 'white',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <ArrowLeftIcon style={{width: '1.25rem', height: '1.25rem'}} />
-            </button>
+            
             <div>
               <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 <PhotoIcon style={{width: '2.5rem', height: '2.5rem', color: 'white'}} />

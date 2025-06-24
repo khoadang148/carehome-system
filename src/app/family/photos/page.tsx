@@ -216,27 +216,7 @@ export default function FamilyPhotosPage() {
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap' }}>
     {/* Trái: Icon + Tiêu đề */}
     <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-      <button
-        onClick={() => router.push("/family")}
-        title="Quay lại trang chính"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #f1f5f9 0%, #e0e7ef 100%)',
-          border: 'none',
-          cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(30,41,59,0.06)',
-          transition: 'background 0.18s',
-        }}
-        onMouseOver={e => e.currentTarget.style.background = 'linear-gradient(135deg, #e0e7ef 0%, #c7d2fe 100%)'}
-        onMouseOut={e => e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e0e7ef 100%)'}
-      >
-        <ArrowLeftIcon style={{ height: 24, width: 24 }} />
-      </button>
+      
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
         <div style={{

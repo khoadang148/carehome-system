@@ -131,28 +131,7 @@ export default function ResidentsPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      <button
-          onClick={() => router.push('/')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            background: 'white',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            marginLeft: '2rem',
-            marginTop: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-          }}
-        >
-          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
-          Quay lại
-        </button>
+
 
       {/* Background decorations */}
       <div style={{

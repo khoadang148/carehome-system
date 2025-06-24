@@ -133,16 +133,14 @@ export default function FinancialReportsPage() {
         {/* Header - improved professional look */}
         <div className="rounded-2xl shadow bg-gradient-to-r from-blue-200 to-indigo-200 px-8 py-8 mb-8 flex flex-col md:flex-row md:items-center md:gap-6">
           <div className="flex items-center gap-6 mb-4 md:mb-0">
-            <button
-              onClick={() => router.push('/')}
-              className="flex items-center gap-2 px-5 py-2 bg-white text-blue-700 font-medium rounded-lg shadow hover:bg-blue-50 transition"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-              Quay lại
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-blue-900 mb-2">Báo cáo Tài chính</h1>
-              <p className="text-blue-800/80 text-base">Thống kê và phân tích tài chính</p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <ChartBarIcon className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Báo cáo Tài chính</h1>
+                <p className="text-gray-600 text-base">Thống kê và phân tích tài chính chi tiết</p>
+              </div>
             </div>
           </div>
         </div>
@@ -177,62 +175,23 @@ export default function FinancialReportsPage() {
           </div>
         </div>
 
-        {/* Summary Cards with softer colors */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-green-200 to-green-400 rounded-xl p-6 shadow text-green-900">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium opacity-90">Tổng Thu nhập</h3>
-              <div className="bg-white/40 p-2 rounded-lg">
-                <ArrowUpIcon className="w-6 h-6 text-green-700" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold">
-              {totalIncome.toLocaleString('vi-VN')} VNĐ
-            </p>
-          </div>
-
-          <div className="bg-gradient-to-br from-red-200 to-red-400 rounded-xl p-6 shadow text-red-900">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium opacity-90">Tổng Chi phí</h3>
-              <div className="bg-white/40 p-2 rounded-lg">
-                <ArrowDownIcon className="w-6 h-6 text-red-700" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold">
-              {totalExpense.toLocaleString('vi-VN')} VNĐ
-            </p>
-          </div>
-
-          <div className={`bg-gradient-to-br from-yellow-200 to-yellow-400 rounded-xl p-6 shadow text-yellow-900`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium opacity-90">Lợi nhuận ròng</h3>
-              <div className="bg-white/40 p-2 rounded-lg">
-                <CurrencyDollarIcon className="w-6 h-6 text-yellow-700" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold">
-              {netIncome.toLocaleString('vi-VN')} VNĐ
-            </p>
-          </div>
-        </div>
-
         {/* Transactions Table */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-indigo-600">
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <DocumentTextIcon className="w-6 h-6 text-white" />
               Chi tiết Giao dịch
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-blue-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mô tả</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số tiền</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Ngày</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Loại</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Mô tả</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Số tiền</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">

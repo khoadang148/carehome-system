@@ -201,7 +201,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
     <div style={{maxWidth: '1100px', margin: '0 auto', marginTop: 32, marginBottom: 32}}>
       {/* Header lớn với avatar và action */}
       <div style={{
-        background: 'linear-gradient(90deg, #f8fafc 0%, #e0e7ef 100%)',
+        background: 'linear-gradient(90deg, #f8fafc 0%,rgb(244, 247, 250) 100%)',
         borderRadius: '1.5rem',
         padding: '2rem 2rem 1.5rem 2rem',
         marginBottom: 32,

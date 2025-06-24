@@ -27,7 +27,6 @@ interface InventoryItem {
   minStock: number;
   maxStock: number;
   unit: string;
-  costPerUnit: number;
   supplier: string;
   expiryDate?: string;
   location: string;
@@ -46,7 +45,6 @@ const MOCK_INVENTORY: InventoryItem[] = [
     minStock: 100,
     maxStock: 500,
     unit: 'viên',
-    costPerUnit: 500,
     supplier: 'Dược phẩm ABC',
     expiryDate: '2024-12-31',
     location: 'Tủ thuốc A-1',
@@ -63,7 +61,6 @@ const MOCK_INVENTORY: InventoryItem[] = [
     minStock: 2,
     maxStock: 5,
     unit: 'cái',
-    costPerUnit: 1500000,
     supplier: 'Thiết bị y tế XYZ',
     location: 'Phòng y tế',
     lastUpdated: '2024-01-10',
@@ -79,7 +76,6 @@ const MOCK_INVENTORY: InventoryItem[] = [
     minStock: 100,
     maxStock: 1000,
     unit: 'hộp',
-    costPerUnit: 50000,
     supplier: 'Vật tư y tế DEF',
     location: 'Kho chính',
     lastUpdated: '2024-01-12',
@@ -114,7 +110,6 @@ interface ValidationErrors {
   minStock?: string;
   maxStock?: string;
   unit?: string;
-  costPerUnit?: string;
   supplier?: string;
   location?: string;
   expiryDate?: string;
@@ -140,7 +135,6 @@ export default function InventoryPage() {
     minStock: 0,
     maxStock: 0,
     unit: '',
-    costPerUnit: 0,
     supplier: '',
     expiryDate: '',
     location: '',
@@ -214,13 +208,7 @@ export default function InventoryPage() {
     return cat ? cat.label : category;
   };
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+
 
   // Check if item is expiring soon (within 30 days)
   const isExpiringSoon = (expiryDate?: string) => {
@@ -296,12 +284,7 @@ export default function InventoryPage() {
       errors.unit = 'Đơn vị không được để trống';
     }
 
-    // Validate cost per unit
-    if (data.costPerUnit === undefined || data.costPerUnit === null) {
-      errors.costPerUnit = 'Giá nhập không được để trống';
-    } else if (data.costPerUnit < 0) {
-      errors.costPerUnit = 'Giá nhập không được âm';
-    }
+
 
     // Validate supplier
     if (!data.supplier?.trim()) {
@@ -366,7 +349,6 @@ export default function InventoryPage() {
       minStock: 0,
       maxStock: 0,
       unit: '',
-      costPerUnit: 0,
       supplier: '',
       expiryDate: '',
       location: '',
@@ -667,9 +649,6 @@ export default function InventoryPage() {
                     Trạng thái
                   </th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: '#374151' }}>
-                    Giá trị
-                  </th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, color: '#374151' }}>
                     Hành động
                   </th>
                 </tr>
@@ -769,17 +748,6 @@ export default function InventoryPage() {
                         </span>
                       </td>
                       <td style={{ padding: '1rem' }}>
-                        <div style={{ fontWeight: 600, color: '#111827' }}>
-                          {formatCurrency(item.currentStock * item.costPerUnit)}
-                        </div>
-                        <div style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#6b7280'
-                        }}>
-                          {formatCurrency(item.costPerUnit)}/{item.unit}
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
                             onClick={() => handleViewClick(item)}
@@ -856,45 +824,83 @@ export default function InventoryPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1000,
+          backdropFilter: 'blur(8px)'
         }}>
           <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '2rem',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
             width: '100%',
-            maxWidth: '600px',
+            maxWidth: '650px',
             maxHeight: '90vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            margin: '1rem',
+            marginLeft: '12rem'
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '1.5rem'
+              marginBottom: '2rem',
+              paddingBottom: '1.5rem',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
             }}>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0
-              }}>
-                Thêm vật tư mới
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '1rem',
+                  padding: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)'
+                }}>
+                  <CubeIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  color: '#111827',
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  Thêm vật tư mới
+                </h2>
+              </div>
               <button
                 onClick={() => setShowAddModal(false)}
+                title="Đóng"
                 style={{
-                  background: 'none',
-                  border: 'none',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '0.75rem',
                   cursor: 'pointer',
-                  padding: '0.5rem'
+                  padding: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
                 }}
               >
                 <XMarkIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
               <div>
                 <label style={{
                   display: 'block',
@@ -912,20 +918,41 @@ export default function InventoryPage() {
                   onChange={handleInputChange}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    border: validationErrors.name ? '1px solid #dc2626' : '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    padding: '0.875rem 1rem',
+                    border: validationErrors.name ? '2px solid #dc2626' : '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    transition: 'all 0.2s ease',
+                    outline: 'none',
+                    boxShadow: validationErrors.name 
+                      ? '0 0 0 3px rgba(220, 38, 38, 0.1)' 
+                      : '0 2px 4px rgba(0, 0, 0, 0.1)'
                   }}
                   placeholder="Nhập tên vật tư"
+                  onFocus={(e) => {
+                    if (!validationErrors.name) {
+                      e.target.style.borderColor = '#10b981';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!validationErrors.name) {
+                      e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }
+                  }}
                 />
                 {validationErrors.name && (
                   <p style={{
                     color: '#dc2626',
                     fontSize: '0.75rem',
-                    marginTop: '0.25rem'
+                    marginTop: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
                   }}>
-                    {validationErrors.name}
+                    ⚠️ {validationErrors.name}
                   </p>
                 )}
               </div>
@@ -946,10 +973,23 @@ export default function InventoryPage() {
                   onChange={handleInputChange}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    padding: '0.875rem 1rem',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    outline: 'none',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#10b981';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                   }}
                 >
                   {CATEGORIES.filter(cat => cat.value !== 'all').map(cat => (
@@ -960,7 +1000,7 @@ export default function InventoryPage() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 <div>
                   <label style={{
                     display: 'block',
@@ -978,12 +1018,24 @@ export default function InventoryPage() {
                     onChange={handleInputChange}
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
+                      padding: '0.875rem 1rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      outline: 'none',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
                     }}
                     placeholder="Nhập mã SKU"
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#10b981';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
                   />
                 </div>
 
@@ -1004,17 +1056,29 @@ export default function InventoryPage() {
                     onChange={handleInputChange}
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
+                      padding: '0.875rem 1rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      outline: 'none',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
                     }}
                     placeholder="Nhập đơn vị"
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#10b981';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
                 <div>
                   <label style={{
                     display: 'block',
@@ -1032,12 +1096,24 @@ export default function InventoryPage() {
                     onChange={handleInputChange}
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
+                      padding: '0.875rem 1rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      outline: 'none',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
                     }}
                     min="0"
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#10b981';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
                   />
                 </div>
 
@@ -1058,12 +1134,24 @@ export default function InventoryPage() {
                     onChange={handleInputChange}
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
+                      padding: '0.875rem 1rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      outline: 'none',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
                     }}
                     min="0"
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#10b981';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
                   />
                 </div>
 
@@ -1084,68 +1172,64 @@ export default function InventoryPage() {
                     onChange={handleInputChange}
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
+                      padding: '0.875rem 1rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      outline: 'none',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
                     }}
                     min="0"
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#10b981';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Giá nhập *
-                  </label>
-                  <input
-                    type="number"
-                    name="costPerUnit"
-                    value={formData.costPerUnit}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ngày hết hạn
-                  </label>
-                  <input
-                    type="date"
-                    name="expiryDate"
-                    value={formData.expiryDate}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                  />
-                </div>
-              </div>
+                             <div>
+                 <label style={{
+                   display: 'block',
+                   fontSize: '0.875rem',
+                   fontWeight: 600,
+                   color: '#374151',
+                   marginBottom: '0.5rem'
+                 }}>
+                   Ngày hết hạn
+                 </label>
+                 <input
+                   type="date"
+                   name="expiryDate"
+                   value={formData.expiryDate}
+                   onChange={handleInputChange}
+                   style={{
+                     width: '100%',
+                     padding: '0.875rem 1rem',
+                     border: '1px solid rgba(0, 0, 0, 0.1)',
+                     borderRadius: '0.75rem',
+                     fontSize: '0.875rem',
+                     background: 'rgba(255, 255, 255, 0.8)',
+                     outline: 'none',
+                     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                     transition: 'all 0.2s ease'
+                   }}
+                   onFocus={(e) => {
+                     e.target.style.borderColor = '#10b981';
+                     e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                   }}
+                   onBlur={(e) => {
+                     e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                     e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                   }}
+                 />
+               </div>
 
               <div>
                 <label style={{
@@ -1164,12 +1248,24 @@ export default function InventoryPage() {
                   onChange={handleInputChange}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    padding: '0.875rem 1rem',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    outline: 'none',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    transition: 'all 0.2s ease'
                   }}
                   placeholder="Nhập tên nhà cung cấp"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#10b981';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                  }}
                 />
               </div>
 
@@ -1190,12 +1286,24 @@ export default function InventoryPage() {
                   onChange={handleInputChange}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    padding: '0.875rem 1rem',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    outline: 'none',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    transition: 'all 0.2s ease'
                   }}
                   placeholder="Nhập vị trí lưu trữ"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#10b981';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                  }}
                 />
               </div>
 
@@ -1215,14 +1323,27 @@ export default function InventoryPage() {
                   onChange={handleInputChange}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
+                    padding: '0.875rem 1rem',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '0.75rem',
                     fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    outline: 'none',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                     minHeight: '100px',
-                    resize: 'vertical'
+                    resize: 'vertical',
+                    transition: 'all 0.2s ease',
+                    fontFamily: 'inherit'
                   }}
                   placeholder="Nhập mô tả chi tiết"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#10b981';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                  }}
                 />
               </div>
             </div>
@@ -1231,18 +1352,36 @@ export default function InventoryPage() {
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '1rem',
-              marginTop: '2rem'
+              marginTop: '2.5rem',
+              paddingTop: '1.5rem',
+              borderTop: '1px solid rgba(0, 0, 0, 0.1)'
             }}>
               <button
                 onClick={() => setShowAddModal(false)}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.15)',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   color: '#374151',
-                  fontWeight: 500,
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 250, 251, 1)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
                 Hủy
@@ -1250,15 +1389,30 @@ export default function InventoryPage() {
               <button
                 onClick={handleAddItem}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.75rem',
                   border: 'none',
-                  background: '#16a34a',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
-                  fontWeight: 500,
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3), 0 2px 4px -1px rgba(16, 185, 129, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(16, 185, 129, 0.4), 0 4px 6px -2px rgba(16, 185, 129, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(16, 185, 129, 0.3), 0 2px 4px -1px rgba(16, 185, 129, 0.1)';
                 }}
               >
+                <CubeIcon style={{ width: '1rem', height: '1rem' }} />
                 Thêm vật tư
               </button>
             </div>
@@ -1278,343 +1432,586 @@ export default function InventoryPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1000,
+          backdropFilter: 'blur(8px)',
+          marginLeft: '8rem'
         }}>
           <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '2rem',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
             width: '100%',
-            maxWidth: '600px',
+            maxWidth: '650px',
             maxHeight: '90vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            margin: '1rem',
+            marginLeft: '12rem'
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '1.5rem'
+              marginBottom: '2rem',
+              paddingBottom: '1.5rem',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
             }}>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0
-              }}>
-                Chi tiết vật tư
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                  borderRadius: '1rem',
+                  padding: '0.75rem',
+                  boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)'
+                }}>
+                  <CubeIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  color: '#111827',
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  Chi tiết vật tư
+                </h2>
+              </div>
               <button
                 onClick={() => setShowViewModal(false)}
+                title="Đóng"
                 style={{
-                  background: 'none',
-                  border: 'none',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '0.75rem',
                   cursor: 'pointer',
-                  padding: '0.5rem'
+                  padding: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
                 }}
               >
                 <XMarkIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              <div>
-                <h3 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: '0 0 0.5rem 0'
-                }}>
-                  {selectedItem.name}
-                </h3>
+            <div style={{ display: 'grid', gap: '2rem' }}>
+              {/* Title and Status Section */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
                 <div style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
+                  flexDirection: 'column',
+                  gap: '1rem'
                 }}>
-                  <span style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    background: '#e0e7ff',
-                    color: '#3730a3'
-                  }}>
-                    {getCategoryLabel(selectedItem.category)}
-                  </span>
-                  <span style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    background: getStatusInfo(selectedItem.status).bg,
-                    color: getStatusInfo(selectedItem.status).color
-                  }}>
-                    {getStatusInfo(selectedItem.status).text}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Mã SKU
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
-                  }}>
-                    {selectedItem.sku}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tên vật tư
+                    </label>
+                    <h3 style={{
+                      fontSize: '1.5rem',
+                      fontWeight: 700,
+                      color: '#111827',
+                      margin: 0,
+                      background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent'
+                    }}>
+                      {selectedItem.name}
+                    </h3>
                   </div>
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Đơn vị
-                  </label>
+                  
                   <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
                   }}>
-                    {selectedItem.unit}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Tồn kho hiện tại
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
-                  }}>
-                    {selectedItem.currentStock} {selectedItem.unit}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Tồn kho tối thiểu
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
-                  }}>
-                    {selectedItem.minStock} {selectedItem.unit}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Tồn kho tối đa
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
-                  }}>
-                    {selectedItem.maxStock} {selectedItem.unit}
+                    <label style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151'
+                    }}>
+                      Trạng thái
+                    </label>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem'
+                    }}>
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+                        color: '#3730a3',
+                        border: '1px solid rgba(55, 48, 163, 0.2)',
+                        boxShadow: '0 2px 4px rgba(55, 48, 163, 0.1)'
+                      }}>
+                        {getCategoryLabel(selectedItem.category)}
+                      </span>
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        background: getStatusInfo(selectedItem.status).bg,
+                        color: getStatusInfo(selectedItem.status).color,
+                        border: `1px solid ${getStatusInfo(selectedItem.status).color}20`,
+                        boxShadow: `0 2px 4px ${getStatusInfo(selectedItem.status).color}10`
+                      }}>
+                        {getStatusInfo(selectedItem.status).text}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Giá nhập
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
-                  }}>
-                    {formatCurrency(selectedItem.costPerUnit)}/{selectedItem.unit}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ngày hết hạn
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#111827'
-                  }}>
-                    {selectedItem.expiryDate || 'Không có'}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+              {/* Basic Information */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h4 style={{
+                  fontSize: '1.125rem',
                   fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Nhà cung cấp
-                </label>
-                <div style={{
-                  padding: '0.75rem',
-                  background: '#f9fafb',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827'
-                }}>
-                  {selectedItem.supplier}
-                </div>
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Vị trí lưu trữ
-                </label>
-                <div style={{
-                  padding: '0.75rem',
-                  background: '#f9fafb',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827'
-                }}>
-                  {selectedItem.location}
-                </div>
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Mô tả
-                </label>
-                <div style={{
-                  padding: '0.75rem',
-                  background: '#f9fafb',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
                   color: '#111827',
-                  minHeight: '100px'
+                  margin: '0 0 1rem 0',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
                 }}>
-                  {selectedItem.description}
+                  Thông tin cơ bản
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '1rem',
+                      
+                    }}>
+                      Mã SKU
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 500
+                    }}>
+                      {selectedItem.sku}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Đơn vị tính
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 500
+                    }}>
+                      {selectedItem.unit}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+              {/* Stock Information */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h4 style={{
+                  fontSize: '1.125rem',
                   fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
+                  color: '#111827',
+                  margin: '0 0 1rem 0',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
                 }}>
-                  Cập nhật lần cuối
-                </label>
-                <div style={{
-                  padding: '0.75rem',
-                  background: '#f9fafb',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827'
+                  Thông tin tồn kho
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tồn kho hiện tại
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 600,
+                      textAlign: 'center'
+                    }}>
+                      {selectedItem.currentStock} {selectedItem.unit}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tồn kho tối thiểu
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 500,
+                      textAlign: 'center'
+                    }}>
+                      {selectedItem.minStock} {selectedItem.unit}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tồn kho tối đa
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 500,
+                      textAlign: 'center'
+                    }}>
+                      {selectedItem.maxStock} {selectedItem.unit}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+                             {/* Expiry Information */}
+               <div style={{
+                 background: 'rgba(255, 255, 255, 0.7)',
+                 borderRadius: '1rem',
+                 padding: '1.5rem',
+                 border: '1px solid rgba(0, 0, 0, 0.05)',
+                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+               }}>
+                 <h4 style={{
+                   fontSize: '1.125rem',
+                   fontWeight: 600,
+                   color: '#111827',
+                   margin: '0 0 1rem 0',
+                   paddingBottom: '0.75rem',
+                   borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
+                 }}>
+                   Thông tin hết hạn
+                 </h4>
+                 <div>
+                   <label style={{
+                     display: 'block',
+                     fontSize: '0.875rem',
+                     fontWeight: 600,
+                     color: '#374151',
+                     marginBottom: '0.5rem'
+                   }}>
+                     Ngày hết hạn
+                   </label>
+                   <div style={{
+                     padding: '0.875rem 1rem',
+                     background: 'rgba(249, 250, 251, 0.8)',
+                     borderRadius: '0.75rem',
+                     fontSize: '0.875rem',
+                     color: '#111827',
+                     border: '1px solid rgba(0, 0, 0, 0.05)',
+                     fontWeight: 500
+                   }}>
+                     {selectedItem.expiryDate || 'Không có'}
+                   </div>
+                 </div>
+               </div>
+
+              {/* Supplier and Location */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h4 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 1rem 0',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
                 }}>
-                  {selectedItem.lastUpdated}
+                  Thông tin nguồn cung cấp
+                </h4>
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Nhà cung cấp
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 500
+                    }}>
+                      {selectedItem.supplier}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Vị trí lưu trữ
+                    </label>
+                    <div style={{
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(249, 250, 251, 0.8)',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      fontWeight: 500
+                    }}>
+                      {selectedItem.location}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h4 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 1rem 0',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
+                }}>
+                  Mô tả chi tiết
+                </h4>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Mô tả
+                  </label>
+                  <div style={{
+                    padding: '1rem',
+                    background: 'rgba(249, 250, 251, 0.8)',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    color: '#111827',
+                    minHeight: '100px',
+                    border: '1px solid rgba(0, 0, 0, 0.05)',
+                    lineHeight: '1.5',
+                    fontWeight: 500
+                  }}>
+                    {selectedItem.description}
+                  </div>
+                </div>
+              </div>
+
+              {/* Last Updated */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h4 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 1rem 0',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
+                }}>
+                  Thông tin cập nhật
+                </h4>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Cập nhật lần cuối
+                  </label>
+                  <div style={{
+                    padding: '0.875rem 1rem',
+                    background: 'rgba(249, 250, 251, 0.8)',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    color: '#111827',
+                    border: '1px solid rgba(0, 0, 0, 0.05)',
+                    fontWeight: 500
+                  }}>
+                    {selectedItem.lastUpdated}
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Action Buttons */}
             <div style={{
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '1rem',
-              marginTop: '2rem'
+              marginTop: '2rem',
+              paddingTop: '1.5rem',
+              borderTop: '1px solid rgba(0, 0, 0, 0.1)'
             }}>
+              <button
+                onClick={() => setShowViewModal(false)}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.15)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#374151',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 250, 251, 1)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                Đóng
+              </button>
               <button
                 onClick={() => {
                   setShowViewModal(false);
                   handleEditClick(selectedItem);
                 }}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.75rem',
                   border: 'none',
-                  background: '#f59e0b',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                   color: 'white',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3), 0 2px 4px -1px rgba(245, 158, 11, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(245, 158, 11, 0.4), 0 4px 6px -2px rgba(245, 158, 11, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(245, 158, 11, 0.3), 0 2px 4px -1px rgba(245, 158, 11, 0.1)';
                 }}
               >
                 <PencilIcon style={{ width: '1rem', height: '1rem' }} />
@@ -1637,387 +2034,628 @@ export default function InventoryPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1000,
+          backdropFilter: 'blur(4px)',
+          marginLeft: '10rem',
         }}>
           <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '2rem',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
             width: '100%',
-            maxWidth: '600px',
+            maxWidth: '700px',
             maxHeight: '90vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(20px)'
           }}>
+            {/* Header */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '1.5rem'
+              marginBottom: '2rem',
+              paddingBottom: '1.5rem',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
             }}>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0
-              }}>
-                Chỉnh sửa vật tư
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  borderRadius: '1rem',
+                  padding: '0.75rem',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                }}>
+                  <PencilIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                </div>
+                <h2 style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  color: '#111827',
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  Chỉnh sửa vật tư
+                </h2>
+              </div>
               <button
                 onClick={() => setShowEditModal(false)}
+                title="Đóng"
                 style={{
-                  background: 'none',
-                  border: 'none',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '0.75rem',
                   cursor: 'pointer',
-                  padding: '0.5rem'
+                  padding: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
                 }}
               >
                 <XMarkIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+            {/* Form Content */}
+            <div style={{ display: 'grid', gap: '2rem' }}>
+              {/* Basic Information */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
                   fontWeight: 600,
                   color: '#374151',
-                  marginBottom: '0.5rem'
+                  margin: 0,
+                  marginBottom: '1.5rem',
+                  paddingBottom: '1rem',
+        
                 }}>
-                  Tên vật tư *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: validationErrors.name ? '1px solid #dc2626' : '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}
-                />
-                {validationErrors.name && (
-                  <p style={{
-                    color: '#dc2626',
-                    fontSize: '0.75rem',
-                    marginTop: '0.25rem'
-                  }}>
-                    {validationErrors.name}
-                  </p>
-                )}
+                  Thông tin cơ bản
+                </h3>
+
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tên vật tư *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: validationErrors.name ? '1px solid #dc2626' : '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      placeholder="Nhập tên vật tư"
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = validationErrors.name ? '#dc2626' : 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    />
+                    {validationErrors.name && (
+                      <p style={{
+                        color: '#dc2626',
+                        fontSize: '0.75rem',
+                        marginTop: '0.25rem'
+                      }}>
+                        {validationErrors.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Danh mục *
+                    </label>
+                    <select
+                      name="category"
+                      value={formData.category}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    >
+                      {CATEGORIES.filter(cat => cat.value !== 'all').map(cat => (
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Mã SKU *
+                      </label>
+                      <input
+                        type="text"
+                        name="sku"
+                        value={formData.sku}
+                        onChange={handleInputChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1rem',
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          borderRadius: '0.75rem',
+                          fontSize: '0.875rem',
+                          background: 'rgba(255, 255, 255, 0.8)',
+                          outline: 'none',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        placeholder="Nhập mã SKU"
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#f59e0b';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                          e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Đơn vị *
+                      </label>
+                      <input
+                        type="text"
+                        name="unit"
+                        value={formData.unit}
+                        onChange={handleInputChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1rem',
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          borderRadius: '0.75rem',
+                          fontSize: '0.875rem',
+                          background: 'rgba(255, 255, 255, 0.8)',
+                          outline: 'none',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        placeholder="VD: hộp, chai, gói..."
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#f59e0b';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                          e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+              {/* Stock Information */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
                   fontWeight: 600,
                   color: '#374151',
-                  marginBottom: '0.5rem'
+                  margin: 0,
+                  marginBottom: '1.5rem'
                 }}>
-                  Danh mục *
-                </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  {CATEGORIES.filter(cat => cat.value !== 'all').map(cat => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  Thông tin tồn kho
+                </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Mã SKU *
-                  </label>
-                  <input
-                    type="text"
-                    name="sku"
-                    value={formData.sku}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tồn kho hiện tại *
+                    </label>
+                    <input
+                      type="number"
+                      name="currentStock"
+                      value={formData.currentStock}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      min="0"
+                      placeholder="0"
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tồn kho tối thiểu *
+                    </label>
+                    <input
+                      type="number"
+                      name="minStock"
+                      value={formData.minStock}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      min="0"
+                      placeholder="0"
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Tồn kho tối đa *
+                    </label>
+                    <input
+                      type="number"
+                      name="maxStock"
+                      value={formData.maxStock}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      min="0"
+                      placeholder="0"
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Đơn vị *
-                  </label>
-                  <input
-                    type="text"
-                    name="unit"
-                    value={formData.unit}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                  />
-                </div>
-              </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                  
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Tồn kho hiện tại *
-                  </label>
-                  <input
-                    type="number"
-                    name="currentStock"
-                    value={formData.currentStock}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Tồn kho tối thiểu *
-                  </label>
-                  <input
-                    type="number"
-                    name="minStock"
-                    value={formData.minStock}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Tồn kho tối đa *
-                  </label>
-                  <input
-                    type="number"
-                    name="maxStock"
-                    value={formData.maxStock}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Giá nhập *
-                  </label>
-                  <input
-                    type="number"
-                    name="costPerUnit"
-                    value={formData.costPerUnit}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ngày hết hạn
-                  </label>
-                  <input
-                    type="date"
-                    name="expiryDate"
-                    value={formData.expiryDate}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}
-                  />
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Ngày hết hạn
+                    </label>
+                    <input
+                      type="date"
+                      name="expiryDate"
+                      value={formData.expiryDate}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
+              {/* Additional Information */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
                   fontWeight: 600,
                   color: '#374151',
-                  marginBottom: '0.5rem'
+                  margin: 0,
+                  marginBottom: '1.5rem'
                 }}>
-                  Nhà cung cấp *
-                </label>
-                <input
-                  type="text"
-                  name="supplier"
-                  value={formData.supplier}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}
-                />
-              </div>
+                  Thông tin bổ sung
+                </h3>
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Vị trí lưu trữ *
-                </label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}
-                />
-              </div>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Nhà cung cấp *
+                      </label>
+                      <input
+                        type="text"
+                        name="supplier"
+                        value={formData.supplier}
+                        onChange={handleInputChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1rem',
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          borderRadius: '0.75rem',
+                          fontSize: '0.875rem',
+                          background: 'rgba(255, 255, 255, 0.8)',
+                          outline: 'none',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        placeholder="Nhập tên nhà cung cấp"
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#f59e0b';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                          e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                        }}
+                      />
+                    </div>
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Mô tả
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    minHeight: '100px',
-                    resize: 'vertical'
-                  }}
-                />
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Vị trí lưu trữ *
+                      </label>
+                      <input
+                        type="text"
+                        name="location"
+                        value={formData.location}
+                        onChange={handleInputChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1rem',
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          borderRadius: '0.75rem',
+                          fontSize: '0.875rem',
+                          background: 'rgba(255, 255, 255, 0.8)',
+                          outline: 'none',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        placeholder="Nhập vị trí lưu trữ"
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#f59e0b';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                          e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Mô tả
+                    </label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1rem',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '0.75rem',
+                        fontSize: '0.875rem',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease',
+                        minHeight: '120px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                      placeholder="Nhập mô tả chi tiết về vật tư..."
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#f59e0b';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Action Buttons */}
             <div style={{
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '1rem',
-              marginTop: '2rem'
+              marginTop: '2rem',
+              paddingTop: '1.5rem',
+              borderTop: '1px solid rgba(0, 0, 0, 0.1)'
             }}>
               <button
                 onClick={() => setShowEditModal(false)}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.15)',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   color: '#374151',
-                  fontWeight: 500,
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 250, 251, 1)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
                 Hủy
@@ -2025,13 +2663,27 @@ export default function InventoryPage() {
               <button
                 onClick={handleEditItem}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.75rem',
                   border: 'none',
-                  background: '#f59e0b',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                   color: 'white',
-                  fontWeight: 500,
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3), 0 2px 4px -1px rgba(245, 158, 11, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(245, 158, 11, 0.4), 0 4px 6px -2px rgba(245, 158, 11, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(245, 158, 11, 0.3), 0 2px 4px -1px rgba(245, 158, 11, 0.1)';
                 }}
               >
                 Lưu thay đổi

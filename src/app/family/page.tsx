@@ -762,7 +762,7 @@ export default function FamilyPortalPage() {
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '0.75rem',
-          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.06)',
+          boxShadow: '0 2px 8px -2px #000000',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem',
           marginBottom: '1rem'
