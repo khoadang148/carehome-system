@@ -280,13 +280,40 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                 gap: '1rem',
                 marginTop: '0.5rem'
               }}>
+                {/* Tuổi */}
                 <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
                   fontSize: '1rem',
-                  color: '#64748b'
+                  color: '#64748b',
+                  background: '#f3f4f6',
+                  borderRadius: '0.5rem',
+                  padding: '0.25rem 0.75rem',
+                  fontWeight: 500
                 }}>
-                  {resident.age} tuổi • Phòng {resident.room}
+                  <UserIcon style={{ width: '1rem', height: '1rem' }} />
+                  <span>Tuổi:</span>
+                  <span>{resident.age}</span>
                 </span>
-                {renderCareLevel(resident.careLevel)}
+                {/* Phòng */}
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  background: '#f3f4f6',
+                  borderRadius: '0.5rem',
+                  padding: '0.25rem 0.75rem',
+                  fontWeight: 500
+                }}>
+                  <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                  <span>Phòng:</span>
+                  <span>{resident.room}</span>
+                </span>
+                
+                {/* Trạng thái */}
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -299,7 +326,8 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   color: statusStyle.text
                 }}>
                   <statusStyle.icon style={{ width: '0.875rem', height: '0.875rem' }} />
-                  {resident.status || 'Đang chăm sóc'}
+                  <span>Trạng thái:</span>
+                  <span>{resident.status || 'Đang chăm sóc'}</span>
                 </span>
               </div>
         </div>

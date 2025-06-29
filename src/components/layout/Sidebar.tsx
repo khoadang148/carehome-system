@@ -53,7 +53,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Lối tắt chăm sóc",
     items: [
-      { name: 'Nhật ký theo dõi', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
+      { name: 'Đánh giá sức khỏe', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
       { name: 'Đăng ảnh hoạt động', href: '/residents/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
       { name: 'Tương tác gia đình', href: '/staff/family-communication', icon: ChatBubbleLeftRightIcon, roles: ['staff'], color: '#f59e0b' },
       

@@ -64,7 +64,29 @@ export default function PhotoGalleryPage() {
       }
     }
   }, []);
+   
 
+  useEffect(() => {
+    console.log('Modal states:', {showModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showModal;
+    
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showModal]);
+  
   // Check access permissions
   useEffect(() => {
     if (!user) {
@@ -383,6 +405,7 @@ export default function PhotoGalleryPage() {
               <div
                 key={photo.id}
                 onClick={() => handlePhotoClick(photo)}
+                
                 style={{
                   background: 'white',
                   borderRadius: '1rem',
@@ -407,105 +430,61 @@ export default function PhotoGalleryPage() {
                   background: `url(${photo.url}) center/cover`,
                   position: 'relative'
                 }}>
-                  <div style={{
-                    position: 'absolute',
-                    top: '0.75rem',
-                    right: '0.75rem',
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    color: 'white',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
-
-                  }}>
-                    <EyeIcon style={{width: '0.875rem', height: '0.875rem', display: 'inline', marginRight: '0.25rem'}} />
-                    {photo.viewCount}
-                  </div>
-                  {photo.shareWithFamily && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '0.75rem',
-                      left: '0.75rem',
-                      background: 'rgba(34, 197, 94, 0.9)',
-                      color: 'white',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600
-                    }}>
-                      👨‍👩‍👧‍👦 Gia đình
-                    </div>
-                  )}
+                  
+                  
                 </div>
 
                 {/* Content */}
                 <div style={{padding: '1rem'}}>
+                  {/* Info Grid - Cơ bản */}
                   <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start',
-                    marginBottom: '0.75rem'
+                    display: 'grid',
+                    gridTemplateColumns: 'max-content 1fr',
+                    rowGap: '0.25rem',
+                    columnGap: '1rem',
+                    alignItems: 'center',
+                    marginBottom: '0.75rem',
+                    borderBottom: '1px solid #f1f5f9',
+                    paddingBottom: '0.5rem'
                   }}>
-                    <div>
-                      <h3 style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: '#374151',
-                        margin: '0 0 0.25rem 0'
-                      }}>
-                        {photo.residentName}
-                      </h3>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        margin: 0
-                      }}>
-                        Phòng {photo.residentRoom}
-                      </p>
-                    </div>
-                    <span style={{
-                      background: 'rgba(102, 126, 234, 0.1)',
-                      color: '#667eea',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600
-                    }}>
-                      {photo.activityType}
-                    </span>
+                    <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Tên:</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.residentName}</span>
+                    <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Phòng:</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.residentRoom}</span>
+                    <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Hoạt động:</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.activityType}</span>
+                    <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Đăng bởi:</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.uploadedBy}</span>
                   </div>
 
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#374151',
-                    margin: '0 0 0.75rem 0',
-                    lineHeight: 1.5,
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical'
-                  }}>
-                    {photo.caption}
-                  </p>
+                  {/* Mô tả */}
+                  <div style={{margin: '0.5rem 0 0.5rem 0', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem'}}>
+                    <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem'}}>Mô tả:</span>
+                    <span style={{marginLeft: 8, color: '#374151', fontSize: '0.98rem'}}>{photo.caption}</span>
+                  </div>
 
                   {/* Tags */}
-                  {photo.tags.length > 0 && (
+                  {Array.isArray(photo.tags) && photo.tags.length > 0 && (
                     <div style={{
                       display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      margin: '0.5rem 0 0.5rem 0',
                       flexWrap: 'wrap',
-                      gap: '0.375rem',
-                      marginBottom: '0.75rem'
+                      borderBottom: '1px solid #f1f5f9',
+                      paddingBottom: '0.5rem'
                     }}>
+                      <TagIcon style={{width: '1rem', height: '1rem', color: '#22c55e'}} />
+                      <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem'}}>Tags:</span>
                       {photo.tags.slice(0, 3).map((tag, index) => (
                         <span
                           key={index}
                           style={{
-                            background: 'rgba(34, 197, 94, 0.1)',
+                            background: 'rgba(34, 197, 94, 0.12)',
                             color: '#22c55e',
-                            padding: '0.125rem 0.375rem',
-                            borderRadius: '0.25rem',
-                            fontSize: '0.75rem',
+                            padding: '0.12rem 0.5rem',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.85rem',
                             fontWeight: 500
                           }}
                         >
@@ -515,7 +494,7 @@ export default function PhotoGalleryPage() {
                       {photo.tags.length > 3 && (
                         <span style={{
                           color: '#6b7280',
-                          fontSize: '0.75rem'
+                          fontSize: '0.85rem'
                         }}>
                           +{photo.tags.length - 3}
                         </span>
@@ -523,21 +502,22 @@ export default function PhotoGalleryPage() {
                     </div>
                   )}
 
+                  {/* Meta */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    fontSize: '0.75rem',
-                    color: '#6b7280'
+                    fontSize: '0.88rem',
+                    color: '#94a3b8',
+                    marginTop: '0.5rem',
+                    gap: '1rem',
                   }}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.375rem'}}>
-                      <CalendarDaysIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                      {formatDate(photo.uploadDate)}
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
+                      <CalendarDaysIcon style={{width: '1rem', height: '1rem'}} />
+                      <span style={{fontWeight: 600}}>Ngày đăng:</span>
+                      <span style={{color: '#64748b'}}>{formatDate(photo.uploadDate)}</span>
                     </div>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.375rem'}}>
-                      <UserIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                      {photo.uploadedBy}
-                    </div>
+                    
                   </div>
                 </div>
               </div>
@@ -553,175 +533,488 @@ export default function PhotoGalleryPage() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
+            background: 'rgba(0, 0, 0, 0.85)',
             zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '2rem'
+            padding: '2rem',
+            backdropFilter: 'blur(5px)',
+            marginLeft: '120px'
           }}>
             <div style={{
-              background: 'white',
-              borderRadius: '1rem',
-              maxWidth: '800px',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative'
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1.5rem',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '95vh',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
+              {/* Close Button */}
               <button
                 onClick={closeModal}
                 style={{
                   position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  background: 'rgba(0, 0, 0, 0.5)',
+                  top: '1.5rem',
+                  right: '1.5rem',
+                  background: 'rgba(15, 23, 42, 0.8)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '50%',
-                  width: '2.5rem',
-                  height: '2.5rem',
+                  width: '3rem',
+                  height: '3rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  zIndex: 1001
+                  zIndex: 1001,
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(15, 23, 42, 0.9)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)';
+                  e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                <XMarkIcon style={{width: '1.25rem', height: '1.25rem'}} />
+                <XMarkIcon style={{width: '1.5rem', height: '1.5rem'}} />
               </button>
 
-              <img
-                src={selectedPhoto.url}
-                alt={selectedPhoto.caption}
-                style={{
-                  width: '100%',
-                  maxHeight: '400px',
-                  objectFit: 'cover',
-                  borderRadius: '1rem 1rem 0 0'
-                }}
-              />
-
-              <div style={{padding: '2rem'}}>
-                <div style={{marginBottom: '1.5rem'}}>
+              {/* Image Section */}
+              <div style={{position: 'relative'}}>
+                <img
+                  src={selectedPhoto.url}
+                  alt={selectedPhoto.caption}
+                  style={{
+                    width: '100%',
+                    height: '400px',
+                    objectFit: 'cover',
+                    display: 'block'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'linear-gradient(transparent, rgba(0, 0, 0, 0.7))',
+                  color: 'white',
+                  padding: '2rem 2rem 1.5rem 2rem'
+                }}>
                   <h2 style={{
                     fontSize: '1.5rem',
                     fontWeight: 700,
-                    color: '#374151',
-                    margin: '0 0 0.5rem 0'
+                    margin: '0 0 0.5rem 0',
+                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
                   }}>
                     {selectedPhoto.residentName}
                   </h2>
                   <p style={{
                     fontSize: '1rem',
-                    color: '#6b7280',
-                    margin: 0
-                  }}>
-                    Phòng {selectedPhoto.residentRoom} • {selectedPhoto.activityType}
-                  </p>
-                </div>
-
-                <div style={{marginBottom: '1.5rem'}}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    margin: '0 0 0.5rem 0'
-                  }}>
-                    Mô tả hoạt động
-                  </h3>
-                  <p style={{
-                    fontSize: '0.95rem',
-                    color: '#374151',
-                    lineHeight: 1.6,
-                    margin: 0
+                    margin: 0,
+                    opacity: 0.9,
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
                   }}>
                     {selectedPhoto.caption}
                   </p>
                 </div>
+              </div>
 
-                {selectedPhoto.tags.length > 0 && (
-                  <div style={{marginBottom: '1.5rem'}}>
-                    <h3 style={{
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 0.5rem 0'
-                    }}>
-                      Tags cảm xúc
-                    </h3>
+              {/* Content Section */}
+              <div style={{
+                padding: '2rem',
+                maxHeight: 'calc(95vh - 400px)',
+                overflowY: 'auto'
+              }}>
+                {/* Thông tin cơ bản */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                  borderRadius: '1rem',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    color: '#1e293b',
+                    margin: '0 0 1rem 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
                     <div style={{
+                      width: '4px',
+                      height: '1.5rem',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                      borderRadius: '2px'
+                    }}></div>
+                    Thông tin chi tiết
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                    gap: '1rem'
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Tên người cao tuổi
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b'
+                      }}>
+                        {selectedPhoto.residentName}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Số phòng
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b'
+                      }}>
+                        Phòng {selectedPhoto.residentRoom}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Loại hoạt động
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b'
+                      }}>
+                        {selectedPhoto.activityType}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Đăng bởi
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b'
+                      }}>
+                        {selectedPhoto.uploadedBy}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Ngày đăng tải
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b'
+                      }}>
+                        {formatDate(selectedPhoto.uploadDate)}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Lượt xem
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b'
+                      }}>
+                        {selectedPhoto.viewCount} lượt
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Chia sẻ với gia đình
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: selectedPhoto.shareWithFamily ? '#22c55e' : '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <span>{selectedPhoto.shareWithFamily ? '✅' : '❌'}</span>
+                        <span>{selectedPhoto.shareWithFamily ? 'Có' : 'Không'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mô tả */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #fef7f0 0%, #fed7aa 100%)',
+                  borderRadius: '1rem',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem',
+                  border: '1px solid #fed7aa'
+                }}>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    color: '#ea580c',
+                    margin: '0 0 1rem 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{
+                      width: '4px',
+                      height: '1.5rem',
+                      background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                      borderRadius: '2px'
+                    }}></div>
+                    Mô tả chi tiết
+                  </h3>
+                  <div style={{
+                    background: 'white',
+                    padding: '1rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #fed7aa'
+                  }}>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: '#c2410c',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Nội dung mô tả
+                    </div>
+                    <div style={{
+                      fontSize: '1rem',
+                      lineHeight: '1.6',
+                      color: '#1e293b'
+                    }}>
+                      {selectedPhoto.caption}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                {Array.isArray(selectedPhoto.tags) && selectedPhoto.tags.length > 0 && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)',
+                    borderRadius: '1rem',
+                    padding: '1.5rem',
+                    marginBottom: '1.5rem',
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <h3 style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 700,
+                      color: '#15803d',
+                      margin: '0 0 1rem 0',
                       display: 'flex',
-                      flexWrap: 'wrap',
+                      alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      {selectedPhoto.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          style={{
-                            background: 'rgba(34, 197, 94, 0.1)',
-                            color: '#22c55e',
-                            padding: '0.375rem 0.75rem',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.875rem',
-                            fontWeight: 500
-                          }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      <div style={{
+                        width: '4px',
+                        height: '1.5rem',
+                        background: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+                        borderRadius: '2px'
+                      }}></div>
+                      Thẻ tags
+                    </h3>
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #bbf7d0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.75rem'
+                      }}>
+                        Các thẻ đính kèm
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem'
+                      }}>
+                        {selectedPhoto.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            style={{
+                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                              color: 'white',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '2rem',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              boxShadow: '0 2px 4px rgba(34, 197, 94, 0.2)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)'
+                            }}
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
 
+                {/* Staff Notes */}
                 {selectedPhoto.staffNotes && user?.role !== 'family' && (
-                  <div style={{marginBottom: '1.5rem'}}>
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
+                    borderRadius: '1rem',
+                    padding: '1.5rem',
+                    border: '1px solid #fef08a'
+                  }}>
                     <h3 style={{
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 0.5rem 0'
+                      fontSize: '1.25rem',
+                      fontWeight: 700,
+                      color: '#ca8a04',
+                      margin: '0 0 1rem 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
                     }}>
+                      <div style={{
+                        width: '4px',
+                        height: '1.5rem',
+                        background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                        borderRadius: '2px'
+                      }}></div>
                       Ghi chú nhân viên
                     </h3>
-                    <p style={{
-                      fontSize: '0.95rem',
-                      color: '#6b7280',
-                      lineHeight: 1.6,
-                      margin: 0,
-                      fontStyle: 'italic'
+                    <div style={{
+                      background: 'white',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #fef08a'
                     }}>
-                      {selectedPhoto.staffNotes}
-                    </p>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#ca8a04',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Ghi chú nội bộ
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontStyle: 'italic',
+                        lineHeight: '1.6',
+                        color: '#1e293b'
+                      }}>
+                        {selectedPhoto.staffNotes}
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '1rem',
-                  padding: '1rem',
-                  background: '#f8fafc',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#6b7280'
-                }}>
-                  <div>
-                    <strong>Ngày đăng:</strong><br />
-                    {formatDate(selectedPhoto.uploadDate)}
-                  </div>
-                  <div>
-                    <strong>Đăng bởi:</strong><br />
-                    {selectedPhoto.uploadedBy}
-                  </div>
-                  <div>
-                    <strong>Lượt xem:</strong><br />
-                    {selectedPhoto.viewCount}
-                  </div>
-                  <div>
-                    <strong>Chia sẻ gia đình:</strong><br />
-                    {selectedPhoto.shareWithFamily ? '✅ Có' : '❌ Không'}
-                  </div>
-                </div>
               </div>
             </div>
           </div>

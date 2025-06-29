@@ -53,14 +53,14 @@ const ROLE_DASHBOARDS = {
         gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
         stats: '24 phòng'
       },
-      {
+      /*{
         title: 'Quản lý kho',
         description: 'Quản lý thiết bị y tế, thuốc, dụng cụ',
         icon: ArchiveBoxIcon,
         href: '/inventory',
         gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
         stats: '150 sản phẩm'
-      }
+      }*/
     ]
   },
   staff: {
@@ -83,14 +83,14 @@ const ROLE_DASHBOARDS = {
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
         stats: '8 ghi nhận hôm nay'
       },
-      {
+     /* {
         title: 'Hỗ trợ',
         description: 'Kiểm kê kho',
         icon: CubeIcon,
         href: '/staff/administrative',
         gradient: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)',
         stats: '2 báo cáo chờ'
-      }
+      }*/
     ]
   },
   family: {

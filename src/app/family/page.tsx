@@ -23,6 +23,9 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { Tab } from '@headlessui/react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { vi } from 'date-fns/locale';
 
 // Add CSS animations
 const styles = `
@@ -78,7 +81,53 @@ const residents = [
     activities: [
       { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
       { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
-      { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: false }
+      { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: false, reason: 'Cảm thấy mệt mỏi, cần nghỉ ngơi' }
+    ],
+    activityHistory: [
+      { 
+        date: '2024-05-10',
+        activities: [
+          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
+          { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
+          { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: false, reason: 'Cảm thấy mệt mỏi, cần nghỉ ngơi' }
+        ]
+      },
+      { 
+        date: '2024-05-09',
+        activities: [
+          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
+          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: false, reason: 'Không có bạn chơi cùng' }
+        ]
+      },
+      { 
+        date: '2024-05-08',
+        activities: [
+          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: false, reason: 'Thời tiết xấu, không thể tập ngoài trời' },
+          { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
+          { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: true },
+          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: true }
+        ]
+      },
+      { 
+        date: '2024-05-07',
+        activities: [
+          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: false, reason: 'Thiết bị âm nhạc bị hỏng' },
+          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: true }
+        ]
+      },
+      { 
+        date: '2024-05-06',
+        activities: [
+          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
+          { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: false, reason: 'Không có đủ dụng cụ cho tất cả mọi người' },
+          { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: true },
+          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: true }
+        ]
+      }
     ],
     vitals: {
       lastUpdated: '10/05/2024 09:30',
@@ -121,6 +170,52 @@ const residents = [
       { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
       { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
       { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true }
+    ],
+    activityHistory: [
+      { 
+        date: '2024-05-10',
+        activities: [
+          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true }
+        ]
+      },
+      { 
+        date: '2024-05-09',
+        activities: [
+          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: false, reason: 'Không có hứng thú vẽ hôm nay' },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
+          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: true }
+        ]
+      },
+      { 
+        date: '2024-05-08',
+        activities: [
+          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: false, reason: 'Đau đầu nhẹ, cần nghỉ ngơi' },
+          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: true }
+        ]
+      },
+      { 
+        date: '2024-05-07',
+        activities: [
+          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: false, reason: 'Cảm thấy không khỏe, bác sĩ khuyên nghỉ ngơi' },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
+          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: true }
+        ]
+      },
+      { 
+        date: '2024-05-06',
+        activities: [
+          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
+          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
+          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
+          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: false, reason: 'Mắt mỏi, không thể đọc sách' }
+        ]
+      }
     ],
     vitals: {
       lastUpdated: '10/05/2024 10:15',
@@ -171,6 +266,9 @@ export default function FamilyPortalPage() {
   // Modal states
   const [showMessageModal, setShowMessageModal] = useState(false);
 
+  // Thêm modal xem nhân viên phụ trách
+  const [showStaffModal, setShowStaffModal] = useState(false);
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successModalData, setSuccessModalData] = useState<{
     title: string;
@@ -191,6 +289,23 @@ export default function FamilyPortalPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [lightboxPhoto, setLightboxPhoto] = useState<any>(null);
+
+  // Activity history states
+  const [selectedActivityDate, setSelectedActivityDate] = useState('2024-05-10');
+  const [showActivityHistory, setShowActivityHistory] = useState(false);
+
+  // Lấy danh sách nhân viên phụ trách (không trùng lặp)
+  const staffInCharge = useMemo(() => {
+    const staffSet = new Set<string>();
+    selectedResident.careNotes.forEach(note => {
+      let staffName = note.staff;
+      if (note.staff.includes(',')) {
+        staffName = note.staff.split(',')[0].trim();
+      }
+      staffSet.add(staffName);
+    });
+    return Array.from(staffSet);
+  }, [selectedResident]);
 
   // Handler functions for button actions
   const handleContactStaff = () => {
@@ -308,12 +423,13 @@ export default function FamilyPortalPage() {
     { id: 6, url: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=300&h=200&fit=crop', caption: 'Hoạt động vẽ tranh', date: '2024-01-10' }
   ];
 
+  // Định nghĩa staffMembers chuẩn (object, giống contact-staff)
   const staffMembers = [
-    'Y tá trưởng - Nguyễn Thị Lan',
-    'Bác sĩ - Dr. Trần Văn Nam', 
-    'Nhân viên chăm sóc - Lê Thị Hoa',
-    'Chuyên viên hoạt động - Phạm Văn Minh',
-    'Quản lý ca - Vũ Thị Mai'
+    { id: 1, name: 'Nguyễn Thị Lan', role: 'Y tá trưởng', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
+    { id: 2, name: 'Dr. Trần Văn Nam', role: 'Bác sĩ', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
+    { id: 3, name: 'Lê Thị Hoa', role: 'Nhân viên chăm sóc', avatar: 'https://randomuser.me/api/portraits/women/68.jpg' },
+    { id: 4, name: 'Phạm Văn Minh', role: 'Chuyên viên hoạt động', avatar: 'https://randomuser.me/api/portraits/men/45.jpg' },
+    { id: 5, name: 'Vũ Thị Mai', role: 'Quản lý ca', avatar: 'https://randomuser.me/api/portraits/women/22.jpg' }
   ];
 
   const residentMembers = [
@@ -354,9 +470,9 @@ export default function FamilyPortalPage() {
   }, [selectedResident]);
 
   useEffect(() => {
-    console.log('Modal states:', { showMessageModal });
+    console.log('Modal states:', { showMessageModal, showStaffModal });
     // Only hide header for modals, not the main page
-    const hasModalOpen = showMessageModal;
+    const hasModalOpen = showMessageModal || showStaffModal;
     
     if (hasModalOpen) {
       console.log('Modal is open - adding hide-header class');
@@ -372,7 +488,7 @@ export default function FamilyPortalPage() {
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     };
-  }, [showMessageModal]);
+  }, [showMessageModal, showStaffModal]);
 
   // Ensure header is shown when component mounts
   useEffect(() => {
@@ -805,8 +921,34 @@ export default function FamilyPortalPage() {
                   </span>
                 </div>
                 <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
-                  
-                  
+                  {/* Nút xem nhân viên phụ trách */}
+                  <button
+                    onClick={() => setShowStaffModal(true)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.75rem',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(99,102,241,0.15)',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
+                    }}
+                  >
+                    <UsersIcon style={{width: '1.25rem', height: '1.25rem', color: 'white'}} />
+                    Nhân viên chăm sóc
+                  </button>
                 </div>
               </div>
               
@@ -951,7 +1093,7 @@ export default function FamilyPortalPage() {
                     : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
                 }`
               }>
-                Hoạt động hôm nay
+                Hoạt động sinh hoạt
               </Tab>
               <Tab className={({ selected }) => 
                 `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
@@ -969,56 +1111,240 @@ export default function FamilyPortalPage() {
                     : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
                 }`
               }>
-                Lịch sử chỉ số sức khỏe
+                Chỉ số sức khỏe
               </Tab>
             </Tab.List>
             <Tab.Panels>
               <Tab.Panel style={{padding: '2rem'}}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  marginBottom: '1.5rem'
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem',
+                  flexWrap: 'wrap',
+                  gap: '1rem'
                 }}>
-                  Hoạt động trong ngày
-                </h3>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                  {selectedResident.activities.map((activity) => (
-                    <div
-                      key={activity.id}
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0
+                  }}>
+                    {showActivityHistory ? 'Lịch sử hoạt động' : 'Hoạt động hôm nay'}
+                  </h3>
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    alignItems: 'center',
+                    flexWrap: 'wrap'
+                  }}>
+                    {showActivityHistory && (
+                      <DatePicker
+                        selected={new Date(selectedActivityDate)}
+                        onChange={date => {
+                          if (!date) return;
+                          // Chỉ cho phép chọn ngày có trong activityHistory
+                          const iso = date.toISOString().slice(0, 10);
+                          if (selectedResident.activityHistory.some(day => day.date === iso)) {
+                            setSelectedActivityDate(iso);
+                          }
+                        }}
+                        includeDates={selectedResident.activityHistory.map(day => new Date(day.date))}
+                        dateFormat="EEEE, d 'tháng' M, yyyy"
+                        locale={vi}
+                        popperPlacement="bottom"
+                        showPopperArrow={false}
+                        customInput={
+                          <button
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.75rem',
+                              border: '2px solid #3b82f6',
+                              background: 'white',
+                              fontSize: '1rem',
+                              fontWeight: 600,
+                              color: '#374151',
+                              cursor: 'pointer',
+                              minWidth: '220px',
+                              textAlign: 'left',
+                              boxShadow: '0 2px 8px rgba(59,130,246,0.07)'
+                            }}
+                          >
+                            {new Date(selectedActivityDate).toLocaleDateString('vi-VN', {
+                              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                            })}
+                          </button>
+                        }
+                      />
+                    )}
+                    <button
+                      onClick={() => setShowActivityHistory(!showActivityHistory)}
                       style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #8b5cf6',
+                        background: showActivityHistory ? 'white' : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                        color: showActivityHistory ? '#8b5cf6' : 'white',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
-                        padding: '1rem',
-                        borderRadius: '0.75rem',
-                        background: activity.participated 
-                          ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
-                          : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                        border: '1px solid',
-                        borderColor: activity.participated ? '#86efac' : '#d1d5db'
+                        gap: '0.5rem'
+                      }}
+                      onMouseOver={(e) => {
+                        if (showActivityHistory) {
+                          e.currentTarget.style.background = '#f3f4f6';
+                        } else {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (showActivityHistory) {
+                          e.currentTarget.style.background = 'white';
+                        } else {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';
+                        }
                       }}
                     >
-                      <div style={{marginRight: '1rem'}}>
-                        {activity.participated ? (
-                          <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
-                        ) : (
-                          <ClockIcon style={{width: '1.5rem', height: '1.5rem', color: '#6b7280'}} />
-                        )}
-                      </div>
-                      <div style={{flex: 1}}>
-                        <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                          <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
-                        </div>
-                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
-                          <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
-                        </div>
-                      </div>
-                      <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
-                        <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
-                      </span>
-                    </div>
-                  ))}
+                      <CalendarDaysIcon style={{width: '1rem', height: '1rem'}} />
+                      {showActivityHistory ? 'Xem hôm nay' : 'Xem lịch sử hoạt động'}
+                    </button>
+                  </div>
                 </div>
+
+                {showActivityHistory ? (
+                  <div>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      marginBottom: '1.5rem',
+                      border: '1px solid #bae6fd'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <InformationCircleIcon style={{width: '1.25rem', height: '1.25rem', color: '#0369a1'}} />
+                        <span style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#0369a1'
+                        }}>
+                          Lịch sử hoạt động - {new Date(selectedActivityDate).toLocaleDateString('vi-VN', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        color: '#0c4a6e',
+                        margin: 0
+                      }}>
+                        Xem lại các hoạt động đã tham gia trong ngày được chọn. 
+                      </p>
+                    </div>
+
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                      {selectedResident.activityHistory
+                        .find(day => day.date === selectedActivityDate)?.activities.map((activity) => (
+                        <div
+                          key={activity.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            borderRadius: '0.75rem',
+                            background: activity.participated 
+                              ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                              : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                            border: '1px solid',
+                            borderColor: activity.participated ? '#86efac' : '#d1d5db'
+                          }}
+                        >
+                          <div style={{marginRight: '1rem'}}>
+                            {activity.participated ? (
+                              <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
+                            ) : (
+                              <XCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#dc2626'}} />
+                            )}
+                          </div>
+                          <div style={{flex: 1}}>
+                            <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                              <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
+                            </div>
+                            <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem'}}>
+                              <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
+                            </div>
+                            <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#dc2626', display: 'block', marginBottom: !activity.participated && activity.reason ? '0.25rem' : 0}}>
+                              <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Không tham gia'}
+                            </span>
+                            {!activity.participated && activity.reason && (
+                              <div style={{
+                                fontSize: '0.75rem', 
+                                color: '#dc2626', 
+                                fontStyle: 'italic',
+                                background: 'rgba(220, 38, 38, 0.07)',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                border: '1px solid rgba(220, 38, 38, 0.15)',
+                                marginTop: 0
+                              }}>
+                                <span style={{fontWeight: 600}}>Lý do: </span>{activity.reason}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                    {selectedResident.activities.map((activity) => (
+                      <div
+                        key={activity.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '1rem',
+                          borderRadius: '0.75rem',
+                          background: activity.participated 
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                            : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                          border: '1px solid',
+                          borderColor: activity.participated ? '#86efac' : '#d1d5db'
+                        }}
+                      >
+                        <div style={{marginRight: '1rem'}}>
+                          {activity.participated ? (
+                            <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
+                          ) : (
+                            <ClockIcon style={{width: '1.5rem', height: '1.5rem', color: '#6b7280'}} />
+                          )}
+                        </div>
+                        <div style={{flex: 1}}>
+                          <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                            <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
+                          </div>
+                          <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem'}}>
+                            <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
+                          </div>
+                          <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
+                            <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Tab.Panel>
               
               <Tab.Panel style={{padding: '2rem'}}>
@@ -1204,6 +1530,231 @@ export default function FamilyPortalPage() {
           </Tab.Group>
         </div>
       </div>
+
+      {/* Modal hiển thị danh sách nhân viên phụ trách */}
+      {showStaffModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(243, 239, 239, 0.82)',
+          zIndex: 10002,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          marginLeft: '120px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '0.5rem',
+            padding: '2rem',
+            width: '500px',
+            maxWidth: '90vw',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1.5rem',
+              borderBottom: '2px solid #e2e8f0',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '0.75rem 0.75rem 0 0',
+              padding: '1.5rem',
+              margin: '-2rem -2rem 1.5rem -2rem'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)'
+                }}>
+                  <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                  </svg>
+                </div>
+                <h2 style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  color: 'white',
+                  margin: 0,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+                }}>
+                  Đội ngũ chăm sóc
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowStaffModal(false)}
+                title="Đóng"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <svg style={{width: '1.25rem', height: '1.25rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Staff list */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              {staffMembers.map((staff) => (
+                <div key={staff.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '1.25rem',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  borderRadius: '0.75rem',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.08)';
+                  e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem'
+                  }}>
+                    <div style={{
+                      width: '3rem',
+                      height: '3rem',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+                      flexShrink: 0
+                    }}>
+                      <svg style={{width: '1.25rem', height: '1.25rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div style={{
+                        fontSize: '1.125rem',
+                        fontWeight: 700,
+                        color: '#1f2937',
+                        marginBottom: '0.375rem',
+                        letterSpacing: '-0.025em'
+                      }}>
+                        {staff.name}
+                      </div>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        fontWeight: 500,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <div style={{
+                          width: '0.5rem',
+                          height: '0.5rem',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          borderRadius: '50%'
+                        }}></div>
+                        {staff.role}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowStaffModal(false);
+                      router.push(`/family/contact-staff?staffId=${staff.id}`);
+                    }}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.25)';
+                    }}
+                  >
+                    <svg style={{width: '1rem', height: '1rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Nhắn tin
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

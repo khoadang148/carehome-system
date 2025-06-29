@@ -1,11 +1,40 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDaysIcon, ClockIcon, HeartIcon, XMarkIcon, CheckIcon, UsersIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ClockIcon as HistoryIcon } from '@heroicons/react/24/solid';
 
 const residents = [
   { id: 1, name: 'Nguyễn Văn Nam', room: 'A01', avatar: 'https://randomuser.me/api/portraits/men/72.jpg', status: 'Ổn định', relationship: 'Cha', age: 78 },
   { id: 2, name: 'Lê Thị Hoa', room: 'A02', avatar: 'https://randomuser.me/api/portraits/women/65.jpg', status: 'Khá', relationship: 'Mẹ', age: 75 }
+];
+
+// Dữ liệu mẫu lịch sử đặt lịch thăm
+const visitHistory = [
+  {
+    id: 1,
+    resident: 'Nguyễn Văn Nam',
+    date: '2024-05-10',
+    time: '09:00 - 10:00',
+    purpose: 'Thăm hỏi sức khỏe',
+    status: 'Đã xác nhận'
+  },
+  {
+    id: 2,
+    resident: 'Lê Thị Hoa',
+    date: '2024-05-08',
+    time: '14:00 - 15:00',
+    purpose: 'Mang quà và thức ăn',
+    status: 'Đã xác nhận'
+  },
+  {
+    id: 3,
+    resident: 'Nguyễn Văn Nam',
+    date: '2024-05-05',
+    time: '10:00 - 11:00',
+    purpose: 'Sinh nhật',
+    status: 'Đã hủy'
+  }
 ];
 
 export default function ScheduleVisitPage() {
@@ -15,6 +44,27 @@ export default function ScheduleVisitPage() {
   const [visitTime, setVisitTime] = useState('');
   const [visitPurpose, setVisitPurpose] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+
+  useEffect(() => {
+    console.log('Modal states:', { showHistory, showSuccess, showMessageModal });
+    // Only hide header for modals, not the main page
+    const hasModalOpen = showHistory || showSuccess || showMessageModal;
+    if (hasModalOpen) {
+      console.log('Modal is open - adding hide-header class');
+      document.body.classList.add('hide-header');
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log('No modal open - removing hide-header class');
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.classList.remove('hide-header');
+      document.body.style.overflow = 'unset';
+    };
+  }, [showHistory, showSuccess, showMessageModal]);
 
   const submitVisitSchedule = () => {
     if (visitDate && visitTime && visitPurpose) {
@@ -24,21 +74,326 @@ export default function ScheduleVisitPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      
+      {/* Modal lịch sử đặt lịch thăm */}
+      {showHistory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
+            minWidth: '600px',
+            maxWidth: '800px',
+            width: '90%',
+            maxHeight: '80vh',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            position: 'relative',
+            overflowY: 'auto'
+          }}>
+            <button
+              onClick={() => setShowHistory(false)}
+              title="Đóng"
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                border: 'none',
+                borderRadius: '0.75rem',
+                cursor: 'pointer',
+                color: '#6b7280',
+                width: '2.5rem',
+                height: '2.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)';
+                e.currentTarget.style.color = '#6b7280';
+              }}
+              aria-label="Đóng"
+            >
+              <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+            </button>
+            
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '1rem', 
+              marginBottom: '2rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div style={{ 
+                width: '3rem', 
+                height: '3rem', 
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                borderRadius: '1rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' 
+              }}>
+                <CalendarDaysIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+              </div>
+              <div>
+                <h3 style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: 700, 
+                  margin: 0, 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Lịch sử đặt lịch thăm
+                </h3>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Theo dõi các lịch hẹn thăm viếng đã đặt
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ 
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              borderRadius: '1rem',
+              padding: '1.5rem',
+              marginBottom: '1.5rem',
+              border: '1px solid #bbf7d0'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.5rem'
+              }}>
+                <CalendarDaysIcon style={{width: '1.25rem', height: '1.25rem', color: '#059669'}} />
+                <span style={{
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  color: '#059669'
+                }}>
+                  Danh sách lịch hẹn
+                </span>
+              </div>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#047857',
+                margin: 0
+              }}>
+                Tổng cộng có {visitHistory.length} lịch hẹn đã được tạo
+              </p>
+            </div>
+            
+            <div style={{ 
+              background: 'white',
+              borderRadius: '1rem',
+              overflow: 'hidden',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+              border: '1px solid #f1f5f9'
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ 
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
+                    borderBottom: '1px solid #e2e8f0'
+                  }}>
+                    <th style={{ 
+                      padding: '1rem', 
+                      textAlign: 'left', 
+                      fontWeight: 600, 
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      letterSpacing: '0.025em'
+                    }}>
+                      Người thân
+                    </th>
+                    <th style={{ 
+                      padding: '1rem', 
+                      textAlign: 'left', 
+                      fontWeight: 600, 
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      letterSpacing: '0.025em'
+                    }}>
+                      Ngày thăm
+                    </th>
+                    <th style={{ 
+                      padding: '1rem', 
+                      textAlign: 'left', 
+                      fontWeight: 600, 
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      letterSpacing: '0.025em'
+                    }}>
+                      Thời gian
+                    </th>
+                    <th style={{ 
+                      padding: '1rem', 
+                      textAlign: 'left', 
+                      fontWeight: 600, 
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      letterSpacing: '0.025em'
+                    }}>
+                      Mục đích
+                    </th>
+                    <th style={{ 
+                      padding: '1rem', 
+                      textAlign: 'left', 
+                      fontWeight: 600, 
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      letterSpacing: '0.025em'
+                    }}>
+                      Trạng thái
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitHistory.map((item, index) => (
+                    <tr 
+                      key={item.id} 
+                      style={{ 
+                        borderBottom: index < visitHistory.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#f8fafc';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <td style={{ 
+                        padding: '1rem', 
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        color: '#111827'
+                      }}>
+                        {item.resident}
+                      </td>
+                      <td style={{ 
+                        padding: '1rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        {new Date(item.date).toLocaleDateString('vi-VN', {
+                          weekday: 'short',
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td style={{ 
+                        padding: '1rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        fontWeight: 500
+                      }}>
+                        {item.time}
+                      </td>
+                      <td style={{ 
+                        padding: '1rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        {item.purpose}
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          ...(item.status === 'Đã xác nhận' ? {
+                            background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                            color: '#166534',
+                            border: '1px solid #bbf7d0'
+                          } : item.status === 'Chờ xác nhận' ? {
+                            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                            color: '#92400e',
+                            border: '1px solid #fde68a'
+                          } : {
+                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                            color: '#991b1b',
+                            border: '1px solid #fecaca'
+                          })
+                        }}>
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '1.8rem', background: 'white', borderRadius: '2rem', boxShadow: '0 8px 32px rgba(16,185,129,0.10)', padding: '2.5rem 2rem', maxWidth: 900, width: '100%', alignItems: 'flex-start', position: 'relative' }}>
-
-       
         {/* Cột phải: Form đặt lịch */}
-        <div style={{ flex: 2, minWidth: 320 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-            <div style={{ width: '3rem', height: '3rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.13)' }}>
-              <CalendarDaysIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+        <div style={{ flex: 2, minWidth: 350 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ width: '3rem', height: '3rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.13)' }}>
+                <CalendarDaysIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: ' #059669', letterSpacing: '-0.5px' }}>Đặt lịch thăm người thân</h2>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>Vui lòng điền đầy đủ thông tin để đặt lịch thăm viếng</div>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: ' #059669', letterSpacing: '-0.5px' }}>Đặt lịch thăm người thân</h2>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>Vui lòng điền đầy đủ thông tin để đặt lịch thăm viếng</div>
-            </div>
-           
+
+            {/* Nút xem lịch sử đặt lịch thăm */}
+            <button
+              onClick={() => setShowHistory(true)}
+              style={{
+                padding: '0.5rem 1.1rem',
+                borderRadius: '9999px',
+                border: '1.5px solid #10b981',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
+                color: '#059669',
+                fontWeight: 700,
+                fontSize: '0.98rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(16,185,129,0.07)',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginLeft: '1rem'
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #bbf7d0 0%, #6ee7b7 100%)'; }}
+              onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)'; }}
+            >
+              <HistoryIcon style={{ width: '1.1rem', height: '1.1rem', color: '#059669' }} />
+              Lịch sử thăm
+            </button>
           </div>
           {!showSuccess ? (
             <>

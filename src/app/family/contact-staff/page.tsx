@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ChatBubbleLeftRightIcon, 
   UsersIcon, 
@@ -567,11 +567,33 @@ const MessageInput = ({ messageInput, setMessageInput, sendMessage }: MessageInp
 
 export default function ContactStaffPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedResident, setSelectedResident] = useState(residents[0]);
   const [selectedStaff, setSelectedStaff] = useState(staffMembers[0]);
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [searchStaff, setSearchStaff] = useState('');
+
+  // Tự động chọn nhân viên nếu có query string staff
+  useEffect(() => {
+    const staffQuery = searchParams?.get('staff');
+    if (staffQuery) {
+      // Tìm theo tên hoặc "vai trò - tên"
+      const found = staffMembers.find(staff => {
+        const full = `${staff.role} - ${staff.name}`;
+        return staff.name === staffQuery || full === staffQuery;
+      });
+      if (found) setSelectedStaff(found);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const staffId = searchParams?.get('staffId');
+    if (staffId) {
+      const found = staffMembers.find(staff => staff.id === Number(staffId));
+      if (found) setSelectedStaff(found);
+    }
+  }, [searchParams]);
 
   const sendMessage = () => {
     if (messageInput.trim()) {
