@@ -852,11 +852,8 @@ export default function FamilyPortalPage() {
                       <div style={{fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
                         {resident.name}
                       </div>
-                      <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem'}}>
-                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age} tuổi • <span style={{fontWeight: 600}}>Giới tính:</span> {resident.gender}
-                      </div>
                       <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                        <span style={{fontWeight: 600}}>Phòng:</span> {resident.room} • <span style={{fontWeight: 600}}>Trạng thái sức khỏe:</span> {resident.status}
+                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Phòng:</span> {resident.room}
                       </div>
                     </div>
                     {selectedResident.id === resident.id && (
