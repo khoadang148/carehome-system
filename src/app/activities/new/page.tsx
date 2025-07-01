@@ -165,6 +165,36 @@ export default function NewActivityPage() {
     approvalRequired: false
   });
 
+  // Prefill form from AI recommendation if available
+  useEffect(() => {
+    const aiDataRaw = localStorage.getItem('aiRecommendationData');
+    if (aiDataRaw) {
+      try {
+        const aiData = JSON.parse(aiDataRaw);
+        setFormData(prev => ({
+          ...prev,
+          name: aiData.activityName || '',
+          description: aiData.reasons?.join('\n') || '',
+          category: aiData.category || '', // Map nếu AI trả về category
+          location: '', // Có thể map nếu AI trả về
+          facilitator: '', // Có thể map nếu AI trả về
+          maxCapacity: aiData.recommendedParticipants?.length || 20,
+          difficultyLevel: 'Dễ', // Có thể map nếu AI trả về
+          ageGroupSuitability: [], // Có thể map nếu AI trả về
+          healthRequirements: [], // Có thể map nếu AI trả về
+          materials: '', // Có thể map nếu AI trả về
+          benefits: aiData.benefits || [],
+          recurring: 'none',
+          specialNotes: aiData.precautions?.join('\n') || '',
+          approvalRequired: false
+        }));
+      } catch (e) {
+        // Nếu lỗi thì bỏ qua
+      }
+      localStorage.removeItem('aiRecommendationData');
+    }
+  }, []);
+
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);

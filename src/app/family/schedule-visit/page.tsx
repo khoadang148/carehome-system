@@ -46,6 +46,9 @@ export default function ScheduleVisitPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [scheduledResidents, setScheduledResidents] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
     console.log('Modal states:', { showHistory, showSuccess, showMessageModal });
@@ -67,7 +70,16 @@ export default function ScheduleVisitPage() {
   }, [showHistory, showSuccess, showMessageModal]);
 
   const submitVisitSchedule = () => {
+    setError(null);
     if (visitDate && visitTime && visitPurpose) {
+      const visitDateTime = new Date(`${visitDate}T${visitTime}:00`);
+      const now = new Date();
+      if (visitDateTime.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
+        setError('Bạn chỉ được đặt lịch trước ít nhất 24 giờ so với thời điểm hiện tại.');
+        setShowErrorModal(true);
+        return;
+      }
+      setScheduledResidents(residents.map(r => r.name));
       setShowSuccess(true);
     }
   };
@@ -455,7 +467,20 @@ export default function ScheduleVisitPage() {
                 <CheckIcon style={{ width: '2.5rem', height: '2.5rem', color: 'white' }} />
               </div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#111827', margin: '0 0 1rem 0' }}>Đã đặt lịch thăm thành công!</h2>
-              <p style={{ fontSize: '1.08rem', color: '#6b7280', margin: '0 0 1.5rem 0', lineHeight: 1.6 }}>Chúng tôi sẽ xác nhận lịch hẹn với bạn trong vòng 3 đến 12 tiếng. Vui lòng kiểm tra thông báo hoặc liên hệ nhân viên nếu cần hỗ trợ thêm.</p>
+              {scheduledResidents.length > 0 ? (
+                <div style={{ fontSize: '1.08rem', color: '#6b7280', margin: '0 0 1.5rem 0', lineHeight: 1.6 }}>
+                  Đã đặt lịch thăm cho các người thân:
+                  <ul style={{ margin: '0.5rem 0 0 0', padding: 0, listStyle: 'none', color: '#059669', fontWeight: 600 }}>
+                    {scheduledResidents.map(name => (
+                      <li key={name}>• {name}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p style={{ fontSize: '1.08rem', color: '#6b7280', margin: '0 0 1.5rem 0', lineHeight: 1.6 }}>
+                  Chúng tôi sẽ xác nhận lịch hẹn với bạn trong vòng 3 đến 12 tiếng. Vui lòng kiểm tra thông báo hoặc liên hệ nhân viên nếu cần hỗ trợ thêm.
+                </p>
+              )}
               <button
                 onClick={() => router.push('/family')}
                 style={{ padding: '1rem 3rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', borderRadius: '0.75rem', fontSize: '1.08rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.3s ease', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.13)', minWidth: '120px' }}
@@ -468,6 +493,58 @@ export default function ScheduleVisitPage() {
           )}
         </div>
       </div>
+      {showErrorModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.35)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(2px)'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1.25rem',
+            padding: '2.2rem 2.5rem',
+            minWidth: 340,
+            maxWidth: 400,
+            boxShadow: '0 8px 32px rgba(239,68,68,0.18)',
+            border: '1.5px solid #fecaca',
+            textAlign: 'center',
+            position: 'relative'
+          }}>
+            <div style={{ marginBottom: 18 }}>
+              <XMarkIcon style={{ width: '2.2rem', height: '2.2rem', color: '#ef4444', marginBottom: 8 }} />
+              <div style={{ fontWeight: 700, fontSize: '1.15rem', color: '#dc2626', marginBottom: 8 }}>Không thể đặt lịch!</div>
+              <div style={{ color: '#991b1b', fontSize: '1rem', fontWeight: 500 }}>{error}</div>
+            </div>
+            <button
+              onClick={() => setShowErrorModal(false)}
+              style={{
+                padding: '0.7rem 2.2rem',
+                borderRadius: '0.75rem',
+                border: 'none',
+                background: 'linear-gradient(135deg, #ef4444 0%, #fca5a5 100%)',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(239,68,68,0.10)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'; }}
+              onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #fca5a5 100%)'; }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

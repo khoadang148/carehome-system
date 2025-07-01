@@ -623,41 +623,7 @@ export default function PhotoUploadPage() {
             </div>
           )}
 
-          {/* Share with Family */}
-          <div style={{
-            marginBottom: '2rem',
-            padding: '1rem',
-            background: 'rgba(16, 185, 129, 0.05)',
-            borderRadius: '0.75rem',
-            border: '1px solid rgba(16, 185, 129, 0.2)'
-          }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 500,
-              color: '#374151'
-            }}>
-              <input
-                type="checkbox"
-                checked={shareWithFamily}
-                onChange={(e) => setShareWithFamily(e.target.checked)}
-                style={{
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  accentColor: '#10b981'
-                }}
-              />
-              <div>
-                <div>Chia sẻ với gia đình</div>
-                <div style={{fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem'}}>
-                  Gia đình sẽ nhận được thông báo và có thể xem ảnh này
-                </div>
-              </div>
-            </label>
-          </div>
+          
 
           {/* Upload Progress */}
           {isUploading && (

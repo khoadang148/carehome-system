@@ -73,6 +73,7 @@ const residents = [
   { 
     id: 1, 
     name: 'Nguyễn Văn Nam', 
+    gender: 'Nam',
     room: 'A01', 
     photo: 'https://randomuser.me/api/portraits/men/72.jpg',
     age: 78,
@@ -161,6 +162,7 @@ const residents = [
   { 
     id: 2, 
     name: 'Lê Thị Hoa', 
+    gender: 'Nữ',
     room: 'A02', 
     photo: 'https://randomuser.me/api/portraits/women/65.jpg',
     age: 75,
@@ -851,7 +853,7 @@ export default function FamilyPortalPage() {
                         {resident.name}
                       </div>
                       <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem'}}>
-                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age} tuổi
+                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Tuổi:</span> {resident.age} tuổi • <span style={{fontWeight: 600}}>Giới tính:</span> {resident.gender}
                       </div>
                       <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
                         <span style={{fontWeight: 600}}>Phòng:</span> {resident.room} • <span style={{fontWeight: 600}}>Trạng thái sức khỏe:</span> {resident.status}
@@ -907,6 +909,9 @@ export default function FamilyPortalPage() {
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
                   <span style={{fontWeight: 800, color: '#374151'}}>Mối quan hệ: </span>{selectedResident.relationship}
+                </div>
+                <div style={{marginBottom: '0.5rem'}}>
+                  <span style={{fontWeight: 800, color: '#374151'}}>Giới tính: </span>{selectedResident.gender}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
                   <span style={{fontWeight: 800, color: '#374151'}}>Phòng: </span>{selectedResident.room}
