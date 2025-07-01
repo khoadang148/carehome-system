@@ -1428,9 +1428,10 @@ export default function FamilyPortalPage() {
                             padding: '0.75rem', 
                             fontSize: '0.95em', 
                             color: '#6b7280',
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            
                           }}>
-                            {vital.time}
+                            {vital.time} am
                           </td>
                           <td style={{
                             padding: '0.75rem', 
@@ -1539,218 +1540,222 @@ export default function FamilyPortalPage() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(243, 239, 239, 0.82)',
+          background: 'rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(4px)',
           zIndex: 10002,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '1rem',
-          marginLeft: '120px'
+          animation: 'fadeIn 0.2s ease-out',
+          marginLeft: '140px'
         }}>
           <div style={{
             background: 'white',
-            borderRadius: '0.5rem',
-            padding: '2rem',
-            width: '500px',
-            maxWidth: '90vw',
-            maxHeight: '80vh',
+            borderRadius: '1rem',
+            padding: '0',
+            width: '520px',
+            maxWidth: '120vw',
+            maxHeight: '90vh',
             overflowY: 'auto',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            animation: 'slideUp 0.3s ease-out'
           }}>
-            {/* Header */}
+            {/* Header đơn giản */}
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem',
-              paddingBottom: '1.5rem',
-              borderBottom: '2px solid #e2e8f0',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '0.75rem 0.75rem 0 0',
+              background: '#f8fafc',
+              borderRadius: '1rem 1rem 0 0',
               padding: '1.5rem',
-              margin: '-2rem -2rem 1.5rem -2rem'
+              borderBottom: '1px solid #e2e8f0'
             }}>
               <div style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}>
                 <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: '0.75rem',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)'
+                  gap: '0.75rem'
                 }}>
-                  <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                  </svg>
-                </div>
-                <h2 style={{
-                  fontSize: '1.75rem',
-                  fontWeight: 700,
-                  color: 'white',
-                  margin: 0,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  Đội ngũ chăm sóc
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowStaffModal(false)}
-                title="Đóng"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '0.5rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-              >
-                <svg style={{width: '1.25rem', height: '1.25rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Staff list */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
-              {staffMembers.map((staff) => (
-                <div key={staff.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '1.25rem',
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                  borderRadius: '0.75rem',
-                  border: '1px solid rgba(226, 232, 240, 0.8)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
-                }}
-                >
                   <div style={{
+                    width: '3rem',
+                    height: '3rem',
+                    background: '#6366f1',
+                    borderRadius: '0.5rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '1rem'
+                    justifyContent: 'center'
                   }}>
-                    <div style={{
-                      width: '3rem',
-                      height: '3rem',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
-                      flexShrink: 0
-                    }}>
-                      <svg style={{width: '1.25rem', height: '1.25rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <div style={{
-                        fontSize: '1.125rem',
-                        fontWeight: 700,
-                        color: '#1f2937',
-                        marginBottom: '0.375rem',
-                        letterSpacing: '-0.025em'
-                      }}>
-                        {staff.name}
-                      </div>
-                      <div style={{
-                        fontSize: '0.875rem',
-                        color: '#6b7280',
-                        fontWeight: 500,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <div style={{
-                          width: '0.5rem',
-                          height: '0.5rem',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          borderRadius: '50%'
-                        }}></div>
-                        {staff.role}
-                      </div>
-                    </div>
+                    <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
                   </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowStaffModal(false);
-                      router.push(`/family/contact-staff?staffId=${staff.id}`);
-                    }}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
+                  <div>
+                    <h2 style={{
+                      fontSize: '1.5rem',
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      color: '#1f2937',
+                      margin: '0 0 0.25rem 0'
+                    }}>
+                      Đội ngũ chăm sóc
+                    </h2>
+                    <p style={{
+                      fontSize: '0.85rem',
+                      color: '#6b7280',
+                      margin: 0
+                    }}>
+                      Nhân viên đang chăm sóc người cao tuổi {selectedResident.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowStaffModal(false)}
+                  title="Đóng"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#6b7280',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.color = '#374151';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#6b7280';
+                  }}
+                >
+                  <XMarkIcon style={{width: '1.125rem', height: '1.125rem'}} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{
+              padding: '1.5rem',
+              background: 'white'
+            }}>
+              {/* Staff list đơn giản */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                {staffMembers.map((staff) => (
+                  <div key={staff.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.background = '#f9fafb';
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                  }}
+                  >
+                    <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)',
-                      transition: 'all 0.2s ease',
-                      flexShrink: 0
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.25)';
-                    }}
-                  >
-                    <svg style={{width: '1rem', height: '1rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    Nhắn tin
-                  </button>
-                </div>
-              ))}
+                      gap: '0.75rem'
+                    }}>
+                      <div style={{
+                        width: '2.5rem',
+                        height: '2.5rem',
+                        background: '#6366f1',
+                        borderRadius: '0.375rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <svg style={{width: '1rem', height: '1rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {staff.name}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          {staff.role}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStaffModal(false);
+                        router.push(`/family/contact-staff?staffId=${staff.id}`);
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.375rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = '#5b21b6';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = '#6366f1';
+                      }}
+                    >
+                      <ChatBubbleLeftRightIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                      Nhắn tin
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer message đơn giản */}
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: '#fef3c7',
+                borderRadius: '0.375rem',
+                textAlign: 'center'
+              }}>
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: '#92400e',
+                  margin: 0,
+                  lineHeight: 1.4
+                }}>
+                  Đội ngũ của chúng tôi luôn sẵn sàng hỗ trợ bạn
+                </p>
+              </div>
             </div>
           </div>
         </div>

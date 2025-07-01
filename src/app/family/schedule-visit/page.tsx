@@ -74,7 +74,7 @@ export default function ScheduleVisitPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      {/* Modal lịch sử đặt lịch thăm */}
+      
       {showHistory && (
         <div style={{
           position: 'fixed',
@@ -87,14 +87,15 @@ export default function ScheduleVisitPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backdropFilter: 'blur(4px)'
+          backdropFilter: 'blur(4px)',
+          marginLeft: '270px'
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
             borderRadius: '1.5rem',
             padding: '2.5rem',
-            minWidth: '600px',
-            maxWidth: '800px',
+            minWidth: '800px',
+            maxWidth: '910px',
             width: '90%',
             maxHeight: '80vh',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
@@ -262,16 +263,6 @@ export default function ScheduleVisitPage() {
                     }}>
                       Mục đích
                     </th>
-                    <th style={{ 
-                      padding: '1rem', 
-                      textAlign: 'left', 
-                      fontWeight: 600, 
-                      fontSize: '0.875rem',
-                      color: '#374151',
-                      letterSpacing: '0.025em'
-                    }}>
-                      Trạng thái
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -323,29 +314,6 @@ export default function ScheduleVisitPage() {
                         color: '#6b7280'
                       }}>
                         {item.purpose}
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          ...(item.status === 'Đã xác nhận' ? {
-                            background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                            color: '#166534',
-                            border: '1px solid #bbf7d0'
-                          } : item.status === 'Chờ xác nhận' ? {
-                            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                            color: '#92400e',
-                            border: '1px solid #fde68a'
-                          } : {
-                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-                            color: '#991b1b',
-                            border: '1px solid #fecaca'
-                          })
-                        }}>
-                          {item.status}
-                        </span>
                       </td>
                     </tr>
                   ))}

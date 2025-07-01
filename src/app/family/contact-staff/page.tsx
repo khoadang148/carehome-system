@@ -33,6 +33,7 @@ interface Staff {
   avatar: string;
   status: 'online' | 'away' | 'offline';
   lastSeen: string;
+  assignedResidents: { id: number; name: string; avatar: string }[];
 }
 
 interface Message {
@@ -81,7 +82,11 @@ const staffMembers = [
     role: 'Y tá trưởng', 
     avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
     status: 'online' as const,
-    lastSeen: 'Đang hoạt động'
+    lastSeen: 'Đang hoạt động',
+    assignedResidents: [
+      { id: 1, name: 'Nguyễn Văn Nam', avatar: 'https://randomuser.me/api/portraits/men/72.jpg' },
+      { id: 2, name: 'Lê Thị Hoa', avatar: 'https://randomuser.me/api/portraits/women/65.jpg' }
+    ]
   },
   { 
     id: 2, 
@@ -89,7 +94,10 @@ const staffMembers = [
     role: 'Bác sĩ', 
     avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
     status: 'online' as const,
-    lastSeen: 'Đang hoạt động'
+    lastSeen: 'Đang hoạt động',
+    assignedResidents: [
+      { id: 1, name: 'Nguyễn Văn Nam', avatar: 'https://randomuser.me/api/portraits/men/72.jpg' }
+    ]
   },
   { 
     id: 3, 
@@ -97,7 +105,10 @@ const staffMembers = [
     role: 'Nhân viên chăm sóc', 
     avatar: 'https://randomuser.me/api/portraits/women/68.jpg',
     status: 'away' as const,
-    lastSeen: '5 phút trước'
+    lastSeen: '5 phút trước',
+    assignedResidents: [
+      { id: 2, name: 'Lê Thị Hoa', avatar: 'https://randomuser.me/api/portraits/women/65.jpg' }
+    ]
   },
   { 
     id: 4, 
@@ -105,7 +116,11 @@ const staffMembers = [
     role: 'Chuyên viên hoạt động', 
     avatar: 'https://randomuser.me/api/portraits/men/45.jpg',
     status: 'offline' as const,
-    lastSeen: '2 giờ trước'
+    lastSeen: '2 giờ trước',
+    assignedResidents: [
+      { id: 1, name: 'Nguyễn Văn Nam', avatar: 'https://randomuser.me/api/portraits/men/72.jpg' },
+      { id: 2, name: 'Lê Thị Hoa', avatar: 'https://randomuser.me/api/portraits/women/65.jpg' }
+    ]
   },
   { 
     id: 5, 
@@ -113,7 +128,8 @@ const staffMembers = [
     role: 'Quản lý ca', 
     avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
     status: 'online' as const,
-    lastSeen: 'Đang hoạt động'
+    lastSeen: 'Đang hoạt động',
+    assignedResidents: []
   }
 ];
 
@@ -316,16 +332,6 @@ const StaffList = ({ filteredStaff, selectedStaff, setSelectedStaff }: StaffList
                 boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
               }}
             />
-            <div style={{
-              position: 'absolute',
-              bottom: '2px',
-              right: '2px',
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              background: staff.status === 'online' ? '#22c55e' : staff.status === 'away' ? '#f59e0b' : '#6b7280',
-              border: '2px solid white'
-            }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ 
@@ -339,16 +345,19 @@ const StaffList = ({ filteredStaff, selectedStaff, setSelectedStaff }: StaffList
             <div style={{ 
               fontSize: '0.8rem', 
               color: '#6b7280',
-              marginBottom: '0.125rem'
+              marginBottom: '0.25rem'
             }}>
               {staff.role}
             </div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: staff.status === 'online' ? '#22c55e' : '#6b7280'
-            }}>
-              {staff.lastSeen}
-            </div>
+            {staff.assignedResidents.length > 0 && (
+              <div style={{ 
+                fontSize: '0.75rem', 
+                color: '#059669',
+                fontWeight: 500
+              }}>
+                Phụ trách: {staff.assignedResidents.map(r => r.name).join(', ')}
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -381,24 +390,23 @@ const ChatHeader = ({ selectedStaff }: ChatHeaderProps) => {
               objectFit: 'cover'
             }}
           />
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            right: '0',
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: selectedStaff.status === 'online' ? '#22c55e' : selectedStaff.status === 'away' ? '#f59e0b' : '#6b7280',
-            border: '2px solid white'
-          }} />
         </div>
         <div>
           <div style={{ fontSize: '1rem', fontWeight: 600, color: 'white' }}>
             {selectedStaff.name}
           </div>
           <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.9)' }}>
-            {selectedStaff.role} • {selectedStaff.lastSeen}
+            {selectedStaff.role}
           </div>
+          {selectedStaff.assignedResidents.length > 0 && (
+            <div style={{ 
+              fontSize: '0.75rem', 
+              color: 'rgba(255,255,255,0.8)',
+              marginTop: '0.125rem'
+            }}>
+              Phụ trách: {selectedStaff.assignedResidents.map(r => r.name).join(', ')}
+            </div>
+          )}
         </div>
       </div>
     </div>

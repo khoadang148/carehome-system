@@ -25,6 +25,7 @@ import {
   PlusCircleIcon
 } from '@heroicons/react/24/outline';
 import ReactDOM from 'react-dom';
+import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 
 // Mock financial transactions data (for admin)
 const adminTransactions = [
@@ -93,6 +94,8 @@ const familyFinancialData = [
     paymentSchedule: 'monthly', // monthly, quarterly, yearly
     lateFeeRate: 0.02, // 2% per day
     gracePeriodDays: 5,
+    room: '101',
+    birthYear: '1980',
     additionalServices: [
       { 
         id: 'SV001',
@@ -140,8 +143,8 @@ const familyFinancialData = [
         amount: 500000,
         originalAmount: 500000,
         lateFee: 0,
-        discount: 50000, // 10% discount for early payment
-        totalAmount: 450000,
+        discount: 0, // 10% discount for early payment
+        totalAmount: 500000,
         dueDate: '2024-05-15',
         paidDate: '2024-05-14',
         status: 'paid',
@@ -205,7 +208,7 @@ const familyFinancialData = [
       overduePayments: 1,
       averagePaymentDelay: 1.5, // days
       totalLateFees: 600000,
-      totalDiscounts: 50000
+      totalDiscounts: 0
     }
   },
   {
@@ -213,6 +216,8 @@ const familyFinancialData = [
     residentName: 'Lê Thị Hoa',
     relationship: 'Mẹ',
     monthlyFee: 18000000,
+    room: '102',
+    birthYear: '1985',
     additionalServices: [
       { name: 'Liệu pháp âm nhạc', amount: 800000, frequency: 'Hai lần/tuần' },
     ],
@@ -270,12 +275,13 @@ export default function FinancePage() {
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
 
   // Hide header when modals are open
   useEffect(() => {
-    if (showPaymentModal || showTermsModal) {
+    if (showPaymentModal || showTermsModal || showInvoiceModal) {
       document.body.classList.add('hide-header');
     } else {
       document.body.classList.remove('hide-header');
@@ -285,7 +291,7 @@ export default function FinancePage() {
     return () => {
       document.body.classList.remove('hide-header');
     };
-  }, [showPaymentModal, showTermsModal]);
+  }, [showPaymentModal, showTermsModal, showInvoiceModal]);
 
   // Check access permissions
   useEffect(() => {
@@ -315,22 +321,84 @@ export default function FinancePage() {
     setShowPaymentModal(true);
   };
 
+  const handleViewInvoice = (payment: any) => {
+    setSelectedPayment(payment);
+    setShowInvoiceModal(true);
+  };
+
   const handleViewServicePackage = () => {
     setShowServiceModal(true);
   };
 
-  const getRegisteredServicePackage = () => {
+  // Thay thế hàm getRegisteredServicePackage bằng logic đồng bộ với trang dịch vụ
+  const getAllRegisteredServicePackages = (statusFilter = 'all') => {
     try {
+      if (user?.role === 'family') {
+        // Lấy từ RESIDENTS_DATA nếu là family
+        const residentsWithPackages = RESIDENTS_DATA.filter((r: any) => r.carePackage);
+        let packages = residentsWithPackages.map((resident: any) => ({
+          ...resident.carePackage,
+          residentInfo: {
+            name: resident.name,
+            age: resident.age,
+            room: resident.room,
+            admissionDate: resident.admissionDate || '',
+            healthCondition: resident.healthCondition || '',
+            emergencyContact: resident.emergencyContact || '',
+            medicalHistory: resident.medicalHistory || '',
+            medications: resident.medications_detail || resident.medications || '',
+            allergyInfo: resident.allergyInfo || '',
+            specialNeeds: resident.specialNeeds || '',
+            id: resident.id,
+          },
+        }));
+        if (statusFilter !== 'all') {
+          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
+        }
+        return packages;
+      }
+      // Còn lại lấy từ localStorage
       const savedResidents = localStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
-        const currentResident = residents.find((r: any) => r.id.toString() === selectedResident);
-        return currentResident?.carePackage || null;
+        const residentsWithPackages = residents.filter((r: any) => r.carePackage);
+        let packages = residentsWithPackages.map((resident: any) => ({
+          ...resident.carePackage,
+          residentInfo: {
+            name: resident.name,
+            age: resident.age,
+            room: resident.room,
+            admissionDate: resident.admissionDate || '',
+            healthCondition: resident.healthCondition || '',
+            emergencyContact: resident.emergencyContact || '',
+            medicalHistory: resident.medicalHistory || '',
+            medications: resident.medications || '',
+            allergyInfo: resident.allergyInfo || '',
+            specialNeeds: resident.specialNeeds || '',
+            id: resident.id,
+          },
+        }));
+        if (statusFilter !== 'all') {
+          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
+        }
+        return packages;
       }
     } catch (error) {
-      console.error('Error getting registered service package:', error);
+      console.error('Error getting registered service packages:', error);
     }
-    return null;
+    return [];
+  };
+
+  const getRegisteredServicePackage = () => {
+    const allPackages = getAllRegisteredServicePackages();
+    // Nếu có selectedResident, ưu tiên lấy đúng người đang chọn
+    if (selectedResident) {
+      const found = allPackages.find(
+        (pkg: any) => pkg.residentInfo?.id?.toString() === selectedResident || pkg.residentInfo?.name === familyFinancialData[selectedResident]?.residentName
+      );
+      return found || (allPackages.length > 0 ? allPackages[0] : null);
+    }
+    return allPackages.length > 0 ? allPackages[0] : null;
   };
 
   const handleProcessPayment = async () => {
@@ -360,13 +428,7 @@ export default function FinancePage() {
         familyFinancialData[selectedResident].gracePeriodDays
       );
 
-      const discount = calculateEarlyPaymentDiscount(
-        selectedPayment.originalAmount,
-        selectedPayment.dueDate,
-        currentDate
-      );
-
-      const finalAmount = selectedPayment.originalAmount + lateFee - discount;
+      const finalAmount = selectedPayment.originalAmount + lateFee;
 
       // Step 4: Simulate QR payment verification with retry logic
       let retryCount = 0;
@@ -427,12 +489,9 @@ export default function FinancePage() {
         payment.paidDate = now;
         payment.updatedAt = now;
         payment.lateFee = lateFee;
-        payment.discount = discount;
         payment.totalAmount = finalAmount;
         payment.bankReference = bankResponse.bankReference;
         payment.paymentType = 'full';
-        payment.processingFee = bankResponse.fee;
-        payment.verificationCode = bankResponse.verificationCode;
 
         // Update resident totals
         residentData.totalPaid += payment.amount;
@@ -441,7 +500,6 @@ export default function FinancePage() {
         // Update payment history analytics
         residentData.paymentHistory.successfulPayments += 1;
         residentData.paymentHistory.totalLateFees += lateFee;
-        residentData.paymentHistory.totalDiscounts += discount;
         
         // Calculate payment delay for analytics
         const paymentDelay = Math.max(0, Math.ceil(
@@ -465,7 +523,6 @@ export default function FinancePage() {
       // Step 8: Create final audit log
       createAuditLog('payment_completed', selectedPayment, {
         lateFee,
-        discount,
         finalAmount,
         bankReference: bankResponse?.bankReference || 'MB972047950',
         processingTime: Date.now() - parseInt(auditLog.id.slice(-6)),
@@ -481,7 +538,6 @@ export default function FinancePage() {
         • Mã ngân hàng: ${bankResponse?.bankReference || 'MB972047950'}
         • Số tiền: ${formatCurrency(finalAmount)}
         ${lateFee > 0 ? `• Phí trễ hạn: ${formatCurrency(lateFee)}` : ''}
-        ${discount > 0 ? `• Giảm giá: -${formatCurrency(discount)}` : ''}
         • Phí giao dịch: ${formatCurrency(0)}
         
         📧 Email xác nhận đã được gửi
@@ -596,7 +652,7 @@ export default function FinancePage() {
                   </span>
                 </div>
                 
-                {(paymentForModal.lateFee > 0 || lateFee > 0) && (
+                {(paymentForModal.lateFee > 0) && (
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -606,20 +662,6 @@ export default function FinancePage() {
                     <span style={{fontSize: '0.875rem', color: '#64748b'}}>Phí trễ hạn</span>
                     <span style={{fontSize: '0.875rem', color: '#0f172a'}}>
                       {formatCurrency(paymentForModal.lateFee || lateFee || 600000)}
-                    </span>
-                  </div>
-                )}
-                
-                {paymentForModal.discount > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '0.75rem 1rem',
-                    borderBottom: '1px solid #f1f5f9'
-                  }}>
-                    <span style={{fontSize: '0.875rem', color: '#64748b'}}>Giảm giá</span>
-                    <span style={{fontSize: '0.875rem', color: '#0f172a'}}>
-                      -{formatCurrency(paymentForModal.discount)}
                     </span>
                   </div>
                 )}
@@ -778,17 +820,6 @@ export default function FinancePage() {
     return Math.floor(originalAmount * lateFeeRate * overdueDays / 100) * 100; // Round to nearest 100
   };
 
-  const calculateEarlyPaymentDiscount = (amount: number, dueDate: string, paymentDate: string) => {
-    const due = new Date(dueDate);
-    const payment = new Date(paymentDate);
-    const diffTime = due.getTime() - payment.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays >= 7) return Math.floor(amount * 0.05); // 5% discount for 7+ days early
-    if (diffDays >= 3) return Math.floor(amount * 0.02); // 2% discount for 3+ days early
-    return 0;
-  };
-
   const getPaymentStatus = (payment: any) => {
     const today = new Date();
     const dueDate = new Date(payment.dueDate);
@@ -879,7 +910,6 @@ export default function FinancePage() {
       },
       totals: {
         originalAmount: payment.originalAmount,
-        discount: payment.discount,
         lateFee: payment.lateFee,
         totalAmount: payment.totalAmount,
         paidAmount: payment.amount
@@ -1278,98 +1308,70 @@ export default function FinancePage() {
                           const statusConfig = {
                             paid: { 
                               text: 'Đã thanh toán', 
-                              bg: '#dcfce7', 
-                              color: '#166534',
-                              icon: <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                              label: 'Đã thanh toán',
+                              bg: '#e6f9ed', // nền xanh lá nhạt
+                              color: '#16a34a', // chữ xanh lá đậm
+                              border: '#bbf7d0', // border xanh lá pastel
+                              icon: null
                             },
                             processing: { 
                               text: 'Đang xử lý', 
-                              bg: '#dbeafe', 
-                              color: '#1d4ed8',
-                              icon: <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                              label: 'Đang xử lý',
+                              bg: '#f3f0fd',
+                              color: '#7c3aed',
+                              border: '#ede9fe',
+                              icon: null
                             },
                             pending: { 
                               text: 'Chờ thanh toán', 
-                              bg: '#fef3c7', 
-                              color: '#d97706',
-                              icon: <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                              label: 'Chờ thanh toán',
+                              bg: '#f0fdf4',
+                              color: '#059669',
+                              border: '#bbf7d0',
+                              icon: null
                             },
                             grace_period: { 
-                              text: 'Trong thời hạn gia hạn', 
-                              bg: '#fed7aa', 
-                              color: '#ea580c',
-                              icon: <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                              text: 'Gia hạn',
+                              label: 'Gia hạn',
+                              bg: '#fefbe9',
+                              color: '#b45309',
+                              border: '#fde68a',
+                              icon: null
                             },
                             overdue: { 
                               text: 'Quá hạn', 
-                              bg: '#fecaca', 
-                              color: '#dc2626',
-                              icon: <XMarkIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                              label: 'Quá hạn',
+                              bg: '#fff1f2',
+                              color: '#e11d48',
+                              border: '#fecdd3',
+                              icon: (
+                                <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                              )
                             }
                           };
-                          
-                          const config = statusConfig[status];
                           
                           return (
                             <div style={{display: 'flex', justifyContent: 'center'}}>
                               <span style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: status === 'overdue' ? '0.375rem 0.625rem' : '0.3rem 0.65rem',
-                                borderRadius: '0.5rem',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                background: status === 'overdue' 
-                                  ? '#fef2f2'
-                                  : status === 'grace_period'
-                                  ? '#fff7ed'
-                                  : status === 'paid'
-                                  ? '#f0fdf4'
-                                  : status === 'processing'
-                                  ? '#eff6ff'
-                                  : '#fffbeb',
-                                color: status === 'overdue' 
-                                  ? '#dc2626'
-                                  : status === 'grace_period'
-                                  ? '#ea580c'
-                                  : status === 'paid'
-                                  ? '#16a34a'
-                                  : status === 'processing'
-                                  ? '#2563eb'
-                                  : '#d97706',
-                                border: `1px solid ${
-                                  status === 'overdue' 
-                                    ? '#fecaca'
-                                    : status === 'grace_period'
-                                    ? '#fed7aa'
-                                    : status === 'paid'
-                                    ? '#bbf7d0'
-                                    : status === 'processing'
-                                    ? '#dbeafe'
-                                    : '#fef3c7'
-                                }`,
-                                textTransform: 'none',
-                                letterSpacing: 'normal',
-                                minWidth: 'auto',
-                                justifyContent: 'center',
-                                boxShadow: 'none'
+                                gap: 4,
+                                padding: '0.18rem 0.7rem',
+                                borderRadius: '0.8rem',
+                                fontSize: '0.92rem',
+                                fontWeight: 500,
+                                background: statusConfig[status].bg,
+                                color: statusConfig[status].color,
+                                border: `1px solid ${statusConfig[status].border}`,
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
+                                letterSpacing: '0.01em',
+                                lineHeight: 1.32,
+                                fontFamily: 'inherit',
+                                transition: 'background 0.18s, color 0.18s'
                               }}>
-                                <span style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  strokeWidth: 2
-                                }}>
-                                  {React.cloneElement(config.icon, {
-                                    style: {
-                                      width: '0.75rem',
-                                      height: '0.75rem'
-                                    }
-                                  })}
-                                </span>
-                                <span style={{whiteSpace: 'nowrap'}}>
-                                  {status === 'overdue' ? 'Quá hạn' : config.text}
-                                </span>
+                                {statusConfig[status].icon}
+                                {statusConfig[status].label}
                               </span>
                             </div>
                           );
@@ -1397,6 +1399,34 @@ export default function FinancePage() {
                                   <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
                                   Hoàn thành
                                 </div>
+                                <button
+                                  onClick={() => handleViewInvoice(payment)}
+                                  style={{
+                                    marginTop: '0.25rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.375rem',
+                                    padding: '0.375rem 0.75rem',
+                                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    minWidth: '90px'
+                                  }}
+                                  onMouseOver={e => {
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                  Xem chi tiết
+                                </button>
                               </div>
                             );
                           }
@@ -1454,15 +1484,43 @@ export default function FinancePage() {
                                     transition: 'all 0.2s ease',
                                     minWidth: '90px'
                                   }}
-                                  onMouseOver={(e) => {
+                                  onMouseOver={e => {
                                     e.currentTarget.style.transform = 'translateY(-1px)';
                                   }}
-                                  onMouseOut={(e) => {
+                                  onMouseOut={e => {
                                     e.currentTarget.style.transform = 'translateY(0)';
                                   }}
                                 >
                                   <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
                                   {isUrgent ? 'Thanh toán' : 'Thanh toán'}
+                                </button>
+                                <button
+                                  onClick={() => handleViewInvoice(payment)}
+                                  style={{
+                                    marginTop: '0.25rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.375rem',
+                                    padding: '0.375rem 0.75rem',
+                                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    minWidth: '90px'
+                                  }}
+                                  onMouseOver={e => {
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                  Xem chi tiết
                                 </button>
                               </div>
                             );
@@ -1479,7 +1537,7 @@ export default function FinancePage() {
           </div>
         </div>
 
-        {/* Professional Payment Modal - QR Code Payment */}
+        {/* Professional Payment Modal - Enhanced Business Rules */}
         {showPaymentModal && selectedPayment && (
           <div style={{
             position: 'fixed',
@@ -1487,123 +1545,193 @@ export default function FinancePage() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            backdropFilter: 'blur(8px)',
+            backdropFilter: 'blur(12px)',
             marginLeft: '12rem'
           }}>
             <div style={{
               background: 'white',
-              borderRadius: '0.75rem',
-              maxWidth: '28rem',
-              width: '90%',
-              maxHeight: '90vh',
+              borderRadius: '1.5rem',
+              maxWidth: '48rem',
+              width: '100%',
+              maxHeight: '95vh',
               overflowY: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              position: 'relative'
+              boxShadow: '0 32px 64px -12px rgba(0, 0, 0, 0.4)',
+              position: 'relative',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
-              {/* Professional Header with Bank Logo */}
+              {/* Enhanced Professional Header */}
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                borderTopLeftRadius: '0.75rem',
-                borderTopRightRadius: '0.75rem',
-                padding: '1.5rem',
+                borderTopLeftRadius: '1.5rem',
+                borderTopRightRadius: '1.5rem',
+                padding: '2rem',
                 color: 'white',
-                position: 'relative'
+                position: 'relative',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
-                
-                
-                <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '1.25rem', marginBottom: '1.5rem'}}>
                   <div style={{
-                    width: '3rem',
-                    height: '3rem',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    borderRadius: '0.75rem',
+                    width: '3.5rem',
+                    height: '3.5rem',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '1rem',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
                   }}>
-                    <DevicePhoneMobileIcon style={{width: '1.75rem', height: '1.75rem'}} />
+                    <DevicePhoneMobileIcon style={{width: '2rem', height: '2rem'}} />
                   </div>
                   <div>
                     <h3 style={{
-                      fontSize: '1.25rem',
+                      fontSize: '1.5rem',
                       fontWeight: 700,
-                      margin: 0
+                      margin: 0,
+                      letterSpacing: '-0.025em'
                     }}>
                       Thanh toán hóa đơn
                     </h3>
                     <p style={{
-                      fontSize: '0.85rem',
+                      fontSize: '0.95rem',
                       opacity: 0.9,
-                      margin: '0.125rem 0 0 0'
+                      margin: '0.25rem 0 0 0',
+                      fontWeight: 500
                     }}>
-                      Quét mã QR để thanh toán nhanh chóng
+                      Phương thức: Chuyển khoản ngân hàng qua QR Code
                     </p>
                   </div>
                 </div>
                 
-               </div>
-
-              {/* QR Code Section */}
+                {/* Business Rules Compliance Notice */}
                 <div style={{
-                padding: '1.5rem',
-                background: '#f8fafc',
-                  display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
+                  background: 'rgba(34, 197, 94, 0.15)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '0.75rem',
+                  padding: '1rem',
+                  marginTop: '1rem'
                 }}>
-                  <div style={{
-                    display: 'flex',
-                  flexDirection: 'column',
-                    alignItems: 'center',
-                  marginBottom: '1rem'
-                }}>
-                  <p style={{
-                    fontSize: '0.85rem',
-                  fontWeight: 600,
-                    color: '#0f172a',
-                    margin: '0 0 0.5rem 0',
-                    textAlign: 'center'
-                  }}>
-                    {selectedPayment.description}
-                  </p>
-                  <p style={{
-                    fontSize: '1.75rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    margin: '0 0 0.5rem 0'
-                  }}>
-                    {formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}
-                  </p>
-                  <p style={{
-                    fontSize: '0.75rem',
-                    color: '#64748b',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}>
-                    <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                    Mã QR có hiệu lực trong 15:00 phút
-                  </p>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                    <CheckCircleIcon style={{width: '1.25rem', height: '1.25rem', color: '#22c55e'}} />
+                    <div>
+                      <p style={{
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        color: '#22c55e',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Tuân thủ quy định thanh toán
+                      </p>
+                      <p style={{
+                        fontSize: '0.8rem',
+                        color: 'rgba(34, 197, 94, 0.8)',
+                        margin: 0,
+                        lineHeight: 1.4
+                      }}>
+                        Giao dịch được thực hiện theo đúng quy định của Ngân hàng Nhà nước và tiêu chuẩn bảo mật PCI DSS
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-                {/* QR Code Display */}
+              {/* Enhanced Payment Information Section */}
               <div style={{
-                  width: '16rem',
-                  height: '16rem',
+                padding: '2rem',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}>
+                {/* Invoice Summary */}
+                <div style={{
                   background: 'white',
-                  border: '8px solid white',
-                  borderRadius: '0.75rem',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  borderRadius: '1rem',
+                  padding: '1.5rem',
+                  width: '100%',
+                  marginBottom: '1.5rem',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                }}>
+                  <div style={{textAlign: 'center', marginBottom: '1rem'}}>
+                    <p style={{
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      margin: '0 0 0.5rem 0'
+                    }}>
+                      {selectedPayment.description}
+                    </p>
+                    <p style={{
+                      fontSize: '2rem',
+                      fontWeight: 700,
+                      color: '#dc2626',
+                      margin: '0 0 0.5rem 0',
+                      letterSpacing: '-0.025em'
+                    }}>
+                      {formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}
+                    </p>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.8rem',
+                      color: '#64748b'
+                    }}>
+                      <ClockIcon style={{width: '1rem', height: '1rem'}} />
+                      <span>Mã QR có hiệu lực trong 15 phút</span>
+                    </div>
+                  </div>
+                  
+                  {/* Business Rules Display */}
+                  <div style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    borderRadius: '0.75rem',
+                    padding: '1rem',
+                    marginTop: '1rem'
+                  }}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem'}}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <span style={{fontSize: '0.85rem', fontWeight: 600, color: '#92400e'}}>
+                        Quy định thanh toán
+                      </span>
+                    </div>
+                                         <div style={{fontSize: '0.8rem', color: '#92400e', lineHeight: 1.5}}>
+                      <div style={{marginBottom: '0.5rem'}}>
+                        • Hạn thanh toán: {selectedPayment.dueDate ? new Date(selectedPayment.dueDate).toLocaleDateString('vi-VN') : 'Chưa xác định'}
+                      </div>
+                      {selectedPayment.lateFee > 0 && (
+                        <div style={{marginBottom: '0.5rem', fontWeight: 600}}>
+                          • Phí trễ hạn: {formatCurrency(selectedPayment.lateFee)} (1%/ngày sau hạn)
+                        </div>
+                      )}
+                      <div>• Chỉ chấp nhận chuyển khoản ngân hàng</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Enhanced QR Code Display */}
+                <div style={{
+                  width: '18rem',
+                  height: '18rem',
+                  background: 'white',
+                  border: '12px solid white',
+                  borderRadius: '1rem',
+                  boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.15)',
                   position: 'relative',
                   marginBottom: '1.5rem'
                 }}>
-                  {/* Simulated QR Code */}
+                  {/* Simulated QR Code with better pattern */}
                   <div style={{
                     position: 'absolute',
                     top: 0,
@@ -1611,26 +1739,21 @@ export default function FinancePage() {
                     right: 0,
                     bottom: 0,
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(33, 1fr)',
-                    gridTemplateRows: 'repeat(33, 1fr)',
+                    gridTemplateColumns: 'repeat(35, 1fr)',
+                    gridTemplateRows: 'repeat(35, 1fr)',
                     gap: '1px',
-                    padding: '8px'
+                    padding: '12px'
                   }}>
-                    {/* This creates a visual representation of a QR code */}
-                    {Array(33*33).fill(0).map((_, i) => {
-                      // Create QR code pattern - this is just a visual simulation
+                    {Array(35*35).fill(0).map((_, i) => {
                       const isCornerSquare = 
-                        // Top-left corner pattern
-                        (i < 99 && i % 33 < 7 && Math.floor(i / 33) < 7) ||
-                        // Top-right corner pattern
-                        (i < 99 && i % 33 >= 33-7 && Math.floor(i / 33) < 7) ||
-                        // Bottom-left corner pattern
-                        (i >= 33*33-99 && i % 33 < 7 && Math.floor(i / 33) >= 33-7);
+                        (i < 105 && i % 35 < 7 && Math.floor(i / 35) < 7) ||
+                        (i < 105 && i % 35 >= 35-7 && Math.floor(i / 35) < 7) ||
+                        (i >= 35*35-105 && i % 35 < 7 && Math.floor(i / 35) >= 35-7);
 
                       const isInnerPattern = 
-                        (i % 33 > 10 && i % 33 < 22 && Math.floor(i / 33) > 10 && Math.floor(i / 33) < 22);
+                        (i % 35 > 12 && i % 35 < 22 && Math.floor(i / 35) > 12 && Math.floor(i / 35) < 22);
                       
-                      const shouldBeBlack = isCornerSquare || isInnerPattern || Math.random() < 0.3;
+                      const shouldBeBlack = isCornerSquare || isInnerPattern || Math.random() < 0.35;
                       
                       return (
                         <div 
@@ -1645,124 +1768,154 @@ export default function FinancePage() {
                     })}
                   </div>
                   
-                  {/* Bank Logo Overlay */}
-                    <div style={{
+                  {/* Enhanced Bank Logo Overlay */}
+                  <div style={{
                     position: 'absolute',
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                      width: '3rem',
-                      height: '3rem',
+                    width: '3.5rem',
+                    height: '3.5rem',
                     background: 'white',
-                      borderRadius: '0.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.8)'
-                    }}>
-                    <BuildingLibraryIcon style={{width: '2rem', height: '2rem', color: '#0f172a'}} />
-                    </div>
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 0 6px rgba(255, 255, 255, 0.9)',
+                    border: '2px solid #e2e8f0'
+                  }}>
+                    <BuildingLibraryIcon style={{width: '2.25rem', height: '2.25rem', color: '#0f172a'}} />
+                  </div>
                 </div>
                 
-                {/* Payment Instructions */}
+                {/* Enhanced Payment Instructions */}
                 <div style={{
-                  background: 'rgba(249, 115, 22, 0.1)',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgba(249, 115, 22, 0.2)',
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  border: '2px solid #f59e0b',
+                  borderRadius: '1rem',
+                  padding: '1.25rem',
                   width: '100%',
-                  marginBottom: '1rem'
+                  marginBottom: '1.5rem'
                 }}>
-                      <p style={{
-                    fontSize: '0.85rem',
+                  <p style={{
+                    fontSize: '0.9rem',
                     fontWeight: 600,
-                    color: '#9a3412',
-                    margin: '0 0 0.5rem 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                    gap: '0.375rem'
+                    color: '#92400e',
+                    margin: '0 0 0.75rem 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}>
-                    <ClockIcon style={{width: '1rem', height: '1rem'}} />
+                    <ClockIcon style={{width: '1.125rem', height: '1.125rem'}} />
                     Hướng dẫn thanh toán
                   </p>
                   <ol style={{
                     margin: 0,
-                    padding: '0 0 0 1.25rem',
-                    fontSize: '0.8rem',
-                    color: '#9a3412'
+                    padding: '0 0 0 1.5rem',
+                    fontSize: '0.85rem',
+                    color: '#92400e',
+                    lineHeight: 1.6
                   }}>
-                    <li style={{marginBottom: '0.25rem'}}>Mở ứng dụng Ngân hàng hoặc Ví điện tử</li>
-                    <li style={{marginBottom: '0.25rem'}}>Chọn chức năng Quét QR</li>
-                    <li style={{marginBottom: '0.25rem'}}>Quét mã QR hiển thị bên trên</li>
-                    <li>Xác nhận thanh toán số tiền {formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}</li>
+                    <li style={{marginBottom: '0.5rem'}}>• Mở ứng dụng Ngân hàng hoặc Ví điện tử</li>
+                    <li style={{marginBottom: '0.5rem'}}>• Chọn chức năng "Quét mã QR"</li>
+                    <li style={{marginBottom: '0.5rem'}}>• Quét mã QR hiển thị bên trên</li>
+                    <li style={{marginBottom: '0.5rem'}}>• Kiểm tra thông tin giao dịch</li>
+                    <li>• Xác nhận thanh toán số tiền <strong>{formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}</strong></li>
                   </ol>
                 </div>
                 
-                {/* Payment Details */}
+                {/* Enhanced Payment Details */}
                 <div style={{
                   width: '100%',
                   background: 'white',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #e2e8f0',
-                  overflow: 'hidden'
+                  borderRadius: '1rem',
+                  border: '2px solid #e2e8f0',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
                 }}>
                   <div style={{
-                    padding: '0.75rem 1rem',
-                    borderBottom: '1px solid #e2e8f0',
-                    background: '#f8fafc'
-                }}>
-                  <h6 style={{
-                      fontSize: '0.75rem',
+                    padding: '1rem 1.25rem',
+                    borderBottom: '2px solid #e2e8f0',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+                  }}>
+                    <h6 style={{
+                      fontSize: '0.8rem',
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       color: '#475569',
                       margin: 0,
-                      letterSpacing: '0.05em'
+                      letterSpacing: '0.1em'
                     }}>
                       Thông tin giao dịch
-                  </h6>
+                    </h6>
                   </div>
                   
-                  <div style={{padding: '0.75rem 1rem'}}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                      marginBottom: '0.75rem'
+                  <div style={{padding: '1.25rem'}}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '1rem',
+                      alignItems: 'center'
                     }}>
-                      <span style={{fontSize: '0.8rem', color: '#64748b'}}>Mã giao dịch</span>
-                      <span style={{fontSize: '0.8rem', fontWeight: 600, color: '#0f172a', fontFamily: 'monospace'}}>
-                        {selectedPayment.transactionId || `TX${Date.now().toString().slice(-8)}`}
-                    </span>
-                  </div>
-                  
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <span style={{fontSize: '0.8rem', color: '#64748b'}}>Đơn vị thụ hưởng</span>
-                      <span style={{fontSize: '0.8rem', fontWeight: 600, color: '#0f172a'}}>
-                        TRUNG TÂM CHĂM SÓC NCT
-                    </span>
-                  </div>
-                  
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <span style={{fontSize: '0.8rem', color: '#64748b'}}>Nội dung</span>
-                      <span style={{fontSize: '0.8rem', fontWeight: 600, color: '#0f172a', fontFamily: 'monospace', maxWidth: '12rem', textAlign: 'right'}}>
-                        THANHTOAN {selectedPayment.transactionId || `TX${Date.now().toString().slice(-8)}`}
-                    </span>
+                      <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 500}}>Mã giao dịch</span>
+                      <span style={{
+                        fontSize: '0.85rem', 
+                        fontWeight: 600, 
+                        color: '#0f172a', 
+                        fontFamily: 'ui-monospace, monospace',
+                        background: '#f1f5f9',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '0.375rem'
+                      }}>
+                        {selectedPayment.transactionId || `TXN${Date.now().toString().slice(-8)}`}
+                      </span>
                     </div>
                     
                     <div style={{
                       display: 'flex',
-                      justifyContent: 'space-between'
+                      justifyContent: 'space-between',
+                      marginBottom: '1rem',
+                      alignItems: 'center'
                     }}>
-                      <span style={{fontSize: '0.8rem', color: '#64748b'}}>Số tiền</span>
-                      <span style={{fontSize: '0.8rem', fontWeight: 700, color: '#0f172a'}}>
+                      <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 500}}>Đơn vị thụ hưởng</span>
+                      <span style={{fontSize: '0.85rem', fontWeight: 600, color: '#0f172a'}}>
+                        TRUNG TÂM CHĂM SÓC NGƯỜI CAO TUỔI
+                      </span>
+                    </div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '1rem',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 500}}>Nội dung chuyển khoản</span>
+                      <span style={{
+                        fontSize: '0.85rem', 
+                        fontWeight: 600, 
+                        color: '#0f172a', 
+                        fontFamily: 'ui-monospace, monospace',
+                        maxWidth: '12rem', 
+                        textAlign: 'right',
+                        background: '#f1f5f9',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '0.375rem'
+                      }}>
+                        THANHTOAN {selectedPayment.transactionId || `TXN${Date.now().toString().slice(-8)}`}
+                      </span>
+                    </div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '1rem',
+                      background: '#f0fdf4',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #bbf7d0'
+                    }}>
+                      <span style={{fontSize: '0.9rem', color: '#166534', fontWeight: 600}}>Số tiền thanh toán</span>
+                      <span style={{fontSize: '1rem', fontWeight: 700, color: '#166534'}}>
                         {formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}
                       </span>
                     </div>
@@ -1770,23 +1923,24 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              {/* Footer Actions */}
+              {/* Enhanced Footer Actions */}
               <div style={{
-                padding: '1rem 1.5rem',
+                padding: '1.5rem 2rem',
                 background: 'white',
-                borderTop: '1px solid #e2e8f0',
-                borderBottomLeftRadius: '0.75rem',
-                borderBottomRightRadius: '0.75rem',
+                borderTop: '2px solid #e2e8f0',
+                borderBottomLeftRadius: '1.5rem',
+                borderBottomRightRadius: '1.5rem',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1.25rem'
               }}>
-                 {/* Action Buttons */}
-                 <div style={{
+                {/* Action Buttons */}
+                <div style={{
                   display: 'flex',
                   gap: '1rem',
-                  justifyContent: 'flex-end',
-                  paddingTop: '1rem'
+                  justifyContent: 'space-between',
+                  alignItems: 'center', 
+                  marginLeft: '17rem'
                 }}>
                   <button
                     onClick={() => setShowPaymentModal(false)}
@@ -1796,15 +1950,16 @@ export default function FinancePage() {
                       border: 'none',
                       borderRadius: '1rem',
                       color: 'white',
-                      fontSize: '0.95rem',
+                      fontSize: '1rem',
                       fontWeight: 600,
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 6px -1px rgba(100, 116, 139, 0.3)'
+                      boxShadow: '0 4px 6px -1px rgba(100, 116, 139, 0.3)',
+                      minWidth: '120px'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(100, 116, 139, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 16px -1px rgba(100, 116, 139, 0.4)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)';
@@ -1813,22 +1968,11 @@ export default function FinancePage() {
                   >
                     Đóng
                   </button>
+                  
+                  
                 </div>
                 
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.7rem',
-                  color: '#64748b',
-                  padding: '0.5rem',
-                  background: 'rgba(241, 245, 249, 0.5)',
-                  borderRadius: '0.375rem'
-                }}>
-                  <BuildingLibraryIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                  <span>Giao dịch được bảo mật theo tiêu chuẩn ngân hàng</span>
-                </div>
+                
               </div>
             </div>
           </div>
@@ -2123,42 +2267,6 @@ export default function FinancePage() {
                     </div>
                   </div>
 
-                  {/* Early Payment Discount - Not applicable */}
-                  <div style={{
-                    background: '#f0fdf4',
-                    borderRadius: '1rem',
-                    padding: '1.5rem',
-                    border: '1px solid #bbf7d0'
-                  }}>
-                    <h4 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 700,
-                      color: '#166534',
-                      margin: '0 0 1rem 0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      <CheckCircleIcon style={{width: '1.25rem', height: '1.25rem', color: '#16a34a'}} />
-                      Chính sách giảm giá thanh toán sớm
-                    </h4>
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      border: '1px solid #bbf7d0'
-                    }}>
-                      <p style={{
-                        fontSize: '0.95rem',
-                        color: '#166534',
-                        margin: 0,
-                        fontWeight: 600
-                      }}>
-                        <strong>Không áp dụng giảm giá khi thanh toán sớm.</strong>
-                      </p>
-                    </div>
-                  </div>
-
                   {/* Payment Methods */}
                   <div style={{
                     background: '#eff6ff',
@@ -2176,7 +2284,7 @@ export default function FinancePage() {
                       gap: '0.5rem'
                     }}>
                       <BuildingLibraryIcon style={{width: '1.25rem', height: '1.25rem', color: '#3b82f6'}} />
-                      Phương thức thanh toán được chấp nhận
+                      Phương thức thanh toán
                     </h4>
                     <div style={{
                       background: 'white',
@@ -2185,7 +2293,6 @@ export default function FinancePage() {
                       border: '1px solid #dbeafe'
                     }}>
                       <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                        <BuildingLibraryIcon style={{width: '1.25rem', height: '1.25rem', color: '#3b82f6'}} />
                         <div>
                           <p style={{
                             fontSize: '0.875rem',
@@ -2356,7 +2463,374 @@ export default function FinancePage() {
               </div>
             </div>
           </div>
-          
+        )}
+
+        {/* Professional Invoice Detail Modal */}
+        {showInvoiceModal && selectedPayment && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(51,65,85,0.32)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(8px)',
+            marginLeft: '12rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #f0f7fa 0%, #ede9fe 100%)',
+              borderRadius: '2.5rem',
+              maxWidth: '44rem',
+              width: '96%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 4px 24px 0 rgba(51,65,85,0.08)',
+              position: 'relative',
+              border: '1px solid #e5e7eb',
+              transition: 'box-shadow 0.2s',
+            }}>
+              {/* Header */}
+              <div style={{
+                background: 'linear-gradient(90deg, #f9fafb 60%, #e0e7ef 100%)',
+                borderTopLeftRadius: '2.5rem',
+                borderTopRightRadius: '2.5rem',
+                padding: '2rem 2.5rem 1.25rem 2.5rem',
+                borderBottom: '1px solid #e5e7eb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                boxShadow: '0 2px 8px 0 rgba(51,65,85,0.02)'
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                  <div style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)'
+                  }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14,2 14,8 20,8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10,9 9,9 8,9"></polyline>
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 style={{
+                      fontSize: '1.55rem',
+                      fontWeight: 700,
+                      margin: 0,
+                      letterSpacing: '-0.01em',
+                      lineHeight: 1.18,
+                      textTransform: 'none',
+                      background: 'linear-gradient(135deg, #1e40af 0%, #3730a3 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}>
+                      Chi tiết hóa đơn
+                    </h2>
+                    <p style={{
+                      fontSize: '0.98rem',
+                      color: '#64748b',
+                      margin: '0.25rem 0 0 0',
+                      fontWeight: 500,
+                      lineHeight: 1.5,
+                      textTransform: 'none',
+                    }}>
+                      Thông tin thanh toán và dịch vụ sử dụng
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowInvoiceModal(false)}
+                  title="Đóng"
+                  style={{
+                    padding: '0.5rem',
+                    background: '#f6f8fa',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '1.2rem',
+                    color: '#8b95a1',
+                    cursor: 'pointer',
+                    fontSize: '1.25rem',
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.18s',
+                    boxShadow: '0 1px 4px 0 rgba(51,65,85,0.04)'
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.background = '#e0e7ef';
+                    e.currentTarget.style.color = '#22223b';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.background = '#f6f8fa';
+                    e.currentTarget.style.color = '#8b95a1';
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Content */}
+              <div style={{padding: '2rem 2.2rem', background: 'transparent'}}>
+                {/* Beneficiary & Service Info */}
+                <div style={{
+                  display: 'flex',
+                  gap: '2rem',
+                  marginBottom: '2.2rem',
+                  flexWrap: 'wrap',
+                }}>
+                  {/* Beneficiary */}
+                  <div style={{
+                    flex: 1,
+                    minWidth: '15rem',
+                    background: 'white',
+                    borderRadius: '1.3rem',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 4px 0 rgba(51,65,85,0.02)',
+                    padding: '1.3rem 1.5rem',
+                    transition: 'box-shadow 0.18s',
+                  }}>
+                    <div style={{fontWeight: 500, color: '#8b95a1', fontSize: '0.93rem', marginBottom: '0.6rem', letterSpacing: '0.08em', textTransform:'uppercase'}}>Người cao tuổi</div>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem',
+                    }}>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <span style={{color:'#8b95a1', fontSize:'0.82rem', fontWeight:500}}>Họ tên:</span>
+                        <span style={{color:'#22223b', fontWeight:600, fontSize:'0.97rem'}}>{familyFinancialData[selectedResident]?.residentName}</span>
+                      </div>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <span style={{color:'#8b95a1', fontSize:'0.82rem', fontWeight:500}}>Phòng:</span>
+                        <span style={{color:'#22223b', fontWeight:600, fontSize:'0.97rem'}}>{familyFinancialData[selectedResident]?.room || 'Chưa cập nhật'}</span>
+                      </div>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <span style={{color:'#8b95a1', fontSize:'0.82rem', fontWeight:500}}>Năm sinh:</span>
+                        <span style={{color:'#22223b', fontWeight:600, fontSize:'0.97rem'}}>{familyFinancialData[selectedResident]?.birthYear || 'Chưa cập nhật'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Service Packages */}
+                  <div style={{
+                    flex: 1.2,
+                    minWidth: '18rem',
+                    background: 'white',
+                    borderRadius: '1.3rem',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 4px 0 rgba(51,65,85,0.02)',
+                    padding: '1.1rem 1.3rem',
+                    transition: 'box-shadow 0.18s',
+                  }}>
+                    <div style={{fontWeight: 500, color: '#8b95a1', fontSize: '0.93rem', marginBottom: '0.6rem', letterSpacing: '0.08em', textTransform:'uppercase'}}>Gói dịch vụ sử dụng</div>
+                    <div style={{marginBottom:'0.38rem'}}>
+                      <span style={{color:'#8b95a1', fontWeight:500, fontSize:'0.92rem', letterSpacing:'0.04em'}}>Tên gói:</span>
+                      <span style={{color:'#2563eb', fontWeight:600, marginLeft: 6}}>{getRegisteredServicePackage()?.packageType || 'Chưa đăng ký'}</span>
+                    </div>
+                    <div style={{marginBottom:'0.38rem'}}>
+                      <span style={{color:'#8b95a1', fontWeight:500, fontSize:'0.92rem', letterSpacing:'0.04em'}}>Giá:</span>
+                      <span style={{color:'#16a34a', fontWeight:600, marginLeft: 6}}>{formatCurrency(getRegisteredServicePackage()?.finalPrice || getRegisteredServicePackage()?.price || 0)}</span>
+                    </div>
+                    <div style={{color:'#8b95a1', fontSize:'0.93rem', marginBottom:'0.38rem'}}>Thanh toán: <b style={{fontWeight:500, color:'#334155'}}>Hàng tháng</b></div>
+                    
+                  </div>
+                </div>
+
+                {/* Invoice Card */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '1.15rem',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 4px 0 rgba(51,65,85,0.03)',
+                  padding: '1.7rem',
+                  marginBottom: '1.5rem',
+                }}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'1.5rem'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:'1.08rem', fontWeight:600, color:'#334155', marginBottom:'0.35rem', lineHeight:1.3}}>{selectedPayment.description}</div>
+                      <div style={{fontSize:'1.7rem', fontWeight:700, color:'#0f172a', marginBottom:'0.18rem', letterSpacing:'-0.01em', lineHeight:1.2}}>{formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}</div>
+                    </div>
+                    <div style={{marginLeft:'1.2rem'}}>
+                      {(() => {
+                        const status = getPaymentStatus(selectedPayment);
+                        const statusConfig = {
+                          paid: { text: 'Đã thanh toán', bg: '#e0f2fe', color: '#0369a1', border: '#bae6fd' },
+                          processing: { text: 'Đang xử lý', bg: '#ede9fe', color: '#7c3aed', border: '#ddd6fe' },
+                          pending: { text: 'Chờ thanh toán', bg: '#fef9c3', color: '#b45309', border: '#fde68a' },
+                          grace_period: { text: 'Gia hạn', bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+                          overdue: { text: 'Quá hạn', bg: '#fee2e2', color: '#dc2626', border: '#fecaca' }
+                        };
+                        const config = statusConfig[status];
+                        return (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.6rem 1.1rem',
+                            borderRadius: '0.7rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            background: config.bg,
+                            color: config.color,
+                            border: `1px solid ${config.border}`,
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 1px 2px 0 rgba(51,65,85,0.03)'
+                          }}>
+                            Trạng thái: {config.text}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  
+                  {/* Info Grid */}
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'1.2rem'}}>
+                    <div>
+                      <div style={{fontWeight:500, color:'#64748b', fontSize:'0.85rem', marginBottom:'0.5rem'}}>Mã hóa đơn</div>
+                      <div style={{fontFamily:'ui-monospace, monospace', color:'#0f172a', fontWeight:500, fontSize:'0.9rem', letterSpacing:'0.02em'}}>{selectedPayment.invoiceId || 'Chưa có'}</div>
+                    </div>
+                    {selectedPayment.status === 'paid' && (
+                      <div>
+                        <div style={{fontWeight:500, color:'#64748b', fontSize:'0.85rem', marginBottom:'0.5rem'}}>Mã giao dịch</div>
+                        <div style={{fontFamily:'ui-monospace, monospace', color:'#0f172a', fontWeight:500, fontSize:'0.9rem', letterSpacing:'0.02em'}}>{selectedPayment.transactionId || 'Chưa có'}</div>
+                      </div>
+                    )}
+                    <div>
+                      <div style={{fontWeight:500, color:'#64748b', fontSize:'0.85rem', marginBottom:'0.5rem'}}>Hạn thanh toán</div>
+                      <div style={{color:'#0f172a', fontWeight:500, fontSize:'0.9rem'}}>{selectedPayment.dueDate ? new Date(selectedPayment.dueDate).toLocaleDateString('vi-VN') : 'Chưa xác định'}</div>
+                    </div>
+                    {selectedPayment.status === 'paid' && selectedPayment.method && (
+                      <div>
+                        <div style={{fontWeight:500, color:'#64748b', fontSize:'0.85rem', marginBottom:'0.5rem'}}>Phương thức thanh toán</div>
+                        <div style={{color:'#0f172a', fontWeight:500, fontSize:'0.9rem'}}>Chuyển khoản ngân hàng</div>
+                      </div>
+                    )}
+                    {selectedPayment.paidDate && (
+                      <div>
+                        <div style={{fontWeight:500, color:'#64748b', fontSize:'0.85rem', marginBottom:'0.5rem'}}>Ngày thanh toán</div>
+                        <div style={{color:'#0f172a', fontWeight:500, fontSize:'0.9rem'}}>{new Date(selectedPayment.paidDate).toLocaleString('vi-VN')}</div>
+                      </div>
+                    )}
+                    
+                  </div>
+                </div>
+
+
+                {/* Payment Breakdown */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '1.15rem',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 4px 0 rgba(51,65,85,0.03)',
+                  padding: '1.7rem',
+                  marginBottom: '1.5rem',
+                }}>
+                  <div style={{fontWeight:600, color:'#475569', fontSize:'1.01rem', marginBottom:'1.1rem'}}>Chi tiết hóa đơn</div>
+                  <div style={{display:'grid', gap:'0.65rem'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                      <span style={{color:'#64748b', fontWeight:500}}>Tạm tính:</span>
+                      <span style={{color:'#0f172a', fontWeight:500}}>{formatCurrency(selectedPayment.originalAmount || selectedPayment.amount)}</span>
+                    </div>
+                    {selectedPayment.lateFee > 0 && (
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <span style={{color:'#dc2626', fontWeight:500}}>Phí phạt chậm thanh toán:</span>
+                        <span style={{color:'#dc2626', fontWeight:600}}>+{formatCurrency(selectedPayment.lateFee)}</span>
+                      </div>
+                    )}
+                    <div style={{borderTop:'1px solid #e5e7eb', marginTop:'0.4rem', paddingTop:'0.6rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                      <span style={{fontSize:'1.01rem', color:'#334155', fontWeight:600}}>Tổng số tiền phải thanh toán:</span>
+                      <span style={{fontSize:'1.18rem', color:'#0f172a', fontWeight:700}}>{formatCurrency(selectedPayment.totalAmount || selectedPayment.amount)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{display:'flex', gap:'1rem', justifyContent:'flex-end', marginTop:'0.5rem'}}>
+                  {getPaymentStatus(selectedPayment) !== 'paid' && (
+                    <button
+                      onClick={() => {
+                        setShowInvoiceModal(false);
+                        handlePayNow(selectedPayment);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.85rem 1.7rem',
+                        background: getPaymentStatus(selectedPayment) === 'overdue' 
+                          ? 'linear-gradient(90deg, #dc2626 60%, #ef4444 100%)' 
+                          : 'linear-gradient(90deg, #38bdf8 60%, #4ade80 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.7rem',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.18s',
+                        boxShadow: getPaymentStatus(selectedPayment) === 'overdue'
+                          ? '0 2px 8px 0 rgba(220,38,38,0.08)'
+                          : '0 2px 8px 0 rgba(56,189,248,0.08)'
+                      }}
+                      onMouseOver={e => {
+                        if (getPaymentStatus(selectedPayment) === 'overdue') {
+                          e.currentTarget.style.background = 'linear-gradient(90deg, #ef4444 60%, #dc2626 100%)';
+                          e.currentTarget.style.boxShadow = '0 4px 16px 0 rgba(220,38,38,0.13)';
+                        } else {
+                          e.currentTarget.style.background = 'linear-gradient(90deg, #4ade80 60%, #4ade80 100%)';
+                          e.currentTarget.style.boxShadow = '0 4px 16px 0 rgba(56,189,248,0.13)';
+                        }
+                      }}
+                      onMouseOut={e => {
+                        if (getPaymentStatus(selectedPayment) === 'overdue') {
+                          e.currentTarget.style.background = 'linear-gradient(90deg, #dc2626 60%, #ef4444 100%)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220,38,38,0.08)';
+                        } else {
+                          e.currentTarget.style.background = '#38bdf8';
+                          e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(56,189,248,0.08)';
+                        }
+                      }}
+                    >
+                      Thanh toán ngay
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowInvoiceModal(false)}
+                    style={{
+                      padding: '0.85rem 1.7rem',
+                      background: '#f1f5f9',
+                      color: '#334155',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.7rem',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.18s',
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = '#e0e7ef';
+                      e.currentTarget.style.color = '#0f172a';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = '#f1f5f9';
+                      e.currentTarget.style.color = '#334155';
+                    }}
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>      
     );
@@ -2716,98 +3190,70 @@ export default function FinancePage() {
                         const statusConfig = {
                           paid: { 
                             text: 'Đã thanh toán', 
-                            bg: '#dcfce7', 
-                            color: '#166534',
-                            icon: <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                            label: 'Đã thanh toán',
+                            bg: '#e6f9ed', // nền xanh lá nhạt
+                            color: '#16a34a', // chữ xanh lá đậm
+                            border: '#bbf7d0', // border xanh lá pastel
+                            icon: null
                           },
                           processing: { 
                             text: 'Đang xử lý', 
-                            bg: '#dbeafe', 
-                            color: '#1d4ed8',
-                            icon: <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                            label: 'Đang xử lý',
+                            bg: '#f3f0fd',
+                            color: '#7c3aed',
+                            border: '#ede9fe',
+                            icon: null
                           },
                           pending: { 
                             text: 'Chờ thanh toán', 
-                            bg: '#fef3c7', 
-                            color: '#d97706',
-                            icon: <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                            label: 'Chờ thanh toán',
+                            bg: '#f0fdf4',
+                            color: '#059669',
+                            border: '#bbf7d0',
+                            icon: null
                           },
                           grace_period: { 
-                            text: 'Trong thời hạn gia hạn', 
-                            bg: '#fed7aa', 
-                            color: '#ea580c',
-                            icon: <ClockIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                            text: 'Gia hạn',
+                            label: 'Gia hạn',
+                            bg: '#fefbe9',
+                            color: '#b45309',
+                            border: '#fde68a',
+                            icon: null
                           },
                           overdue: { 
                             text: 'Quá hạn', 
-                            bg: '#fecaca', 
-                            color: '#dc2626',
-                            icon: <XMarkIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                            label: 'Quá hạn',
+                            bg: '#fff1f2',
+                            color: '#e11d48',
+                            border: '#fecdd3',
+                            icon: (
+                              <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                            )
                           }
                         };
-                        
-                        const config = statusConfig[status];
                         
                         return (
                           <div style={{display: 'flex', justifyContent: 'center'}}>
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '0.25rem',
-                              padding: status === 'overdue' ? '0.375rem 0.625rem' : '0.3rem 0.65rem',
-                              borderRadius: '0.5rem',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              background: status === 'overdue' 
-                                ? '#fef2f2'
-                                : status === 'grace_period'
-                                ? '#fff7ed'
-                                : status === 'paid'
-                                ? '#f0fdf4'
-                                : status === 'processing'
-                                ? '#eff6ff'
-                                : '#fffbeb',
-                              color: status === 'overdue' 
-                                ? '#dc2626'
-                                : status === 'grace_period'
-                                ? '#ea580c'
-                                : status === 'paid'
-                                ? '#16a34a'
-                                : status === 'processing'
-                                ? '#2563eb'
-                                : '#d97706',
-                              border: `1px solid ${
-                                status === 'overdue' 
-                                  ? '#fecaca'
-                                  : status === 'grace_period'
-                                  ? '#fed7aa'
-                                  : status === 'paid'
-                                  ? '#bbf7d0'
-                                  : status === 'processing'
-                                  ? '#dbeafe'
-                                  : '#fef3c7'
-                              }`,
-                              textTransform: 'none',
-                              letterSpacing: 'normal',
-                              minWidth: 'auto',
-                              justifyContent: 'center',
-                              boxShadow: 'none'
+                              gap: 4,
+                              padding: '0.18rem 0.7rem',
+                              borderRadius: '0.8rem',
+                              fontSize: '0.92rem',
+                              fontWeight: 500,
+                              background: statusConfig[status].bg,
+                              color: statusConfig[status].color,
+                              border: `1px solid ${statusConfig[status].border}`,
+                              whiteSpace: 'nowrap',
+                              boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
+                              letterSpacing: '0.01em',
+                              lineHeight: 1.32,
+                              fontFamily: 'inherit',
+                              transition: 'background 0.18s, color 0.18s'
                             }}>
-                              <span style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                strokeWidth: 2
-                              }}>
-                                {React.cloneElement(config.icon, {
-                                  style: {
-                                    width: '0.75rem',
-                                    height: '0.75rem'
-                                  }
-                                })}
-                              </span>
-                              <span style={{whiteSpace: 'nowrap'}}>
-                                {status === 'overdue' ? 'Quá hạn' : config.text}
-                              </span>
+                              {statusConfig[status].icon}
+                              {statusConfig[status].label}
                             </span>
                           </div>
                         );
@@ -2835,6 +3281,34 @@ export default function FinancePage() {
                                 <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
                                 Hoàn thành
                               </div>
+                              <button
+                                onClick={() => handleViewInvoice(payment)}
+                                style={{
+                                  marginTop: '0.25rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.375rem',
+                                  padding: '0.375rem 0.75rem',
+                                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '0.5rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  minWidth: '90px'
+                                }}
+                                onMouseOver={e => {
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseOut={e => {
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }}
+                              >
+                                <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                Xem chi tiết
+                              </button>
                             </div>
                           );
                         }
@@ -2892,15 +3366,43 @@ export default function FinancePage() {
                                   transition: 'all 0.2s ease',
                                   minWidth: '90px'
                                 }}
-                                onMouseOver={(e) => {
+                                onMouseOver={e => {
                                   e.currentTarget.style.transform = 'translateY(-1px)';
                                 }}
-                                onMouseOut={(e) => {
+                                onMouseOut={e => {
                                   e.currentTarget.style.transform = 'translateY(0)';
                                 }}
                               >
                                 <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
                                 {isUrgent ? 'Thanh toán' : 'Thanh toán'}
+                              </button>
+                              <button
+                                onClick={() => handleViewInvoice(payment)}
+                                style={{
+                                  marginTop: '0.25rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.375rem',
+                                  padding: '0.375rem 0.75rem',
+                                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '0.5rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  minWidth: '90px'
+                                }}
+                                onMouseOver={e => {
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseOut={e => {
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }}
+                              >
+                                <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                Xem chi tiết
                               </button>
                             </div>
                           );
