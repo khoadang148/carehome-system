@@ -12,60 +12,7 @@ import {
   CheckCircleIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-
-const carePackages = [
-  {
-    id: 1,
-    name: 'Gói Cơ Bản',
-    price: 15000000,
-    image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    badge: null,
-    features: [
-      'Chăm sóc cơ bản hàng ngày',
-      'Bữa ăn theo tiêu chuẩn',
-      'Kiểm tra sức khỏe định kỳ',
-      'Hoạt động giải trí cơ bản'
-    ],
-    description: 'Phù hợp cho người cao tuổi có sức khỏe tốt, cần hỗ trợ sinh hoạt cơ bản.',
-    color: 'from-blue-400 to-blue-600',
-    buttonColor: '#2563eb'
-  },
-  {
-    id: 2,
-    name: 'Gói Nâng Cao',
-    price: 25000000,
-    image: 'https://img.rawpixel.com/s3fs-private/rawpixel_images/website_content/v211batch10-audi-80-health_2.jpg?w=1300&dpr=1&fit=default&crop=default&q=80&vib=3&con=3&usm=15&bg=F4F4F3&ixlib=js-2.2.1&s=0c9814284e1b21fa1d1751a6e3f1374b',
-    badge: 'Phổ biến nhất',
-    features: [
-      'Tất cả dịch vụ của gói Cơ Bản',
-      'Chăm sóc y tế chuyên sâu',
-      'Vật lý trị liệu định kỳ',
-      'Hoạt động giải trí đa dạng',
-      'Chế độ dinh dưỡng cá nhân hóa'
-    ],
-    description: 'Phù hợp cho người cao tuổi cần được chăm sóc kỹ lưỡng hơn về sức khỏe.',
-    color: 'from-emerald-400 to-emerald-600',
-    buttonColor: '#10b981'
-  },
-  {
-    id: 3,
-    name: 'Gói Cao Cấp',
-    price: 35000000,
-    image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    badge: 'Chất lượng cao',
-    features: [
-      'Tất cả dịch vụ của gói Nâng Cao',
-      'Chăm sóc y tế 24/7',
-      'Phòng riêng cao cấp',
-      'Dịch vụ trị liệu tâm lý',
-      'Hoạt động văn hóa, giải trí cao cấp',
-      'Đưa đón khám chuyên khoa'
-    ],
-    description: 'Dành cho người cao tuổi cần được chăm sóc toàn diện với chất lượng cao cấp nhất.',
-    color: 'from-purple-400 to-purple-600',
-    buttonColor: '#7c3aed'
-  }
-];
+import { carePlansAPI, residentAPI } from '@/lib/api';
 
 // Business rules data
 const termsData = [
@@ -200,7 +147,7 @@ const termsData = [
   },
   {
     id: 'emergency',
-      title: 'Tình Huống Khẩn Cấp',
+    title: 'Tình Huống Khẩn Cấp',
     icon: 'local-hospital',
     content: [
       {
@@ -219,6 +166,11 @@ export default function ServicesPage() {
   const router = useRouter();
   const { user } = useAuth();
   
+  // Care plans state from API
+  const [carePlans, setCarePlans] = useState<any[]>([]);
+  const [loadingCarePlans, setLoadingCarePlans] = useState(true);
+  const [carePlansError, setCarePlansError] = useState<string | null>(null);
+  
   // Check access permissions
   useEffect(() => {
     if (!user) {
@@ -232,16 +184,83 @@ export default function ServicesPage() {
     }
   }, [user, router]);
   
-  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
+  // Fetch care plans from API
+  useEffect(() => {
+    setLoadingCarePlans(true);
+    setCarePlansError(null);
+    carePlansAPI.getAll()
+      .then((data) => {
+        setCarePlans(data);
+      })
+      .catch(() => {
+        setCarePlansError('Không thể tải danh sách gói dịch vụ.');
+      })
+      .finally(() => {
+        setLoadingCarePlans(false);
+      });
+  }, []);
+  
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedResidentIndex, setSelectedResidentIndex] = useState(0);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [pendingPackages, setPendingPackages] = useState<any[]>([]);
   const [showBusinessRulesModal, setShowBusinessRulesModal] = useState(false);
+  const [showStaffRegisterModal, setShowStaffRegisterModal] = useState(false);
   
   // New state for filtering packages by status
   const [packageStatusFilter, setPackageStatusFilter] = useState<string>('all');
   
+  // Thêm state cho danh sách người thân và loading
+  const [relatives, setRelatives] = useState<any[]>([]);
+  const [loadingRelatives, setLoadingRelatives] = useState(false);
+  const [selectedRelativeIndex, setSelectedRelativeIndex] = useState(0);
+
+  // New: State for care plans by resident
+  const [residentCarePlans, setResidentCarePlans] = useState<{ [residentId: string]: any[] }>({});
+  const [loadingResidentCarePlans, setLoadingResidentCarePlans] = useState<{ [residentId: string]: boolean }>({});
+  const [residentCarePlansError, setResidentCarePlansError] = useState<{ [residentId: string]: string | null }>({});
+
+  // Thêm state cho care plan chi tiết khi lấy qua carePlanId
+  const [residentCarePlanDetail, setResidentCarePlanDetail] = useState<{ [residentId: string]: any | null }>({});
+  const [loadingCarePlanDetail, setLoadingCarePlanDetail] = useState<{ [residentId: string]: boolean }>({});
+  const [carePlanDetailError, setCarePlanDetailError] = useState<{ [residentId: string]: string | null }>({});
+
+  // Thêm state lưu chi tiết plan cho từng assignment
+  const [assignmentPlanDetails, setAssignmentPlanDetails] = useState<{ [assignmentId: string]: any }>({});
+
+  // Debug: Log relatives khi thay đổi
+  useEffect(() => {
+    if (relatives.length > 0) {
+      console.log('Relatives:', relatives);
+    }
+  }, [relatives]);
+
+  // Fetch care plans for selected resident when modal opens or resident changes
+  useEffect(() => {
+    if (!showServiceModal || relatives.length === 0) return;
+    const resident = relatives[selectedRelativeIndex];
+    if (!resident?._id) return;
+    const residentId = resident._id;
+    console.log('Fetching care plans for residentId:', residentId, resident); // Log residentId và object resident
+    // Only fetch if not already loaded
+    if (residentCarePlans[residentId]) return;
+    setLoadingResidentCarePlans((prev) => ({ ...prev, [residentId]: true }));
+    setResidentCarePlansError((prev) => ({ ...prev, [residentId]: null }));
+    carePlansAPI.getByResidentId(residentId)
+      .then((data) => {
+        console.log('API raw data for resident', residentId, data); // Thêm log này
+        setResidentCarePlans((prev) => ({ ...prev, [residentId]: data }));
+      })
+      .catch((err) => {
+        console.log('API error for resident', residentId, err);
+        setResidentCarePlansError((prev) => ({ ...prev, [residentId]: 'Không thể tải gói dịch vụ cho người thân này.' }));
+      })
+      .finally(() => {
+        setLoadingResidentCarePlans((prev) => ({ ...prev, [residentId]: false }));
+      });
+  }, [showServiceModal, selectedRelativeIndex, relatives]);
+
   const loadPendingPackages = () => {
     try {
       const savedResidents = localStorage.getItem('nurseryHomeResidents');
@@ -266,7 +285,7 @@ export default function ServicesPage() {
                 ...r.carePackage,
                 type: 'registration',
                 residentName: r.name,
-                residentId: r.id,
+                residentId: r._id,
                 residentAge: r.age,
                 residentRoom: r.room
               };
@@ -276,7 +295,7 @@ export default function ServicesPage() {
                 type: 'cancellation',
                 cancellationRequest: r.carePackage.cancellationRequest,
                 residentName: r.name,
-                residentId: r.id,
+                residentId: r._id,
                 residentAge: r.age,
                 residentRoom: r.room
               };
@@ -377,7 +396,7 @@ export default function ServicesPage() {
     };
   }, [showServiceModal, showApprovalModal, showBusinessRulesModal]);
 
-  const handlePackageSelect = (packageId: number) => {
+  const handlePackageSelect = (packageId: string) => {
     if (!user) {
       router.push('/login');
       return;
@@ -385,21 +404,21 @@ export default function ServicesPage() {
 
     // Check if user already has a registered or pending package of this type
     const existingPackages = getAllRegisteredServicePackages() || [];
-    const packageToSelect = carePackages.find(p => p.id === packageId);
+    const packageToSelect = carePlans.find((p: any) => p._id === packageId);
     
     if (!packageToSelect) {
       return;
     }
     
     // Check for existing packages of the same type
-    const alreadyRegistered = existingPackages.some(pkg => 
-      pkg.packageType === packageToSelect.name && 
+    const alreadyRegistered = existingPackages.some((pkg: any) => 
+      pkg.packageType === packageToSelect.planName && 
       ['active', 'pending_approval'].includes(pkg.status)
     );
     
     if (alreadyRegistered) {
       const confirmContinue = window.confirm(
-        `Bạn đã đăng ký gói "${packageToSelect.name}" trước đó và đang chờ duyệt hoặc đang sử dụng. Bạn có chắc muốn tiếp tục đăng ký gói này không?`
+        `Bạn đã đăng ký gói "${packageToSelect.planName}" trước đó và đang chờ duyệt hoặc đang sử dụng. Bạn có chắc muốn tiếp tục đăng ký gói này không?`
       );
       if (!confirmContinue) {
         return;
@@ -440,7 +459,7 @@ export default function ServicesPage() {
         
         // Apply status filter if not 'all'
         if (statusFilter !== 'all') {
-          packages = packages.filter(pkg => pkg.status === statusFilter);
+          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
         }
         
         return packages;
@@ -469,7 +488,7 @@ export default function ServicesPage() {
         
         // Apply status filter if not 'all'
         if (statusFilter !== 'all') {
-          packages = packages.filter(pkg => pkg.status === statusFilter);
+          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
         }
         
         return packages;
@@ -493,6 +512,116 @@ export default function ServicesPage() {
   };
 
   const currentPackage = getRegisteredServicePackage();
+
+  // Gọi API lấy danh sách người thân khi user thay đổi
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoadingRelatives(true);
+    residentAPI.getByFamilyMemberId(user.id)
+      .then((data) => {
+        setRelatives(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setRelatives([]))
+      .finally(() => setLoadingRelatives(false));
+  }, [user]);
+
+  // useEffect fetch carePlanId nếu API trả về rỗng, đặt ở cấp component
+  useEffect(() => {
+    if (!showServiceModal || relatives.length === 0) return;
+    const resident = relatives[selectedRelativeIndex];
+    const residentId = resident?._id;
+    if (
+      residentId &&
+      (!residentCarePlans[residentId] || residentCarePlans[residentId].length === 0) &&
+      resident?.carePlanId &&
+      !residentCarePlanDetail[residentId] &&
+      !loadingCarePlanDetail[residentId]
+    ) {
+      setLoadingCarePlanDetail((prev) => ({ ...prev, [residentId]: true }));
+      setCarePlanDetailError((prev) => ({ ...prev, [residentId]: null }));
+      carePlansAPI.getById(resident.carePlanId)
+        .then((plan) => {
+          setResidentCarePlanDetail((prev) => ({ ...prev, [residentId]: plan }));
+        })
+        .catch((err) => {
+          setCarePlanDetailError((prev) => ({ ...prev, [residentId]: 'Không thể tải gói dịch vụ cho người thân này.' }));
+        })
+        .finally(() => {
+          setLoadingCarePlanDetail((prev) => ({ ...prev, [residentId]: false }));
+        });
+    }
+    // eslint-disable-next-line
+  }, [showServiceModal, selectedRelativeIndex, relatives, residentCarePlans, residentCarePlanDetail, loadingCarePlanDetail]);
+
+  // State for residents list and selected resident (for staff modal)
+  const [staffResidents, setStaffResidents] = useState<any[]>([]);
+  const [loadingStaffResidents, setLoadingStaffResidents] = useState(false);
+  const [selectedStaffResidentId, setSelectedStaffResidentId] = useState<string | null>(null);
+
+  // Fetch residents for staff modal when modal opens
+  useEffect(() => {
+    if (showStaffRegisterModal) {
+      setLoadingStaffResidents(true);
+      residentAPI.getAll()
+        .then((data) => {
+          setStaffResidents(Array.isArray(data) ? data : []);
+        })
+        .catch(() => setStaffResidents([]))
+        .finally(() => setLoadingStaffResidents(false));
+    }
+  }, [showStaffRegisterModal]);
+
+  // Handler for staff confirm register
+  async function handleStaffRegisterConfirm() {
+    if (!selectedStaffResidentId || !selectedPackage) return;
+    // 1. Lấy danh sách gói đã đăng ký của cư dân
+    try {
+      const carePlans = await carePlansAPI.getByResidentId(selectedStaffResidentId);
+      // 2. Kiểm tra trùng gói
+      const selectedPlan = carePlans.find((plan: any) => plan.planId === selectedPackage && ['active', 'pending_approval'].includes(plan.status));
+      if (selectedPlan) {
+        alert('Cư dân đã có gói này đang hoạt động hoặc chờ duyệt!');
+        return;
+      }
+      // 3. Nếu hợp lệ, chuyển sang trang đăng ký
+      router.push(`/services/purchase/${selectedPackage}?residentId=${selectedStaffResidentId}`);
+      setShowStaffRegisterModal(false);
+      setSelectedStaffResidentId(null);
+    } catch (err) {
+      alert('Không thể kiểm tra gói dịch vụ. Vui lòng thử lại!');
+    }
+  }
+
+  // Đặt biến plans ở scope component
+  const resident = relatives[selectedRelativeIndex];
+  const residentId = resident?._id;
+  let plans = residentId ? residentCarePlans[residentId] : [];
+  if (plans && !Array.isArray(plans)) {
+    plans = [plans];
+  }
+  const loading = residentId ? loadingResidentCarePlans[residentId] : false;
+  const error = residentId ? residentCarePlansError[residentId] : null;
+  if ((!plans || plans.length === 0) && resident?.carePlanId) {
+    const detail = residentCarePlanDetail[residentId];
+    if (detail) plans = [detail];
+  }
+
+  // Fetch chi tiết plan cho assignment nếu thiếu thông tin (đặt ngoài hàm render)
+  useEffect(() => {
+    (plans || []).forEach((plan: any) => {
+      const planData = plan.plan || plan;
+      const isAssignment = !planData.plan_name && plan.total_monthly_cost !== undefined;
+      // Lấy id plan từ assignment, nếu là object thì lấy _id, nếu là string thì dùng trực tiếp
+      let planId = plan.plan_id || (Array.isArray(plan.care_plan_ids) ? plan.care_plan_ids[0] : undefined);
+      if (planId && typeof planId === 'object' && planId._id) planId = planId._id;
+      if (isAssignment && planId && !assignmentPlanDetails[planId]) {
+        carePlansAPI.getById(planId).then((detail) => {
+          setAssignmentPlanDetails(prev => ({ ...prev, [planId]: detail }));
+        });
+      }
+    });
+    // eslint-disable-next-line
+  }, [plans]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
@@ -577,31 +706,28 @@ export default function ServicesPage() {
                 })()}
                 
                 {(() => {
-                  const allPackages = getAllRegisteredServicePackages();
-                  // Chỉ hiển thị badge tổng số nếu có nhiều hơn 1 gói, KHÔNG hiển thị badge màu cam cho pending nữa
-                  if (allPackages.length > 1) {
-                    return (
-                      <span style={{
-                        position: 'absolute',
-                        top: '-0.5rem',
-                        right: '-0.5rem',
-                        background: '#3b82f6',
-                        color: 'white',
-                        borderRadius: '50%',
-                        width: '1.5rem',
-                        height: '1.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        border: '2px solid white'
-                      }}>
-                        {allPackages.length}
-                      </span>
-                    );
-                  }
-                  return null;
+                  // Lọc chỉ lấy các gói active
+                  const allPackages = getAllRegisteredServicePackages().filter((pkg: any) => pkg.status === 'active');
+                  return (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-0.5rem',
+                      right: '-0.5rem',
+                      background: '#3b82f6',
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: '1.5rem',
+                      height: '1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      border: '2px solid white'
+                    }}>
+                      {allPackages.length}
+                    </span>
+                  );
                 })()}
               </button>
             )}
@@ -731,188 +857,146 @@ export default function ServicesPage() {
           gap: '2rem',
           alignItems: 'stretch'
         }}>
-          {carePackages.map((pkg, index) => (
+          {loadingCarePlans ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#374151', fontSize: '1.2rem', padding: '2rem' }}>
+              Đang tải danh sách gói dịch vụ...
+            </div>
+          ) : carePlansError ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#dc2626', fontSize: '1.1rem', padding: '2rem' }}>
+              {carePlansError}
+            </div>
+          ) : carePlans.length === 0 ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#374151', fontSize: '1.1rem', padding: '2rem' }}>
+              Không có gói dịch vụ nào.
+            </div>
+          ) : carePlans.map((pkg: any, index: number) => (
             <div
-              key={pkg.id}
+              key={pkg._id}
               style={{
                 background: 'white',
                 borderRadius: '20px',
-                overflow: 'hidden',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                transition: 'all 0.3s ease',
-                transform: index === 1 ? 'scale(1.05)' : 'scale(1)',
-                position: 'relative',
-                border: index === 1 ? '3px solid #10b981' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-10px) scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = index === 1 ? 'scale(1.05)' : 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
+                boxShadow: '0 4px 16px rgba(56,189,248,0.08)',
+                border: '2px solid #5eead4',
+                padding: '1.5rem 1.2rem',
+                maxWidth: 340,
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                fontFamily: "'Inter', 'Montserrat', Arial, sans-serif",
+                marginBottom: '1.2rem',
+                transition: 'box-shadow 0.2s, border 0.2s',
               }}
             >
-              {/* Badge */}
-              {pkg.badge && (
-                <div style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  background: 'linear-gradient(45deg, #ff6b6b, #feca57)',
-                  color: 'white',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '25px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  zIndex: 2,
-                  boxShadow: '0 4px 15px rgba(255, 107, 107, 0.4)'
-                }}>
-                  {pkg.badge}
-                </div>
-              )}
-
-              {/* Image */}
-              <div style={{ 
-                height: '200px', 
-                backgroundImage: `url(${pkg.image})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                position: 'relative'
+              <h2 style={{
+                fontFamily: "'Montserrat', 'Inter', Arial, sans-serif",
+                fontSize: '1.35rem',
+                fontWeight: 700,
+                color: '#22223b',
+                textAlign: 'center',
+                letterSpacing: '-0.5px',
+                lineHeight: 1.18,
+                textShadow: '0 2px 8px #e0e7ef',
+                margin: 0,
+                marginBottom: '0.7rem'
               }}>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '1rem',
-                  left: 0,
-                  right: 0,
-                  color: 'white',
-                  textAlign: 'center'
-                }}>
-                  <h2 style={{ 
-                    fontSize: '1.75rem', 
-                    fontWeight: 700, 
-                    margin: 0,
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
-                  }}>
-                    {pkg.name}
-                  </h2>
-                </div>
+                {pkg.plan_name}
+              </h2>
+              <div style={{
+                fontFamily: "'Montserrat', 'Inter', Arial, sans-serif",
+                fontSize: '1.5rem',
+                fontWeight: 800,
+                background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                marginBottom: '0.5rem',
+                textAlign: 'center',
+                letterSpacing: '-1px',
+                lineHeight: 1.1
+              }}>
+                {new Intl.NumberFormat('vi-VN').format(pkg.monthly_price)} <span style={{fontSize: '1rem'}}>đ</span>
               </div>
-
-              {/* Content */}
-              <div style={{ padding: '1.5rem' }}>
-                {/* Price */}
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                  <div style={{ 
-                    fontSize: '2.5rem', 
-                    fontWeight: 700, 
-                    color: pkg.buttonColor,
-                    lineHeight: 1.2
-                  }}>
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND'
-                    }).format(pkg.price)}
-                  </div>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    color: '#6b7280',
-                    fontWeight: 500
-                  }}>
-                    /tháng
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p style={{ 
-                  color: '#6b7280', 
-                  marginBottom: '1.5rem',
-                  lineHeight: 1.6,
-                  fontSize: '0.9rem'
+              <div style={{
+                fontFamily: "'Inter', Arial, sans-serif",
+                fontSize: '0.98rem',
+                color: '#64748b',
+                marginBottom: '1.1rem',
+                textAlign: 'center',
+                minHeight: 32,
+                lineHeight: 1.5,
+                fontWeight: 400,
+                padding: 0
+              }}>
+                {pkg.description}
+              </div>
+              <div style={{ width: '100%', marginBottom: '0.7rem' }}>
+                <div style={{
+                  fontFamily: "'Montserrat', 'Inter', Arial, sans-serif",
+                  fontWeight: 700,
+                  color: '#06b6d4',
+                  marginBottom: '0.5rem',
+                  fontSize: '1rem',
+                  letterSpacing: '-0.5px',
+                  textAlign: 'left',
                 }}>
-                  {pkg.description}
-                </p>
-
-                {/* Features */}
-                <div style={{ marginBottom: '2rem' }}>
-                  <h3 style={{ 
-                    fontSize: '1rem', 
-                    fontWeight: 600, 
-                    color: '#374151',
-                    marginBottom: '1rem'
-                  }}>
-                    Dịch vụ bao gồm:
-                  </h3>
-                  <ul style={{ 
-                    listStyle: 'none', 
-                    padding: 0, 
-                    margin: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem'
-                  }}>
-                    {pkg.features.map((feature, index) => (
-                      <li key={index} style={{ display: 'flex', alignItems: 'flex-start' }}>
-                        <svg
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            color: '#10b981',
-                            marginRight: '0.75rem',
-                            marginTop: '2px',
-                            flexShrink: 0
-                          }}
-                          fill="none"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2.5"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span style={{ 
-                          color: '#4b5563', 
-                          fontSize: '0.875rem',
-                          lineHeight: 1.5
-                        }}>
-                          {feature}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  Dịch vụ bao gồm:
                 </div>
-
-                {/* Button */}
+                <ul style={{
+                  fontFamily: "'Inter', Arial, sans-serif",
+                  padding: 0,
+                  margin: 0,
+                  listStyle: 'none',
+                  color: '#10b981',
+                  fontSize: '0.98rem',
+                  textAlign: 'left',
+                }}>
+                  {pkg.services_included?.map((feature: string, i: number) => (
+                    <li key={i} style={{
+                      marginBottom: 7,
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontWeight: 500
+                    }}>
+                      <span style={{
+                        marginRight: 7,
+                        fontSize: 16,
+                        color: '#22c55e',
+                        flexShrink: 0
+                      }}>✔</span>
+                      <span style={{color: '#334155'}}>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {/* Nút đăng ký cho staff */}
+              {user?.role === 'staff' && (
                 <button
-                  onClick={() => handlePackageSelect(pkg.id)}
+                  onClick={() => {
+                    router.push(`/services/purchase/${pkg._id}`);
+                  }}
                   style={{
-                    width: '100%',
-                    background: pkg.buttonColor,
+                    marginTop: 12,
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '12px',
-                    padding: '1rem',
+                    borderRadius: 12,
+                    fontWeight: 700,
                     fontSize: '1rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: `0 4px 15px ${pkg.buttonColor}40`,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
+                    boxShadow: '0 2px 8px rgba(16,185,129,0.15)',
+                    transition: 'all 0.2s',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = `0 8px 25px ${pkg.buttonColor}60`;
+                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)';
                   }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = `0 4px 15px ${pkg.buttonColor}40`;
+                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)';
                   }}
                 >
-                  {user?.role === 'family' ? 'Đăng Ký Cho Người Thân' : 'Chọn Gói Này'}
+                  Đăng ký cho cư dân
                 </button>
-              </div>
+              )}
             </div>
           ))}
         </div>
@@ -1123,9 +1207,10 @@ export default function ServicesPage() {
                 Đăng ký dịch vụ
               </h4>
               <p style={{ color: '#0c4a6e', lineHeight: 1.6, margin: 0 }}>
-                Mỗi người thụ hưởng chỉ được đăng ký <strong>một gói dịch vụ</strong> tại một thời điểm. 
-                Gói dịch vụ sau khi đăng ký sẽ chờ quản trị viên phê duyệt trước khi có hiệu lực.
-              </p>
+              Mỗi người thụ hưởng có thể đăng ký đồng thời nhiều gói dịch vụ tại một thời điểm.
+               Việc đăng ký được thực hiện sau khi đội ngũ nhân viên đã tư vấn kỹ lưỡng, 
+               dựa trên tình trạng sức khỏe và nhu cầu cá nhân của người cao tuổi,
+                nhằm đảm bảo lựa chọn phù hợp và tối ưu nhất.             </p>
             </div>
 
             {/* Rule 2 */}
@@ -1163,8 +1248,8 @@ export default function ServicesPage() {
                 Hủy dịch vụ
               </h4>
               <p style={{ color: '#14532d', lineHeight: 1.6, margin: 0 }}>
-                Có thể <strong>hủy trực tiếp</strong> khi trạng thái "Chờ duyệt". 
-                Sau khi đã được duyệt, việc hủy cần gửi yêu cầu và chờ quản trị viên xử lý.
+              Dịch vụ sẽ được hủy trực tiếp tại viện sau khi hoàn tất thủ tục. 
+              Tiền đặt cọc sẽ được hoàn lại (nếu có), và quá trình bàn giao người cao tuổi sẽ được thực hiện với gia đình.
               </p>
             </div>
 
@@ -1242,8 +1327,7 @@ export default function ServicesPage() {
                 Lưu ý quan trọng
               </h4>
               <p style={{ color: '#7f1d1d', lineHeight: 1.6, margin: 0 }}>
-                Thông tin đăng ký phải <strong>chính xác</strong>. Việc hủy gói sẽ chấm dứt ngay lập tức tất cả dịch vụ chăm sóc.
-              </p>
+              Thông tin đăng ký cần được cung cấp một cách đầy đủ và chính xác. Việc hủy gói dịch vụ sẽ dẫn đến việc chấm dứt ngay lập tức toàn bộ các dịch vụ chăm sóc đang được triển khai.             </p>
             </div>
           </div>
 
@@ -1458,7 +1542,7 @@ export default function ServicesPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e40af', margin: 0 }}>
-                    Chi tiết gói dịch vụ đã đăng ký
+                    Gói dịch vụ đã đăng ký
                   </h3>
                   <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>
                     Thông tin chi tiết về gói dịch vụ đang sử dụng
@@ -1502,76 +1586,89 @@ export default function ServicesPage() {
               borderBottom: '1px solid #f1f5f9',
               background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
             }}>
-              {(() => {
-                // Luôn lấy tất cả gói (không filter theo trạng thái nữa)
-                const allPackages = getAllRegisteredServicePackages();
-                if (allPackages.length > 1) {
-                  return (
-                    <>
-                      <label style={{ 
-                        display: 'block', 
-                        fontSize: '0.875rem', 
-                        fontWeight: 600, 
-                        color: '#475569', 
-                        marginBottom: '0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <svg style={{ width: '16px', height: '16px', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-1H21m0 0l-3 3m3-3l-3-3" />
-                        </svg>
-                        <span style={{ fontSize: '1rem' }}>Chọn người thân:</span>
-                      </label>
-                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        {allPackages.map((pkg: any, index: number) => (
-                          <button
-                            key={index}
-                            onClick={() => setSelectedResidentIndex(index)}
-                            style={{
-                              padding: '0.75rem 1rem',
-                              borderRadius: '12px',
-                              border: selectedResidentIndex === index ? '2px solid #3b82f6' : '2px solid #e2e8f0',
-                              background: selectedResidentIndex === index ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' : 'white',
-                              color: selectedResidentIndex === index ? '#1e40af' : '#64748b',
-                              fontWeight: 500,
-                              fontSize: '0.875rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              transform: selectedResidentIndex === index ? 'scale(1.02)' : 'scale(1)',
-                              boxShadow: selectedResidentIndex === index ? '0 4px 12px rgba(59, 130, 246, 0.2)' : '0 2px 4px rgba(0,0,0,0.1)'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (selectedResidentIndex !== index) {
-                                e.currentTarget.style.transform = 'scale(1.02)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (selectedResidentIndex !== index) {
-                                e.currentTarget.style.transform = 'scale(1)';
-                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                              }
-                            }}
-                          >
-                            {pkg.residentInfo?.name || `Gói ${index + 1}`}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  );
-                }
-                return null;
-              })()}
+              {relatives.length > 1 && (
+                <>
+                  <label style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#475569',
+                    marginBottom: '0.75rem',
+                  }}>
+                    <svg style={{ width: '16px', height: '16px', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-1H21m0 0l-3 3m3-3l-3-3" />
+                    </svg>
+                    <span style={{ fontSize: '1rem' }}>Chọn người thân:</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    {relatives.map((relative: any, index: number) => (
+                      <button
+                        key={relative._id || index}
+                        onClick={() => setSelectedRelativeIndex(index)}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderRadius: '12px',
+                          border: selectedRelativeIndex === index ? '2px solid #3b82f6' : '2px solid #e2e8f0',
+                          background: selectedRelativeIndex === index ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' : 'white',
+                          color: selectedRelativeIndex === index ? '#1e40af' : '#64748b',
+                          fontWeight: 500,
+                          fontSize: '0.875rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          transform: selectedRelativeIndex === index ? 'scale(1.02)' : 'scale(1)',
+                          boxShadow: selectedRelativeIndex === index ? '0 4px 12px rgba(59, 130, 246, 0.2)' : '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedRelativeIndex !== index) {
+                            e.currentTarget.style.transform = 'scale(1.02)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedRelativeIndex !== index) {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                          }
+                        }}
+                      >
+                        {relative.name || relative.full_name || `Người thân ${index + 1}`}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Nội dung chi tiết */}
                           {(() => {
-                const registeredPackage = getRegisteredServicePackage();
-                const allPackages = getAllRegisteredServicePackages();
-                const filteredPackages = getAllRegisteredServicePackages(packageStatusFilter);
-                
-                if (!registeredPackage) {
+              const resident = relatives[selectedRelativeIndex];
+              const residentId = resident?._id;
+              let plans = residentId ? residentCarePlans[residentId] : [];
+              // Nếu là object, chuyển thành mảng
+              if (plans && !Array.isArray(plans)) {
+                plans = [plans];
+              }
+              const loading = residentId ? loadingResidentCarePlans[residentId] : false;
+              const error = residentId ? residentCarePlansError[residentId] : null;
+              // Nếu plans rỗng, thử lấy carePlanId từ resident
+              if ((!plans || plans.length === 0) && resident?.carePlanId) {
+                const detail = residentCarePlanDetail[residentId];
+                if (detail) plans = [detail];
+              }
+              const loadingDetail = residentId ? loadingCarePlanDetail[residentId] : false;
+              const errorDetail = residentId ? carePlanDetailError[residentId] : null;
+              // Nếu plans vẫn rỗng và có carePlanId, fetch chi tiết care plan
+              console.log('Plans to render:', plans); // Thêm log này
+
+              if (loading) {
+                return <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>Đang tải gói dịch vụ...</div>;
+              }
+              if (error) {
+                return <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#dc2626' }}>{error}</div>;
+              }
+              if (!plans || !Array.isArray(plans) || plans.length === 0) {
                   return (
                     <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>
                       <div style={{ marginBottom: '1.5rem' }}>
@@ -1589,43 +1686,12 @@ export default function ServicesPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                         </div>
-                        {allPackages.length === 0 ? (
-                          <>
                             <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
                               Chưa có gói dịch vụ
                             </h3>
                             <p style={{ color: '#6b7280', maxWidth: '400px', margin: '0 auto', lineHeight: 1.6 }}>
-                              Hiện tại chưa có gói dịch vụ nào được đăng ký. Vui lòng liên hệ để đăng ký gói dịch vụ phù hợp.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
-                              Không tìm thấy gói dịch vụ
-                            </h3>
-                            <p style={{ color: '#6b7280', maxWidth: '450px', margin: '0 auto', lineHeight: 1.6 }}>
-                              Không có gói dịch vụ nào khớp với bộ lọc hiện tại. Vui lòng thử bộ lọc khác hoặc chọn "Tất cả" để xem tất cả các gói dịch vụ.
-                            </p>
-                            <div style={{ marginTop: '1rem' }}>
-                              <button
-                                onClick={() => setPackageStatusFilter('all')}
-                                style={{
-                                  background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-                                  color: '#475569',
-                                  fontWeight: 600,
-                                  padding: '0.5rem 1.5rem',
-                                  borderRadius: '8px',
-                                  border: '1px solid #cbd5e1',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  marginBottom: '1rem'
-                                }}
-                              >
-                                Hiển thị tất cả gói dịch vụ
-                              </button>
-                            </div>
-                          </>
-                        )}
+                        Hiện tại chưa có gói dịch vụ nào được đăng ký cho người thân này.
+                      </p>
                       </div>
                       <button
                         onClick={() => setShowServiceModal(false)}
@@ -1654,485 +1720,135 @@ export default function ServicesPage() {
                     </div>
                   );
               }
-
-              // Thêm nút hủy nếu trạng thái là pending_approval hoặc active
-              const canCancel = ['pending_approval', 'active'].includes(registeredPackage?.status || '');
-              const hasCancellationRequest = registeredPackage?.cancellationRequest && 
-                registeredPackage.cancellationRequest.status === 'pending_approval';
-
-              if (registeredPackage?.residentInfo) {
-                const resident = registeredPackage.residentInfo;
+              // Show all care plans for this resident
                 return (
-                  <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                   
-                    {/* Display rejection reason if applicable */}
-                    {registeredPackage.status === 'rejected' && registeredPackage.rejectionReason && (
-                      <div style={{
-                        background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-                        border: '1px solid #ef4444',
-                        borderRadius: '16px',
-                        padding: '1.25rem',
-                        marginBottom: '1rem'
-                      }}>
-                        <div style={{ 
-                          fontSize: '1rem', 
-                          fontWeight: 600, 
-                          color: '#dc2626', 
-                          marginBottom: '0.75rem',
+                <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {plans.map((assignment: any, idx: number) => (
+                    <div
+                      key={assignment._id || idx}
+                      style={{
+                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0eafc 100%)',
+                        borderRadius: 20,
+                        padding: 32,
+                        marginBottom: 36,
+                        boxShadow: '0 8px 32px rgba(59,130,246,0.10)',
+                        border: '1.5px solid #e0e7ef',
+                        maxWidth: 800,
+                        margin: '0 auto'
+                      }}
+                    >
+                      {/* Header */}
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
+                        <div style={{
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                          borderRadius: '50%',
+                          width: 56,
+                          height: 56,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '8px'
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: 28,
+                          marginRight: 20,
+                          boxShadow: '0 2px 8px rgba(59,130,246,0.15)'
                         }}>
-                          <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
-                          Lý do từ chối
-                        </div>
-                        <div style={{ color: '#7f1d1d', fontSize: '0.9rem' }}>
-                          {registeredPackage.rejectionReason}
-                        </div>
                       </div>
-                    )}
-
-                    {/* Thông tin người thân */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)',
-                      border: '1.5px solid #dbeafe',
-                      borderRadius: '24px',
-                      padding: '2.25rem 2rem',
-                      marginBottom: '2.5rem',
-                      boxShadow: '0 8px 32px rgba(59,130,246,0.08)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}>
-                      {/* Background decoration */}
-                      <div style={{ 
-                        position: 'absolute',
-                        top: '-20px',
-                        right: '-20px',
-                        width: '80px',
-                        height: '80px',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                        borderRadius: '50%',
-                        opacity: 0.1
-                      }}></div>
-                      
-                      <div style={{ 
-                        fontSize: '1.25rem', 
-                        fontWeight: 700, 
-                        color: '#2563eb', 
-                        marginBottom: '1.5rem',
-                        textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px'
-                      }}>
-                        <svg style={{ width: '24px', height: '24px', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        Thông tin người thân
-                      </div>
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                        gap: '1.25rem',
-                        position: 'relative',
-                        zIndex: 1
-                      }}>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #e2e8f0',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Họ tên</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{resident.name || 'Chưa cập nhật'}</div>
-                        </div>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #e2e8f0',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tuổi</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{resident.age ? `${resident.age} tuổi` : 'Chưa cập nhật'}</div>
-                        </div>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #e2e8f0',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Phòng</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{resident.room || 'Chưa cập nhật'}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div style={{height:'1px',background:'linear-gradient(90deg, transparent 0%, #e5e7eb 50%, transparent 100%)',margin:'2rem 0'}} />
-
-                    {/* Thông tin liên hệ khẩn cấp */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-                      border: '1.5px solid #fecaca',
-                      borderRadius: '24px',
-                      padding: '2.25rem 2rem',
-                      boxShadow: '0 8px 32px rgba(239,68,68,0.08)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}>
-                      {/* Background decoration */}
-                      <div style={{ 
-                        position: 'absolute',
-                        top: '-20px',
-                        left: '-20px',
-                        width: '80px',
-                        height: '80px',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                        borderRadius: '50%',
-                        opacity: 0.1
-                      }}></div>
-                      
-                      <div style={{ 
-                        fontSize: '1.25rem', 
-                        fontWeight: 700, 
-                        color: '#dc2626', 
-                        textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px'
-                      }}>
-                        <svg style={{ width: '24px', height: '24px', color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                        Người liên hệ khẩn cấp
-                      </div>
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-                        gap: '1.25rem',
-                        position: 'relative',
-                        zIndex: 1
-                      }}>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #fecaca',
-                          boxShadow: '0 2px 8px rgba(239,68,68,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Họ tên</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{resident.emergencyContact || 'Chưa cập nhật'}</div>
-                        </div>
-                          <div style={{ 
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #fecaca',
-                          boxShadow: '0 2px 8px rgba(239,68,68,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Số điện thoại</div>
-                          <div style={{ 
-                            fontSize: '1.1rem', 
-                            fontWeight: 700, 
-                            color: '#1e293b',
-                            fontFamily: 'monospace',
-                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '12px',
-                            border: '1px solid #e2e8f0',
-                            display: 'inline-block'
-                          }}>
-                            {resident.contactPhone || 'Chưa cập nhật'}
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '1.5rem', color: '#1e293b', marginBottom: 2 }}>
+                            {assignment.resident_id?.full_name}
+                          </div>
+                          <div style={{ color: '#64748b', fontSize: '1rem' }}>
+                            Người giám hộ: <b>{assignment.family_member_id?.full_name}</b>
                           </div>
                         </div>
                       </div>
-                      <div style={{ 
-                        marginTop: '1rem', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        gap: '8px',
-                        fontSize: '0.8rem',
-                        color: '#dc2626',
-                        fontWeight: 500
-                      }}>
-                        <span style={{ 
-                          width: '8px', 
-                          height: '8px', 
-                          background: '#ef4444', 
-                          borderRadius: '50%', 
-                          animation: 'pulse 2s infinite' 
-                        }}></span>
-                        <span>Liên hệ khi có tình huống khẩn cấp</span>
-                      </div>
-                    </div>
 
-                    {/* Divider */}
-                    <div style={{height:'1px',background:'linear-gradient(90deg, transparent 0%, #e5e7eb 50%, transparent 100%)',margin:'2rem 0'}} />
-
-                    {/* Thông tin gói dịch vụ */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                      border: '1.5px solid #bfdbfe',
-                      borderRadius: '24px',
-                      padding: '2.25rem 2rem',
-                      marginBottom: '2.5rem',
-                      boxShadow: '0 8px 32px rgba(59,130,246,0.08)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}>
-                      {/* Background decoration */}
-                      <div style={{ 
-                        position: 'absolute',
-                        bottom: '-20px',
-                        right: '-20px',
-                        width: '80px',
-                        height: '80px',
-                        background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-                        borderRadius: '50%',
-                        opacity: 0.1
-                      }}></div>
-                      
-                      <div style={{ 
-                        fontSize: '1.25rem', 
-                        fontWeight: 700, 
-                        color: '#0c4a6e', 
-                        marginBottom: '1.5rem',
-                        textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px'
-                      }}>
-                        <svg style={{ width: '24px', height: '24px', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Thông tin gói dịch vụ
-                      </div>
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                        gap: '1.25rem',
-                        marginBottom: '1.5rem',
-                        position: 'relative',
-                        zIndex: 1
-                      }}>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #bfdbfe',
-                          boxShadow: '0 2px 8px rgba(59,130,246,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tên gói</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1d4ed8' }}>{registeredPackage.packageType || 'Chưa cập nhật'}</div>
-                        </div>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #bfdbfe',
-                          boxShadow: '0 2px 8px rgba(59,130,246,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Giá</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1d4ed8' }}>{formatCurrency(registeredPackage.finalPrice || registeredPackage.price)}</div>
-                        </div>
-                        <div style={{
-                          background: 'white',
-                          borderRadius: '16px',
-                          padding: '1.25rem',
-                          border: '1px solid #bfdbfe',
-                          boxShadow: '0 2px 8px rgba(59,130,246,0.04)'
-                        }}>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ngày bắt đầu</div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>{registeredPackage.startDate ? new Date(registeredPackage.startDate).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}</div>
-                        </div>
-                      </div>
-                      
-                      {/* Dịch vụ bao gồm */}
-                      <div style={{ 
-                        marginBottom: '1.5rem',
-                        background: 'white',
-                        borderRadius: '16px',
-                        padding: '1.5rem',
-                        border: '1px solid #bfdbfe',
-                        boxShadow: '0 2px 8px rgba(59,130,246,0.04)'
-                      }}>
-                        <div style={{ 
-                          fontSize: '0.9rem', 
-                          color: '#64748b', 
-                          fontWeight: 600, 
-                          marginBottom: '1rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>Dịch vụ bao gồm</div>
-                        <ul style={{ 
-                          listStyle: 'none', 
-                          padding: 0, 
-                          margin: 0,
+                      {/* Tổng quan */}
+                      <div style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                          gap: '0.75rem'
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: '1.5rem',
+                        marginBottom: 24
+                      }}>
+                        <div>
+                          <div style={{ color: '#64748b', fontWeight: 500 }}>Ngày đăng ký</div>
+                          <div style={{ fontWeight: 600 }}>{assignment.registration_date ? new Date(assignment.registration_date).toLocaleDateString('vi-VN') : '---'}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: '#64748b', fontWeight: 500 }}>Ngày bắt đầu</div>
+                          <div style={{ fontWeight: 600 }}>{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString('vi-VN') : '---'}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: '#64748b', fontWeight: 500 }}>Trạng thái</div>
+                          <div style={{
+                            fontWeight: 700,
+                            color: assignment.status === 'active' ? '#10b981' : '#f59e42',
+                            textTransform: 'capitalize'
+                          }}>
+                            {assignment.status === 'active' ? 'Đang sử dụng' : (assignment.status || '---')}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Các gói dịch vụ */}
+                      <div style={{ marginBottom: 18 }}>
+                        <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '1.15rem', marginBottom: 8 }}>
+                          Các gói dịch vụ đã đăng ký:
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '1.2rem'
                         }}>
-                          {registeredPackage.features?.map((f: string, i: number) => (
-                            <li key={i} style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '8px',
-                              fontSize: '0.9rem',
-                              color: '#374151',
-                              lineHeight: 1.5
-                            }}>
-                              <svg style={{ width: '16px', height: '16px', color: '#10b981', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              {f}
-                            </li>
+                          {Array.isArray(assignment.care_plan_ids) && assignment.care_plan_ids.length > 0 ? (
+                            assignment.care_plan_ids.map((plan: any, i: number) => (
+                              <div key={plan._id || i} style={{
+                                background: 'white',
+                                borderRadius: 14,
+                                boxShadow: '0 2px 8px rgba(59,130,246,0.08)',
+                                padding: '1.1rem 1.5rem',
+                                minWidth: 220,
+                                marginBottom: 8,
+                                border: '1px solid #e0e7ef'
+                              }}>
+                                <div style={{ fontWeight: 700, color: '#0c4a6e', fontSize: '1.1rem', marginBottom: 4 }}>{plan.plan_name}</div>
+                                <div style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '1rem', marginBottom: 2 }}>
+                                  Giá: {typeof plan.monthly_price === 'number' ? formatCurrency(plan.monthly_price) : '---'}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div>Không có gói dịch vụ nào</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Thông tin bổ sung */}
+                      {Array.isArray(assignment.additional_medications) && assignment.additional_medications.length > 0 && (
+                        <div style={{
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: 10,
+                          padding: '0.75rem 1.25rem',
+                          color: '#b91c1c',
+                          fontWeight: 500,
+                          marginTop: 16
+                        }}>
+                          <b>Thuốc bổ sung:</b>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {assignment.additional_medications.map((med: any) => (
+                              <li key={med._id}>{med.medication_name} - {med.dosage} - {med.frequency}</li>
                           ))}
                         </ul>
+                        </div>
+                      )}
                       </div>
-                      
-                      {/* Khuyến mãi */}
-                      {registeredPackage.discount > 0 && (
-                        <div style={{
-                          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                          border: '1.5px solid #bbf7d0',
-                          borderRadius: '20px',
-                          padding: '1.5rem',
-                          marginTop: '1rem',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}>
-                          <div style={{ 
-                            position: 'absolute',
-                            top: '-10px',
-                            right: '-10px',
-                            width: '40px',
-                            height: '40px',
-                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                            borderRadius: '50%',
-                            opacity: 0.1
-                          }}></div>
-                          
-                          <div style={{ 
-                            fontSize: '0.9rem', 
-                            fontWeight: 700, 
-                            color: '#15803d', 
-                            marginBottom: '1rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                            </svg>
-                            Khuyến mãi đặc biệt
-                          </div>
-                          <div style={{ 
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1rem', 
-                            fontSize: '0.9rem',
-                            position: 'relative',
-                            zIndex: 1
-                          }}>
-                            <div style={{
-                              background: 'white',
-                              borderRadius: '12px',
-                              padding: '1rem',
-                              border: '1px solid #bbf7d0'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Giá gốc:</span>
-                                <span style={{ fontWeight: 600, color: '#1f2937' }}>{formatCurrency(Number(registeredPackage.price) || 15000000)}</span>
-                            </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #bbf7d0', paddingBottom: '0.5rem' }}>
-                                <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Giảm giá ({registeredPackage.discount}%):</span>
-                                <span style={{ fontWeight: 600, color: '#16a34a' }}>-{formatCurrency(Number(registeredPackage.discountAmount) || 0)}</span>
-                            </div>
-                            <div style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center',
-                                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                              borderRadius: '8px',
-                                padding: '0.75rem',
-                              border: '1px solid #bbf7d0',
-                                marginTop: '0.5rem'
-                            }}>
-                                <span style={{ fontWeight: 700, color: '#1f2937' }}>Thành tiền:</span>
-                                <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1.1rem' }}>{formatCurrency(registeredPackage.finalPrice)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Button đóng và hủy */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {/* Hiển thị thông báo yêu cầu hủy đang chờ duyệt */}
-                      {hasCancellationRequest && (
-                        <div style={{
-                          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                          border: '1.5px solid #f59e0b',
-                          borderRadius: '20px',
-                          padding: '1.5rem',
-                          marginBottom: '1rem',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}>
-                          <div style={{ 
-                            position: 'absolute',
-                            top: '-10px',
-                            right: '-10px',
-                            width: '40px',
-                            height: '40px',
-                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                            borderRadius: '50%',
-                            opacity: 0.1
-                          }}></div>
-                          
-                          <div style={{ 
-                            fontSize: '0.95rem', 
-                            fontWeight: 600, 
-                            color: '#92400e', 
-                            marginBottom: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Yêu cầu hủy đang chờ duyệt
-                          </div>
-                          <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.5 }}>
-                            <div style={{ marginBottom: '0.5rem' }}>
-                              <strong>Lý do:</strong> {registeredPackage.cancellationRequest.reason}
-                          </div>
-                            <div>
-                              <strong>Ngày yêu cầu:</strong> {new Date(registeredPackage.cancellationRequest.requestedDate).toLocaleDateString('vi-VN')}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      
-                    </div>
+                  ))}
                   </div>
                 );
-              }
-              return null;
             })()}
           </div>
         </div>
@@ -2371,10 +2087,8 @@ export default function ServicesPage() {
                       {/* Action Buttons */}
                       <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb', marginTop: '2rem' }}>
                         <button
-                          onClick={() => pkg.type === 'cancellation' ? 
-                            handleRejectCancellation(pkg.registrationId) : 
-                            handleRejectPackage(pkg.registrationId)
-                          }
+                          onClick={() => pkg.type === 'cancellation' ? undefined : handleRejectPackage(pkg.registrationId)}
+                          disabled={pkg.type === 'cancellation'}
                           style={{
                             minWidth: 120,
                             display: 'flex',
@@ -2403,10 +2117,8 @@ export default function ServicesPage() {
                           Từ chối
                         </button>
                         <button
-                          onClick={() => pkg.type === 'cancellation' ? 
-                            handleApproveCancellation(pkg.registrationId) : 
-                            handleApprovePackage(pkg.registrationId)
-                          }
+                          onClick={() => pkg.type === 'cancellation' ? undefined : handleApprovePackage(pkg.registrationId)}
+                          disabled={pkg.type === 'cancellation'}
                           style={{
                             minWidth: 120,
                             display: 'flex',
@@ -2759,6 +2471,63 @@ export default function ServicesPage() {
                 }}
               >
                 Đã hiểu và đồng ý
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Register Modal */}
+      {showStaffRegisterModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 16,
+            maxWidth: 420,
+            width: '95%',
+            padding: '2rem',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            position: 'relative'
+          }}>
+            <h3 style={{ fontWeight: 700, fontSize: '1.25rem', marginBottom: 16 }}>Chọn cư dân để đăng ký gói dịch vụ</h3>
+            {loadingStaffResidents ? (
+              <div>Đang tải danh sách cư dân...</div>
+            ) : staffResidents.length === 0 ? (
+              <div>Không có cư dân nào.</div>
+            ) : (
+              <select
+                value={selectedStaffResidentId || ''}
+                onChange={e => setSelectedStaffResidentId(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem', borderRadius: 8, border: '1px solid #d1d5db', marginBottom: 20 }}
+              >
+                <option value=''>-- Chọn cư dân --</option>
+                {staffResidents.map(r => (
+                  <option key={r._id} value={r._id}>{r.fullName || r.name} - Phòng: {r.room || ''}</option>
+                ))}
+              </select>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                onClick={() => {
+                  setShowStaffRegisterModal(false);
+                  setSelectedStaffResidentId(null);
+                }}
+                style={{ padding: '0.5rem 1.2rem', borderRadius: 8, border: '1px solid #d1d5db', background: 'white', color: '#374151', fontWeight: 500, cursor: 'pointer' }}
+              >
+                Hủy
+              </button>
+              <button
+                disabled={!selectedStaffResidentId}
+                onClick={handleStaffRegisterConfirm}
+                style={{ padding: '0.5rem 1.2rem', borderRadius: 8, border: 'none', background: '#10b981', color: 'white', fontWeight: 700, cursor: selectedStaffResidentId ? 'pointer' : 'not-allowed' }}
+              >
+                Xác nhận
               </button>
             </div>
           </div>

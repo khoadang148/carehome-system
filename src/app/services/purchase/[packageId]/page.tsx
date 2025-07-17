@@ -6,66 +6,26 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import Link from 'next/link';
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-
-// Sử dụng lại dữ liệu gói từ trang services
-const carePackages = [
-  {
-    id: 1,
-    name: 'Gói Cơ Bản',
-    price: 15000000,
-    image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    features: [
-      'Chăm sóc cơ bản hàng ngày',
-      'Bữa ăn theo tiêu chuẩn',
-      'Kiểm tra sức khỏe định kỳ',
-      'Hoạt động giải trí cơ bản'
-    ],
-    description: 'Phù hợp cho người cao tuổi có sức khỏe tốt, cần hỗ trợ sinh hoạt cơ bản.',
-    color: 'from-blue-400 to-blue-600',
-    buttonColor: '#2563eb'
-  },
-  {
-    id: 2,
-    name: 'Gói Nâng Cao',
-    price: 25000000,
-    image: 'https://img.rawpixel.com/s3fs-private/rawpixel_images/website_content/v211batch10-audi-80-health_2.jpg?w=1300&dpr=1&fit=default&crop=default&q=80&vib=3&con=3&usm=15&bg=F4F4F3&ixlib=js-2.2.1&s=0c9814284e1b21fa1d1751a6e3f1374b',
-    features: [
-      'Tất cả dịch vụ của gói Cơ Bản',
-      'Chăm sóc y tế chuyên sâu',
-      'Vật lý trị liệu định kỳ',
-      'Hoạt động giải trí đa dạng',
-      'Chế độ dinh dưỡng cá nhân hóa'
-    ],
-    description: 'Phù hợp cho người cao tuổi cần được chăm sóc kỹ lưỡng hơn về sức khỏe.',
-    color: 'from-emerald-400 to-emerald-600',
-    buttonColor: '#10b981'
-  },
-  {
-    id: 3,
-    name: 'Gói Cao Cấp',
-    price: 35000000,
-    image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    features: [
-      'Tất cả dịch vụ của gói Nâng Cao',
-      'Chăm sóc y tế 24/7',
-      'Phòng riêng cao cấp',
-      'Dịch vụ trị liệu tâm lý',
-      'Hoạt động văn hóa, giải trí cao cấp',
-      'Đưa đón khám chuyên khoa'
-    ],
-    description: 'Dành cho người cao tuổi cần được chăm sóc toàn diện với chất lượng cao cấp nhất.',
-    color: 'from-purple-400 to-purple-600',
-    buttonColor: '#7c3aed'
-  }
-];
+import { carePlansAPI } from '@/lib/api';
+import { residentAPI } from '@/lib/api';
+import Select from 'react-select';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { format, parse, parseISO } from 'date-fns';
 
 export default function PurchaseServicePage({ params }: { params: { packageId: string } }) {
   const router = useRouter();
   const { user } = useAuth();
   const [selectedResident, setSelectedResident] = useState('');
   const [loading, setLoading] = useState(false);
-  const [residents, setResidents] = useState(RESIDENTS_DATA);
+  const [residents, setResidents] = useState<any[]>([]);
+  const [loadingResidents, setLoadingResidents] = useState(false);
   const [familyResidents, setFamilyResidents] = useState<any[]>([]);
+
+  // Thêm state để lưu gói dịch vụ từ API
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [loadingPackage, setLoadingPackage] = useState(true);
+  const [packageError, setPackageError] = useState<string | null>(null);
 
   // Advanced business logic states
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -95,35 +55,42 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [registrationData, setRegistrationData] = useState<any>(null);
 
+  // Thêm state cho stepper UI
+  const [step, setStep] = useState(1);
+  const steps = [
+    'Chọn người thụ hưởng',
+    'Xác nhận thông tin',
+    'Gói dịch vụ',
+    'Thông tin bổ sung',
+    'Xác nhận',
+    'Hoàn tất'
+  ];
+
   // Get packageId from params directly
   const packageId = params.packageId;
 
+  // Fetch gói dịch vụ từ API theo packageId
+  useEffect(() => {
+    setLoadingPackage(true);
+    setPackageError(null);
+    
+    carePlansAPI.getById(packageId)
+      .then((pkg) => {
+        setSelectedPackage(pkg);
+      })
+      .catch((error) => {
+        console.error('Error fetching package:', error);
+        setPackageError('Không thể tải thông tin gói dịch vụ');
+        setSelectedPackage(null);
+      })
+      .finally(() => {
+        setLoadingPackage(false);
+      });
+  }, [packageId]);
+
   // Debug logging
   console.log('Package ID from URL:', packageId);
-  console.log('Available package IDs:', carePackages.map(pkg => pkg.id));
-
-  // Find the selected package
-  let selectedPackage = carePackages.find(pkg => pkg.id === parseInt(packageId));
-  console.log('Selected package:', selectedPackage);
-  
-  // Fake selectedPackage for demo if not found
-  if (!selectedPackage) {
-    selectedPackage = {
-      id: 1,
-      name: 'Gói Cơ Bản',
-      price: 15000000,
-      description: 'Phù hợp cho người cao tuổi có sức khỏe tốt, cần hỗ trợ sinh hoạt cơ bản.',
-      image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      features: [
-        'Chăm sóc cơ bản hàng ngày',
-        'Bữa ăn theo tiêu chuẩn',
-        'Kiểm tra sức khỏe định kỳ',
-        'Hoạt động giải trí cơ bản'
-      ],
-      color: 'from-blue-400 to-blue-600',
-      buttonColor: '#2563eb'
-    };
-  }
+  console.log('Selected package from API:', selectedPackage);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -134,30 +101,30 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
           const parsedResidents = JSON.parse(savedResidents);
           setResidents(parsedResidents);
           
-          if (user?.role === 'family') {
-            // For family role, create fake family members data for demo
-            const familyMembers = [
-              {
-                id: 1,
-                name: 'Nguyễn Văn Nam',
-                age: 78,
-                room: 'A01',
-                relationship: 'Cha',
-                condition: 'Tốt',
-                image: '/api/placeholder/60/60'
-              },
-              {
-                id: 2,
-                name: 'Lê Thị Hoa',
-                age: 75,
-                room: 'A02',
-                relationship: 'Mẹ',
-                condition: 'Khá',
-                image: '/api/placeholder/60/60'
-              }
-            ];
-            setFamilyResidents(familyMembers);
+                if (user?.role === 'family') {
+        // For family role, create fake family members data for demo
+        const familyMembers = [
+          {
+            id: 1,
+            name: 'Nguyễn Văn Nam',
+            age: 78,
+            room: 'A01',
+            relationship: 'Cha',
+            condition: 'Tốt',
+            image: '/api/placeholder/60/60'
+          },
+          {
+            id: 2,
+            name: 'Lê Thị Hoa',
+            age: 75,
+            room: 'A02',
+            relationship: 'Mẹ',
+            condition: 'Khá',
+            image: '/api/placeholder/60/60'
           }
+        ];
+        setFamilyResidents(familyMembers);
+      }
         } catch (error) {
           console.error('Error parsing saved residents data:', error);
           
@@ -165,53 +132,66 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
           localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
           setResidents(RESIDENTS_DATA);
           
-          if (user?.role === 'family') {
-            // For family role, create fake family members data for demo
-            const familyMembers = [
-              {
-                id: 1,
-                name: 'Nguyễn Văn Nam',
-                age: 78,
-                room: 'A01',
-                relationship: 'Cha',
-                condition: 'Tốt',
-                image: '/api/placeholder/60/60'
-              },
-              {
-                id: 2,
-                name: 'Lê Thị Hoa',
-                age: 75,
-                room: 'A02',
-                relationship: 'Mẹ',
-                condition: 'Khá',
-                image: '/api/placeholder/60/60'
-              },
-              {
-                id: 3,
-                name: 'Nguyễn Văn Minh',
-                age: 82,
-                room: 'B05',
-                relationship: 'Ông',
-                condition: 'Tốt',
-                image: '/api/placeholder/60/60'
-              }
-            ];
-            setFamilyResidents(familyMembers);
+                if (user?.role === 'family') {
+        // For family role, create fake family members data for demo
+        const familyMembers = [
+          {
+            id: 1,
+            name: 'Nguyễn Văn Nam',
+            age: 78,
+            room: 'A01',
+            relationship: 'Cha',
+            condition: 'Tốt',
+            image: '/api/placeholder/60/60'
+          },
+          {
+            id: 2,
+            name: 'Lê Thị Hoa',
+            age: 75,
+            room: 'A02',
+            relationship: 'Mẹ',
+            condition: 'Khá',
+            image: '/api/placeholder/60/60'
+          },
+          {
+            id: 3,
+            name: 'Nguyễn Văn Minh',
+            age: 82,
+            room: 'B05',
+            relationship: 'Ông',
+            condition: 'Tốt',
+            image: '/api/placeholder/60/60'
           }
+        ];
+        setFamilyResidents(familyMembers);
+      }
         }
       } else {
         // Initialize localStorage with default data if it's empty
         localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
         setResidents(RESIDENTS_DATA);
         
-        if (user?.role === 'family') {
-          const familyMembers = RESIDENTS_DATA.slice(0, 2).map((resident: any) => ({
-            ...resident,
-            relationship: resident.id === 1 ? 'Cha' : 'Mẹ'
-          }));
-          setFamilyResidents(familyMembers);
-        }
+                  if (user?.role === 'family') {
+            const familyMembers = RESIDENTS_DATA.slice(0, 2).map((resident: any) => ({
+              ...resident,
+              relationship: resident.id === 1 ? 'Cha' : 'Mẹ'
+            }));
+            setFamilyResidents(familyMembers);
+          }
       }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    setLoadingResidents(true);
+    if (user?.role === 'staff') {
+      residentAPI.getAll()
+        .then(data => setResidents(Array.isArray(data) ? data : []))
+        .finally(() => setLoadingResidents(false));
+    } else if (user?.role === 'family') {
+      residentAPI.getByFamilyMemberId(user.id)
+        .then(data => setResidents(Array.isArray(data) ? data : []))
+        .finally(() => setLoadingResidents(false));
     }
   }, [user]);
 
@@ -230,7 +210,25 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     }
   }, [showSuccessModal, registrationData]);
 
-  if (!selectedPackage) {
+  // Loading state cho gói dịch vụ
+  if (loadingPackage) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: '#f8fafc'
+      }}>
+        <div style={{ textAlign: 'center', color: '#6b7280' }}>
+          <h2>Đang tải thông tin gói dịch vụ...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state cho gói dịch vụ
+  if (packageError || !selectedPackage) {
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -241,6 +239,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
       }}>
         <div style={{ textAlign: 'center', color: '#6b7280' }}>
           <h2>Không tìm thấy gói dịch vụ</h2>
+          <p>{packageError || 'Gói dịch vụ không tồn tại'}</p>
           <button 
             onClick={() => router.push('/services')}
             style={{
@@ -442,13 +441,13 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     // Advanced business validation
     const selectedMember = familyResidents.find(member => member.id.toString() === selectedResident);
     if (selectedMember) {
-      // Age-based package compatibility
-      if (selectedMember.age < 60 && selectedPackage?.id === 3) {
+      // Age-based package compatibility - sử dụng planName thay vì id
+      if (selectedMember.age < 60 && selectedPackage?.planName === 'Gói Cao Cấp') {
         errors.packageCompatibility = 'Gói Cao Cấp chỉ dành cho người trên 60 tuổi';
       }
       
       // Health condition validation for advanced packages
-      if (selectedMember.condition === 'Yếu' && selectedPackage?.id === 1) {
+      if (selectedMember.condition === 'Yếu' && selectedPackage?.planName === 'Gói Cơ Bản') {
         errors.healthCompatibility = 'Người thân có tình trạng sức khỏe yếu nên chọn gói Nâng Cao hoặc Cao Cấp';
       }
     }
@@ -521,149 +520,49 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   };
 
   const handlePurchase = async () => {
-    console.log('handlePurchase called');
-    console.log('selectedResident:', selectedResident);
-    console.log('user:', user);
-    console.log('selectedPackage:', selectedPackage);
-    
-    // Validate all required fields with professional validation
-    const isValid = validateRegistration();
-    if (!isValid) {
-      // Scroll to first error field
-      const firstErrorField = Object.keys(validationErrors)[0];
-      if (firstErrorField) {
-        const element = document.querySelector(`[data-field="${firstErrorField}"]`);
-        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
-    }
-
     setLoading(true);
     try {
-      // Sử dụng selectedPackage đã được định nghĩa ở trên
-      if (!selectedPackage) {
-        throw new Error('Không tìm thấy gói dịch vụ');
-      }
-
-      console.log('Processing purchase for role:', user?.role);
-
-      if (user?.role === 'family') {
-        // For family role, find the selected family member and update with care package
-        const selectedFamilyMember = familyResidents.find(member => member.id.toString() === selectedResident);
-        
-        // Calculate final price with discount
-        const originalPrice = selectedPackage.price;
-        const discountAmount = (originalPrice * discountApplied) / 100;
-        const finalPrice = originalPrice - discountAmount;
-        
-        if (selectedFamilyMember) {
-          const updatedFamilyMember = {
-            ...selectedFamilyMember,
-            carePackage: {
-              id: selectedPackage.id,
-              name: selectedPackage.name,
-              price: originalPrice,
-              finalPrice: finalPrice,
-              discount: discountApplied,
-              discountAmount: discountAmount,
-              purchaseDate: new Date().toISOString(),
-              startDate: startDate,
-              paymentMethod: paymentMethod,
-              emergencyContact: emergencyContact,
-              medicalNotes: medicalNotes,
-              features: selectedPackage.features,
-              status: 'pending_approval',
-              registrationId: `REG-${Date.now()}-${selectedFamilyMember.id}`
-            }
-          };
-
-          // Update the resident in the main residents list
-          const updatedResidents = residents.map((resident: any) => 
-            resident.id.toString() === selectedFamilyMember.id.toString() 
-              ? updatedFamilyMember 
-              : resident
-          );
-
-          localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
-          
-          // Store registration data for success modal
-          const registrationInfo = {
-            registrationId: updatedFamilyMember.carePackage.registrationId,
-            packageName: selectedPackage.name,
-            memberName: selectedFamilyMember.name,
-            originalPrice,
-            discountAmount,
-            finalPrice,
-            startDate,
-            discountApplied
-          };
-          
-          setRegistrationData(registrationInfo);
-          
-          // 🚀 Sử dụng tính năng nâng cao - Lưu lịch sử
-          try {
-            const historyItem = {
-              ...registrationInfo,
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-              id: Date.now()
-            };
-            
-            const existingHistory = JSON.parse(localStorage.getItem('registrationHistory') || '[]');
-            const updatedHistory = [historyItem, ...existingHistory.slice(0, 9)];
-            localStorage.setItem('registrationHistory', JSON.stringify(updatedHistory));
-            console.log('✅ Đã lưu vào lịch sử đăng ký');
-          } catch (error) {
-            console.log('Không thể lưu lịch sử:', error);
-          }
-          
-          console.log('🎉 Đăng ký thành công! Chuẩn bị hiển thị chi tiết...'); // Thông báo
-          
-          console.log('Purchase successful for family member:', updatedFamilyMember);
-          setShowConfirmation(false);
-          setShowSuccessModal(true);
-        }
-      } else {
-        // For other roles, update residents data
-        const savedResidents = localStorage.getItem('nurseryHomeResidents');
-        let residents = RESIDENTS_DATA;
-        if (savedResidents) {
-          residents = JSON.parse(savedResidents);
-        }
-
-        // Cập nhật thông tin gói dịch vụ cho resident được chọn
-        const updatedResidents = residents.map((resident: any) => {
-          if (resident.id.toString() === selectedResident) {
-            return {
-              ...resident,
-              carePackage: {
-                id: selectedPackage.id,
-                name: selectedPackage.name,
-                price: selectedPackage.price,
-                purchaseDate: new Date().toISOString(),
-                features: selectedPackage.features
-              }
-            };
-          }
-          return resident;
-        });
-
-        // Lưu danh sách residents đã cập nhật vào localStorage
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
-
-        // Show success message and redirect
-        console.log('Purchase successful for resident:', selectedResident);
-        alert('Đăng ký gói chăm sóc thành công! Chúng tôi sẽ liên hệ với bạn để hoàn tất thủ tục.');
-        router.push(`/residents/${selectedResident}`);
-      }
+      const payload = {
+        carePlanId: selectedPackage._id,
+        residentId: selectedResident
+      };
+      console.log('Payload gửi lên:', payload);
+      const result = await carePlansAPI.register(payload);
+      console.log('Kết quả trả về:', result);
+      setShowConfirmation(false);
+      setShowSuccessModal(true);
     } catch (error) {
-      console.error('Error purchasing service:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      alert(`Có lỗi xảy ra khi đăng ký dịch vụ: ${errorMessage}. Vui lòng thử lại sau.`);
+      console.error('API error:', error?.response?.data || error);
+      alert('Có lỗi xảy ra khi đăng ký dịch vụ. Vui lòng thử lại!');
     } finally {
       setLoading(false);
     }
   };
+
+  function getAge(dateOfBirth: string) {
+    if (!dateOfBirth) return '';
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  }
+
+  function getResidentOption(resident: any) {
+    const name = resident.fullName || resident.name;
+    const room = resident.room ? `Phòng ${resident.room}` : '';
+    const dob = resident.dateOfBirth ? `SN: ${new Date(resident.dateOfBirth).toLocaleDateString('vi-VN')}` : '';
+    const age = resident.age ? `${resident.age} tuổi` : (resident.dateOfBirth ? `${getAge(resident.dateOfBirth)} tuổi` : '');
+    const code = resident.code ? `Mã: ${resident.code}` : '';
+    return {
+      value: resident._id,
+      label: `${name} ${room ? '- ' + room : ''} ${dob ? '(' + dob : ''}${age ? (dob ? ' - ' : '(') + age : ''}${dob || age ? ')' : ''}${code ? ' - ' + code : ''}`.replace(/\s+/g, ' ').trim(),
+      resident
+    };
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
@@ -768,7 +667,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     {/* Package Header with Image */}
     <div style={{ 
       height: '220px',
-      backgroundImage: `url(${selectedPackage.image})`,
+      backgroundImage: `url(${selectedPackage.image || 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       position: 'relative',
@@ -789,14 +688,14 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
           marginBottom: '0.5rem',
           color: '#1e293b'
         }}>
-          {selectedPackage.name}
+          {selectedPackage.planName}
         </h2>
         <div style={{ 
           fontSize: '1.5rem',
           fontWeight: 600,
           color: '#059669'
         }}>
-          {new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(selectedPackage.price)}
+          {new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(selectedPackage.monthlyPrice)}
           <span style={{ 
             fontSize:'1rem',
             color:'#64748b',
@@ -844,7 +743,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                 gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                 gap: '1rem'
               }}>
-                {selectedPackage.features.map((feature, index) => (
+                {selectedPackage.servicesIncluded?.map((feature: string, index: number) => (
                   <div key={index} style={{
                     background: 'rgba(16, 185, 129, 0.05)',
                     border: '1px solid rgba(16, 185, 129, 0.2)',
@@ -872,140 +771,300 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
             </div>
 
             {/* Resident/Family Member Selection */}
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{
-                fontSize: '1.15rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '1.2rem'
-              }}>
-                👤 {user?.role === 'family' ? 'Chọn người thụ hưởng gói dịch vụ' : 'Chọn người thụ hưởng gói dịch vụ'}
-              </h3>
-
-              {user?.role === 'family' ? (
-                // Family role: Show family members as selectable cards
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-                  {familyResidents.map((member) => (
-                    <div
-                      key={member.id}
-                      onClick={() => setSelectedResident(member.id.toString())}
-                      style={{
-                        background: selectedResident === member.id.toString() ? '#eff6ff' : 'white',
-                        border: selectedResident === member.id.toString() ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                        borderRadius: '12px',
-                        padding: '1.5rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        position: 'relative'
-                      }}
-                    >
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '1rem',
-                        marginBottom: '1rem'
-                      }}>
-                        <div style={{
-                          width: '60px',
-                          height: '60px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #3B82F6, #1E40AF)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: '1.5rem',
-                          fontWeight: 'bold'
-                        }}>
-                          {member.name.charAt(0)}
+            {/* Step 1: Chọn người thụ hưởng */}
+            {step === 1 && (
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#374151', marginBottom: '1.2rem' }}>👤 Chọn người thụ hưởng gói dịch vụ</h3>
+                {loadingResidents ? (
+                  <div>Đang tải danh sách cư dân...</div>
+                ) : (
+                  <Select
+                    options={residents.map(getResidentOption)}
+                    value={residents.map(getResidentOption).find(opt => opt.value === selectedResident) || null}
+                    onChange={opt => setSelectedResident(opt ? opt.value : '')}
+                    isSearchable
+                    placeholder="Tìm kiếm tên, phòng, ngày sinh, mã số..."
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: 56, borderRadius: 12, fontSize: '1rem', borderColor: '#d1d5db' }),
+                      menu: (base) => ({ ...base, borderRadius: 12, fontSize: '1rem' }),
+                      option: (base, state) => ({ ...base, fontSize: '1rem', background: state.isSelected ? '#eff6ff' : state.isFocused ? '#f3f4f6' : 'white', color: '#22223b' })
+                    }}
+                    noOptionsMessage={() => 'Không tìm thấy cư dân phù hợp'}
+                  />
+                )}
+                {/* Card chi tiết cư dân khi đã chọn */}
+                {selectedResident && (() => {
+                  const resident = residents.find(r => r._id === selectedResident);
+                  if (!resident) return null;
+                  return (
+                    <div style={{
+                      marginTop: 24,
+                      background: '#f8fafc',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 16,
+                      padding: '1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 24
+                    }}>
+                      {resident.avatarUrl && (
+                        <img src={resident.avatarUrl} alt="avatar" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b', marginBottom: 8 }}>
+                          <span style={{ color: '#6b7280', fontSize: '0.9rem', fontWeight: 500 }}>Họ và tên: </span>
+                          {resident.fullName || resident.name}
                         </div>
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#111827' }}>{member.name}</h4>
-                          <p style={{ margin: '0.25rem 0', color: '#6B7280', fontSize: '0.9rem' }}>
-                            <strong>Quan hệ:</strong> {member.relationship}
-                          </p>
+                        <div style={{ color: '#475569', fontSize: '0.98rem', marginTop: 4, display: 'flex', gap: '1rem' }}>
+                          <span><span style={{ fontWeight: 500 }}>Ngày sinh:</span> {resident.dateOfBirth ? new Date(resident.dateOfBirth).toLocaleDateString('vi-VN') : 'Chưa cập nhật'} ({resident.age || getAge(resident.dateOfBirth)} tuổi)</span>
                         </div>
-                        {selectedResident === member.id.toString() && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '1rem',
-                            right: '1rem',
-                            color: '#3b82f6'
-                          }}>
-                            <svg style={{ width: '24px', height: '24px' }} fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                        gap: '1rem',
-                        fontSize: '0.9rem',
-                        color: '#4B5563'
-                      }}>
-                        <p style={{ margin: 0 }}>
-                          <strong>Tuổi:</strong> {member.age} tuổi
-                        </p>
-                        <p style={{ margin: 0 }}>
-                          <strong>Phòng:</strong> {member.room}
-                        </p>
+                        <div style={{ color: '#64748b', fontSize: '0.95rem', marginTop: 4 }}>
+                          <span style={{ fontWeight: 500 }}>Mã NCT:</span> {resident.code || resident._id}
+                        </div>
+                        <div style={{ color: '#dc2626', fontSize: '0.95rem', marginTop: 4 }}>
+                          <span style={{ fontWeight: 500 }}>Liên hệ khẩn cấp:</span> {resident.emergencyContact?.fullName || resident.emergencyContact || 'Chưa cập nhật'}
+                        </div>
+                        <div style={{ color: '#dc2626', fontSize: '0.95rem', marginTop: 2 }}>
+                          <span style={{ fontWeight: 500 }}>SĐT khẩn cấp:</span> {resident.emergencyContact?.phoneNumber || resident.contactPhone || 'Chưa cập nhật'}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                })()}
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setStep(2)}
+                    disabled={!selectedResident}
+                    style={{ background: !selectedResident ? '#d1d5db' : 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 2rem', cursor: !selectedResident ? 'not-allowed' : 'pointer' }}
+                  >
+                    Tiếp tục
+                  </button>
                 </div>
-              ) : (
-                // Other roles: Show dropdown selection
-                <select
-                  value={selectedResident}
-                  onChange={(e) => setSelectedResident(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    background: 'white',
-                    color: '#374151'
-                  }}
-                  required
-                >
-                  <option value="">Chọn người cần chăm sóc</option>
-                  {residents.map((resident) => (
-                    <option key={resident.id} value={resident.id}>
-                      {resident.name} - Phòng {resident.room} ({resident.age} tuổi)
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Purchase Button */}
-            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-              <button
-                onClick={(e) => {
-                  console.log('Button clicked', e);
-                  handleInitialPurchase();
-                }}
-                disabled={!selectedResident || loading}
-                style={{
-                  background: (!selectedResident || loading) ? '#9ca3af' : 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
+              </div>
+            )}
+            {/* Step 2: Xác nhận thông tin người thụ hưởng */}
+            {step === 2 && selectedResident && (() => {
+              const resident = residents.find(r => r._id === selectedResident);
+              if (!resident) return null;
+              return (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#374151', marginBottom: '1.2rem' }}>🔎 Xác nhận thông tin người thụ hưởng</h3>
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 16,
+                    padding: '2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 32
+                  }}>
+                    {resident.avatarUrl && (
+                      <img src={resident.avatarUrl} alt="avatar" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                    )}
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b', marginBottom: 8 }}>
+                          <span style={{ color: '#6b7280', fontSize: '0.9rem', fontWeight: 500 }}>Họ và tên: </span>
+                          {resident.fullName || resident.name}
+                        </div>
+                        <div style={{ color: '#475569', fontSize: '0.98rem', marginTop: 4, display: 'flex', gap: '1rem' }}>
+                          <span><span style={{ fontWeight: 500 }}>Ngày sinh:</span> {resident.dateOfBirth ? new Date(resident.dateOfBirth).toLocaleDateString('vi-VN') : 'Chưa cập nhật'} ({resident.age || getAge(resident.dateOfBirth)} tuổi)</span>
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.95rem', marginTop: 4 }}>
+                          <span style={{ fontWeight: 500 }}>Mã NCT:</span> {resident.code || resident._id}
+                        </div>
+                        <div style={{ color: '#dc2626', fontSize: '0.95rem', marginTop: 4 }}>
+                          <span style={{ fontWeight: 500 }}>Liên hệ khẩn cấp:</span> {resident.emergencyContact?.fullName || resident.emergencyContact || 'Chưa cập nhật'}
+                        </div>
+                        <div style={{ color: '#dc2626', fontSize: '0.95rem', marginTop: 2 }}>
+                          <span style={{ fontWeight: 500 }}>SĐT khẩn cấp:</span> {resident.emergencyContact?.phoneNumber || resident.contactPhone || 'Chưa cập nhật'}
+                        </div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
+                    <button
+                      onClick={() => setStep(1)}
+                      style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      onClick={() => setStep(3)}
+                      style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                    >
+                      Tiếp tục
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+            {/* Step 3: Thông tin gói dịch vụ */}
+            {step === 3 && selectedPackage && (
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#374151', marginBottom: '1.2rem' }}>📦 Thông tin gói dịch vụ</h3>
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 16,
+                  padding: '2rem',
+                  marginBottom: 24
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: '1.2rem', color: '#1e293b', marginBottom: 8 }}>{selectedPackage.planName}</div>
+                  <div style={{ color: '#475569', fontSize: '1rem', marginBottom: 8 }}>{selectedPackage.description}</div>
+                  <div style={{ color: '#059669', fontWeight: 600, fontSize: '1.1rem', marginBottom: 8 }}>
+                    Giá: {new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(selectedPackage.monthlyPrice)} / tháng
+                  </div>
+                  <div style={{ color: '#374151', fontSize: '0.98rem', marginBottom: 8 }}>
+                    Dịch vụ bao gồm:
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                      {selectedPackage.servicesIncluded?.map((feature: string, i: number) => (
+                        <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ color: '#10b981', fontWeight: 700 }}>✔</span> {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
+                  <button
+                    onClick={() => setStep(2)}
+                    style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    onClick={() => setStep(4)}
+                    style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                  >
+                    Tiếp tục
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Step 4: Thông tin bổ sung */}
+            {step === 4 && (
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#374151', marginBottom: '1.2rem' }}>📝 Thông tin bổ sung</h3>
+                <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 16, padding: '2rem', marginBottom: 24 }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>Ngày bắt đầu dịch vụ *</label>
+                    <DatePicker
+                      selected={startDate ? parseISO(startDate) : null}
+                      onChange={date => setStartDate(date ? format(date, 'yyyy-MM-dd') : '')}
+                      dateFormat="dd/MM/yyyy"
+                      minDate={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)}
+                      placeholderText="dd/mm/yyyy"
+                      className="custom-datepicker-input"
+                      wrapperClassName="custom-datepicker-wrapper"
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode="select"
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
+                  <button
+                    onClick={() => setStep(3)}
+                    style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    onClick={() => setStep(5)}
+                    style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                  >
+                    Tiếp tục
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Step 5: Xác nhận cuối cùng */}
+            {step === 5 && (
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#374151', marginBottom: '1.2rem' }}>✅ Xác nhận thông tin đăng ký</h3>
+                <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 16, padding: '2rem', marginBottom: 24 }}>
+                  <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Người thụ hưởng: {(() => {
+                    const resident = residents.find(r => r._id === selectedResident);
+                    return resident ? (resident.fullName || resident.name) : '';
+                  })()}</div>
+                  <div style={{ color: '#475569', marginBottom: 8 }}>Gói dịch vụ: {selectedPackage?.planName}</div>
+                  <div style={{ color: '#059669', marginBottom: 8 }}>Giá: {selectedPackage ? new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(selectedPackage.monthlyPrice) : ''} / tháng</div>
+                  <div style={{ color: '#374151', marginBottom: 8 }}>Ngày bắt đầu: {startDate ? new Date(startDate).toLocaleDateString('vi-VN') : ''}</div>
+                  <div style={{ color: '#374151', marginBottom: 8 }}>
+                    <strong>Liên hệ khẩn cấp:</strong>
+                    <div style={{ marginLeft: '1rem', marginTop: '0.25rem' }}>
+                      {(() => {
+                        const resident = residents.find(r => r._id === selectedResident);
+                        const contactName = resident?.emergencyContact?.fullName || resident?.emergencyContact || 'Chưa cập nhật';
+                        const contactPhone = resident?.emergencyContact?.phoneNumber || resident?.contactPhone;
+                        
+                        if (contactPhone) {
+                          return (
+                            <>
+                              <div>• Họ tên: {contactName}</div>
+                              <div>• Số điện thoại: {contactPhone}</div>
+                            </>
+                          );
+                        } else {
+                          return <div>• {contactName}</div>;
+                        }
+                      })()}
+                    </div>
+                  </div>
+ {medicalNotes && <div style={{ color: '#374151', marginBottom: 8 }}>Ghi chú y tế: {medicalNotes}</div>}
+                  <div style={{ marginTop: 16 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#059669' }}>
+                      <input type="checkbox" checked={!!validationErrors.confirmed} onChange={e => setValidationErrors(prev => ({ ...prev, confirmed: e.target.checked ? '1' : '' }))} />
+                      Tôi xác nhận thông tin trên là chính xác
+                    </label>
+                  </div>
+                </div>
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
+                  <button
+                    onClick={() => setStep(4)}
+                    style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!validationErrors.confirmed) {
+                        alert('Vui lòng xác nhận thông tin trước khi hoàn tất!');
+                        return;
+                      }
+                      setStep(6);
+                    }}
+                    style={{ background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                  >
+                    Hoàn tất đăng ký
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Step 6: Modal thành công */}
+            {step === 6 && (
+              <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
                   color: 'white',
-                  border: 'none',
-                  padding: '1rem 3rem',
-                  borderRadius: '12px',
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
-                  cursor: (!selectedResident || loading) ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: (!selectedResident || loading) ? 'none' : '0 4px 15px rgba(59, 130, 246, 0.4)',
-                  transform: (!selectedResident || loading) ? 'none' : 'translateY(-2px)'
-                }}
-              >
-                {loading ? 'Đang xử lý...' : (user?.role === 'family' ? 'Đăng Ký ' : 'Xác Nhận Đăng Ký')}
-              </button>
-            </div>
+                  borderRadius: 24,
+                  padding: '2.5rem 1.5rem',
+                  margin: '0 auto 2rem',
+                  maxWidth: 500
+                }}>
+                  <svg style={{ width: 64, height: 64, margin: '0 auto 1.5rem' }} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <h2 style={{ fontSize: '2rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>Đăng ký thành công!</h2>
+                  <p style={{ fontSize: '1.1rem', margin: 0, opacity: 0.95 }}>Đăng ký của bạn đã được gửi và đang chờ phê duyệt. Chúng tôi sẽ liên hệ với bạn trong 1-2 ngày làm việc.</p>
+                </div>
+                <button
+                  onClick={() => router.push('/services')}
+                  style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 2rem', cursor: 'pointer' }}
+                >
+                  Về trang dịch vụ
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

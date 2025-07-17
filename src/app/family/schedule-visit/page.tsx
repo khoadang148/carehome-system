@@ -3,69 +3,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDaysIcon, ClockIcon, HeartIcon, XMarkIcon, CheckIcon, UsersIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { ClockIcon as HistoryIcon } from '@heroicons/react/24/solid';
-
-const residents = [
-  { id: 1, name: 'Nguyễn Văn Nam', room: 'A01', avatar: 'https://randomuser.me/api/portraits/men/72.jpg', status: 'Ổn định', relationship: 'Cha', age: 78 },
-  { id: 2, name: 'Lê Thị Hoa', room: 'A02', avatar: 'https://randomuser.me/api/portraits/women/65.jpg', status: 'Khá', relationship: 'Mẹ', age: 75 }
-];
-
-// Hàm chuyển giờ bắt đầu thành chuỗi dạng "09:00 - 10:00"
-function getTimeRange(startTime: string) {
-  const [hour, minute] = startTime.split(':').map(Number);
-  const endHour = hour + 1;
-  return `${startTime} - ${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-}
-
-type VisitHistoryItem = {
-  id: number;
-  resident: string;
-  date: string;
-  time: string;
-  purpose: string;
-  status: string;
-};
-
-// Gộp các entry có cùng ngày, giờ, mục đích, status thành 1 dòng với danh sách người thân
-function groupVisitHistory(history: VisitHistoryItem[]) {
-  const grouped: {
-    key: string;
-    residents: string[];
-    date: string;
-    time: string;
-    purpose: string;
-    status: string;
-  }[] = [];
-
-  history.forEach(item => {
-    const key = `${item.date}|${item.time}|${item.purpose}|${item.status}`;
-    const found = grouped.find(g =>
-      g.date === item.date &&
-      g.time === item.time &&
-      g.purpose === item.purpose &&
-      g.status === item.status
-    );
-    if (found) {
-      if (!found.residents.includes(item.resident)) {
-        found.residents.push(item.resident);
-      }
-    } else {
-      grouped.push({
-        key,
-        residents: [item.resident],
-        date: item.date,
-        time: item.time,
-        purpose: item.purpose,
-        status: item.status
-      });
-    }
-  });
-
-  return grouped;
-}
+import { residentAPI, visitsAPI } from '@/lib/api';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 export default function ScheduleVisitPage() {
   const router = useRouter();
-  const [selectedResident, setSelectedResident] = useState(residents[0]);
+  const { user } = useAuth();
+  const [residents, setResidents] = useState<any[]>([]);
+  const [visitHistory, setVisitHistory] = useState<any[]>([]);
+  const [selectedResident, setSelectedResident] = useState<any>(null);
   const [visitDate, setVisitDate] = useState('');
   const [visitTime, setVisitTime] = useState('');
   const [visitPurpose, setVisitPurpose] = useState('');
@@ -75,55 +21,138 @@ export default function ScheduleVisitPage() {
   const [scheduledResidents, setScheduledResidents] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [visitHistory, setVisitHistory] = useState<VisitHistoryItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('visitHistory');
-      if (stored) return JSON.parse(stored);
+  const [loading, setLoading] = useState(false);
+  const [loadingResidents, setLoadingResidents] = useState(false);
+  const [loadingVisits, setLoadingVisits] = useState(false);
+
+  // Hàm chuyển giờ bắt đầu thành chuỗi dạng "09:00 - 10:00"
+  function getTimeRange(startTime: string) {
+    const [hour, minute] = startTime.split(':').map(Number);
+    const endHour = hour + 1;
+    return `${startTime} - ${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  }
+
+  // Hàm xác định trạng thái của lịch thăm
+  function getVisitStatus(date: string, time: string) {
+    if (!date || !time) return 'unknown';
+
+    const visitDate = new Date(date);
+    const now = new Date();
+
+    // Lấy ngày/tháng/năm của lịch thăm
+    const visitDay = visitDate.getDate();
+    const visitMonth = visitDate.getMonth();
+    const visitYear = visitDate.getFullYear();
+
+    // Lấy ngày/tháng/năm hiện tại
+    const nowDay = now.getDate();
+    const nowMonth = now.getMonth();
+    const nowYear = now.getFullYear();
+
+    if (
+      visitYear < nowYear ||
+      (visitYear === nowYear && visitMonth < nowMonth) ||
+      (visitYear === nowYear && visitMonth === nowMonth && visitDay < nowDay)
+    ) {
+      return 'past'; // Đã qua
+    } else if (
+      visitYear === nowYear &&
+      visitMonth === nowMonth &&
+      visitDay === nowDay
+    ) {
+      return 'today'; // Hôm nay
+    } else {
+      return 'future'; // Tương lai
     }
-    return [
-      {
-        id: 1,
-        resident: 'Nguyễn Văn Nam',
-        date: '2024-05-10',
-        time: '09:00 - 10:00',
-        purpose: 'Thăm hỏi sức khỏe',
-        status: 'Đã xác nhận'
-      },
-      {
-        id: 2,
-        resident: 'Lê Thị Hoa',
-        date: '2024-05-08',
-        time: '14:00 - 15:00',
-        purpose: 'Mang quà và thức ăn',
-        status: 'Đã xác nhận'
-      },
-      {
-        id: 3,
-        resident: 'Nguyễn Văn Nam',
-        date: '2024-05-05',
-        time: '10:00 - 11:00',
-        purpose: 'Sinh nhật',
-        status: 'Đã hủy'
+  }
+
+  // Gộp các entry có cùng ngày, giờ, mục đích, status thành 1 dòng với danh sách người thân
+  function groupVisitHistory(history: any[], residents: any[]) {
+    const grouped: {
+      key: string;
+      residents: string[];
+      date: string;
+      time: string;
+      purpose: string;
+      status: string;
+    }[] = [];
+    history.forEach(item => {
+      const date = item.visit_date || item.requestedDate || item.date || '';
+      const time = item.visit_time || item.requestedTime || item.time || '';
+      // Ánh xạ resident_id sang tên từ residents
+      let residentName = 'Chưa cập nhật';
+      if (item.resident_id) {
+        const found = residents.find(r => r._id === item.resident_id);
+        residentName = found?.full_name || found?.fullName || found?.name || 'Chưa cập nhật';
       }
-    ];
-  });
+      const key = `${date}|${time}|${item.purpose}|${item.status}`;
+      const foundGroup = grouped.find(g =>
+        g.date === date &&
+        g.time === time &&
+        g.purpose === item.purpose &&
+        g.status === item.status
+      );
+      if (foundGroup) {
+        if (!foundGroup.residents.includes(residentName)) {
+          foundGroup.residents.push(residentName);
+        }
+      } else {
+        grouped.push({
+          key,
+          residents: [residentName],
+          date,
+          time,
+          purpose: item.purpose,
+          status: item.status
+        });
+      }
+    });
+    return grouped;
+  }
 
+  // Fetch residents
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visitHistory', JSON.stringify(visitHistory));
+    setLoadingResidents(true);
+    if (user?.id) {
+      residentAPI.getByFamilyMemberId(user.id)
+        .then((data) => {
+          const arr = Array.isArray(data) ? data : [data];
+          setResidents(arr && arr.filter(r => r && r._id));
+          setSelectedResident((arr && arr[0]) || null);
+        })
+        .catch(() => setResidents([]))
+        .finally(() => setLoadingResidents(false));
+    } else {
+      setResidents([]);
+      setLoadingResidents(false);
     }
-  }, [visitHistory]);
+  }, [user]);
+
+  // Fetch visits (nếu API hỗ trợ lấy theo user, nên truyền userId)
+  const fetchVisits = () => {
+    setLoadingVisits(true);
+    visitsAPI.getAll()
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : [];
+        setVisitHistory(arr);
+        console.log('DEBUG visitHistory after fetch:', arr); // Log dữ liệu thực tế
+      })
+      .catch(() => setVisitHistory([]))
+      .finally(() => setLoadingVisits(false));
+  };
+  useEffect(() => {
+    if (user?.id) fetchVisits();
+  }, [user]);
 
   useEffect(() => {
-    console.log('Modal states:', { showHistory, showSuccess, showMessageModal });
-    // Only hide header for modals, not the main page
     const hasModalOpen = showHistory || showSuccess || showMessageModal;
     if (hasModalOpen) {
-      console.log('Modal is open - adding hide-header class');
       document.body.classList.add('hide-header');
       document.body.style.overflow = 'hidden';
+      if (showHistory) {
+        console.log('DEBUG visitHistory:', visitHistory);
+      }
     } else {
-      console.log('No modal open - removing hide-header class');
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     }
@@ -133,21 +162,32 @@ export default function ScheduleVisitPage() {
     };
   }, [showHistory, showSuccess, showMessageModal]);
 
-  const submitVisitSchedule = () => {
+  const submitVisitSchedule = async () => {
     setError(null);
-    if (visitDate && visitTime && visitPurpose) {
-      // Kiểm tra trùng lịch cho tất cả người thân
+    if (!visitDate || !visitTime || !visitPurpose) {
+      setError('Vui lòng điền đầy đủ thông tin.');
+      setShowErrorModal(true);
+      return;
+    }
+    if (!residents.length) {
+      setError('Không có người thân nào để đặt lịch.');
+      setShowErrorModal(true);
+      return;
+    }
+    setLoading(true);
+    try {
+      // Kiểm tra trùng lịch cho từng resident: cùng resident_id, visit_date, visit_time
       const duplicatedNames = residents.filter(resident =>
-        visitHistory.some((item: VisitHistoryItem) =>
-          item.date === visitDate &&
-          item.time.startsWith(visitTime) &&
-          item.resident === resident.name &&
-          item.status === 'Đã xác nhận'
+        visitHistory.some((item) =>
+          (item.resident_id === resident._id) &&
+          (item.visit_date === new Date(visitDate).toISOString()) &&
+          (item.visit_time === visitTime)
         )
-      ).map(r => r.name);
+      ).map(r => r.fullName || r.name || 'Người thân');
       if (duplicatedNames.length > 0) {
         setError(`Người thân sau đã có lịch thăm vào khung giờ này: ${duplicatedNames.join(', ')}. Vui lòng chọn thời gian khác.`);
         setShowErrorModal(true);
+        setLoading(false);
         return;
       }
       const visitDateTime = new Date(`${visitDate}T${visitTime}:00`);
@@ -155,22 +195,30 @@ export default function ScheduleVisitPage() {
       if (visitDateTime.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
         setError('Bạn chỉ được đặt lịch trước ít nhất 24 giờ so với thời điểm hiện tại.');
         setShowErrorModal(true);
+        setLoading(false);
         return;
       }
-      // Thêm lịch mới cho tất cả người thân vào lịch sử
-      setVisitHistory((prev: VisitHistoryItem[]): VisitHistoryItem[] => ([
-        ...prev,
-        ...residents.map((resident) => ({
-          id: prev.length + 1 + Math.random(), // Math.random để tránh trùng id khi thêm nhiều entry cùng lúc
-          resident: resident.name,
-          date: visitDate,
-          time: getTimeRange(visitTime),
+      // Gọi API tạo lịch cho tất cả người thân
+      await Promise.all(residents.map(resident => {
+        if (!resident._id) return Promise.resolve(); // Bỏ qua resident không hợp lệ
+        const payload = {
+          resident_id: String(resident._id),
+          visit_date: new Date(visitDate).toISOString(),
+          visit_time: visitTime,
           purpose: visitPurpose,
-          status: 'Đã xác nhận'
-        }))
-      ]));
-      setScheduledResidents(residents.map(r => r.name));
+          duration: 60,
+          numberOfVisitors: 1
+        };
+        return visitsAPI.create(payload);
+      }));
+      setScheduledResidents(residents.map(r => r.full_name || r.fullName || r.name || 'Người thân'));
       setShowSuccess(true);
+      fetchVisits();
+    } catch (err) {
+      setError(String((err && (err as any).message) || err || 'Có lỗi xảy ra khi đặt lịch.'));
+      setShowErrorModal(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -306,10 +354,77 @@ export default function ScheduleVisitPage() {
               <p style={{
                 fontSize: '0.875rem',
                 color: '#047857',
-                margin: 0
+                margin: 0,
+                marginBottom: '1rem'
               }}>
-                Tổng cộng có {visitHistory.length} lịch hẹn đã được tạo
+                Tổng cộng có {groupVisitHistory([...visitHistory], residents).length} lịch hẹn đã được tạo
               </p>
+              
+              {/* Chú thích màu sắc */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                alignItems: 'center'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{
+                    width: '1rem',
+                    height: '1rem',
+                    borderRadius: '0.25rem',
+                    backgroundColor: '#6b7280'
+                  }}></div>
+                  <span style={{
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    fontWeight: 500
+                  }}>
+                    Lịch thăm đã qua
+                  </span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{
+                    width: '1rem',
+                    height: '1rem',
+                    borderRadius: '0.25rem',
+                    backgroundColor: '#ef4444'
+                  }}></div>
+                  <span style={{
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    fontWeight: 500
+                  }}>
+                    Lịch thăm hôm nay
+                  </span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{
+                    width: '1rem',
+                    height: '1rem',
+                    borderRadius: '0.25rem',
+                    backgroundColor: '#10b981'
+                  }}></div>
+                  <span style={{
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    fontWeight: 500
+                  }}>
+                    Lịch thăm sắp tới
+                  </span>
+                </div>
+              </div>
             </div>
             
             <div style={{ 
@@ -325,16 +440,6 @@ export default function ScheduleVisitPage() {
                     background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
                     borderBottom: '1px solid #e2e8f0'
                   }}>
-                    <th style={{ 
-                      padding: '1rem', 
-                      textAlign: 'left', 
-                      fontWeight: 600, 
-                      fontSize: '0.875rem',
-                      color: '#374151',
-                      letterSpacing: '0.025em'
-                    }}>
-                      Người thân
-                    </th>
                     <th style={{ 
                       padding: '1rem', 
                       textAlign: 'left', 
@@ -368,7 +473,7 @@ export default function ScheduleVisitPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groupVisitHistory([...visitHistory])
+                  {groupVisitHistory([...visitHistory], residents)
                     .sort((a, b) => {
                       if (a.date < b.date) return 1;
                       if (a.date > b.date) return -1;
@@ -376,57 +481,87 @@ export default function ScheduleVisitPage() {
                       const bStart = b.time.split(' - ')[0];
                       return aStart < bStart ? 1 : aStart > bStart ? -1 : 0;
                     })
-                    .map((item, index) => (
-                      <tr
-                        key={item.key}
-                        style={{
-                          borderBottom: index < visitHistory.length - 1 ? '1px solid #f1f5f9' : 'none',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#f8fafc';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                        }}
-                      >
-                        <td style={{
-                          padding: '1rem',
-                          fontWeight: 600,
-                          fontSize: '0.875rem',
-                          color: '#111827'
-                        }}>
-                          {item.residents.join(', ')}
-                        </td>
-                        <td style={{
-                          padding: '1rem',
-                          fontSize: '0.875rem',
-                          color: '#6b7280'
-                        }}>
-                          {new Date(item.date).toLocaleDateString('vi-VN', {
-                            weekday: 'short',
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })}
-                        </td>
-                        <td style={{
-                          padding: '1rem',
-                          fontSize: '0.875rem',
-                          color: '#6b7280',
-                          fontWeight: 500
-                        }}>
-                          {item.time}
-                        </td>
-                        <td style={{
-                          padding: '1rem',
-                          fontSize: '0.875rem',
-                          color: '#6b7280'
-                        }}>
-                          {item.purpose}
-                        </td>
-                      </tr>
-                    ))}
+                    .map((item) => {
+                      const status = getVisitStatus(item.date, item.time);
+                      const getStatusColor = () => {
+                        switch (status) {
+                          case 'past':
+                            return {
+                              background: '#f9fafb',
+                              borderLeft: '4px solid #6b7280',
+                              color: '#6b7280'
+                            };
+                          case 'today':
+                            return {
+                              background: '#fef2f2',
+                              borderLeft: '4px solid #ef4444',
+                              color: '#dc2626'
+                            };
+                          case 'future':
+                            return {
+                              background: '#f0fdf4',
+                              borderLeft: '4px solid #10b981',
+                              color: '#059669'
+                            };
+                          default:
+                            return {
+                              background: 'transparent',
+                              borderLeft: '4px solid #e5e7eb',
+                              color: '#6b7280'
+                            };
+                        }
+                      };
+                      const statusStyle = getStatusColor();
+                      
+                      return (
+                        <tr
+                          key={item.key}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            transition: 'all 0.2s ease',
+                            ...statusStyle
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = status === 'past' ? '#f3f4f6' : 
+                                                              status === 'today' ? '#fee2e2' : 
+                                                              status === 'future' ? '#dcfce7' : '#f8fafc';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = statusStyle.background;
+                          }}
+                        >
+                          <td style={{
+                            padding: '1rem',
+                            fontSize: '0.875rem',
+                            color: statusStyle.color,
+                            fontWeight: status === 'today' ? 600 : 500
+                          }}>
+                            {item.date ? (() => {
+                              const date = new Date(item.date);
+                              const day = date.getDate().toString().padStart(2, '0');
+                              const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                              const year = date.getFullYear();
+                              return `${day}/${month}/${year}`;
+                            })() : ''}
+                          </td>
+                          <td style={{
+                            padding: '1rem',
+                            fontSize: '0.875rem',
+                            color: statusStyle.color,
+                            fontWeight: status === 'today' ? 600 : 500
+                          }}>
+                            {getTimeRange(item.time)}
+                          </td>
+                          <td style={{
+                            padding: '1rem',
+                            fontSize: '0.875rem',
+                            color: statusStyle.color
+                          }}>
+                            {item.purpose}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -475,6 +610,11 @@ export default function ScheduleVisitPage() {
           </div>
           {!showSuccess ? (
             <>
+              {residents.length === 0 && !loadingResidents && (
+                <div style={{ color: '#ef4444', fontWeight: 600, marginBottom: 16 }}>
+                  Không có người thân nào để đặt lịch. Vui lòng liên hệ nhân viên để được hỗ trợ thêm.
+                </div>
+              )}
               <div style={{ display: 'grid', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.98rem', fontWeight: 600, color: '#374151', marginBottom: '0.75rem' }}>
@@ -549,10 +689,10 @@ export default function ScheduleVisitPage() {
                 </button>
                 <button
                   onClick={submitVisitSchedule}
-                  disabled={!visitDate || !visitTime || !visitPurpose}
-                  style={{ padding: '0.85rem 1.7rem', borderRadius: '0.75rem', border: 'none', background: (!visitDate || !visitTime || !visitPurpose) ? 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', cursor: (!visitDate || !visitTime || !visitPurpose) ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s ease', boxShadow: (!visitDate || !visitTime || !visitPurpose) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.13)' }}
-                  onMouseOver={e => { if (!(!visitDate || !visitTime || !visitPurpose)) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.18)'; } }}
-                  onMouseOut={e => { if (!(!visitDate || !visitTime || !visitPurpose)) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.13)'; } }}
+                  disabled={!visitDate || !visitTime || !visitPurpose || loading}
+                  style={{ padding: '0.85rem 1.7rem', borderRadius: '0.75rem', border: 'none', background: loading ? 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s ease', boxShadow: loading ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.13)' }}
+                  onMouseOver={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.18)'; } }}
+                  onMouseOut={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.13)'; } }}
                 >
                   <CheckIcon style={{ width: '1.1rem', height: '1.1rem' }} />
                   Đặt lịch

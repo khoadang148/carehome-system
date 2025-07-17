@@ -22,7 +22,7 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
   };
 
   const getPriorityColor = (note: string) => {
-    const lowerNote = note.toLowerCase();
+    const lowerNote = (note || '').toLowerCase();
     if (lowerNote.includes('cần theo dõi') || lowerNote.includes('khẩn cấp') || lowerNote.includes('nguy hiểm')) {
       return { bg: '#fee2e2', border: '#fca5a5', text: '#dc2626' };
     }
@@ -50,12 +50,13 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      {careNotes.map((careNote) => {
+      {careNotes.map((careNote, idx) => {
         const colors = getPriorityColor(careNote.note);
         
+        const key = careNote.id || careNote._id || idx;
         return (
           <div
-            key={careNote.id}
+            key={key}
             style={{
               background: colors.bg,
               border: `1px solid ${colors.border}`,
@@ -81,9 +82,9 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
                   fontWeight: 600,
                   color: colors.text
                 }}>
-                  {careNote.staff.split(',')[0]?.trim() || 'Nhân viên'}
+                  {(careNote.staff ? careNote.staff.split(',')[0]?.trim() : 'Nhân viên') || 'Nhân viên'}
                 </span>
-                {careNote.staff.includes(',') && (
+                {careNote.staff && careNote.staff.includes(',') && (
                   <span style={{
                     fontSize: '0.75rem',
                     color: '#6b7280',
@@ -107,12 +108,12 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
               lineHeight: '1.6',
               marginBottom: '0.5rem'
             }}>
-              {careNote.note}
+              {careNote.note || careNote.content || 'Không có nội dung ghi chú'}
             </div>
 
             {/* Priority indicator for high priority notes */}
-            {(careNote.note.toLowerCase().includes('cần theo dõi') || 
-              careNote.note.toLowerCase().includes('khẩn cấp')) && (
+            {((careNote.note || '').toLowerCase().includes('cần theo dõi') || 
+              ((careNote.note || '').toLowerCase().includes('khẩn cấp'))) && (
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',

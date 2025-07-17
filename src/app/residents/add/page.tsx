@@ -12,6 +12,7 @@ import {
   DocumentTextIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
+import { residentAPI } from '@/lib/api';
 
 type ResidentFormData = {
   firstName: string;
@@ -62,18 +63,35 @@ export default function AddResidentPage() {
   
   const onSubmit = async (data: ResidentFormData) => {
     setIsSubmitting(true);
-    
     try {
-      // API call simulation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log('Form data submitted:', data);
-      
+      // Map form data sang request body API
+      const payload = {
+        fullName: data.lastName + ' ' + data.firstName,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        admissionDate: new Date().toISOString().slice(0,10),
+        dischargeDate: null,
+        familyMemberId: '', // Có thể lấy từ user context nếu có
+        medicalHistory: data.medicalConditions,
+        currentMedications: data.medications ? data.medications.split(',').map(s => s.trim()).filter(Boolean) : [],
+        allergies: data.allergies ? data.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+        emergencyContact: {
+          fullName: data.emergencyContact,
+          relationship: '', // Có thể bổ sung trường này nếu form có
+          phoneNumber: data.emergencyPhone
+        },
+        careLevel: data.careLevel,
+        status: 'active',
+        room: data.room,
+        notes: data.notes,
+        idNumber: data.idNumber,
+        contactPhone: data.contactPhone
+      };
+      await residentAPI.create(payload);
       setShowSuccess(true);
       setTimeout(() => {
         router.push('/residents');
       }, 2000);
-      
     } catch (error) {
       console.error('Error submitting form:', error);
     } finally {

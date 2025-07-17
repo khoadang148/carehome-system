@@ -15,119 +15,23 @@ import {
   SparklesIcon,
   ShieldCheckIcon
 } from '@heroicons/react/24/outline';
-
-// Mock resident data (same as in the residents page)
-const initialResidents = [
-  { 
-    id: 1, 
-    name: 'Alice Johnson', 
-    firstName: 'Alice',
-    lastName: 'Johnson',
-    age: 78, 
-    room: '101', 
-    careLevel: 'Cơ bản', 
-
-    dateOfBirth: '1945-04-15',
-    gender: 'female',
-    medicalConditions: ['Hypertension', 'Arthritis'],
-    medications: ['Lisinopril', 'Ibuprofen'],
-    allergies: ['Penicillin'],
-    emergencyContact: 'Bob Johnson',
-    contactPhone: '(555) 123-4567',
-    personalNotes: 'Cần được định hướng lại thường xuyên. Thích liệu pháp âm nhạc.',
-    dietaryRestrictions: 'Low sodium',
-    mobilityStatus: 'Uses walker'
-  },
-  { 
-    id: 2, 
-    name: 'Robert Smith', 
-    firstName: 'Robert',
-    lastName: 'Smith',
-    age: 82, 
-    room: '102', 
-    careLevel: 'Nâng cao', 
-    admissionDate: '2023-01-10',
-    dateOfBirth: '1941-08-23',
-    gender: 'male',
-    medicalConditions: ['Diabetes', 'Heart Disease'],
-    medications: ['Metformin', 'Atorvastatin'],
-    allergies: ['Sulfa drugs'],
-    emergencyContact: 'Susan Smith',
-    contactPhone: '(555) 234-5678',
-    personalNotes: 'Giáo sư về hưu. Thích chơi cờ và nghe nhạc cổ điển.',
-    dietaryRestrictions: 'Diabetic diet',
-    mobilityStatus: 'Independent'
-  },
-  { 
-    id: 3, 
-    name: 'Mary Williams', 
-    firstName: 'Mary',
-    lastName: 'Williams',
-    age: 85, 
-    room: '103', 
-    careLevel: 'Cao cấp', 
-    admissionDate: '2022-11-23',
-    dateOfBirth: '1937-11-05',
-    gender: 'female',
-    medicalConditions: ['Alzheimer\'s', 'Osteoporosis'],
-    medications: ['Donepezil', 'Calcium supplements'],
-    allergies: ['Latex'],
-    emergencyContact: 'John Williams',
-    contactPhone: '(555) 345-6789',
-    personalNotes: 'Cần được định hướng lại thường xuyên. Thích liệu pháp âm nhạc.',
-    dietaryRestrictions: 'Soft diet',
-    mobilityStatus: 'Wheelchair bound'
-  },
-  { 
-    id: 4, 
-    name: 'James Brown', 
-    firstName: 'James',
-    lastName: 'Brown',
-    age: 76, 
-    room: '104', 
-    careLevel: 'Nâng cao', 
-    admissionDate: '2023-03-05',
-    dateOfBirth: '1947-06-30',
-    gender: 'male',
-    medicalConditions: ['COPD', 'Arthritis'],
-    medications: ['Albuterol', 'Acetaminophen'],
-    allergies: ['Aspirin'],
-    emergencyContact: 'Patricia Brown',
-    contactPhone: '(555) 456-7890',
-    personalNotes: 'Thợ mộc trước đây. Thích làm đồ gỗ khi có thể.',
-    dietaryRestrictions: 'None',
-    mobilityStatus: 'Uses cane'
-  },
-  { 
-    id: 5, 
-    name: 'Patricia Davis', 
-    firstName: 'Patricia',
-    lastName: 'Davis',
-    age: 81, 
-    room: '105', 
-    careLevel: 'Cơ bản', 
-    admissionDate: '2023-04-12',
-    dateOfBirth: '1942-02-18',
-    gender: 'female',
-    medicalConditions: ['Hypertension', 'Depression'],
-    medications: ['Amlodipine', 'Sertraline'],
-    allergies: ['None known'],
-    emergencyContact: 'Michael Davis',
-    contactPhone: '(555) 567-8901',
-    personalNotes: 'Giáo viên về hưu. Thích thủ công và giao tiếp xã hội.',
-    dietaryRestrictions: 'Vegetarian',
-    mobilityStatus: 'Independent'
-  },
-];
+import { residentAPI } from '@/lib/api';
 
 type ResidentFormData = {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
   gender: string;
+  idNumber: string;
   room: string;
   careLevel: string;
-  emergencyContact: string;
+  status: string;
+  admissionDate: string;
+  dischargeDate: string;
+  familyMemberId: string;
+  emergencyContactName: string;
+  emergencyContactRelationship: string;
+  emergencyContactPhone: string;
   contactPhone: string;
   medicalConditions: string;
   medications: string;
@@ -190,12 +94,28 @@ const validationRules = {
       message: 'Số điện thoại không đúng định dạng Việt Nam'
     }
   },
-  emergencyContact: {
-    required: 'Người liên hệ khẩn cấp là bắt buộc',
+  emergencyContactName: {
+    required: 'Tên người liên hệ khẩn cấp là bắt buộc',
     minLength: { value: 2, message: 'Tên người liên hệ phải có ít nhất 2 ký tự' },
     pattern: {
       value: /^[a-zA-ZÀ-ỹ\s]+$/,
       message: 'Tên chỉ được chứa chữ cái và khoảng trắng'
+    }
+  },
+  emergencyContactRelationship: {
+    required: 'Quan hệ với người liên hệ là bắt buộc',
+    minLength: { value: 2, message: 'Quan hệ phải có ít nhất 2 ký tự' },
+    maxLength: { value: 50, message: 'Quan hệ không được quá 50 ký tự' },
+    pattern: {
+      value: /^[a-zA-ZÀ-ỹ\s]+$/,
+      message: 'Quan hệ chỉ được chứa chữ cái và khoảng trắng'
+    }
+  },
+  emergencyContactPhone: {
+    required: 'Số điện thoại liên hệ khẩn cấp là bắt buộc',
+    pattern: {
+      value: /^(\+84|0)[3-9]\d{8}$/,
+      message: 'Số điện thoại không đúng định dạng Việt Nam'
     }
   },
   gender: {
@@ -236,15 +156,14 @@ const mobilityOptions = [
   'Nằm liệt giường'
 ];
 
-export default function EditResidentPage({ params }: { params: Promise<{ id: string }> }) {
+export default function EditResidentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [residents, setResidents] = useState(initialResidents);
-  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
-  const [formSection, setFormSection] = useState('personal'); // personal, medical, contact, additional
+  const [formSection, setFormSection] = useState<string>('personal'); // personal, medical, contact, additional
+  const [residentData, setResidentData] = useState<any>(null);
   
   const { 
     register, 
@@ -258,130 +177,82 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
   const watchedFields = watch();
   
   useEffect(() => {
-    // Resolve params Promise
-    const resolveParams = async () => {
-      const resolved = await params;
-      setResolvedParams(resolved);
-    };
-    resolveParams();
-  }, [params]);
-  
-  useEffect(() => {
-    if (!resolvedParams) return;
-    
-    // Check if there's saved residents data in localStorage
-    const savedResidents = localStorage.getItem('nurseryHomeResidents');
-    if (savedResidents) {
-      setResidents(JSON.parse(savedResidents));
-    }
-    
-    // Simulate API call to fetch resident data
+    // Fetch resident từ API thật
     const fetchResident = async () => {
+      setLoading(true);
       try {
-        // In a real application, you would fetch from an API endpoint
-        const residentId = parseInt(resolvedParams.id);
-        // Use the residents from state or localStorage
-        const foundResident = residents.find(r => r.id === residentId);
-        
-        if (foundResident) {
-          // Format data for the form
-          reset({
-            firstName: foundResident.firstName,
-            lastName: foundResident.lastName,
-            dateOfBirth: foundResident.dateOfBirth,
-            gender: foundResident.gender,
-            room: foundResident.room,
-            careLevel: foundResident.careLevel,
-            emergencyContact: foundResident.emergencyContact,
-            contactPhone: foundResident.contactPhone,
-            medicalConditions: foundResident.medicalConditions.join(', '),
-            medications: foundResident.medications.join(', '),
-            allergies: foundResident.allergies.join(', '),
-            dietaryRestrictions: foundResident.dietaryRestrictions,
-            mobilityStatus: foundResident.mobilityStatus,
-            notes: foundResident.personalNotes
-          });
-        } else {
-          // Resident not found
-          setNotFound(true);
-        }
+        const data = await residentAPI.getById(params.id);
+        setResidentData(data); // Lưu lại dữ liệu gốc
+        reset({
+          firstName: data.fullName?.split(' ').slice(-1)[0] || '',
+          lastName: data.fullName?.split(' ').slice(0, -1).join(' ') || '',
+          dateOfBirth: data.dateOfBirth ? data.dateOfBirth.slice(0, 10) : '',
+          gender: data.gender || '',
+          idNumber: data.idNumber || '',
+          room: data.room || '',
+          careLevel: data.careLevel === 'basic' ? 'Cơ bản' : data.careLevel === 'intermediate' ? 'Nâng cao' : data.careLevel === 'advanced' ? 'Cao cấp' : data.careLevel,
+          status: data.status || 'active',
+          admissionDate: data.admissionDate ? data.admissionDate.slice(0, 10) : '',
+          dischargeDate: data.dischargeDate ? data.dischargeDate.slice(0, 10) : '',
+          familyMemberId: data.familyMemberId || '',
+          emergencyContactName: data.emergencyContact?.fullName || '',
+          emergencyContactRelationship: data.emergencyContact?.relationship || '',
+          emergencyContactPhone: data.emergencyContact?.phoneNumber || '',
+          contactPhone: data.contactPhone || '',
+          medicalConditions: typeof data.medicalHistory === 'string' ? data.medicalHistory : (Array.isArray(data.medicalHistory) ? data.medicalHistory.join(', ') : ''),
+          medications: Array.isArray(data.currentMedications) ? data.currentMedications.join(', ') : (data.currentMedications || ''),
+          allergies: Array.isArray(data.allergies) ? data.allergies.join(', ') : (data.allergies || ''),
+          dietaryRestrictions: data.dietaryRestrictions || '',
+          mobilityStatus: data.mobilityStatus || '',
+          notes: data.notes || ''
+        });
       } catch (error) {
-        console.error('Error fetching resident:', error);
+        setNotFound(true);
       } finally {
         setLoading(false);
       }
     };
-    
     fetchResident();
-  }, [resolvedParams, reset]);
+  }, [params.id, reset]);
   
   const onSubmit = async (data: ResidentFormData) => {
-    if (!resolvedParams) return;
-    
     setIsSubmitting(true);
-    
     try {
-      // Validate all fields before submitting
       const isFormValid = await trigger();
       if (!isFormValid) {
         setIsSubmitting(false);
         return;
       }
-
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
-      if (!savedResidents) {
-        throw new Error('Không tìm thấy dữ liệu người cao tuổi');
-      }
-
-      const residents = JSON.parse(savedResidents);
-      const residentId = parseInt(resolvedParams.id);
-      const residentIndex = residents.findIndex((r: any) => r.id === residentId);
-      
-      if (residentIndex === -1) {
-        throw new Error('Không tìm thấy người cao tuổi');
-      }
-
-      // Calculate age from date of birth
-      const birthDate = new Date(data.dateOfBirth);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear() - 
-        (today.getMonth() < birthDate.getMonth() || 
-         (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate()) ? 1 : 0);
-
-      // Update resident data
-      residents[residentIndex] = {
-        ...residents[residentIndex],
-        name: `${data.firstName} ${data.lastName}`,
-            firstName: data.firstName,
-            lastName: data.lastName,
-        age,
-            dateOfBirth: data.dateOfBirth,
-            gender: data.gender,
-            room: data.room,
-            careLevel: data.careLevel,
-            emergencyContact: data.emergencyContact,
-            contactPhone: data.contactPhone,
-        medicalConditions: data.medicalConditions.split(',').map(s => s.trim()).filter(Boolean),
-        medications: data.medications.split(',').map(s => s.trim()).filter(Boolean),
-        allergies: data.allergies.split(',').map(s => s.trim()).filter(Boolean),
-            dietaryRestrictions: data.dietaryRestrictions,
-            mobilityStatus: data.mobilityStatus,
-        personalNotes: data.notes,
-        lastUpdated: new Date().toISOString()
-          };
-      
-      localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
-      
-      // Trigger data update event
-      window.dispatchEvent(new CustomEvent('dataUpdated'));
-      
+      // Map dữ liệu form sang request body API chuẩn
+      const body = {
+        fullName: data.lastName + ' ' + data.firstName,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        idNumber: data.idNumber,
+        room: data.room,
+        careLevel: data.careLevel === 'Cơ bản' ? 'basic' : data.careLevel === 'Nâng cao' ? 'intermediate' : data.careLevel === 'Cao cấp' ? 'advanced' : data.careLevel,
+        status: data.status || residentData?.status || 'active',
+        admissionDate: data.admissionDate || residentData?.admissionDate || new Date().toISOString().slice(0,10),
+        dischargeDate: data.dischargeDate || (residentData?.dischargeDate ?? null),
+        familyMemberId: data.familyMemberId || residentData?.familyMemberId || '',
+        medicalHistory: data.medicalConditions,
+        currentMedications: data.medications ? data.medications.split(',').map(s => s.trim()).filter(Boolean) : [],
+        allergies: data.allergies ? data.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+        emergencyContact: {
+          fullName: data.emergencyContactName,
+          relationship: data.emergencyContactRelationship,
+          phoneNumber: data.emergencyContactPhone
+        },
+        contactPhone: data.contactPhone,
+        dietaryRestrictions: data.dietaryRestrictions,
+        mobilityStatus: data.mobilityStatus,
+        notes: data.notes
+      };
+      await residentAPI.update(params.id, body);
       setSuccessMessage('Thông tin người cao tuổi đã được cập nhật thành công!');
-      
-      // Redirect back to detail page after short delay
       setTimeout(() => {
-      router.push(`/residents/${resolvedParams.id}`);
+        router.push(`/residents/${params.id}`);
       }, 2000);
-      
     } catch (error) {
       console.error('Error updating resident:', error);
       alert('Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
@@ -391,7 +262,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
   };
   
   // Show loading state while fetching data
-  if (loading || !resolvedParams) {
+  if (loading || !params.id) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -559,7 +430,8 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
     const hasError = errors[name];
     const isTouched = touchedFields[name];
     const hasValue = watchedFields[name];
-    
+    // Sửa lỗi validationRules: chỉ truyền nếu có, nếu không thì truyền {}
+    const validation = Object.prototype.hasOwnProperty.call(validationRules, String(name)) ? validationRules[name as keyof typeof validationRules] : {};
     return (
       <div style={{ marginBottom: '1.5rem' }}>
         <label style={{
@@ -571,17 +443,16 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         }}>
           {label}
           {required && <span style={{ color: '#ef4444', marginLeft: '0.25rem' }}>*</span>}
-                </label>
-        
+        </label>
         {options ? (
           <select
-            {...register(name, validationRules[name] || {})}
-                  style={{
-                    width: '100%',
+            {...register(name, validation)}
+            style={{
+              width: '100%',
               padding: '0.75rem',
               border: `2px solid ${hasError ? '#fca5a5' : isTouched && hasValue ? '#86efac' : '#d1d5db'}`,
               borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
+              fontSize: '0.875rem',
               outline: 'none',
               transition: 'all 0.2s ease',
               backgroundColor: hasError ? '#fef2f2' : isTouched && hasValue ? '#f0fdf4' : 'white'
@@ -595,15 +466,15 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
           </select>
         ) : isTextarea ? (
           <textarea
-            {...register(name, validationRules[name] || {})}
+            {...register(name, validation)}
             placeholder={placeholder}
             rows={4}
-                  style={{
-                    width: '100%',
+            style={{
+              width: '100%',
               padding: '0.75rem',
               border: `2px solid ${hasError ? '#fca5a5' : isTouched && hasValue ? '#86efac' : '#d1d5db'}`,
               borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
+              fontSize: '0.875rem',
               outline: 'none',
               transition: 'all 0.2s ease',
               backgroundColor: hasError ? '#fef2f2' : isTouched && hasValue ? '#f0fdf4' : 'white',
@@ -611,24 +482,23 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
               minHeight: '100px'
             }}
           />
-        ) : (
-                <input
+        ) :
+          <input
             type={type}
-            {...register(name, validationRules[name] || {})}
+            {...register(name, validation)}
             placeholder={placeholder}
-                  style={{
-                    width: '100%',
+            style={{
+              width: '100%',
               padding: '0.75rem',
               border: `2px solid ${hasError ? '#fca5a5' : isTouched && hasValue ? '#86efac' : '#d1d5db'}`,
               borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
+              fontSize: '0.875rem',
               outline: 'none',
               transition: 'all 0.2s ease',
               backgroundColor: hasError ? '#fef2f2' : isTouched && hasValue ? '#f0fdf4' : 'white'
             }}
           />
-        )}
-        
+        }
         {hasError && (
           <div style={{
             display: 'flex',
@@ -640,9 +510,8 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
           }}>
             <ExclamationTriangleIcon style={{ width: '1rem', height: '1rem' }} />
             {hasError.message}
-              </div>
+          </div>
         )}
-        
         {!hasError && isTouched && hasValue && (
           <div style={{
             display: 'flex',
@@ -655,8 +524,8 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
             Hợp lệ
           </div>
-                )}
-              </div>
+        )}
+      </div>
     );
   };
 
@@ -686,7 +555,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             marginBottom: '1rem'
           }}>
             <Link
-              href={`/residents/${resolvedParams?.id}`}
+              href={`/residents/${params?.id}`}
                   style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -844,13 +713,37 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     required
                   />
                   
-                  <FormInput
-                    label="Gói dịch vụ*"
-                    name="careLevel"
-                    options={careLevelOptions}
-                    required
-                />
-              </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Gói dịch vụ hiện tại
+                    </label>
+                    <input
+                      type="text"
+                      value={watchedFields.careLevel || ''}
+                      readOnly
+                      disabled
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#f3f4f6',
+                        color: '#64748b',
+                        cursor: 'not-allowed'
+                      }}
+                    />
+                    <div style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: 4 }}>
+                      Để thay đổi gói dịch vụ, vui lòng đăng ký gói mới tại trang <Link href="/services" style={{ color: '#3b82f6', textDecoration: 'underline' }}>Gói dịch vụ</Link>.
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
               
@@ -978,15 +871,22 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                   gap: '1.5rem'
                 }}>
                   <FormInput
-                    label="Người liên hệ khẩn cấp*"
-                    name="emergencyContact"
+                    label="Tên người liên hệ khẩn cấp*"
+                    name="emergencyContactName"
                     placeholder="VD: Bob Johnson"
                     required
                   />
                   
                   <FormInput
-                    label="Số điện thoại liên hệ*"
-                    name="contactPhone"
+                    label="Quan hệ với người liên hệ*"
+                    name="emergencyContactRelationship"
+                    placeholder="VD: Bố, vợ, con, người thân"
+                    required
+                  />
+                  
+                  <FormInput
+                    label="Số điện thoại liên hệ khẩn cấp*"
+                    name="emergencyContactPhone"
                   type="tel"
                     placeholder="VD: 0123456789 hoặc +84123456789"
                     required
@@ -1124,7 +1024,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
               justifyContent: 'flex-end'
             }}>
             <Link 
-                href={`/residents/${resolvedParams?.id}`}
+                href={`/residents/${params?.id}`}
               style={{
                   display: 'inline-flex',
                   alignItems: 'center',

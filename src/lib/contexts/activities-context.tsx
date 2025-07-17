@@ -1,9 +1,17 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { activitiesAPI } from '@/lib/api';
+import { getCookie } from 'cookies-next';
+
+interface ResidentEvaluation {
+  residentId: string;
+  participated: boolean;
+  reason?: string;
+}
 
 interface Activity {
-  id: number;
+  id: string;
   name: string;
   description: string;
   category: string;
@@ -23,188 +31,140 @@ interface Activity {
   ageGroupSuitability?: string[];
   healthRequirements?: string[];
   createdAt: string;
+  residentEvaluations?: ResidentEvaluation[];
 }
 
 interface ActivitiesContextType {
   activities: Activity[];
   addActivity: (activity: Omit<Activity, 'id' | 'participants' | 'createdAt'>) => void;
-  updateActivity: (id: number, activity: Partial<Activity>) => void;
-  deleteActivity: (id: number) => void;
-  getActivityById: (id: number) => Activity | undefined;
+  updateActivity: (id: string, activity: Partial<Activity>) => void;
+  deleteActivity: (id: string) => void;
+  getActivityById: (id: string) => Activity | undefined;
 }
 
 const ActivitiesContext = createContext<ActivitiesContextType | undefined>(undefined);
 
-// Initial mock data
-const INITIAL_ACTIVITIES: Activity[] = [
-  { 
-    id: 1, 
-    name: 'Tập thể dục buổi sáng', 
-    description: 'Các bài tập kéo giãn và vận động nhẹ nhàng để cải thiện khả năng vận động',
-    category: 'physical', 
-    location: 'Phòng sinh hoạt chung',
-    startTime: '08:00',
-    endTime: '08:45',
-    duration: 45,
-    capacity: 20,
-    participants: 18,
-    facilitator: 'David Wilson',
-    date: '2024-01-15',
-    status: 'Đã lên lịch',
-    level: 'Dễ',
-    recurring: 'daily',
-    createdAt: '2024-01-10T08:00:00Z'
-  },
-  { 
-    id: 2, 
-    name: 'Mỹ thuật & Thủ công', 
-    description: 'Hoạt động vẽ tranh và làm đồ thủ công sáng tạo',
-    category: 'creative', 
-    location: 'Phòng hoạt động',
-    startTime: '10:30',
-    endTime: '11:30',
-    duration: 60,
-    capacity: 15,
-    participants: 12,
-    facilitator: 'Emily Parker',
-    date: '2024-01-15',
-    status: 'Đang diễn ra',
-    level: 'Trung bình',
-    recurring: 'weekly',
-    createdAt: '2024-01-10T10:00:00Z'
-  },
-  { 
-    id: 3, 
-    name: 'Trò chơi bài cùng bạn', 
-    description: 'Trò chơi bài và cờ để giao lưu giữa các người cao tuổi',
-    category: 'social', 
-    location: 'Phòng giải trí',
-    startTime: '14:00',
-    endTime: '15:30',
-    duration: 90,
-    capacity: 20,
-    participants: 15,
-    facilitator: 'Sarah Thompson',
-    date: '2024-01-16',
-    status: 'Đã lên lịch',
-    level: 'Dễ',
-    recurring: 'weekly',
-    createdAt: '2024-01-10T12:00:00Z'
-  },
-  { 
-    id: 4, 
-    name: 'Trị liệu âm nhạc', 
-    description: 'Buổi âm nhạc trị liệu với các hoạt động hát theo và chơi nhạc cụ',
-    category: 'therapy', 
-    location: 'Khu vườn',
-    startTime: '09:00',
-    endTime: '10:00',
-    duration: 60,
-    capacity: 30,
-    participants: 25,
-    facilitator: 'Robert Johnson',
-    date: '2024-01-17',
-    status: 'Đã lên lịch',
-    level: 'Dễ',
-    recurring: 'weekly',
-    createdAt: '2024-01-10T14:00:00Z'
-  },
-  { 
-    id: 5, 
-    name: 'Trò chơi trí nhớ', 
-    description: 'Các trò chơi nhận thức để cải thiện trí nhớ và sự nhanh nhạy tinh thần',
-    category: 'cognitive', 
-    location: 'Phòng hoạt động',
-    startTime: '11:00',
-    endTime: '11:45',
-    duration: 45,
-    capacity: 12,
-    participants: 10,
-    facilitator: 'David Wilson',
-    date: '2024-01-18',
-    status: 'Đã lên lịch',
-    level: 'Trung bình',
-    recurring: 'biweekly',
-    createdAt: '2024-01-10T16:00:00Z'
-  },
-  { 
-    id: 6, 
-    name: 'Yoga buổi chiều', 
-    description: 'Lớp yoga nhẹ nhàng cho người cao tuổi',
-    category: 'physical', 
-    location: 'Khu vườn',
-    startTime: '16:00',
-    endTime: '17:00',
-    duration: 60,
-    capacity: 15,
-    participants: 12,
-    facilitator: 'Emily Parker',
-    date: '2024-01-19',
-    status: 'Đã lên lịch',
-    level: 'Dễ',
-    recurring: 'weekly',
-    createdAt: '2024-01-10T18:00:00Z'
+// Map API activity to UI activity
+function mapApiActivity(api: any): Activity {
+  // Calculate duration if possible
+  let duration = 0;
+  if (typeof api.duration === 'number') {
+    duration = api.duration;
+  } else if (api.scheduleTime && api.endTime) {
+    // If both scheduleTime and endTime are ISO strings, calculate duration in minutes
+    const start = new Date(api.scheduleTime);
+    const end = new Date(api.endTime);
+    duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
   }
-];
+
+  // Tính endTime nếu chưa có, dựa vào scheduleTime và duration
+  let endTime = '';
+  if (api.endTime) {
+    endTime = api.endTime;
+  } else if (api.scheduleTime && duration) {
+    const start = new Date(api.scheduleTime);
+    const end = new Date(start.getTime() + duration * 60000);
+    endTime = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+
+  // Ensure we have a valid id - try _id first, then id, then generate a temporary one
+  const activityId = api._id || api.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  return {
+    id: activityId,
+    name: api.activityName || api.name || '',
+    description: api.description || '',
+    startTime: api.scheduleTime ? new Date(api.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : (api.startTime || ''),
+    endTime,
+    date: api.scheduleTime ? new Date(api.scheduleTime).toISOString().split('T')[0] : (api.date || ''),
+    category: api.category || '',
+    location: api.location || '',
+    capacity: api.capacity || 0,
+    participants: api.participants || 0,
+    facilitator: api.facilitator || '',
+    status: api.status || '',
+    level: api.level || '',
+    recurring: api.recurring || '',
+    materials: api.materials || '',
+    specialNotes: api.specialNotes || '',
+    ageGroupSuitability: api.ageGroupSuitability || [],
+    healthRequirements: api.healthRequirements || [],
+    createdAt: api.created_at || api.createdAt || '',
+    residentEvaluations: api.residentEvaluations || [],
+    duration,
+  };
+}
 
 export function ActivitiesProvider({ children }: { children: React.ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load activities from localStorage on mount
+  // Load activities from API on mount
   useEffect(() => {
-    const savedActivities = localStorage.getItem('activities');
-    if (savedActivities) {
+    const fetchActivities = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setActivities(JSON.parse(savedActivities));
-      } catch (error) {
-        console.error('Error loading activities from localStorage:', error);
-        setActivities(INITIAL_ACTIVITIES);
+        const token = getCookie('access_token');
+        if (!token) {
+          setLoading(false);
+          setError('Chưa đăng nhập');
+          return;
+        }
+        const data = await activitiesAPI.getAll();
+        setActivities(Array.isArray(data) ? data.map(mapApiActivity) : []);
+      } catch (err: any) {
+        setError(err.message || 'Lỗi khi tải danh sách hoạt động');
+      } finally {
+        setLoading(false);
       }
-    } else {
-      setActivities(INITIAL_ACTIVITIES);
-    }
+    };
+    fetchActivities();
   }, []);
 
-  // Save activities to localStorage whenever activities change
-  useEffect(() => {
-    if (activities.length > 0) {
-      localStorage.setItem('activities', JSON.stringify(activities));
+  const addActivity = async (activityData: Omit<Activity, 'id' | 'participants' | 'createdAt'>) => {
+    setError(null);
+    try {
+      const newActivity = await activitiesAPI.create(activityData);
+      setActivities(prev => [mapApiActivity(newActivity), ...prev]);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi tạo hoạt động');
     }
-  }, [activities]);
-
-  const addActivity = (activityData: Omit<Activity, 'id' | 'participants' | 'createdAt'>) => {
-    const newActivity: Activity = {
-      ...activityData,
-      id: Date.now(), // Simple ID generation
-      participants: 0, // Start with 0 participants
-      createdAt: new Date().toISOString()
-    };
-    
-    setActivities(prev => [newActivity, ...prev]); // Add to beginning of array
   };
 
-  const updateActivity = (id: number, updates: Partial<Activity>) => {
-    setActivities(prev => 
-      prev.map(activity => 
-        activity.id === id ? { ...activity, ...updates } : activity
-      )
-    );
+  const updateActivity = async (id: string, updates: Partial<Activity>) => {
+    setError(null);
+    try {
+      const updated = await activitiesAPI.update(id, updates);
+      setActivities(prev => prev.map(activity => activity.id === id ? { ...activity, ...mapApiActivity(updated) } : activity));
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi cập nhật hoạt động');
+    }
   };
 
-  const deleteActivity = (id: number) => {
-    setActivities(prev => prev.filter(activity => activity.id !== id));
+  const deleteActivity = async (id: string) => {
+    setError(null);
+    try {
+      await activitiesAPI.delete(id);
+      setActivities(prev => prev.filter(activity => activity.id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi xóa hoạt động');
+    }
   };
 
-  const getActivityById = (id: number) => {
+  const getActivityById = (id: string) => {
     return activities.find(activity => activity.id === id);
   };
 
-  const value: ActivitiesContextType = {
+  const value: ActivitiesContextType & { loading: boolean; error: string | null } = {
     activities,
     addActivity,
     updateActivity,
     deleteActivity,
-    getActivityById
+    getActivityById,
+    loading,
+    error
   };
 
   return (

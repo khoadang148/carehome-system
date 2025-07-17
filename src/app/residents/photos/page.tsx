@@ -8,7 +8,7 @@ import {
   XMarkIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { residentAPI, photosAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 export default function PhotoUploadPage() {
@@ -20,12 +20,30 @@ export default function PhotoUploadPage() {
   const [photoDescription, setPhotoDescription] = useState('');
   const [selectedResident, setSelectedResident] = useState('');
   const [activityType, setActivityType] = useState('');
-  const [staffNotes, setStaffNotes] = useState('');
   const [photoTags, setPhotoTags] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentUploading, setCurrentUploading] = useState(0); // Ảnh đang upload thứ mấy
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [shareWithFamily, setShareWithFamily] = useState(true);
+  const [residents, setResidents] = useState<any[]>([]);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultMessage, setResultMessage] = useState('');
+  const [autoCloseTimeout, setAutoCloseTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Load residents from API
+  useEffect(() => {
+    const fetchResidents = async () => {
+      try {
+        const data = await residentAPI.getAll();
+        // Đảm bảo giữ nguyên trường familyId khi setResidents
+        setResidents(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setResidents([]);
+      }
+    };
+    fetchResidents();
+  }, []);
   
   // Check access permissions
   useEffect(() => {
@@ -115,11 +133,6 @@ export default function PhotoUploadPage() {
       errors.photoDescription = 'Mô tả không được vượt quá 500 ký tự';
     }
     
-    // Staff notes validation
-    if (staffNotes.length > 300) {
-      errors.staffNotes = 'Ghi chú nhân viên không được vượt quá 300 ký tự';
-    }
-    
     // Files validation
     const fileValidation = validateFiles(selectedFiles);
     if (!fileValidation.isValid) {
@@ -133,15 +146,21 @@ export default function PhotoUploadPage() {
   // Handle photo upload with professional validation
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    
-    // Validate files immediately
-    const validation = validateFiles(files);
+    // Nối files mới vào danh sách cũ
+    const newFiles = [...selectedFiles, ...files];
+    // Giới hạn tối đa 10 ảnh
+    if (newFiles.length > MAX_FILES_COUNT) {
+      setValidationErrors(prev => ({...prev, files: `Tối đa ${MAX_FILES_COUNT} ảnh mỗi lần tải lên`}));
+      event.target.value = '';
+      return;
+    }
+    // Validate files mới
+    const validation = validateFiles(newFiles);
     if (validation.isValid) {
-      setSelectedFiles(files);
+      setSelectedFiles(newFiles);
       setValidationErrors(prev => ({...prev, files: ''}));
     } else {
       setValidationErrors(prev => ({...prev, files: validation.errors.join('; ')}));
-      // Clear the input
       event.target.value = '';
     }
   };
@@ -153,72 +172,77 @@ export default function PhotoUploadPage() {
 
     setIsUploading(true);
     setUploadProgress(0);
+    setCurrentUploading(0);
+    let successCount = 0;
+    let errorCount = 0;
 
     try {
-      // Simulate upload progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const resident = RESIDENTS_DATA.find(r => r.id.toString() === selectedResident);
-      const currentTime = new Date().toISOString();
-
-      const newPhotos = selectedFiles.map((file, index) => ({
-        id: Date.now() + index,
-        url: URL.createObjectURL(file),
-        fileName: file.name,
-        fileSize: file.size,
-        caption: photoDescription.trim(),
-        activityType,
-        staffNotes: staffNotes.trim(),
-        tags: photoTags,
-        residentId: selectedResident,
-        residentName: resident?.name || '',
-        residentRoom: resident?.room || '',
-        uploadDate: currentTime,
-        uploadedBy: user?.name || 'Nhân viên',
-        uploadedByRole: user?.role || 'staff',
-        shareWithFamily,
-        // Business logic fields
-        reviewStatus: 'pending', // For supervisor review
-        approvedBy: null,
-        approvedDate: null,
-        viewCount: 0,
-        familyViewed: false
-      }));
-
-      // Save to localStorage with professional structure
-      const savedPhotos = localStorage.getItem('uploadedPhotos');
-      const existingPhotos = savedPhotos ? JSON.parse(savedPhotos) : [];
-      const updatedPhotos = [...existingPhotos, ...newPhotos];
-      localStorage.setItem('uploadedPhotos', JSON.stringify(updatedPhotos));
-
-      // Complete progress
+      // Lấy resident object từ danh sách residents (so sánh kiểu string)
+      const residentObj = residents.find(r => String(r._id) === String(selectedResident));
+      console.log("selectedResident:", selectedResident);
+      console.log("residentObj:", residentObj);
+      if (!residentObj || !residentObj.familyMemberId) {
+        setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người thân (familyId)'}));
+        setIsUploading(false);
+        return;
+      }
+      // Upload song song tất cả ảnh
+      const uploadPromises = selectedFiles.map((file, i) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('familyId', residentObj.familyMemberId); // id của account family
+        formData.append('residentId', residentObj._id);    // id của resident/người cao tuổi
+        formData.append('caption', photoDescription.trim());
+        formData.append('activityType', activityType);
+        photoTags.forEach(tag => formData.append('tags', tag));
+        formData.append('takenDate', new Date().toISOString());
+        // Truyền thêm tên người gửi (fix linter: chỉ dùng user.email nếu không có fullName/username)
+        let senderName = 'Nhân viên';
+        if (user) {
+          if ('fullName' in user && user.fullName) senderName = user.fullName;
+          else if ('username' in user && user.username) senderName = user.username;
+          else if ('email' in user && user.email) senderName = user.email;
+        }
+        formData.append('uploadedByName', String(senderName));
+        // formData.append('relatedActivityId', '');
+        return photosAPI.upload(formData)
+          .then(() => {
+            successCount++;
+          })
+          .catch(() => {
+            errorCount++;
+          })
+          .finally(() => {
+            setCurrentUploading(prev => prev + 1);
+            setUploadProgress(prev => {
+              const done = prev + Math.round(100 / selectedFiles.length);
+              return done > 100 ? 100 : done;
+            });
+          });
+      });
+      await Promise.all(uploadPromises);
       setUploadProgress(100);
-      
-      // Wait a bit to show 100% progress
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Show success message
-      alert(`✅ Đã tải lên ${newPhotos.length} ảnh thành công! ${shareWithFamily ? 'Gia đình sẽ được thông báo.' : ''}`);
-      
-      // Navigate back to residents page
-      router.push('/residents');
+      setResultMessage(`✅ Đã tải lên ${successCount}/${selectedFiles.length} ảnh thành công!${errorCount > 0 ? ' Có ' + errorCount + ' ảnh lỗi.' : ''}`);
+      setShowResultModal(true);
+      if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
+      const timeout = setTimeout(() => {
+        setShowResultModal(false);
+        router.push('/residents');
+      }, 2000);
+      setAutoCloseTimeout(timeout);
     } catch (error) {
-      console.error('Upload error:', error);
-      alert('❌ Có lỗi xảy ra khi tải ảnh. Vui lòng thử lại.');
+      setResultMessage('❌ Có lỗi xảy ra khi tải ảnh. Vui lòng thử lại.');
+      setShowResultModal(true);
+      if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
+      const timeout = setTimeout(() => {
+        setShowResultModal(false);
+      }, 2000);
+      setAutoCloseTimeout(timeout);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      setCurrentUploading(0);
     }
   };
 
@@ -236,7 +260,6 @@ export default function PhotoUploadPage() {
     setPhotoDescription('');
     setSelectedResident('');
     setActivityType('');
-    setStaffNotes('');
     setPhotoTags([]);
     setValidationErrors({});
     setShareWithFamily(true);
@@ -316,9 +339,9 @@ export default function PhotoUploadPage() {
               }}
             >
               <option value="">-- Chọn người cao tuổi --</option>
-              {RESIDENTS_DATA.map(resident => (
-                <option key={resident.id} value={resident.id.toString()}>
-                  {resident.name} - Phòng {resident.room}
+              {residents.map((resident: any) => (
+                <option key={resident._id} value={resident._id}>
+                  {resident.fullName} {resident.room ? `- Phòng ${resident.room}` : ''}
                 </option>
               ))}
             </select>
@@ -448,47 +471,6 @@ export default function PhotoUploadPage() {
             </div>
           </div>
 
-          {/* Staff Notes */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.5rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
-              Ghi chú nhân viên (tùy chọn)
-              <span style={{fontSize: '0.8rem', color: '#6b7280', fontWeight: 400}}>
-                ({staffNotes.length}/300 ký tự)
-              </span>
-            </label>
-            <textarea
-              value={staffNotes}
-              onChange={(e) => {
-                setStaffNotes(e.target.value);
-                setValidationErrors(prev => ({...prev, staffNotes: ''}));
-              }}
-              placeholder="Ghi chú riêng cho nhân viên về hoạt động này..."
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                borderRadius: '0.75rem',
-                border: `2px solid ${validationErrors.staffNotes ? '#ef4444' : '#e5e7eb'}`,
-                fontSize: '0.95rem',
-                background: validationErrors.staffNotes ? '#fef2f2' : 'white',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                resize: 'vertical'
-              }}
-            />
-            {validationErrors.staffNotes && (
-              <p style={{color: '#ef4444', fontSize: '0.875rem', margin: '0.5rem 0 0 0', fontWeight: 500}}>
-                {validationErrors.staffNotes}
-              </p>
-            )}
-          </div>
-
           {/* File Upload */}
           <div style={{marginBottom: '1.5rem'}}>
             <label style={{
@@ -586,7 +568,8 @@ export default function PhotoUploadPage() {
                     padding: '0.75rem',
                     borderRadius: '0.5rem',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    position: 'relative'
                   }}>
                     <div style={{
                       width: '60px',
@@ -617,6 +600,34 @@ export default function PhotoUploadPage() {
                     }}>
                       {(file.size / 1024 / 1024).toFixed(1)} MB
                     </p>
+                    {/* Nút xóa ảnh */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '1.5rem',
+                        height: '1.5rem',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: '1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 1px 3px rgba(239,68,68,0.15)'
+                      }}
+                      title="Xóa ảnh này"
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>
@@ -644,7 +655,7 @@ export default function PhotoUploadPage() {
                   animation: 'spin 1s linear infinite'
                 }} />
                 <span style={{fontSize: '0.95rem', fontWeight: 600, color: '#22c55e'}}>
-                  Đang tải ảnh lên... {uploadProgress}%
+                  Đang tải ảnh {currentUploading}/{selectedFiles.length}... {uploadProgress}%
                 </span>
               </div>
               <div style={{
@@ -757,6 +768,57 @@ export default function PhotoUploadPage() {
           100% { transform: rotate(360deg); }
         }
       `}</style>
+      {/* Modal kết quả upload */}
+      {showResultModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.35)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem 2.5rem',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            minWidth: 320,
+            textAlign: 'center',
+            position: 'relative',
+          }}>
+            <div style={{fontSize: '2rem', marginBottom: 12}}>
+              {resultMessage.startsWith('✅') ? '✅' : '❌'}
+            </div>
+            <div style={{fontSize: '1.1rem', fontWeight: 600, color: resultMessage.startsWith('✅') ? '#22c55e' : '#ef4444', marginBottom: 16}}>
+              {resultMessage.replace(/^✅|^❌/, '')}
+            </div>
+            <button
+              onClick={() => {
+                setShowResultModal(false);
+                if (resultMessage.startsWith('✅')) router.push('/residents');
+              }}
+              style={{
+                padding: '0.5rem 1.5rem',
+                borderRadius: '0.5rem',
+                background: resultMessage.startsWith('✅') ? '#22c55e' : '#ef4444',
+                color: 'white',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                marginTop: 8
+              }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

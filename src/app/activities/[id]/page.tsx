@@ -3,41 +3,39 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useActivities } from '@/lib/contexts/activities-context';
+import { useResidents } from '@/lib/contexts/residents-context';
+import { activitiesAPI, activityParticipationsAPI } from '@/lib/api';
 
-export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ActivityDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { getActivityById } = useActivities();
+  const { getActivityById, updateActivity } = useActivities();
+  const { residents } = useResidents();
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [participations, setParticipations] = useState<any[]>([]);
+  const [evaluationMode, setEvaluationMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [evaluations, setEvaluations] = useState<{[key: string]: {participated: boolean, reason?: string}}>({});
+  const [saving, setSaving] = useState(false);
   
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const resolvedParams = await params;
-        const activityId = parseInt(resolvedParams.id);
-        
-        // Get activity from context
+        const activityId = params.id; // KHÔNG parseInt
+        // Lấy từ context trước cho nhanh
         const contextActivity = getActivityById(activityId);
-        
         if (contextActivity) {
-          // Map context data to match component expectations
-          const mappedActivity = {
-            ...contextActivity,
-            category: getCategoryLabel(contextActivity.category),
-            scheduledTime: formatTime(contextActivity.startTime),
-            endTime: formatTime(contextActivity.endTime),
-            recurring: getRecurringLabel(contextActivity.recurring),
-            // Add default values for fields that might not exist
-            participants: contextActivity.participants || [],
-            materials: contextActivity.materials ? contextActivity.materials.split(', ') : [],
-            benefits: ['Cải thiện sức khỏe', 'Tăng cường tinh thần', 'Giao lưu xã hội'],
-            notes: contextActivity.specialNotes || 'Không có ghi chú đặc biệt.'
-          };
-          setActivity(mappedActivity);
+          setActivity(mapActivity(contextActivity));
+        }
+        // Luôn gọi API để lấy dữ liệu mới nhất
+        const apiActivity = await activitiesAPI.getById(activityId);
+        if (apiActivity) {
+          setActivity(mapActivity(apiActivity));
+          // Nếu dữ liệu API khác context, có thể cập nhật lại context (nếu muốn)
+          // updateActivity(activityId, apiActivity); // Nếu muốn đồng bộ context
         } else {
-          // If no activity found in context, redirect to activities list
           router.push('/activities');
         }
       } catch (error) {
@@ -47,9 +45,101 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         setLoading(false);
       }
     };
-
     fetchActivity();
   }, [params, getActivityById, router]);
+
+  // Fetch participations for this activity
+  useEffect(() => {
+    const fetchParticipations = async () => {
+      if (!activity?.id) return;
+      
+      try {
+        const participationsData = await activityParticipationsAPI.getAll({
+          activityId: activity.id
+        });
+        console.log('Fetched participations:', participationsData);
+        console.log('Available residents:', residents);
+        setParticipations(participationsData);
+        
+        // Initialize evaluations from existing participations
+        // Handle the nested residentId object structure from API
+        const initialEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+        participationsData.forEach((participation: any) => {
+          // Extract residentId from the nested object structure
+          const residentId = participation.residentId?._id || participation.residentId;
+          const participated = participation.attendanceStatus === 'attended';
+          const reason = participation.performanceNotes || '';
+          
+          if (residentId) {
+            console.log('Processing participation for residentId:', residentId);
+            // Map API residentId to residents context ID
+            // Now both use string IDs
+            const matchingResident = residents.find(r => r.id === residentId);
+            console.log('Matching resident found by ID:', matchingResident);
+            
+            // If no match by ID, try to match by name from API
+            if (!matchingResident && participation.residentId?.fullName) {
+              const matchingResidentByName = residents.find(r => 
+                r.name.toLowerCase() === participation.residentId.fullName.toLowerCase()
+              );
+              console.log('Matching resident found by name:', matchingResidentByName);
+              
+                          if (matchingResidentByName) {
+              initialEvaluations[matchingResidentByName.id] = {
+                participated,
+                reason
+              };
+            }
+          } else if (matchingResident) {
+            initialEvaluations[matchingResident.id] = {
+              participated,
+              reason
+            };
+            } else {
+              console.log('No matching resident found for ID:', residentId, 'or name:', participation.residentId?.fullName);
+            }
+          }
+        });
+        console.log('Initialized evaluations:', initialEvaluations);
+        setEvaluations(initialEvaluations);
+      } catch (error) {
+        console.error('Error fetching participations:', error);
+      }
+    };
+    
+    fetchParticipations();
+  }, [activity?.id]);
+
+  // Map API/context data về đúng format cho component
+  const mapActivity = (apiActivity: any) => ({
+    id: apiActivity._id,
+    name: apiActivity.activityName || apiActivity.name || '',
+    description: apiActivity.description || '',
+    category: getCategoryLabel(apiActivity.category || 'physical'), // Default to physical if not provided
+    scheduledTime: apiActivity.scheduleTime ? new Date(apiActivity.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+    startTime: apiActivity.scheduleTime ? new Date(apiActivity.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+    endTime: apiActivity.scheduleTime && apiActivity.duration ? 
+      new Date(new Date(apiActivity.scheduleTime).getTime() + apiActivity.duration * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
+    duration: apiActivity.duration || 0,
+    date: apiActivity.scheduleTime ? new Date(apiActivity.scheduleTime).toISOString().split('T')[0] : '',
+    location: apiActivity.location || '',
+    capacity: apiActivity.capacity || 0,
+    participants: apiActivity.participants || 0,
+    facilitator: apiActivity.facilitator || 'Chưa phân công',
+    status: apiActivity.status || 'Đã lên lịch',
+    level: apiActivity.level || 'Trung bình',
+    recurring: getRecurringLabel(apiActivity.recurring || 'none'),
+    materials: apiActivity.materials || '',
+    specialNotes: apiActivity.specialNotes || '',
+    ageGroupSuitability: apiActivity.ageGroupSuitability || ['Người cao tuổi'],
+    healthRequirements: apiActivity.healthRequirements || ['Không có yêu cầu đặc biệt'],
+    createdAt: apiActivity.created_at || apiActivity.createdAt || '',
+    updatedAt: apiActivity.updated_at || apiActivity.updatedAt || '',
+    residentEvaluations: apiActivity.residentEvaluations || [],
+    // Additional fields for display
+    benefits: ['Cải thiện sức khỏe', 'Tăng cường tinh thần', 'Giao lưu xã hội'],
+    notes: apiActivity.specialNotes || 'Không có ghi chú đặc biệt.',
+  });
 
   // Helper functions for data mapping
   const getCategoryLabel = (categoryId: string) => {
@@ -64,7 +154,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     return categoryMap[categoryId] || categoryId;
   };
 
-  const formatTime = (time: string) => {
+  const formatTime = (time: string | undefined) => {
+    if (!time || typeof time !== 'string' || !time.includes(':')) {
+      return '';
+    }
     const [hours, minutes] = time.split(':');
     const hour24 = parseInt(hours);
     const ampm = hour24 >= 12 ? 'PM' : 'AM';
@@ -86,6 +179,101 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const handleEditClick = () => {
     router.push(`/activities/${activity.id}/edit`);
   };
+
+  // Evaluation functions
+  const handleEvaluationChange = (residentId: string, participated: boolean) => {
+    setEvaluations(prev => ({
+      ...prev,
+      [residentId]: {
+        ...prev[residentId],
+        participated,
+        reason: participated ? '' : (prev[residentId]?.reason || '')
+      }
+    }));
+  };
+
+  const handleReasonChange = (residentId: string, reason: string) => {
+    setEvaluations(prev => ({
+      ...prev,
+      [residentId]: {
+        ...prev[residentId],
+        reason
+      }
+    }));
+  };
+
+  const handleSelectAll = (participated: boolean) => {
+    const newEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+    residents.forEach(resident => {
+      newEvaluations[resident.id] = {
+        participated,
+        reason: participated ? '' : 'Không có lý do cụ thể'
+      };
+    });
+    setEvaluations(newEvaluations);
+  };
+
+  const handleSaveEvaluations = async () => {
+    if (!activity?.id) return;
+    
+    setSaving(true);
+    try {
+      // Update or create participations for each resident
+      for (const [residentId, evaluation] of Object.entries(evaluations)) {
+        // Find existing participation by matching residentId._id
+        const existingParticipation = participations.find(p => 
+          (p.residentId?._id || p.residentId) === residentId
+        );
+        
+        if (existingParticipation) {
+          // Update existing participation
+          await activityParticipationsAPI.update(existingParticipation._id, {
+            attendanceStatus: evaluation.participated ? 'attended' : 'absent',
+            performanceNotes: evaluation.participated ? 
+              'Tham gia tích cực' : 
+              (evaluation.reason || 'Không có lý do cụ thể')
+          });
+        } else {
+          // Create new participation
+          // Find the resident to get their API ID
+          const resident = residents.find(r => r.id === residentId);
+          if (resident) {
+            // Use the resident's actual ID
+            await activityParticipationsAPI.create({
+              activityId: activity.id,
+              residentId: resident.id, // Use actual resident ID
+              date: new Date().toISOString().split('T')[0], // Today's date
+              attendanceStatus: evaluation.participated ? 'attended' : 'absent',
+              performanceNotes: evaluation.participated ? 
+                'Tham gia tích cực' : 
+                (evaluation.reason || 'Không có lý do cụ thể'),
+              approvalStatus: 'pending'
+            });
+          }
+        }
+      }
+      
+      // Refresh participations
+      const participationsData = await activityParticipationsAPI.getAll({
+        activityId: activity.id
+      });
+      setParticipations(participationsData);
+      
+      setEvaluationMode(false);
+      alert('Đánh giá đã được lưu thành công!');
+    } catch (error) {
+      console.error('Error saving evaluations:', error);
+      alert('Có lỗi xảy ra khi lưu đánh giá. Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Filter residents based on search term
+  const filteredResidents = residents.filter(resident =>
+    resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    resident.room?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   
   if (loading) {
     return (
@@ -420,54 +608,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   gap: '0.75rem',
                   alignItems: 'flex-end'
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    gap: '0.375rem'
-                  }}>
-                    <label style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      color: 'white',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
-                    }}>
-                      Danh mục
-                    </label>
-                    <div style={{
-                      transform: 'scale(1.1)',
-                      filter: 'brightness(1.2) contrast(1.3)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                    }}>
-                      {renderCategory(activity.category)}
-                    </div>
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    gap: '0.375rem'
-                  }}>
-                    <label style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      color: 'white',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
-                    }}>
-                      Trạng thái
-                    </label>
-                    <div style={{
-                      transform: 'scale(1.1)',
-                      filter: 'brightness(1.2) contrast(1.3)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                    }}>
-                      {renderStatus(activity.status)}
-                    </div>
-                  </div>
+
                 </div>
               </div>
             </div>
@@ -541,7 +682,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 <UserGroupIcon style={{ width: '1.125rem', height: '1.125rem' }} />
                 <div>
                   <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Số người tham gia:</label>
-                  <span>{activity.participants?.length || 0}/{activity.capacity} người</span>
+                  <span>{activity.participants || 0}/{activity.capacity} người</span>
                 </div>
             </div>
           </div>
@@ -656,19 +797,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     </span>
                 </div>
                 
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem'
-                  }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Lặp lại:</span>
-                    <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                      {activity.recurring}
-                    </span>
-                </div>
+
                 
                   <div style={{
                     display: 'flex',
@@ -678,11 +807,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     background: '#f9fafb',
                     borderRadius: '0.5rem'
                   }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Mức độ:</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Thời lượng:</span>
                     <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                      {activity.level}
+                      {activity.duration} phút
                     </span>
                   </div>
+
               </div>
             </div>
             
@@ -734,224 +864,314 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Đã đăng ký:</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                    {activity.participants?.length || 0} người 
+                    {activity.participants || 0} người 
                       </span>
                       <span style={{
                         fontSize: '0.75rem',
                         fontWeight: 600,
                         padding: '0.25rem 0.5rem',
                         borderRadius: '0.375rem',
-                        background: (activity.participants?.length || 0) >= activity.capacity ? '#fef2f2' : '#f0fdf4',
-                        color: (activity.participants?.length || 0) >= activity.capacity ? '#dc2626' : '#16a34a'
+                        background: (activity.participants || 0) >= activity.capacity ? '#fef2f2' : '#f0fdf4',
+                        color: (activity.participants || 0) >= activity.capacity ? '#dc2626' : '#16a34a'
                       }}>
-                        {(activity.participants?.length || 0) >= activity.capacity ? 'Đầy' : `Còn ${activity.capacity - (activity.participants?.length || 0)} chỗ`}
+                        {(activity.participants || 0) >= activity.capacity ? 'Đầy' : `Còn ${activity.capacity - (activity.participants || 0)} chỗ`}
                       </span>
                     </div>
                   </div>
                   
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem'
-                  }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Người hướng dẫn:</span>
-                    <span style={{ 
-                      fontSize: '0.875rem', 
-                      color: '#111827', 
-                      fontWeight: 600,
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.25rem' 
-                    }}>
-                      <UserIcon style={{ width: '0.875rem', height: '0.875rem', color: '#6366f1' }} />
-                      {activity.facilitator}
-                    </span>
-                </div>
+
               </div>
             </div>
             
-            {/* Benefits & Materials */}
-              <div style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem', 
-                border: '1px solid #e5e7eb', 
-                padding: '1.5rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-              }}>
-                <h3 style={{
-                  fontSize: '1.125rem', 
-                  fontWeight: 600, 
-                  color: '#111827', 
-                  marginTop: 0, 
-                  marginBottom: '1.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <SparklesIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
-                  Lợi ích & Dụng cụ
-                </h3>
-              
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                  gap: '1.5rem'
-                }}>
-                  <div>
-                    <h4 style={{
-                      fontSize: '0.875rem', 
-                      fontWeight: 600, 
-                      color: '#374151', 
-                      marginBottom: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      Lợi ích:
-                </h4>
-                    <div style={{
-                      background: '#f9fafb',
-                      borderRadius: '0.5rem',
-                      padding: '1rem'
-                    }}>
-                      <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                  {activity.benefits?.map((benefit: string, index: number) => (
-                          <li key={index} style={{
-                            fontSize: '0.875rem', 
-                            color: '#6b7280', 
-                            marginBottom: '0.5rem',
-                            lineHeight: 1.5
-                          }}>
-                            {benefit}
-                          </li>
-                        )) || <li style={{ fontSize: '0.875rem', color: '#6b7280' }}>Chưa có thông tin</li>}
-                </ul>
-                    </div>
-              </div>
-              
-              <div>
-                    <h4 style={{
-                      fontSize: '0.875rem', 
-                      fontWeight: 600, 
-                      color: '#374151', 
-                      marginBottom: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      Dụng cụ cần thiết:
-                </h4>
-                    <div style={{
-                      background: '#f9fafb',
-                      borderRadius: '0.5rem',
-                      padding: '1rem'
-                    }}>
-                      <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                  {activity.materials?.map((material: string, index: number) => (
-                          <li key={index} style={{
-                            fontSize: '0.875rem', 
-                            color: '#6b7280', 
-                            marginBottom: '0.5rem',
-                            lineHeight: 1.5
-                          }}>
-                            {material}
-                          </li>
-                        )) || <li style={{ fontSize: '0.875rem', color: '#6b7280' }}>Chưa có thông tin</li>}
-                </ul>
-                    </div>
-                  </div>
-                </div>
-            </div>
+            
           </div>
           
-          {/* Participants List */}
-            {activity.participants && activity.participants.length > 0 && (
-              <div style={{
-                marginTop: '1.5rem',
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem', 
-                border: '1px solid #e5e7eb', 
-                padding: '1.5rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+          
+          
+
+
+          {/* Bảng đánh giá tham gia */}
+          <div style={{
+            marginTop: '1.5rem',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1rem',
+            border: '1px solid #e5e7eb',
+            padding: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.25rem'
+            }}>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}>
-                <h3 style={{
-                  fontSize: '1.125rem', 
-                  fontWeight: 600, 
-                  color: '#111827', 
-                  marginTop: 0, 
-                  marginBottom: '1.25rem'
-                }}>
-                   Danh sách tham gia ({activity.participants.length}/{activity.capacity})
-            </h3>
-            
+                <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
+                Đánh giá tham gia hoạt động
+              </h3>
+              {!evaluationMode && (
+                <button
+                  onClick={() => setEvaluationMode(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                  Đánh giá tham gia
+                </button>
+              )}
+            </div>
+
+            {evaluationMode ? (
+              <div>
+                {/* Search and bulk actions */}
                 <div style={{
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-                  gap: '0.75rem'
+                  display: 'flex',
+                  gap: '1rem',
+                  marginBottom: '1.5rem',
+                  alignItems: 'center'
                 }}>
-                  {activity.participants.map((participant: string, index: number) => (
-                    <div key={index} style={{
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <MagnifyingGlassIcon style={{
+                      position: 'absolute',
+                      left: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '1rem',
+                      height: '1rem',
+                      color: '#9ca3af'
+                    }} />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm cư dân theo tên hoặc phòng..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      style={{
+                        width: '100%',
+                        paddingLeft: '2.5rem',
+                        paddingRight: '1rem',
+                        paddingTop: '0.75rem',
+                        paddingBottom: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleSelectAll(true)}
+                    style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.875rem',
-                      background: '#f9fafb',
-                      borderRadius: '0.75rem',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      color: '#374151',
-                      fontWeight: 500,
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <UserIcon style={{ width: '1rem', height: '1rem', color: '#6366f1' }} />
-                      {participant}
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <CheckIcon style={{ width: '1rem', height: '1rem' }} />
+                    Chọn tất cả Có
+                  </button>
+                  <button
+                    onClick={() => handleSelectAll(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: '#dc2626',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                    Chọn tất cả Không
+                  </button>
+                </div>
+
+                {/* Participants list */}
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                     {filteredResidents.map((resident) => {
+                     const evaluation = evaluations[resident.id] || { participated: false, reason: '' };
+                    return (
+                      <div
+                        key={resident.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '1rem',
+                          borderBottom: '1px solid #e5e7eb',
+                          background: evaluation.participated ? '#f0fdf4' : '#fef2f2'
+                        }}
+                      >
+                        <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '50%',
+                          background: '#6366f1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          marginRight: '1rem'
+                        }}>
+                          {resident.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                            {resident.name}
+                          </div>
+                                                     <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                             Phòng: {resident.room || 'N/A'} | Tuổi: {resident.age || 'N/A'}
+                           </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name={`participation-${resident.id}`}
+                              checked={evaluation.participated}
+                              onChange={() => handleEvaluationChange(resident.id, true)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Có</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name={`participation-${resident.id}`}
+                              checked={!evaluation.participated}
+                              onChange={() => handleEvaluationChange(resident.id, false)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Không</span>
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filteredResidents.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      Không tìm thấy cư dân nào.
                     </div>
-                  ))}
+                  )}
                 </div>
-                </div>
-              )}
-          
-          {/* Notes Section */}
-          {activity.notes && (
-              <div style={{
-                marginTop: '1.5rem',
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem', 
-                border: '1px solid #e5e7eb', 
-                padding: '1.5rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-              }}>
-                <h3 style={{
-                  fontSize: '1.125rem', 
-                  fontWeight: 600, 
-                  color: '#111827', 
-                  marginTop: 0, 
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <ClipboardDocumentListIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
-                  Ghi chú:
-              </h3>
+
+                {/* Action buttons */}
                 <div style={{
-                  background: '#f9fafb',
-                  borderRadius: '0.5rem',
-                  padding: '1rem'
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem',
+                  marginTop: '1.5rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid #e5e7eb'
                 }}>
-                  <p style={{
-                    fontSize: '0.875rem', 
-                    color: '#6b7280', 
-                    margin: 0, 
-                    lineHeight: 1.6
-                  }}>
-                    {activity.notes}
-                  </p>
+                  <button
+                    onClick={() => setEvaluationMode(false)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#6b7280',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleSaveEvaluations}
+                    disabled={saving}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: saving ? '#9ca3af' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: saving ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
+                  </button>
                 </div>
-            </div>
-          )}
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9' }}>
+                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên cư dân</th>
+                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Tham gia</th>
+                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Lý do (nếu vắng)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participations.map((participation) => {
+                      // Extract residentId from the nested object structure
+                      const residentId = participation.residentId?._id || participation.residentId;
+                      const resident = residents.find(r => r.id === residentId);
+                      const participated = participation.attendanceStatus === 'attended';
+                      
+                      return (
+                        <tr key={participation._id} style={{ background: participated ? '#f0fdf4' : '#fef2f2' }}>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', fontWeight: 500 }}>
+                            {resident ? resident.name : (participation.residentId?.fullName || 'Cư dân #' + residentId)}
+                          </td>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: participated ? '#10b981' : '#dc2626', fontWeight: 600 }}>
+                            {participated ? 'Có' : 'Không'}
+                          </td>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
+                            {!participated ? (participation.performanceNotes || <span style={{ color: '#f59e0b' }}>Chưa nhập lý do</span>) : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {participations.length === 0 && (
+                      <tr>
+                        <td colSpan={3} style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>
+                          Chưa có đánh giá tham gia nào.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
           </div>
         </div>
       </div>

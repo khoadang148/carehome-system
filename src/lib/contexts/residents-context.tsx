@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 
 // Define types for resident data
 export interface Resident {
-  id: number;
+  id: string; // Changed to string to match API ObjectIds
   name: string;
   room: string;
   photo: string;
@@ -21,16 +21,17 @@ interface ResidentsContextType {
   residents: Resident[];
   selectedResident: Resident | null;
   setSelectedResident: (resident: Resident | null) => void;
-  getResidentById: (id: number) => Resident | undefined;
+  getResidentById: (id: string) => Resident | undefined;
   getResidentByName: (name: string) => Resident | undefined;
 }
 
 const ResidentsContext = createContext<ResidentsContextType | undefined>(undefined);
 
 // Mock residents data - sync with family page
+// Using API ObjectIds where known, generating others for consistency
 const mockResidents: Resident[] = [
   { 
-    id: 1, 
+    id: 'resident_alice_johnson', // Temporary ID for Alice Johnson
     name: 'Alice Johnson', 
     room: '101', 
     photo: 'https://randomuser.me/api/portraits/women/72.jpg',
@@ -64,7 +65,7 @@ const mockResidents: Resident[] = [
     ]
   },
   { 
-    id: 2, 
+    id: '686907bf5790b3201332f4e3', // Actual API ID for Nguyễn Văn Nam
     name: 'Nguyễn Văn Nam', 
     room: '102', 
     photo: 'https://randomuser.me/api/portraits/men/65.jpg',
@@ -72,7 +73,7 @@ const mockResidents: Resident[] = [
     status: 'Ổn định'
   },
   { 
-    id: 3, 
+    id: 'resident_tran_thi_lan', // Temporary ID for Trần Thị Lan
     name: 'Trần Thị Lan', 
     room: '103', 
     photo: 'https://randomuser.me/api/portraits/women/68.jpg',
@@ -80,7 +81,7 @@ const mockResidents: Resident[] = [
     status: 'Cần theo dõi'
   },
   { 
-    id: 4, 
+    id: 'resident_le_van_minh', // Temporary ID for Lê Văn Minh
     name: 'Lê Văn Minh', 
     room: '104', 
     photo: 'https://randomuser.me/api/portraits/men/70.jpg',
@@ -93,7 +94,7 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
   const [residents] = useState<Resident[]>(mockResidents);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(residents[0]);
 
-  const getResidentById = (id: number) => {
+  const getResidentById = (id: string) => {
     return residents.find(resident => resident.id === id);
   };
 

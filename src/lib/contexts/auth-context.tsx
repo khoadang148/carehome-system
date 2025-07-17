@@ -2,9 +2,16 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { authAPI } from '@/lib/api';
+import { 
+  clearSessionData, 
+  isSessionValid, 
+  initializeSession, 
+  SESSION_TIMEOUT 
+} from '@/lib/utils/session';
 
-// Define user roles
-export type UserRole = 'staff' | 'family' | 'admin' | null;
+// Define user role type
+export type UserRole = 'admin' | 'staff' | 'family';
 
 // Define user interface
 export interface User {
@@ -12,6 +19,13 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  avatar?: string;
+  phone?: string;
+  department?: string;
+  position?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Define auth context interface
@@ -20,90 +34,99 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 // Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const MOCK_USERS = [
-  { id: '1', name: 'Quản trị viên', email: 'admin@example.com', password: 'admin', role: 'admin' },
-  { id: '2', name: 'Nhân viên', email: 'staff@example.com', password: 'staff', role: 'staff' },
-  { id: '3', name: 'Thành viên gia đình', email: 'family@example.com', password: 'family', role: 'family' },
-];
-
-// Create auth provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Check for stored user data on initial load
+  // Check for stored user data and token on initial load
   useEffect(() => {
     const checkUserSession = () => {
-      const storedUser = localStorage.getItem('user');
+      // Kiểm tra session validity
+      if (!isSessionValid()) {
+        clearSessionData();
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Lấy user data từ sessionStorage
+      const storedUser = sessionStorage.getItem('user');
       if (storedUser) {
         try {
           const userData = JSON.parse(storedUser);
           setUser(userData);
         } catch (e) {
-          localStorage.removeItem('user');
+          clearSessionData();
+          setUser(null);
         }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     };
-    
-    // Run check immediately
     checkUserSession();
   }, []);
 
-  // Login function
+  // Login function: only allow family role
   const login = async (email: string, password: string) => {
     try {
-      // In a real app, this would be an API call
-      const foundUser = MOCK_USERS.find(
-        (u) => u.email === email && u.password === password
-      );
-
-      if (foundUser) {
-        const { password, ...userWithoutPassword } = foundUser;
-        
-        // Update state and localStorage synchronously
-        localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-        setUser(userWithoutPassword as User);
-        
-        // Redirect based on role - do this immediately
-        if (userWithoutPassword.role === 'family') {
-          router.push('/family');
+      const response = await authAPI.login(email, password);
+      console.log('API login response:', response); // Thêm log để kiểm tra dữ liệu trả về
+      if (response.access_token) {
+        const userProfile = response.user;
+        const userRole = userProfile.role;
+        // Cho phép family, staff, admin
+        if (userRole === 'family' || userRole === 'staff' || userRole === 'admin') {
+          const userObj = {
+            id: userProfile.id,
+            name: userProfile.fullName || userProfile.username || userProfile.email,
+            email: userProfile.email,
+            role: userRole,
+          };
+          
+          // Initialize session with new data
+          initializeSession(response.access_token, userObj);
+          
+          // Set user state ngay lập tức
+          setUser(userObj);
+          
+          // Không redirect ở đây nữa!
+          return true;
         } else {
-          router.push('/');
+          throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
         }
-        
-        return true;
       }
-      
       return false;
     } catch (error) {
       console.error('Login error:', error);
-      return false;
+      throw error;
     }
   };
 
   // Logout function
-  const logout = () => {
-    localStorage.removeItem('user');
+  const logout = async () => {
+    clearSessionData();
     setUser(null);
     router.push('/login');
   };
 
+  // Dummy refreshUser for compatibility
+  const refreshUser = async () => {};
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Custom hook to use auth context
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -112,33 +135,4 @@ export function useAuth() {
   return context;
 }
 
-// Hook to protect routes based on required roles
-export function useRequireAuth(allowedRoles?: UserRole[]) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    // Only run the effect if loading is complete
-    if (!loading) {
-      // If no user is logged in, redirect to login
-      if (!user) {
-        const url = `/login?returnUrl=${encodeURIComponent(pathname)}`;
-        router.replace(url); // Use replace instead of push for faster navigation
-        return;
-      }
-      
-      // If roles are specified and user's role is not allowed
-      if (allowedRoles && !allowedRoles.includes(user.role)) {
-        // Redirect based on role immediately
-        if (user.role === 'family') {
-          router.replace('/family');
-        } else {
-          router.replace('/');
-        }
-      }
-    }
-  }, [user, loading, router, pathname, allowedRoles]);
-
-  return { user, loading };
-} 
+// No useRequireAuth here, each role should have its own login page/component 

@@ -21,8 +21,7 @@ import {
   DocumentTextIcon,
   ClipboardDocumentCheckIcon,
   HeartIcon,
-  PhotoIcon,
-  ChatBubbleLeftRightIcon
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 import { useAuth, UserRole } from '@/lib/contexts/auth-context';
 
@@ -53,9 +52,8 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Lối tắt chăm sóc",
     items: [
-      { name: 'Đánh giá sức khỏe', href: '/staff/care-notes', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
+      { name: 'Ghi chú chăm sóc', href: '/staff/assessments', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
       { name: 'Đăng ảnh hoạt động', href: '/residents/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
-      { name: 'Tương tác gia đình', href: '/staff/family-communication', icon: ChatBubbleLeftRightIcon, roles: ['staff'], color: '#f59e0b' },
       
     ]
   },
@@ -65,10 +63,9 @@ const menuGroups: MenuGroup[] = [
       { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['staff'], color: '#f59e0b' },
       { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['staff'], color: '#8b5cf6' },
       { name: 'Thông tin', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
-      { name: 'Liên hệ', href: '/family/contact-staff', icon: ChatBubbleLeftRightIcon, roles: ['family'], color: '#6366f1' },
       { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1' },
       { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1' },
-      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['admin', 'family'], color: '#6366f1' },
+      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'family'], color: '#6366f1' },
       
     ]
   },

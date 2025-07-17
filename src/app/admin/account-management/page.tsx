@@ -21,6 +21,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { staffAPI, familyMembersAPI } from '@/lib/api';
+import axios from 'axios';
 
 // Interfaces
 interface StaffUser {
@@ -51,54 +53,9 @@ interface FamilyAccount {
   address: string;
 }
 
-// Mock data for available staff (những nhân viên chưa có tài khoản)
-const availableStaff = [
-  { id: 'S001', name: 'Nguyễn Văn An', role: 'Bác sĩ', department: 'Y tế', email: 'an.nguyen@carehome.com' },
-  { id: 'S002', name: 'Trần Thị Bình', role: 'Y tá', department: 'Y tế', email: 'binh.tran@carehome.com' },
-  { id: 'S003', name: 'Lê Văn Cường', role: 'Kế toán', department: 'Kế toán', email: 'cuong.le@carehome.com' },
-  { id: 'S004', name: 'Phạm Thị Dung', role: 'Y tá', department: 'Y tế', email: 'dung.pham@carehome.com' },
-  { id: 'S005', name: 'Hoàng Văn Em', role: 'Bảo vệ', department: 'An ninh', email: 'em.hoang@carehome.com' }
-];
-
-// Mock data for residents and their guardians (người giám hộ chưa có tài khoản)
-const availableGuardians = [
-  { 
-    id: 'G001', 
-    name: 'Nguyễn Văn Minh', 
-    residentName: 'Nguyễn Thị Lan', 
-    residentId: 'R001', 
-    relationship: 'Con trai',
-    phone: '0912345678',
-    email: 'minh.nguyen@email.com'
-  },
-  { 
-    id: 'G002', 
-    name: 'Trần Văn Hải', 
-    residentName: 'Trần Thị Mai', 
-    residentId: 'R002', 
-    relationship: 'Con trai',
-    phone: '0923456789',
-    email: 'hai.tran@email.com'
-  },
-  { 
-    id: 'G003', 
-    name: 'Lê Thị Hoa', 
-    residentName: 'Lê Văn Nam', 
-    residentId: 'R003', 
-    relationship: 'Con gái',
-    phone: '0934567890',
-    email: 'hoa.le@email.com'
-  },
-  { 
-    id: 'G004', 
-    name: 'Phạm Văn Khánh', 
-    residentName: 'Phạm Thị Oanh', 
-    residentId: 'R004', 
-    relationship: 'Con trai',
-    phone: '0945678901',
-    email: 'khanh.pham@email.com'
-  }
-];
+// Thêm hàm gọi API activate/deactivate
+const activateUser = async (id: string) => axios.patch(`/users/${id}/activate`);
+const deactivateUser = async (id: string) => axios.patch(`/users/${id}/deactivate`);
 
 export default function AccountManagementPage() {
   // Add CSS animations for modals
@@ -127,75 +84,17 @@ export default function AccountManagementPage() {
     const styleSheet = document.createElement('style');
     styleSheet.innerText = modalAnimationStyles;
     document.head.appendChild(styleSheet);
-    return () => document.head.removeChild(styleSheet);
+    return () => {
+      if (styleSheet.parentNode) {
+        styleSheet.parentNode.removeChild(styleSheet);
+      }
+    };
   }, []);
 
   // State for managing data
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([
-    { 
-      id: 1, 
-      name: 'Admin Nguyễn', 
-      email: 'admin@carehome.com',
-      role: 'Quản trị viên',
-      permissions: ['Đọc', 'Ghi', 'Chỉnh sửa', 'Xóa'],
-      department: 'Quản lý',
-      lastActive: '2024-01-20',
-      status: 'active'
-    },
-    { 
-      id: 2, 
-      name: 'Y tá Trần', 
-      email: 'nurse@carehome.com',
-      role: 'Y tá',
-      permissions: ['Đọc', 'Ghi', 'Chỉnh sửa'],
-      department: 'Y tế',
-      lastActive: '2024-01-19',
-      status: 'active'
-    },
-    { 
-      id: 3, 
-      name: 'Bác sĩ Lê', 
-      email: 'doctor@carehome.com',
-      role: 'Bác sĩ',
-      permissions: ['Đọc', 'Ghi', 'Chỉnh sửa'],
-      department: 'Y tế',
-      lastActive: '2024-01-18',
-      status: 'active'
-    }
-  ]);
-
-  const [familyAccounts, setFamilyAccounts] = useState<FamilyAccount[]>([
-    {
-      id: 'FA001',
-      username: 'minh.nguyen',
-      email: 'minh.nguyen@email.com',
-      fullName: 'Nguyễn Văn Minh',
-      phone: '0912345678',
-      relationship: 'Con trai',
-      residentName: 'Nguyễn Thị Lan',
-      residentId: 'R001',
-      status: 'active',
-      lastLogin: '2024-01-20T14:30:00',
-      createdDate: '2024-01-15T10:00:00',
-      emergencyContact: '0987654321',
-      address: 'Hà Nội'
-    },
-    {
-      id: 'FA002',
-      username: 'hai.tran',
-      email: 'hai.tran@email.com',
-      fullName: 'Trần Văn Hải',
-      phone: '0923456789',
-      relationship: 'Con trai',
-      residentName: 'Trần Thị Mai',
-      residentId: 'R002',
-      status: 'active',
-      lastLogin: '2024-01-19T16:45:00',
-      createdDate: '2024-01-10T09:30:00',
-      emergencyContact: '0976543210',
-      address: 'TP.HCM'
-    }
-  ]);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [familyAccounts, setFamilyAccounts] = useState<FamilyAccount[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
   const [activeTab, setActiveTab] = useState<'staff' | 'family'>('staff');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('Tất cả');
@@ -212,20 +111,16 @@ export default function AccountManagementPage() {
   const [formData, setFormData] = useState<any>({});
   
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   // Check access permissions
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
+    if (!loading && user && user.role !== 'admin') {
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'family') router.replace('/family');
+      else router.replace('/login');
     }
-    
-    if (user.role !== 'admin') {
-      router.push('/');
-      return;
-    }
-  }, [user, router]);
+  }, [user, loading, router]);
 
   useEffect(() => {
     console.log('Modal states:', { showCreateModal, showEditModal, showDetailModal, showDeleteModal });
@@ -247,6 +142,25 @@ export default function AccountManagementPage() {
       document.body.style.overflow = 'unset';
     };
   }, [showCreateModal, showEditModal, showDetailModal, showDeleteModal]);
+
+  // Fetch accounts from API
+  useEffect(() => {
+    async function fetchAccounts() {
+      setLoadingData(true);
+      try {
+        const allUsers = await staffAPI.getAll();
+        const staff = allUsers.filter((u: any) => Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('staff')));
+        const family = allUsers.filter((u: any) => Array.isArray(u.roles) && u.roles.includes('family'));
+        setStaffUsers(staff);
+        setFamilyAccounts(family);
+      } catch (err) {
+        alert('Lỗi khi tải dữ liệu tài khoản!');
+      } finally {
+        setLoadingData(false);
+      }
+    }
+    fetchAccounts();
+  }, []); // Không thay đổi dependency array này
 
   // CRUD Functions
   const handleCreate = () => {
@@ -274,37 +188,6 @@ export default function AccountManagementPage() {
     setShowCreateModal(true);
   };
 
-  const handleStaffSelection = (staffId: string) => {
-    const selectedStaff = availableStaff.find(s => s.id === staffId);
-    if (selectedStaff) {
-      setFormData({
-        ...formData,
-        selectedStaffId: staffId,
-        name: selectedStaff.name,
-        email: selectedStaff.email,
-        role: selectedStaff.role,
-        department: selectedStaff.department
-      });
-    }
-  };
-
-  const handleGuardianSelection = (guardianId: string) => {
-    const selectedGuardian = availableGuardians.find(g => g.id === guardianId);
-    if (selectedGuardian) {
-      setFormData({
-        ...formData,
-        selectedGuardianId: guardianId,
-        fullName: selectedGuardian.name,
-        email: selectedGuardian.email,
-        phone: selectedGuardian.phone,
-        relationship: selectedGuardian.relationship,
-        residentId: selectedGuardian.residentId,
-        residentName: selectedGuardian.residentName,
-        username: selectedGuardian.name.toLowerCase().replace(/\s+/g, '.')
-      });
-    }
-  };
-
   const handleEdit = (account: StaffUser | FamilyAccount) => {
     setSelectedAccount(account);
     setFormData(account);
@@ -321,81 +204,103 @@ export default function AccountManagementPage() {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!selectedAccount) return;
-
-    if (activeTab === 'staff') {
-      setStaffUsers(prev => prev.filter(user => user.id !== (selectedAccount as StaffUser).id));
-    } else {
-      setFamilyAccounts(prev => prev.filter(acc => acc.id !== (selectedAccount as FamilyAccount).id));
+    setLoadingData(true);
+    try {
+      if (activeTab === 'staff') {
+        if (Array.isArray((selectedAccount as any).roles) && (selectedAccount as any).roles.includes('admin')) {
+          alert('Không thể xóa tài khoản admin!');
+          setShowDeleteModal(false);
+          setSelectedAccount(null);
+          setLoadingData(false);
+          return;
+        }
+        await staffAPI.delete(String(selectedAccount.id));
+        const data = await staffAPI.getAll();
+        setStaffUsers(data);
+        alert(`Đã xóa tài khoản ${selectedAccount.name} thành công!`);
+      } else {
+        await familyMembersAPI.delete(String(selectedAccount.id));
+        const data = await familyMembersAPI.getAll();
+        setFamilyAccounts(data);
+        alert(`Đã xóa tài khoản ${selectedAccount.fullName} thành công!`);
+      }
+      setShowDeleteModal(false);
+      setSelectedAccount(null);
+    } catch (err) {
+      alert('Lỗi khi xóa tài khoản!');
+    } finally {
+      setLoadingData(false);
     }
-
-    setShowDeleteModal(false);
-    setSelectedAccount(null);
-    
-    // Show success message
-    alert(`Đã xóa tài khoản ${activeTab === 'staff' ? (selectedAccount as StaffUser).name : (selectedAccount as FamilyAccount).fullName} thành công!`);
   };
 
-  const saveAccount = () => {
-    if (activeTab === 'staff') {
-      if (showCreateModal) {
-        // Create new staff account
-        const newStaffUser: StaffUser = {
-          id: Math.max(...staffUsers.map(u => u.id)) + 1,
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-          department: formData.department,
-          permissions: getDefaultPermissions(formData.role),
-          lastActive: new Date().toISOString().split('T')[0],
-          status: 'active'
-        };
-        setStaffUsers(prev => [...prev, newStaffUser]);
-        alert(`Đã tạo tài khoản nhân viên cho ${formData.name} thành công!`);
-      } else if (showEditModal && selectedAccount) {
-        // Update existing staff account
-        setStaffUsers(prev => prev.map(user => 
-          user.id === (selectedAccount as StaffUser).id 
-            ? { ...user, ...formData }
-            : user
-        ));
-        alert(`Đã cập nhật tài khoản ${formData.name} thành công!`);
+  const saveAccount = async () => {
+    setLoadingData(true);
+    try {
+      if (activeTab === 'staff') {
+        if (showCreateModal) {
+          await staffAPI.create({
+            name: formData.name,
+            email: formData.email,
+            role: formData.role,
+            department: formData.department,
+            password: formData.password,
+          });
+          alert(`Đã tạo tài khoản nhân viên cho ${formData.name} thành công!`);
+        } else if (showEditModal && selectedAccount) {
+          // Kiểm tra nếu status thay đổi
+          if (formData.status && formData.status !== selectedAccount.status) {
+            if (formData.status === 'active') {
+              await activateUser(String(selectedAccount.id));
+            } else {
+              await deactivateUser(String(selectedAccount.id));
+            }
+          }
+          // Xóa trường status khỏi formData trước khi update
+          const { status, ...updateData } = formData;
+          if (activeTab === 'staff') {
+            await staffAPI.update(String(selectedAccount.id), updateData);
+            alert(`Đã cập nhật tài khoản ${formData.name} thành công!`);
+            const data = await staffAPI.getAll();
+            setStaffUsers(data);
+          } else {
+            await familyMembersAPI.update(String(selectedAccount.id), updateData);
+            alert(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
+            const data = await familyMembersAPI.getAll();
+            setFamilyAccounts(data);
+          }
+        }
+      } else {
+        if (showCreateModal) {
+          await familyMembersAPI.create({
+            username: formData.username,
+            email: formData.email,
+            fullName: formData.fullName,
+            phone: formData.phone,
+            relationship: formData.relationship,
+            residentName: formData.residentName,
+            residentId: formData.residentId,
+            password: formData.password,
+            emergencyContact: formData.emergencyContact,
+            address: formData.address,
+          });
+          alert(`Đã tạo tài khoản gia đình cho ${formData.fullName} thành công!`);
+        } else if (showEditModal && selectedAccount) {
+          await familyMembersAPI.update(String(selectedAccount.id), formData);
+          alert(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
+          const data = await familyMembersAPI.getAll();
+          setFamilyAccounts(data);
+        }
       }
-    } else {
-      if (showCreateModal) {
-        // Create new family account
-        const newFamilyAccount: FamilyAccount = {
-          id: `FA${String(familyAccounts.length + 1).padStart(3, '0')}`,
-          username: formData.username,
-          email: formData.email,
-          fullName: formData.fullName,
-          phone: formData.phone,
-          relationship: formData.relationship,
-          residentName: formData.residentName,
-          residentId: formData.residentId,
-          status: 'active',
-          lastLogin: '',
-          createdDate: new Date().toISOString(),
-          emergencyContact: formData.emergencyContact || '',
-          address: formData.address || ''
-        };
-        setFamilyAccounts(prev => [...prev, newFamilyAccount]);
-        alert(`Đã tạo tài khoản gia đình cho ${formData.fullName} thành công!`);
-      } else if (showEditModal && selectedAccount) {
-        // Update existing family account
-        setFamilyAccounts(prev => prev.map(acc => 
-          acc.id === (selectedAccount as FamilyAccount).id 
-            ? { ...acc, ...formData }
-            : acc
-        ));
-        alert(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
-      }
+      setShowCreateModal(false);
+      setShowEditModal(false);
+      setFormData({});
+    } catch (err) {
+      alert('Lỗi khi lưu tài khoản!');
+    } finally {
+      setLoadingData(false);
     }
-
-    setShowCreateModal(false);
-    setShowEditModal(false);
-    setFormData({});
   };
 
   // Helper function to get default permissions based on role
@@ -460,6 +365,8 @@ export default function AccountManagementPage() {
       'Kế toán': { bg: '#fffbeb', color: '#92400e', border: '#fbbf24' }
     };
     const colors = roleColors[user.role as keyof typeof roleColors] || { bg: '#f8fafc', color: '#4338ca', border: '#c7d2fe' };
+
+    const isAdmin = Array.isArray(user.roles) && user.roles.includes('admin');
 
     return (
       <div style={{
@@ -622,25 +529,30 @@ export default function AccountManagementPage() {
               title="Xóa"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete(user);
+                if (!isAdmin) handleDelete(user);
               }}
               style={{
                 padding: '0.5rem',
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                background: isAdmin ? '#e5e7eb' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                 border: 'none',
                 borderRadius: '0.5rem',
-                color: 'white',
-                cursor: 'pointer',
+                color: isAdmin ? '#9ca3af' : 'white',
+                cursor: isAdmin ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                boxShadow: isAdmin ? 'none' : '0 2px 4px rgba(239, 68, 68, 0.3)'
               }}
+              disabled={isAdmin}
               onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.4)';
+                if (!isAdmin) {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.4)';
+                }
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.3)';
+                if (!isAdmin) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.3)';
+                }
               }}
             >
               <TrashIcon style={{ width: '1rem', height: '1rem' }} />
@@ -657,7 +569,8 @@ export default function AccountManagementPage() {
       inactive: { bg: '#f9fafb', color: '#374151', border: '#d1d5db' },
       suspended: { bg: '#fef2f2', color: '#991b1b', border: '#fca5a5' }
     };
-    const colors = statusColors[account.status];
+    const defaultColors = { bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' };
+    const colors = statusColors[account.status] || defaultColors;
 
     return (
       <div style={{
@@ -1047,70 +960,78 @@ export default function AccountManagementPage() {
           padding: '2rem',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
         }}>
-          {activeTab === 'staff' ? (
-            <div>
-              <div style={{
-                fontSize: '1.125rem',
-                fontWeight: 600,
-                color: '#1f2937',
-                marginBottom: '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                Tài khoản Nhân viên ({staffUsers.filter(user => 
-                  user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                ).length} tài khoản)
-              </div>
-              {staffUsers
-                .filter(user => 
-                  user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map(user => <StaffListItem key={user.id} user={user} /> )
-              }
+          {loadingData ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
             </div>
           ) : (
-            <div>
-              <div style={{
-                fontSize: '1.125rem',
-                fontWeight: 600,
-                color: '#1f2937',
-                marginBottom: '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                Tài khoản Gia đình ({familyAccounts.filter(account => 
-                  account.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  account.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  account.email.toLowerCase().includes(searchTerm.toLowerCase())
-                ).length} tài khoản)
-              </div>
-              {familyAccounts
-                .filter(account => 
-                  account.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  account.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  account.email.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map(account => <FamilyListItem key={account.id} account={account} />)
-              }
-            </div>
+            <>
+              {activeTab === 'staff' ? (
+                <div>
+                  <div style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
+                    Tài khoản Nhân viên ({staffUsers.filter(user => 
+                      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    ).length} tài khoản)
+                  </div>
+                  {staffUsers
+                    .filter(user => 
+                      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    )
+                    .map((user, idx) => <StaffListItem key={user.id ? String(user.id) : `staff-${idx}`} user={user} /> )
+                  }
+                </div>
+              ) : (
+                <div>
+                  <div style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
+                    Tài khoản Gia đình ({familyAccounts.filter(account => 
+                      (account.fullName && account.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    ).length} tài khoản)
+                  </div>
+                  {familyAccounts
+                    .filter(account => 
+                      (account.fullName && account.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    )
+                    .map((account, idx) => <FamilyListItem key={account.id ? String(account.id) : `family-${idx}`} account={account} />)
+                  }
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Empty State - show inside the content area if no results */}
         {((activeTab === 'staff' && staffUsers.filter(user => 
-          user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase())
+          (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
         ).length === 0) || 
         (activeTab === 'family' && familyAccounts.filter(account => 
-          account.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          account.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          account.email.toLowerCase().includes(searchTerm.toLowerCase())
+          (account.fullName && account.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
         ).length === 0)) && searchTerm && (
           <div style={{
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',

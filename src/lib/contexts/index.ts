@@ -1,4 +1,3 @@
 export { AuthProvider, useAuth, type UserRole } from './auth-context';
 export { ResidentsProvider, useResidents } from './residents-context';
-export { ActivitiesProvider, useActivities } from './activities-context';
-export { ChatProvider, useChat } from './chat-context'; 
+export { ActivitiesProvider, useActivities } from './activities-context'; 

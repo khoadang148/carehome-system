@@ -23,10 +23,16 @@ import {
   CloudIcon as CloudIconSolid
 } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
+import { residentAPI, vitalSignsAPI, staffAPI } from '@/lib/api';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { format, parseISO } from 'date-fns';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface VitalSigns {
-  id: number;
-  residentId: number;
+  id: string; // đổi sang string để khớp với API
+  residentId: string;
   residentName: string;
   date: string;
   time: string;
@@ -44,7 +50,7 @@ interface VitalSigns {
 }
 
 interface Resident {
-  id: number;
+  id: string;
   name: string;
   room: string;
   age: number;
@@ -55,10 +61,13 @@ export default function StaffVitalSignsPage() {
   const router = useRouter();
   const [vitalSigns, setVitalSigns] = useState<VitalSigns[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
-  const [selectedResident, setSelectedResident] = useState<number | null>(null);
+  const [selectedResident, setSelectedResident] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [addDate, setAddDate] = useState<Date | null>(new Date());
+  const [filterDate, setFilterDate] = useState<Date | null>(new Date());
   const [loading, setLoading] = useState(true);
+  const [staffMap, setStaffMap] = useState<{[id: string]: string}>({});
 
   useEffect(() => {
     loadData();
@@ -85,82 +94,115 @@ export default function StaffVitalSignsPage() {
     };
   }, [showAddForm]);
 
+  useEffect(() => {
+    // Lấy danh sách staff từ API
+    staffAPI.getAll().then((list: any[]) => {
+      const map: {[id: string]: string} = {};
+      list.forEach(staff => {
+        map[staff._id || staff.id] = staff.fullName || staff.username || staff.email;
+      });
+      setStaffMap(map);
+    });
+  }, []);
 
-  const loadData = () => {
-    // Mock residents data
-    const mockResidents: Resident[] = [
-      { id: 1, name: 'Nguyễn Văn Bảy', room: 'P201', age: 75 },
-      { id: 2, name: 'Trần Thị Cúc', room: 'P202', age: 68 },
-      { id: 3, name: 'Lê Văn Đức', room: 'P203', age: 82 }
-    ];
 
-    // Mock vital signs data
-    const mockVitalSigns: VitalSigns[] = [
-      {
-        id: 1,
-        residentId: 1,
-        residentName: 'Nguyễn Văn Bảy',
-        date: '2024-01-15',
-        time: '08:00',
-        bloodPressureSystolic: 140,
-        bloodPressureDiastolic: 90,
-        heartRate: 78,
-        temperature: 36.5,
-        oxygenSaturation: 98,
-        respiratoryRate: 16,
-        weight: 65,
-        bloodSugar: 120,
-        recordedBy: user?.name || 'Staff',
-        status: 'warning',
-        notes: 'Huyết áp hơi cao, cần theo dõi'
-      },
-      {
-        id: 2,
-        residentId: 2,
-        residentName: 'Trần Thị Cúc',
-        date: '2024-01-15',
-        time: '08:15',
-        bloodPressureSystolic: 120,
-        bloodPressureDiastolic: 80,
-        heartRate: 72,
-        temperature: 36.7,
-        oxygenSaturation: 99,
-        respiratoryRate: 14,
-        recordedBy: user?.name || 'Staff',
-        status: 'normal'
-      }
-    ];
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Lấy residents từ API
+      const resList = await residentAPI.getAll();
+      const mappedResidents: Resident[] = resList.map((r: any) => ({
+        id: r._id || r.id,
+        name: r.fullName || r.name,
+        room: r.room || r.roomNumber || '',
+        age: r.age || 0,
+      }));
+      setResidents(mappedResidents);
 
-    setResidents(mockResidents);
-    setVitalSigns(mockVitalSigns);
+      // Lấy vital signs từ API
+      const vsList = await vitalSignsAPI.getAll();
+      const mappedVitalSigns: VitalSigns[] = vsList.map((vs: any) => {
+        // Tìm resident name
+        const resident = mappedResidents.find(r => r.id === (vs.residentId || vs.resident_id));
+        // Tách ngày và giờ
+        let date = '', time = '';
+        if (vs.dateTime) {
+          const dt = new Date(vs.dateTime);
+          date = dt.toISOString().split('T')[0];
+          time = dt.toTimeString().slice(0, 5);
+        } else if (vs.date && vs.time) {
+          date = vs.date;
+          time = vs.time;
+        }
+        // Tách huyết áp
+        let bloodPressureSystolic = 0, bloodPressureDiastolic = 0;
+        if (vs.bloodPressure && typeof vs.bloodPressure === 'string' && vs.bloodPressure.includes('/')) {
+          const [sys, dia] = vs.bloodPressure.split('/');
+          bloodPressureSystolic = parseInt(sys);
+          bloodPressureDiastolic = parseInt(dia);
+        } else {
+          bloodPressureSystolic = vs.bloodPressureSystolic || 0;
+          bloodPressureDiastolic = vs.bloodPressureDiastolic || 0;
+        }
+        return {
+          id: vs._id || vs.id,
+          residentId: vs.residentId || vs.resident_id,
+          residentName: resident?.name || '',
+          date,
+          time,
+          bloodPressureSystolic,
+          bloodPressureDiastolic,
+          heartRate: vs.heartRate,
+          temperature: vs.temperature,
+          oxygenSaturation: vs.oxygenLevel || vs.oxygenSaturation,
+          respiratoryRate: vs.respiratoryRate,
+          weight: vs.weight,
+          bloodSugar: vs.bloodSugar,
+          notes: vs.notes,
+          recordedBy: vs.recordedBy || 'Staff',
+          status: getVitalSignsStatus({
+            bloodPressureSystolic,
+            bloodPressureDiastolic,
+            heartRate: vs.heartRate,
+            temperature: vs.temperature,
+            oxygenSaturation: vs.oxygenLevel || vs.oxygenSaturation,
+          })
+        };
+      });
+      setVitalSigns(mappedVitalSigns);
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      alert('Lỗi khi tải dữ liệu chỉ số sinh lý hoặc danh sách người cao tuổi!');
+    }
     setLoading(false);
   };
 
-  const handleAddVitalSigns = (data: Partial<VitalSigns>) => {
-    const resident = residents.find(r => r.id === data.residentId);
-    const status = getVitalSignsStatus(data);
-    
-    const newRecord: VitalSigns = {
-      id: Date.now(),
-      residentId: data.residentId!,
-      residentName: resident?.name || '',
-      date: data.date!,
-      time: data.time!,
-      bloodPressureSystolic: data.bloodPressureSystolic!,
-      bloodPressureDiastolic: data.bloodPressureDiastolic!,
-      heartRate: data.heartRate!,
-      temperature: data.temperature!,
-      oxygenSaturation: data.oxygenSaturation!,
-      respiratoryRate: data.respiratoryRate!,
-      weight: data.weight,
-      bloodSugar: data.bloodSugar,
-      notes: data.notes,
-      recordedBy: user?.name || 'Staff',
-      status
-    };
-
-    setVitalSigns(prev => [...prev, newRecord]);
-    setShowAddForm(false);
+  const handleAddVitalSigns = async (data: Partial<VitalSigns>) => {
+    try {
+      // Tìm resident
+      const resident = residents.find(r => r.id === data.residentId);
+      // Ghép ngày và giờ thành ISO string
+      const dateTime = data.date && data.time ? `${data.date}T${data.time}:00.000Z` : undefined;
+      // Ghép huyết áp
+      const bloodPressure = `${data.bloodPressureSystolic}/${data.bloodPressureDiastolic}`;
+      // Gửi lên API
+      await vitalSignsAPI.create({
+        residentId: data.residentId,
+        dateTime,
+        temperature: data.temperature,
+        heartRate: data.heartRate,
+        bloodPressure,
+        respiratoryRate: data.respiratoryRate,
+        oxygenLevel: data.oxygenSaturation,
+        weight: data.weight,
+        notes: data.notes,
+      });
+      setShowAddForm(false);
+      await loadData();
+      toast.success('Thêm chỉ số sinh lý thành công!', { position: 'top-right' });
+    } catch (err) {
+      toast.error('Lỗi khi thêm chỉ số sinh lý!', { position: 'top-right' });
+    }
   };
 
   const getVitalSignsStatus = (data: Partial<VitalSigns>): 'normal' | 'warning' | 'critical' => {
@@ -188,9 +230,11 @@ export default function StaffVitalSignsPage() {
     }
   };
 
-  const filteredVitalSigns = selectedResident 
-    ? vitalSigns.filter(vs => vs.residentId === selectedResident)
-    : vitalSigns.filter(vs => vs.date === currentDate);
+  const filteredVitalSigns = vitalSigns.filter(vs => {
+    const matchResident = selectedResident ? vs.residentId === selectedResident : true;
+    const matchDate = currentDate ? vs.date === currentDate : true;
+    return matchResident && matchDate;
+  });
 
   if (loading) {
     return (
@@ -215,6 +259,7 @@ export default function StaffVitalSignsPage() {
 
   return (
     <>
+      <ToastContainer />
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes pulse {
@@ -338,21 +383,30 @@ export default function StaffVitalSignsPage() {
                 fontSize: '0.875rem',
                 fontWeight: 600,
                 color: '#374151',
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem', 
+                marginLeft: '2rem'
               }}>
                 Ngày
               </label>
-              <input
-                type="date"
-                value={currentDate}
-                onChange={(e) => setCurrentDate(e.target.value)}
-                style={{
-                  width: '100%',
+              <DatePicker
+                selected={filterDate}
+                onChange={(date) => {
+                  setFilterDate(date);
+                  setCurrentDate(date ? format(date, 'yyyy-MM-dd') : '');
+                }}
+                dateFormat="dd/MM/yyyy"
+                className="form-control"
+                wrapperClassName="date-picker-wrapper"
+                customInput={<input style={{
+                  width: '600px',
                   padding: '0.75rem',
                   border: '1px solid #d1d5db',
                   borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
+                  fontSize: '0.875rem',
+                  background: 'white',
+                  marginLeft: '2rem'
+                  
+                }} />}
               />
             </div>
 
@@ -368,7 +422,7 @@ export default function StaffVitalSignsPage() {
               </label>
               <select
                 value={selectedResident || ''}
-                onChange={(e) => setSelectedResident(e.target.value ? parseInt(e.target.value) : null)}
+                onChange={(e) => setSelectedResident(e.target.value ? e.target.value : null)}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -453,7 +507,11 @@ export default function StaffVitalSignsPage() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <span style={{ fontWeight: 500 }}>Ngày:</span>
-                        <span>{new Date(record.date).toLocaleDateString('vi-VN')}</span>
+                        <span>
+                          {record.date
+                            ? format(parseISO(record.date), 'dd/MM/yyyy')
+                            : ''}
+                        </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <span style={{ fontWeight: 500 }}>Giờ:</span>
@@ -461,7 +519,7 @@ export default function StaffVitalSignsPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <span style={{ fontWeight: 500 }}>Đo đạc bởi:</span>
-                        <span>{record.recordedBy}</span>
+                        <span>{staffMap[record.recordedBy] || record.recordedBy}</span>
                       </div>
                     </div>
                   </div>
@@ -696,8 +754,8 @@ export default function StaffVitalSignsPage() {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
                 const data = {
-                  residentId: parseInt(formData.get('residentId') as string),
-                  date: formData.get('date') as string,
+                  residentId: formData.get('residentId') as string,
+                  date: addDate ? format(addDate, 'yyyy-MM-dd') : '',
                   time: formData.get('time') as string,
                   bloodPressureSystolic: parseInt(formData.get('bloodPressureSystolic') as string),
                   bloodPressureDiastolic: parseInt(formData.get('bloodPressureDiastolic') as string),
@@ -757,21 +815,22 @@ export default function StaffVitalSignsPage() {
                     }}>
                       Ngày *
                     </label>
-                    <input
-                      type="date"
-                      name="date"
-                      defaultValue={currentDate}
-                      min={new Date().toISOString().split('T')[0]}
-                      max={new Date().toISOString().split('T')[0]}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
+                   <DatePicker
+                     selected={addDate}
+                     onChange={(date) => setAddDate(date)}
+                     dateFormat="dd/MM/yyyy"
+                     className="form-control"
+                     required
+                     wrapperClassName="date-picker-wrapper"
+                     customInput={<input style={{
+                       width: '100%',
+                       padding: '0.75rem',
+                       border: '1px solid #d1d5db',
+                       borderRadius: '0.5rem',
+                       fontSize: '0.875rem',
+                       background: 'white'
+                     }} />}
+                   />
                   </div>
 
                   <div>

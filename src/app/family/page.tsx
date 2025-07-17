@@ -26,6 +26,13 @@ import { Tab } from '@headlessui/react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { vi } from 'date-fns/locale';
+import { residentAPI } from '@/lib/api';
+import Select from 'react-select';
+import { vitalSignsAPI } from '@/lib/api';
+import { careNotesAPI } from '@/lib/api';
+import { staffAPI } from '@/lib/api';
+import { carePlansAPI, roomsAPI } from '@/lib/api';
+import { userAPI } from '@/lib/api';
 
 // Add CSS animations
 const styles = `
@@ -68,192 +75,38 @@ const styles = `
   }
 `;
 
-// Mock family member data - multiple family members
-const residents = [
-  { 
-    id: 1, 
-    name: 'Nguyễn Văn Nam', 
-    gender: 'Nam',
-    room: 'A01', 
-    photo: 'https://randomuser.me/api/portraits/men/72.jpg',
-    age: 78,
-    relationship: 'Cha',
-    status: 'Ổn định',
-    activities: [
-      { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
-      { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
-      { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: false, reason: 'Cảm thấy mệt mỏi, cần nghỉ ngơi' }
-    ],
-    activityHistory: [
-      { 
-        date: '2024-05-10',
-        activities: [
-          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
-          { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
-          { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: false, reason: 'Cảm thấy mệt mỏi, cần nghỉ ngơi' }
-        ]
-      },
-      { 
-        date: '2024-05-09',
-        activities: [
-          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
-          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: false, reason: 'Không có bạn chơi cùng' }
-        ]
-      },
-      { 
-        date: '2024-05-08',
-        activities: [
-          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: false, reason: 'Thời tiết xấu, không thể tập ngoài trời' },
-          { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: true },
-          { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: true },
-          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: true }
-        ]
-      },
-      { 
-        date: '2024-05-07',
-        activities: [
-          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: false, reason: 'Thiết bị âm nhạc bị hỏng' },
-          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: true }
-        ]
-      },
-      { 
-        date: '2024-05-06',
-        activities: [
-          { id: 1, name: 'Tập thể dục buổi sáng', time: '08:00', endTime: '09:00', participated: true },
-          { id: 2, name: 'Nghệ thuật & Thủ công', time: '10:30', endTime: '11:30', participated: false, reason: 'Không có đủ dụng cụ cho tất cả mọi người' },
-          { id: 3, name: 'Liệu pháp âm nhạc', time: '14:00', endTime: '15:00', participated: true },
-          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: true }
-        ]
-      }
-    ],
-    vitals: {
-      lastUpdated: '10/05/2024 09:30',
-      bloodPressure: '130/85',
-      heartRate: 72,
-      temperature: 36.8,
-      weight: '65'
-    },
-    careNotes: [
-      { id: 1, date: '2024-05-10', note: 'Tham gia tập thể dục buổi sáng rất tích cực. Ăn hết 100% bữa sáng.', staff: 'Nguyễn Thị Lan, Y tá trưởng' },
-      { id: 2, date: '2024-05-09', note: 'Báo cáo khó chịu nhẹ ở đầu gối phải. Đã áp dụng túi chườm nóng. Sẽ theo dõi.', staff: 'Lê Thị Hoa, Nhân viên chăm sóc' },
-      { id: 3, date: '2024-05-08', note: 'Được gia đình thăm. Tâm trạng cải thiện rõ rệt sau chuyến thăm.', staff: 'Vũ Thị Mai, Quản lý ca' }
-    ],
-    medications: [
-      { id: 1, name: 'Lisinopril', dosage: '10mg', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' },
-      { id: 2, name: 'Simvastatin', dosage: '20mg', schedule: 'Mỗi ngày một lần trước giờ đi ngủ', lastAdministered: '09/05/2024 21:00' },
-      { id: 3, name: 'Vitamin D', dosage: '1000 IU', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' }
-    ],
-    appointments: [
-      { id: 1, type: 'Khám bác sĩ', date: '2024-05-15', time: '10:00', provider: 'BS. Trần Văn Nam' },
-      { id: 2, type: 'Vật lý trị liệu', date: '2024-05-12', time: '14:30', provider: 'KTV. Phạm Văn Minh' }
-    ],
-    vitalHistory: [
-      { id: 1, date: '2024-05-10', time: '09:30', bloodPressure: '130/85', heartRate: 72, temperature: 36.8, weight: 65, notes: 'Chỉ số ổn định' },
-      { id: 2, date: '2024-05-09', time: '09:15', bloodPressure: '128/82', heartRate: 74, temperature: 36.7, weight: 65, notes: 'Tất cả trong giới hạn bình thường' },
-      { id: 3, date: '2024-05-08', time: '09:45', bloodPressure: '132/87', heartRate: 70, temperature: 36.9, weight: 65, notes: 'Huyết áp hơi cao, cần theo dõi' },
-      { id: 4, date: '2024-05-07', time: '09:30', bloodPressure: '125/80', heartRate: 73, temperature: 36.6, weight: 64.8, notes: 'Chỉ số tốt' },
-      { id: 5, date: '2024-05-06', time: '09:20', bloodPressure: '127/83', heartRate: 71, temperature: 36.8, weight: 64.9, notes: 'Ổn định' }
-    ]
-  },
-  { 
-    id: 2, 
-    name: 'Lê Thị Hoa', 
-    gender: 'Nữ',
-    room: 'A02', 
-    photo: 'https://randomuser.me/api/portraits/women/65.jpg',
-    age: 75,
-    relationship: 'Mẹ',
-    status: 'Khá',
-    activities: [
-      { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
-      { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-      { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true }
-    ],
-    activityHistory: [
-      { 
-        date: '2024-05-10',
-        activities: [
-          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true }
-        ]
-      },
-      { 
-        date: '2024-05-09',
-        activities: [
-          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: false, reason: 'Không có hứng thú vẽ hôm nay' },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
-          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: true }
-        ]
-      },
-      { 
-        date: '2024-05-08',
-        activities: [
-          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: false, reason: 'Đau đầu nhẹ, cần nghỉ ngơi' },
-          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: true }
-        ]
-      },
-      { 
-        date: '2024-05-07',
-        activities: [
-          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: false, reason: 'Cảm thấy không khỏe, bác sĩ khuyên nghỉ ngơi' },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
-          { id: 4, name: 'Chơi cờ', time: '16:30', endTime: '17:30', participated: true }
-        ]
-      },
-      { 
-        date: '2024-05-06',
-        activities: [
-          { id: 1, name: 'Tập thể dục nhẹ', time: '08:30', endTime: '09:30', participated: true },
-          { id: 2, name: 'Hoạt động vẽ tranh', time: '10:00', endTime: '11:00', participated: true },
-          { id: 3, name: 'Thư giãn nghe nhạc', time: '15:00', endTime: '16:00', participated: true },
-          { id: 4, name: 'Đọc sách', time: '16:00', endTime: '17:00', participated: false, reason: 'Mắt mỏi, không thể đọc sách' }
-        ]
-      }
-    ],
-    vitals: {
-      lastUpdated: '10/05/2024 10:15',
-      bloodPressure: '125/80',
-      heartRate: 68,
-      temperature: 36.6,
-      weight: '58'
-    },
-    careNotes: [
-      { id: 1, date: '2024-05-10', note: 'Tham gia hoạt động vẽ tranh với tinh thần rất vui vẻ. Hoàn thành một bức tranh đẹp.', staff: 'Phạm Văn Minh, Chuyên viên hoạt động' },
-      { id: 2, date: '2024-05-09', note: 'Ăn uống tốt, ngủ đầy đủ. Không có vấn đề gì bất thường.', staff: 'Lê Thị Hoa, Nhân viên chăm sóc' },
-      { id: 3, date: '2024-05-08', note: 'Rất vui khi được gia đình đến thăm. Kể nhiều câu chuyện vui.', staff: 'Nguyễn Thị Lan, Y tá trưởng' }
-    ],
-    medications: [
-      { id: 1, name: 'Amlodipine', dosage: '5mg', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' },
-      { id: 2, name: 'Calcium', dosage: '500mg', schedule: 'Hai lần mỗi ngày', lastAdministered: '10/05/2024 08:00' },
-      { id: 3, name: 'Omega-3', dosage: '1000mg', schedule: 'Mỗi ngày một lần', lastAdministered: '10/05/2024 08:00' }
-    ],
-    appointments: [
-      { id: 1, type: 'Khám định kỳ', date: '2024-05-18', time: '09:00', provider: 'BS. Nguyễn Thị Minh' },
-      { id: 2, type: 'Khám mắt', date: '2024-05-20', time: '15:00', provider: 'BS. Lê Văn Đức' }
-    ],
-    vitalHistory: [
-      { id: 1, date: '2024-05-10', time: '10:15', bloodPressure: '125/80', heartRate: 68, temperature: 36.6, weight: 58, notes: 'Chỉ số rất tốt' },
-      { id: 2, date: '2024-05-09', time: '10:00', bloodPressure: '123/78', heartRate: 70, temperature: 36.5, weight: 58.2, notes: 'Tất cả bình thường' },
-      { id: 3, date: '2024-05-08', time: '10:30', bloodPressure: '127/82', heartRate: 69, temperature: 36.7, weight: 58.1, notes: 'Ổn định' },
-      { id: 4, date: '2024-05-07', time: '10:15', bloodPressure: '124/79', heartRate: 67, temperature: 36.6, weight: 58, notes: 'Chỉ số lý tưởng' },
-      { id: 5, date: '2024-05-06', time: '10:45', bloodPressure: '126/81', heartRate: 71, temperature: 36.8, weight: 58.3, notes: 'Tốt' }
-    ]
+// Thêm hàm tính tuổi ở đầu file (sau import)
+const getAge = (dob: string) => {
+  if (!dob) return '';
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+    age--;
   }
-];
+  return age;
+};
+
+// Helper function to format date of birth as dd-mm-yyyy
+const formatDob = (dob: string) => {
+  if (!dob) return 'Chưa cập nhật';
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return 'Chưa cập nhật';
+  const day: string = String(d.getDate()).padStart(2, '0');
+  const month: string = String(d.getMonth() + 1).padStart(2, '0');
+  const year: number = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
 
 export default function FamilyPortalPage() {
   const router = useRouter();
-  
-  const [selectedResident, setSelectedResident] = useState(residents[0]);
+  const { user, loading } = useAuth();
+  // Thay state resident thành residents (mảng) và selectedResidentId
+  const [residents, setResidents] = useState<any[]>([]);
+  const [selectedResidentId, setSelectedResidentId] = useState<string>("");
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState('');
   
   // Add notifications state
   interface Notification {
@@ -296,18 +149,68 @@ export default function FamilyPortalPage() {
   const [selectedActivityDate, setSelectedActivityDate] = useState('2024-05-10');
   const [showActivityHistory, setShowActivityHistory] = useState(false);
 
+  // Thêm state cho vital signs
+  const [vitalSigns, setVitalSigns] = useState<any>(null);
+  const [vitalLoading, setVitalLoading] = useState(false);
+  const [vitalError, setVitalError] = useState('');
+
+  // Thêm state cho lịch sử chỉ số sức khỏe
+  const [vitalSignsHistory, setVitalSignsHistory] = useState<any[]>([]);
+  const [vitalHistoryLoading, setVitalHistoryLoading] = useState(false);
+  const [vitalHistoryError, setVitalHistoryError] = useState('');
+
+  // Thêm state cho care notes
+  const [careNotes, setCareNotes] = useState<any[]>([]);
+  const [careNotesLoading, setCareNotesLoading] = useState(false);
+  const [careNotesError, setCareNotesError] = useState('');
+
+  const [staffList, setStaffList] = useState<any[]>([]);
+
+  // Thêm state cho số phòng
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomLoading, setRoomLoading] = useState(false);
+
+  // Thêm state để lưu staffName tạm thời khi fetch từ API
+  const [fetchedStaffNames, setFetchedStaffNames] = useState<{[id: string]: string}>({});
+
+  // Sửa useEffect fetch resident
+  useEffect(() => {
+    if (user?.id) {
+      setDataLoading(true);
+      residentAPI.getByFamilyMemberId(user.id)
+        .then((data) => {
+          const arr = Array.isArray(data) ? data : [data];
+          setResidents(arr);
+          setSelectedResidentId(arr.length > 0 ? arr[0]._id : "");
+          setError('');
+        })
+        .catch((err) => {
+          setError('Không tìm thấy thông tin người thân hoặc lỗi kết nối API.');
+          setResidents([]);
+        })
+        .finally(() => setDataLoading(false));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    staffAPI.getAll().then(data => {
+      setStaffList(Array.isArray(data) ? data : []);
+    }).catch(() => setStaffList([]));
+  }, []);
+
+  // Lấy resident đang chọn
+  const selectedResident = residents.find(r => r._id === selectedResidentId);
+
   // Lấy danh sách nhân viên phụ trách (không trùng lặp)
-  const staffInCharge = useMemo(() => {
-    const staffSet = new Set<string>();
-    selectedResident.careNotes.forEach(note => {
+  const staffInCharge = selectedResident && selectedResident.careNotes ? Array.from(new Set(
+    selectedResident.careNotes.map((note: any) => {
       let staffName = note.staff;
       if (note.staff.includes(',')) {
         staffName = note.staff.split(',')[0].trim();
       }
-      staffSet.add(staffName);
-    });
-    return Array.from(staffSet);
-  }, [selectedResident]);
+      return staffName;
+    })
+  )) : [];
 
   // Handler functions for button actions
   const handleContactStaff = () => {
@@ -445,9 +348,10 @@ export default function FamilyPortalPage() {
       const uploadedPhotos = localStorage.getItem('uploadedPhotos');
       if (uploadedPhotos) {
         const parsedPhotos = JSON.parse(uploadedPhotos);
-        // Filter photos for current resident and format them
-        const residentPhotos = parsedPhotos
-          .filter((photo: any) => photo.residentId.toString() === selectedResident.id.toString())
+        let residentPhotos: any[] = [];
+        if (selectedResident && selectedResident.id && parsedPhotos) {
+          residentPhotos = parsedPhotos
+            .filter((photo: any) => photo.residentId && photo.residentId.toString() === selectedResident.id.toString())
           .map((photo: any) => ({
             id: `uploaded_${photo.id}`,
             url: photo.url,
@@ -456,6 +360,7 @@ export default function FamilyPortalPage() {
             uploadedBy: photo.uploadedBy,
             isUploaded: true
           }));
+        }
         
         // Combine with mock photos
         const combinedPhotos = [...mockPhotos, ...residentPhotos];
@@ -515,6 +420,118 @@ export default function FamilyPortalPage() {
       timers.forEach(timer => clearTimeout(timer));
     };
   }, [notifications]);
+
+  // Gọi API lấy vital signs khi đổi resident
+  useEffect(() => {
+    if (selectedResidentId) {
+      setVitalLoading(true);
+      setVitalError('');
+      vitalSignsAPI.getByResidentId(selectedResidentId)
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            const sorted = [...data].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+            setVitalSigns(sorted[0]);
+          } else {
+            setVitalSigns(null);
+          }
+        })
+        .catch(() => {
+          setVitalError('Không lấy được dữ liệu chỉ số sức khỏe');
+          setVitalSigns(null);
+        })
+        .finally(() => setVitalLoading(false));
+    }
+  }, [selectedResidentId]);
+
+  // Gọi API lấy lịch sử chỉ số sức khỏe khi đổi resident
+  useEffect(() => {
+    if (selectedResidentId) {
+      setVitalHistoryLoading(true);
+      setVitalHistoryError('');
+      vitalSignsAPI.getByResidentId(selectedResidentId)
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            const sorted = [...data].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+            setVitalSignsHistory(sorted);
+          } else {
+            setVitalSignsHistory([]);
+          }
+        })
+        .catch(() => {
+          setVitalHistoryError('Không lấy được dữ liệu chỉ số sức khỏe');
+          setVitalSignsHistory([]);
+        })
+        .finally(() => setVitalHistoryLoading(false));
+    }
+  }, [selectedResidentId]);
+
+  // Fetch care notes khi đổi resident
+  useEffect(() => {
+    if (selectedResidentId) {
+      setCareNotesLoading(true);
+      setCareNotesError('');
+      careNotesAPI.getAll({ resident_id: selectedResidentId })
+        .then((data) => {
+          setCareNotes(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setCareNotesError('Không lấy được ghi chú chăm sóc');
+          setCareNotes([]);
+        })
+        .finally(() => setCareNotesLoading(false));
+    }
+  }, [selectedResidentId]);
+
+  // Lấy số phòng khi đổi resident
+  useEffect(() => {
+    if (!selectedResidentId) {
+      setRoomNumber('Chưa cập nhật');
+      return;
+    }
+    setRoomLoading(true);
+    carePlansAPI.getByResidentId(selectedResidentId)
+      .then((assignments: any[]) => {
+        // Tìm assignment có assigned_room_id
+        const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+        const roomId = assignment?.assigned_room_id;
+        if (roomId) {
+          return roomsAPI.getById(roomId)
+            .then((room: any) => {
+              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+            })
+            .catch(() => setRoomNumber('Chưa cập nhật'));
+        } else {
+          setRoomNumber('Chưa cập nhật');
+        }
+      })
+      .catch(() => setRoomNumber('Chưa cập nhật'))
+      .finally(() => setRoomLoading(false));
+  }, [selectedResidentId]);
+
+  // Bảo vệ route chỉ cho family
+  useEffect(() => {
+    if (!loading && user && user.role !== 'family') {
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
+    }
+  }, [user, loading, router]);
+  if (loading || (user && user.role !== 'family')) return null;
+
+  if (dataLoading) return <div>Đang tải thông tin người thân...</div>;
+  if (error) return <div style={{color: 'red'}}>{error}</div>;
+  if (!selectedResident) return <div>Không có dữ liệu người thân.</div>;
+
+  const formatOptionLabel = (option: any) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <img
+        src={option.avatar}
+        alt={option.label}
+        style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', background: '#f3f4f6' }}
+      />
+      <div style={{ fontWeight: 700, fontSize: 20 }}>{option.label}</div>
+    </div>
+  );
 
   return (
     <div style={{
@@ -783,96 +800,68 @@ export default function FamilyPortalPage() {
             </div>
           </div>
         </div>
-        
-        {/* Family Member Selector */}
+        {/* Dropdown chọn resident có avatar bằng react-select */}
         {residents.length > 1 && (
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            padding: '1.5rem',
-            marginBottom: '2rem'
-          }}>
-            <h3 style={{
-              fontSize: '1rem',
+          <div style={{ marginBottom: '2rem', maxWidth: 400 }}>
+            <label style={{ 
               fontWeight: 600,
-              color: '#374151',
-              marginBottom: '1rem',
+              marginRight: 8, 
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              marginBottom: 12,
+              color: '#374151',
+              fontSize: '0.95rem'
             }}>
               <UsersIcon style={{width: '1.25rem', height: '1.25rem', color: '#8b5cf6'}} />
               Chọn người thân để xem thông tin
-            </h3>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem'}}>
-              {residents.map((resident) => (
-                <div
-                  key={resident.id}
-                  onClick={() => setSelectedResident(resident)}
-                  style={{
-                    background: selectedResident.id === resident.id ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' : 'white',
-                    border: selectedResident.id === resident.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                    borderRadius: '1rem',
-                    padding: '1.5rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    position: 'relative'
-                  }}
-                  onMouseOver={(e) => {
-                    if (selectedResident.id !== resident.id) {
-                      e.currentTarget.style.borderColor = '#d1d5db';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.1)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (selectedResident.id !== resident.id) {
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }
-                  }}
-                >
-                  <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                    <img 
-                      src={resident.photo} 
-                      alt={resident.name} 
-                      style={{
-                        height: '3.5rem', 
-                        width: '3.5rem', 
-                        borderRadius: '1rem', 
-                        objectFit: 'cover',
-                        border: '3px solid white',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
-                    <div style={{flex: 1}}>
-                      <div style={{fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                        {resident.name}
-                      </div>
-                      <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                        <span style={{fontWeight: 600}}>Quan hệ:</span> {resident.relationship} • <span style={{fontWeight: 600}}>Phòng:</span> {resident.room}
-                      </div>
-                    </div>
-                    {selectedResident.id === resident.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '1rem',
-                        right: '1rem',
-                        color: '#3b82f6'
-                      }}>
-                        <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem'}} />
+            </label>
+            {/* react-select custom dropdown */}
+            <Select
+              options={residents.map((r: any) => ({
+                value: r._id,
+                label: r.full_name || r.fullName || 'Chưa rõ',
+                avatar: r.avatar || '/default-avatar.svg',
+                relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+              }))}
+              value={(() => {
+                const found = residents.find((r: any) => r._id === selectedResidentId);
+                return found ? {
+                  value: found._id,
+                  label: found.full_name || found.fullName || 'Chưa rõ',
+                  avatar: found.avatar || '/default-avatar.svg',
+                  relationship: found.relationship || found.emergency_contact?.relationship || found.emergencyContact?.relationship || 'Chưa rõ'
+                } : null;
+              })()}
+              onChange={opt => setSelectedResidentId(opt?.value)}
+              formatOptionLabel={formatOptionLabel}
+              isSearchable
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderRadius: 12,
+                  minHeight: 60,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  borderColor: '#e5e7eb',
+                  paddingLeft: 4
+                }),
+                option: (base, state) => ({
+                  ...base,
+                  background: state.isSelected ? '#f5f3ff' : state.isFocused ? '#f3f4f6' : '#fff',
+                  color: '#111827',
+                  cursor: 'pointer',
+                  paddingTop: 12,
+                  paddingBottom: 12,
+                  fontSize: 20,
+                  fontWeight: 700
+                })
+              }}
+              placeholder='Chọn người thân...'
+            />
                       </div>
                     )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Resident Overview */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -886,8 +875,8 @@ export default function FamilyPortalPage() {
             <div style={{display: 'flex', flexWrap: 'wrap', gap: '3.5rem', alignItems: 'center', width: '100%'}}>
               <div>
                 <img 
-                  src={selectedResident.photo} 
-                  alt={selectedResident.name} 
+                  src={selectedResident?.avatar || selectedResident?.avatarUrl || '/default-avatar.svg'}
+                  alt={selectedResident?.fullName || 'avatar'} 
                   style={{
                     height: '10rem', 
                     width: '10rem', 
@@ -902,24 +891,28 @@ export default function FamilyPortalPage() {
               <div style={{flex: 1, marginTop: '1.5rem'}}>
                 
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Tên: </span>{selectedResident.name}
+                  <span style={{fontWeight: 800, color: '#374151'}}>Họ và Tên: </span>{selectedResident?.full_name || selectedResident?.fullName || 'Chưa cập nhật'}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Mối quan hệ: </span>{selectedResident.relationship}
+                  <span style={{fontWeight: 800, color: '#374151'}}>Ngày sinh: </span>
+                  {selectedResident?.date_of_birth || selectedResident?.dateOfBirth
+                    ? `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}`
+                    : 'Chưa cập nhật'}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Giới tính: </span>{selectedResident.gender}
+                  <span style={{fontWeight: 800, color: '#374151'}}>Giới tính: </span>{selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa cập nhật')}
                 </div>
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Phòng: </span>{selectedResident.room}
+                  <span style={{fontWeight: 800, color: '#374151'}}>Phòng: </span>{roomLoading ? 'Đang tải...' : roomNumber}
                 </div>
+                
                 <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Tuổi: </span>{selectedResident.age} tuổi
+                  <span style={{fontWeight: 800, color: '#374151'}}>Mối quan hệ với người cao tuổi: </span>{selectedResident?.relationship || selectedResident?.emergency_contact?.relationship || selectedResident?.emergencyContact?.relationship || 'Chưa cập nhật'}
                 </div>
                 <div style={{marginBottom: '1.5rem'}}>
-                  <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
-                    <div style={{width: '0.5rem', height: '0.5rem', background: selectedResident.status === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
-                    Trạng thái sức khỏe: {selectedResident.status}
+                  <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident?.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident?.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident?.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
+                    <div style={{width: '0.5rem', height: '0.5rem', background: selectedResident?.status === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
+                    Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                   </span>
                 </div>
                 <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
@@ -994,7 +987,7 @@ export default function FamilyPortalPage() {
                       color: '#1f2937', 
                       margin: 0
                     }}>
-                      Chỉ số sức khỏe của {selectedResident.name}
+                      Chỉ số sức khỏe của {selectedResident?.full_name}
                     </h3>
                   </div>
                   
@@ -1003,7 +996,9 @@ export default function FamilyPortalPage() {
                     color: '#6b7280', 
                     margin: '0 0 1rem 0'
                   }}>
-                    <span style={{fontWeight: 600}}>Lần cập nhật gần nhất:</span> {selectedResident.vitals.lastUpdated}
+                    <span style={{fontWeight: 600}}>Lần cập nhật gần nhất:</span> {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? new Date(vitalSigns.date_time).toLocaleDateString('vi-VN', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    }) : 'Không có dữ liệu'}
                   </p>
                   
                   <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
@@ -1014,7 +1009,9 @@ export default function FamilyPortalPage() {
                       border: '1px solid rgba(239, 68, 68, 0.2)'
                     }}>
                       <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Huyết áp (mmHg)</div>
-                      <div style={{fontWeight: 700, color: '#ef4444', fontSize: '0.8rem'}}>{selectedResident.vitals.bloodPressure}</div>
+                      <div style={{fontWeight: 700, color: '#ef4444', fontSize: '0.8rem'}}>
+                        {vitalLoading ? 'Đang tải...' : vitalSigns?.blood_pressure ?? 'Không có dữ liệu'}
+                      </div>
                     </div>
                     
                     <div style={{
@@ -1024,7 +1021,9 @@ export default function FamilyPortalPage() {
                       border: '1px solid rgba(16, 185, 129, 0.2)'
                     }}>
                       <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Nhịp tim (bpm)</div>
-                      <div style={{fontWeight: 700, color: '#10b981', fontSize: '0.8rem'}}>{selectedResident.vitals.heartRate}</div>
+                      <div style={{fontWeight: 700, color: '#10b981', fontSize: '0.8rem'}}>
+                        {vitalLoading ? 'Đang tải...' : vitalSigns?.heart_rate ?? 'Không có dữ liệu'}
+                      </div>
                     </div>
                     
                     <div style={{
@@ -1034,7 +1033,9 @@ export default function FamilyPortalPage() {
                       border: '1px solid rgba(245, 158, 11, 0.2)'
                     }}>
                       <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Nhiệt độ cơ thể</div>
-                      <div style={{fontWeight: 700, color: '#f59e0b', fontSize: '0.8rem'}}>{selectedResident.vitals.temperature}°C</div>
+                      <div style={{fontWeight: 700, color: '#f59e0b', fontSize: '0.8rem'}}>
+                        {vitalLoading ? 'Đang tải...' : vitalSigns?.temperature ?? 'Không có dữ liệu'}°C
+                      </div>
                     </div>
                     
                     <div style={{
@@ -1044,7 +1045,9 @@ export default function FamilyPortalPage() {
                       border: '1px solid rgba(99, 102, 241, 0.2)'
                     }}>
                       <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Cân nặng hiện tại</div>
-                      <div style={{fontWeight: 700, color: '#6366f1', fontSize: '0.8rem'}}>{selectedResident.vitals.weight} kg</div>
+                      <div style={{fontWeight: 700, color: '#6366f1', fontSize: '0.8rem'}}>
+                        {vitalLoading ? 'Đang tải...' : vitalSigns?.weight ?? 'Không có dữ liệu'} kg
+                      </div>
                     </div>
                   </div>
                   
@@ -1148,11 +1151,11 @@ export default function FamilyPortalPage() {
                           if (!date) return;
                           // Chỉ cho phép chọn ngày có trong activityHistory
                           const iso = date.toISOString().slice(0, 10);
-                          if (selectedResident.activityHistory.some(day => day.date === iso)) {
+                          if (selectedResident?.activityHistory.some((day: { date: string }) => day.date === iso)) {
                             setSelectedActivityDate(iso);
                           }
                         }}
-                        includeDates={selectedResident.activityHistory.map(day => new Date(day.date))}
+                        includeDates={(selectedResident?.activityHistory ?? []).map((day: { date: string }) => new Date(day.date))}
                         dateFormat="EEEE, d 'tháng' M, yyyy"
                         locale={vi}
                         popperPlacement="bottom"
@@ -1256,8 +1259,9 @@ export default function FamilyPortalPage() {
                     </div>
 
                     <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                      {selectedResident.activityHistory
-                        .find(day => day.date === selectedActivityDate)?.activities.map((activity) => (
+                      {(selectedResident?.activityHistory ?? [])
+                        .find((day: { date: string; activities: any[] }) => day.date === selectedActivityDate)?.activities
+                        ?.map((activity: any) => (
                         <div
                           key={activity.id}
                           style={{
@@ -1310,7 +1314,8 @@ export default function FamilyPortalPage() {
                   </div>
                 ) : (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                    {selectedResident.activities.map((activity) => (
+                    {Array.isArray(selectedResident?.activities) && selectedResident?.activities.length > 0 ? (
+                      selectedResident.activities.map((activity: any) => (
                       <div
                         key={activity.id}
                         style={{
@@ -1344,7 +1349,10 @@ export default function FamilyPortalPage() {
                           </span>
                         </div>
                       </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div>Không có dữ liệu hoạt động</div>
+                    )}
                   </div>
                 )}
               </Tab.Panel>
@@ -1368,22 +1376,59 @@ export default function FamilyPortalPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedResident.careNotes.map((note) => {
-                        let staffName = note.staff;
-                        let staffRole = '';
-                        if (note.staff.includes(',')) {
-                          const parts = note.staff.split(',');
-                          staffName = parts[0].trim();
-                          staffRole = parts[1].trim();
-                        }
-                        return (
-                          <tr key={note.id} style={{borderTop: '1px solid #e5e7eb'}}>
-                            <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}><span style={{fontWeight: 600}}></span>{new Date(note.date).toLocaleDateString('vi-VN')}</td>
-                            <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}><span style={{fontWeight: 600}}></span>{note.note}</td>
-                            <td style={{padding: '0.75rem', fontSize: '0.95em'}}><span style={{fontWeight: 600}}></span><span style={{fontWeight: 700, color: '#8b5cf6'}}>{staffName}</span>{staffRole && (<span style={{fontWeight: 500, color: '#6366f1', fontSize: '0.85em', marginLeft: 4}}>&nbsp;({staffRole})</span>)}</td>
-                          </tr>
-                        );
-                      })}
+                      {careNotesLoading ? (
+                        <tr><td colSpan={3}>Đang tải ghi chú chăm sóc...</td></tr>
+                      ) : careNotesError ? (
+                        <tr><td colSpan={3} style={{color: 'red'}}>{careNotesError}</td></tr>
+                      ) : Array.isArray(careNotes) && careNotes.length > 0 ? (
+                        careNotes.map((note: any) => {
+                          return (
+                            <tr key={note._id} style={{borderTop: '1px solid #e5e7eb'}}>
+                              <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}>
+                                {note.date ? new Date(note.date).toLocaleDateString('vi-VN') : ''}
+                              </td>
+                              <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}>
+                                <div style={{fontWeight: 700, marginBottom: 4}}>{note.assessment_type || 'Đánh giá'}</div>
+                                <div style={{marginBottom: 2}}><span style={{fontWeight: 600}}>Ghi chú: </span>{note.notes || 'Không có ghi chú'}</div>
+                                <div><span style={{fontWeight: 600}}>Khuyến nghị: </span>{note.recommendations || 'Không có khuyến nghị'}</div>
+                              </td>
+                              <td style={{padding: '0.75rem', fontSize: '0.95em'}}>
+                                <span style={{fontWeight: 700, color: '#8b5cf6'}}>{
+                                  (() => {
+                                    const staff = staffList.find((s: any) => String(s._id) === String(note.conducted_by));
+                                    if (staff) {
+                                      return staff.fullName || staff.full_name || staff.name || staff.username || staff.email;
+                                    }
+                                    if (note.conducted_by && fetchedStaffNames[note.conducted_by]) {
+                                      return fetchedStaffNames[note.conducted_by];
+                                    }
+                                    if (note.conducted_by && !fetchedStaffNames[note.conducted_by]) {
+                                      // Dùng userAPI.getById để lấy tên staff
+                                      userAPI.getById(note.conducted_by)
+                                        .then(data => {
+                                          setFetchedStaffNames(prev => ({
+                                            ...prev,
+                                            [note.conducted_by]: (data.full_name || data.fullName || data.name || data.username || data.email || note.conducted_by) + (data.position ? ` (${data.position})` : '')
+                                          }));
+                                        })
+                                        .catch(() => {
+                                          setFetchedStaffNames(prev => ({
+                                            ...prev,
+                                            [note.conducted_by]: note.conducted_by
+                                          }));
+                                        });
+                                      return 'Đang tải...';
+                                    }
+                                    return '---';
+                                  })()
+                                }</span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr><td colSpan={3}>Không có ghi chú chăm sóc</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1399,132 +1444,71 @@ export default function FamilyPortalPage() {
                   Lịch sử chỉ số sức khỏe
                 </h3>
                 <div style={{overflowX: 'auto'}}>
-                  <table style={{width: '100%', borderCollapse: 'collapse', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderRadius: '0.75rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}>
+                  <table style={{
+                    width: '100%',
+                    borderCollapse: 'separate',
+                    borderSpacing: 0,
+                    background: 'white',
+                    borderRadius: 16,
+                    boxShadow: '0 4px 24px rgba(139,92,246,0.07)',
+                    overflow: 'hidden'
+                  }}>
                     <thead>
-                      <tr>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ngày</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Thời gian đo</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Huyết áp</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhịp tim</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhiệt độ</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Cân nặng</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ghi chú</th>
+                      <tr style={{
+                        background: 'linear-gradient(90deg, #ede9fe 0%, #f3f4f6 100%)'
+                      }}>
+                        {['Ngày', 'Thời gian đo', 'Huyết áp', 'Nhịp tim', 'Nhiệt độ', 'Cân nặng', 'Ghi chú'].map((h, i) => (
+                          <th key={i} style={{
+                            padding: '1rem',
+                            textAlign: 'left',
+                            color: '#7c3aed',
+                            fontWeight: 800,
+                            fontSize: 15,
+                            letterSpacing: 1,
+                            borderBottom: '2px solid #ede9fe',
+                            textTransform: 'uppercase'
+                          }}>{h}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedResident.vitalHistory.map((vital, index) => (
-                        <tr key={vital.id} style={{
-                          borderTop: index > 0 ? '1px solid #e5e7eb' : 'none',
-                          background: index % 2 === 0 ? 'white' : 'rgba(248, 250, 252, 0.5)'
-                        }}>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#374151', 
-                            fontWeight: 600,
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {new Date(vital.date).toLocaleDateString('vi-VN')}
-                          </td>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#6b7280',
-                            whiteSpace: 'nowrap',
-                            
-                          }}>
-                            {vital.time} am
-                          </td>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#374151',
-                            fontWeight: 600
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                              color: '#92400e',
-                              border: '1px solid #fbbf24'
+                      {vitalHistoryLoading ? (
+                        <tr><td colSpan={7} style={{padding: '1.5rem', textAlign: 'center', color: '#8b5cf6'}}>Đang tải dữ liệu...</td></tr>
+                      ) : vitalSignsHistory.length > 0 ? (
+                        vitalSignsHistory.map((vital: any, index: number) => (
+                          <tr key={vital._id}
+                            style={{
+                              background: index % 2 === 0 ? '#fff' : '#f8fafc',
+                              transition: 'background 0.2s'
                             }}>
-                              {vital.bloodPressure} mmHg
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#374151',
-                            fontWeight: 600
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                              color: '#1e40af',
-                              border: '1px solid #60a5fa'
-                            }}>
-                              {vital.heartRate} bpm
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#374151',
-                            fontWeight: 600
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                              color: '#166534',
-                              border: '1px solid #86efac'
-                            }}>
-                              {vital.temperature}°C
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#374151',
-                            fontWeight: 600
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
-                              color: '#be185d',
-                              border: '1px solid #f9a8d4'
-                            }}>
-                              {vital.weight} kg
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '0.75rem', 
-                            fontSize: '0.95em', 
-                            color: '#6b7280',
-                            fontStyle: 'italic'
-                          }}>
-                            {vital.notes}
-                          </td>
+                            <td style={{padding: '1rem', fontWeight: 600, color: '#374151'}}>
+                              {vital.date_time ? new Date(vital.date_time).toLocaleDateString('vi-VN') : ''}
+                            </td>
+                            <td style={{padding: '1rem', color: '#6b7280'}}>
+                              {vital.date_time ? new Date(vital.date_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </td>
+                            <td style={{padding: '1rem', fontWeight: 700, color: '#ef4444', fontSize: 16}}>
+                              {vital.blood_pressure ?? <span style={{color:'#9ca3af'}}>--</span>}
+                            </td>
+                            <td style={{padding: '1rem', fontWeight: 700, color: '#10b981', fontSize: 16}}>
+                                {vital.heart_rate ?? <span style={{color:'#9ca3af'}}>--</span>}
+                            </td>
+                            <td style={{padding: '1rem', fontWeight: 700, color: '#f59e0b', fontSize: 16}}>
+                              {vital.temperature ?? <span style={{color:'#9ca3af'}}>--</span>}
+                            </td>
+                            <td style={{padding: '1rem', fontWeight: 700, color: '#6366f1', fontSize: 16}}>
+                              {vital.weight ?? <span style={{color:'#9ca3af'}}>--</span>}
+                            </td>
+                            <td style={{padding: '1rem', color: '#6b7280', fontStyle: 'italic', fontSize: 15}}>
+                              {vital.notes ?? <span style={{color:'#9ca3af'}}>--</span>}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} style={{padding: '1.5rem', textAlign: 'center', color: '#9ca3af'}}>Không có dữ liệu chỉ số sức khỏe</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1605,7 +1589,7 @@ export default function FamilyPortalPage() {
                       color: '#6b7280',
                       margin: 0
                     }}>
-                      Nhân viên đang chăm sóc người cao tuổi {selectedResident.name}
+                      Nhân viên đang chăm sóc người cao tuổi {selectedResident?.fullName}
                     </p>
                   </div>
                 </div>

@@ -5,7 +5,6 @@ import ClientLayout from "@/components/layout/ClientLayout";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ResidentsProvider } from "@/lib/contexts/residents-context";
 import { ActivitiesProvider } from "@/lib/contexts/activities-context";
-import { ChatProvider } from "@/lib/contexts/chat-context";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,9 +31,7 @@ export default function RootLayout({
         <AuthProvider>
           <ResidentsProvider>
             <ActivitiesProvider>
-              <ChatProvider>
-                <ClientLayout>{children}</ClientLayout>
-              </ChatProvider>
+              <ClientLayout>{children}</ClientLayout>
             </ActivitiesProvider>
           </ResidentsProvider>
         </AuthProvider>

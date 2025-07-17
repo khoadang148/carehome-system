@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import StaffDashboardWidgets from '@/components/staff/StaffDashboardWidgets';
 import FamilyDashboardWidgets from '@/components/family/FamilyDashboardWidgets';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { vitalSignsAPI } from '@/lib/api';
 import { 
   UsersIcon,
   HeartIcon,
@@ -73,7 +75,7 @@ const ROLE_DASHBOARDS = {
         icon: ClipboardDocumentListIcon,
         href: '/staff/tasks',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        stats: '5 nhiệm vụ hôm nay'
+        
       },
       {
         title: 'Chỉ số sức khỏe',
@@ -81,7 +83,7 @@ const ROLE_DASHBOARDS = {
         icon: HeartIcon,
         href: '/staff/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-        stats: '8 ghi nhận hôm nay'
+      
       },
      /* {
         title: 'Hỗ trợ',
@@ -168,12 +170,50 @@ const ROLE_DASHBOARDS = {
 export default function RoleDashboard() {
   const { user } = useAuth();
   const router = useRouter();
+  // Thêm state cho số lượng ghi nhận chỉ số sức khỏe hôm nay
+  const [vitalSignsToday, setVitalSignsToday] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Chỉ fetch nếu là staff
+    if (user?.role === 'staff') {
+      // Giả sử API trả về tất cả ghi nhận, lọc theo ngày hôm nay
+      vitalSignsAPI.getAll()
+        .then((data: any[]) => {
+          console.log('Vital signs data:', data); // Thêm log để kiểm tra dữ liệu thực tế
+          // Log chi tiết trường ngày của từng bản ghi
+          data.forEach(item => console.log('Ngày:', item.date, item.recordedAt, item.createdAt));
+          // Lọc các ghi nhận có ngày là hôm nay
+          const today = new Date();
+          const todayStr = today.toISOString().slice(0, 10); // yyyy-mm-dd
+          // Ưu tiên các trường ngày phổ biến
+          const count = data.filter(item => {
+            const dateStr = (item.date || item.recordedAt || item.createdAt || '').slice(0, 10);
+            return dateStr === todayStr;
+          }).length;
+          setVitalSignsToday(count);
+        })
+        .catch(() => setVitalSignsToday(null));
+    }
+  }, [user?.role]);
 
   if (!user) {
     return null;
   }
 
-  const dashboard = ROLE_DASHBOARDS[user.role as keyof typeof ROLE_DASHBOARDS];
+  let dashboard;
+  if (user?.role === 'staff') {
+    dashboard = { ...ROLE_DASHBOARDS['staff'] };
+    dashboard.cards = dashboard.cards.map(card => {
+      if (card.title === 'Chỉ số sức khỏe') {
+        // Xóa stats khỏi card này
+        const { stats, ...rest } = card;
+        return rest;
+      }
+      return card;
+    });
+  } else {
+    dashboard = ROLE_DASHBOARDS[user.role as keyof typeof ROLE_DASHBOARDS];
+  }
 
   if (!dashboard) {
     return null;
@@ -323,7 +363,8 @@ export default function RoleDashboard() {
               </p>
 
               {/* Stats */}
-              {card.stats && (
+              {/* Chỉ render stats nếu không phải staff hoặc card này không phải 'Chỉ số sức khỏe' */}
+              {card.stats && !(user?.role === 'staff' && card.title === 'Chỉ sức khỏe') && (
                 <div style={{
                   padding: '0.5rem 1rem',
                   background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',

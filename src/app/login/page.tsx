@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -25,62 +25,85 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [role, setRole] = useState<'staff' | 'family' | 'admin'>('staff');
   const [showPassword, setShowPassword] = useState(false);
 
-  const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/';
+  const { login, user, loading } = useAuth();
+
+  // Redirect nếu đã đăng nhập
+  useEffect(() => {
+    if (!loading && user) {
+      if (returnUrl && returnUrl !== '/login') {
+        router.replace(returnUrl);
+      } else if (user.role === 'family') {
+        router.replace('/family');
+      } else if (user.role === 'admin') {
+        router.replace('/admin');
+      } else if (user.role === 'staff') {
+        router.replace('/staff');
+      } else {
+        router.replace('/');
+      }
+    }
+  }, [user, loading, router, returnUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
+    // Tạo timeout promise để tránh chờ quá lâu
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 5000); // 5 giây timeout
+    });
+
     try {
-      const loginEmail = email || `${role}@example.com`;
-      const success = await login(loginEmail, password || role);
+      // Race giữa login và timeout
+      const success = await Promise.race([
+        login(email, password),
+        timeoutPromise
+      ]);
       
       if (!success) {
         setError('Thông tin đăng nhập không chính xác. Vui lòng thử lại.');
       }
-    } catch (err) {
-      setError('Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
+      // Nếu thành công, context sẽ tự redirect
+    } catch (err: any) {
+      // Xử lý lỗi chi tiết từ API
+      if (err.response) {
+        const status = err.response.status;
+        const data = err.response.data;
+        if (status === 401) {
+          setError('Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.');
+        } else if (status === 403) {
+          setError('Tài khoản của bạn không có quyền truy cập.');
+        } else if (status === 423) {
+          setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.');
+        } else if (status === 404) {
+          setError('Tài khoản không tồn tại.');
+        } else if (data && (data.detail || data.message)) {
+          const msg = data.detail || data.message;
+          if (typeof msg === 'string' && (msg.includes('/auth/refresh') || msg.includes('Khoa'))) {
+            setError('Phiên đăng nhập đã hết hạn hoặc có lỗi xác thực. Vui lòng đăng nhập lại.');
+          } else {
+            setError(msg);
+          }
+        } else {
+          setError('Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
+        }
+      } else if (err.message && err.message.includes('hết thời gian chờ')) {
+        setError('Kết nối chậm. Vui lòng kiểm tra mạng và thử lại.');
+      } else if (err.message && err.message.includes('Không thể kết nối')) {
+        setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
+      } else {
+        setError(err.message || 'Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
-
-  const roleOptions = [
-    { 
-      value: 'admin', 
-      label: 'Quản trị hệ thống', 
-      icon: ShieldCheckIcon,
-      description: 'Toàn quyền quản lý hệ thống',
-      color: '#0ea5e9',
-      lightBg: '#f0f9ff',
-      darkBg: '#0c4a6e'
-    },
-    { 
-      value: 'staff', 
-      label: 'Nhân viên y tế', 
-      icon: AcademicCapIcon,
-      description: 'Điều dưỡng, bác sĩ chuyên khoa',
-      color: '#10b981',
-      lightBg: '#ecfdf5',
-      darkBg: '#064e3b'
-    },
-    { 
-      value: 'family', 
-      label: 'Thân nhân', 
-      icon: HeartIcon,
-      description: 'Theo dõi thông tin người thân',
-      color: '#f59e0b',
-      lightBg: '#fffbeb',
-      darkBg: '#92400e'
-    }
-  ];
 
   return (
     <div style={{ 
@@ -124,6 +147,10 @@ export default function LoginPage() {
         @keyframes glowLoop {
           0%, 100% { filter: brightness(1) drop-shadow(0 0 0px #fff6); }
           50% { filter: brightness(1.15) drop-shadow(0 0 12px #fff8); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
       {/* Subtle Animated Grid */}
@@ -653,12 +680,11 @@ export default function LoginPage() {
         `,
         borderRadius: '50%',
         animation: 'megaFloat 4s ease-in-out infinite, continuousRotate 12s linear infinite, megaPulse 6s ease-in-out infinite',
-        boxShadow: '0 0 20px rgba(255, 0, 110, 0.8)',
+        boxShadow: '0 0 20px rgba(255, 0, 110, 0.8), 0 15px 30px rgba(84, 160, 255, 0.4)',
         border: '1px solid rgba(255, 255, 255, 0.4)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 15px 30px rgba(84, 160, 255, 0.4)'
+        justifyContent: 'center'
       }}>
         <ShieldCheckIcon style={{ width: '45px', height: '45px', color: 'white', filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.8))' }} />
       </div>
@@ -1121,130 +1147,6 @@ export default function LoginPage() {
             )}
             
             <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-              {/* Role Selection */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '1rem'
-                }}>
-                  Loại tài khoản
-                </label>
-                <div style={{ 
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem'
-                }}>
-                  {roleOptions.map((option) => (
-                    <button 
-                      key={option.value}
-                      type="button"
-                      onClick={() => setRole(option.value as any)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '1rem',
-                          padding: '1rem 1.25rem',
-                          borderRadius: '12px',
-                        border: '2px solid',
-                        borderColor: role === option.value ? option.color : '#e5e7eb',
-                          background: role === option.value 
-                            ? `linear-gradient(135deg, ${option.lightBg} 0%, ${option.lightBg}80 100%)`
-                            : 'white',
-                        cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          textAlign: 'left',
-                          position: 'relative',
-                          overflow: 'hidden'
-                      }}
-                      onMouseOver={(e) => {
-                        if (role !== option.value) {
-                            e.currentTarget.style.borderColor = option.color + '60';
-                            e.currentTarget.style.background = option.lightBg + '40';
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (role !== option.value) {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                          e.currentTarget.style.background = 'white';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                        }
-                      }}
-                    >
-                        {role === option.value && (
-                      <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: '3px',
-                            background: `linear-gradient(90deg, ${option.color} 0%, ${option.darkBg} 100%)`
-                          }} />
-                        )}
-                        
-                      <div style={{
-                          width: '45px',
-                          height: '45px',
-                          background: role === option.value 
-                            ? `linear-gradient(135deg, ${option.color} 0%, ${option.darkBg} 100%)`
-                            : '#f8fafc',
-                          borderRadius: '10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                          flexShrink: 0,
-                          boxShadow: role === option.value ? `0 4px 12px ${option.color}30` : 'none'
-                      }}>
-                        <option.icon style={{
-                            width: '20px', 
-                            height: '20px', 
-                          color: role === option.value ? 'white' : '#6b7280'
-                        }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                            fontSize: '0.9rem',
-                          fontWeight: 600,
-                            color: role === option.value ? option.darkBg : '#374151',
-                          marginBottom: '0.25rem'
-                        }}>
-                          {option.label}
-                        </div>
-                        <div style={{
-                          fontSize: '0.75rem',
-                            color: '#6b7280',
-                            lineHeight: 1.4
-                        }}>
-                          {option.description}
-                        </div>
-                      </div>
-                      {role === option.value && (
-                        <div style={{
-                            width: '24px',
-                            height: '24px',
-                          background: option.color,
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                            justifyContent: 'center',
-                            animation: 'pulse 2s infinite'
-                        }}>
-                          <div style={{
-                              width: '8px',
-                              height: '8px',
-                            background: 'white',
-                            borderRadius: '50%'
-                          }} />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
               {/* Email Input */}
               <div>
                 <label 
@@ -1274,7 +1176,7 @@ export default function LoginPage() {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder={`${role}@example.com`}
+                    placeholder={"example@email.com"}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={{
@@ -1433,7 +1335,7 @@ export default function LoginPage() {
                     borderRadius: '12px',
                   border: 'none',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.3s ease',
+                    transition: 'all 0.2s ease',
                     marginTop: '0.5rem',
                     boxShadow: isLoading ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.3)',
                     position: 'relative',
@@ -1462,7 +1364,7 @@ export default function LoginPage() {
                       border: '2px solid rgba(255,255,255,0.3)',
                       borderTopColor: 'white',
                       borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
+                      animation: 'spin 0.8s linear infinite'
                     }} />
                     Đang xác thực...
                   </div>

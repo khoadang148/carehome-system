@@ -26,6 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ReactDOM from 'react-dom';
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { billsAPI, carePlansAPI, roomsAPI } from '@/lib/api';
 
 // Mock financial transactions data (for admin)
 const adminTransactions = [
@@ -244,6 +245,17 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+// Helper function to format date of birth as dd-mm-yyyy
+const formatDob = (dob: string) => {
+  if (!dob) return 'Chưa cập nhật';
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return 'Chưa cập nhật';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 export default function FinancePage() {
   // Add CSS for animations
   React.useEffect(() => {
@@ -278,6 +290,114 @@ export default function FinancePage() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
+  const [familyFinancialData, setFamilyFinancialData] = useState<any[]>([]); // <-- move this here, replace mock
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomLoading, setRoomLoading] = useState(false);
+
+  // Fetch residents for family
+  useEffect(() => {
+    const fetchResidentsAndBills = async (familyMemberId: string, accessToken: string) => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/residents/family-member/${familyMemberId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: '*/*',
+            },
+          }
+        );
+        if (!res.ok) throw new Error('Failed to fetch residents');
+        const residents = await res.json();
+        if (!Array.isArray(residents)) {
+          setFamilyFinancialData([]);
+          return;
+        }
+        // Fetch bills for each resident
+        const billsData = await Promise.all(residents.map(async (resident: any) => {
+          let bills = [];
+          try {
+            bills = await billsAPI.getByResidentId(resident._id);
+          } catch (e) {
+            bills = [];
+          }
+          // Map bills to UI payment structure
+          const payments = Array.isArray(bills) ? bills.map((bill: any, idx: number) => ({
+            id: bill._id || idx,
+            description: bill.care_plan_snapshot?.planName || bill.notes || 'Hóa đơn dịch vụ',
+            amount: bill.amount,
+            originalAmount: bill.amount,
+            lateFee: 0, // You can calculate late fee if needed
+            discount: 0,
+            totalAmount: bill.amount,
+            dueDate: bill.due_date,
+            paidDate: bill.paid_date,
+            status: bill.status === 'paid' ? 'paid' : (bill.status === 'unpaid' ? 'pending' : bill.status),
+            method: bill.payment_method || '',
+            bankReference: '',
+            paymentType: 'full',
+            verificationStatus: 'verified',
+            createdAt: bill.createdAt,
+            updatedAt: bill.updatedAt,
+            invoiceId: bill._id,
+            transactionId: bill._id,
+            notes: bill.notes,
+            care_plan_snapshot: bill.care_plan_snapshot,
+          })) : [];
+          return {
+            id: resident._id,
+            residentName: resident.full_name || resident.fullName || resident.name,
+            room: resident.room || '',
+            residentDob: resident.dateOfBirth || resident.date_of_birth || '',
+            birthYear: resident.birthYear || '',
+            payments,
+            totalPaid: payments.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
+            totalDue: payments.filter((p: any) => p.status !== 'paid').reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
+            nextPaymentDate: payments.find((p: any) => p.status !== 'paid')?.dueDate || '',
+          };
+        }));
+        setFamilyFinancialData(billsData);
+      } catch (err) {
+        setFamilyFinancialData([]);
+      }
+    };
+
+    if (user?.role === 'family') {
+      const accessToken = sessionStorage.getItem('access_token');
+      if (user.id && accessToken) {
+        fetchResidentsAndBills(user.id, accessToken);
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!familyFinancialData[selectedResident]) {
+      setRoomNumber('Chưa cập nhật');
+      return;
+    }
+    const residentId = familyFinancialData[selectedResident]?.id || familyFinancialData[selectedResident]?._id;
+    if (!residentId) {
+      setRoomNumber('Chưa cập nhật');
+      return;
+    }
+    setRoomLoading(true);
+    carePlansAPI.getByResidentId(residentId)
+      .then((assignments: any[]) => {
+        const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+        const roomId = assignment?.assigned_room_id;
+        if (roomId) {
+          return roomsAPI.getById(roomId)
+            .then((room: any) => {
+              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+            })
+            .catch(() => setRoomNumber('Chưa cập nhật'));
+        } else {
+          setRoomNumber('Chưa cập nhật');
+        }
+      })
+      .catch(() => setRoomNumber('Chưa cập nhật'))
+      .finally(() => setRoomLoading(false));
+  }, [selectedResident, familyFinancialData]);
 
   // Hide header when modals are open
   useEffect(() => {
@@ -476,7 +596,7 @@ export default function FinancePage() {
       // Step 5: Update payment data with comprehensive information
       const updatedData = [...familyFinancialData];
       const residentData = updatedData[selectedResident];
-      const paymentIndex = residentData.payments.findIndex(p => p.id === selectedPayment.id);
+      const paymentIndex = residentData.payments.findIndex((p: any) => p.id === selectedPayment.id);
       
       if (paymentIndex !== -1) {
         const now = new Date().toISOString();
@@ -524,7 +644,7 @@ export default function FinancePage() {
       createAuditLog('payment_completed', selectedPayment, {
         lateFee,
         finalAmount,
-        bankReference: bankResponse?.bankReference || 'MB972047950',
+        bankReference: bankResponse && bankResponse.bankReference ? bankResponse.bankReference : 'MB972047950',
         processingTime: Date.now() - parseInt(auditLog.id.slice(-6)),
         receipt: receipt.receiptId
       });
@@ -535,7 +655,7 @@ export default function FinancePage() {
         
         📋 Thông tin giao dịch:
         • Mã giao dịch: ${selectedPayment.transactionId || 'TXN202406001'}
-        • Mã ngân hàng: ${bankResponse?.bankReference || 'MB972047950'}
+        • Mã ngân hàng: ${(bankResponse && bankResponse.bankReference) || 'MB972047950'}
         • Số tiền: ${formatCurrency(finalAmount)}
         ${lateFee > 0 ? `• Phí trễ hạn: ${formatCurrency(lateFee)}` : ''}
         • Phí giao dịch: ${formatCurrency(0)}
@@ -880,18 +1000,18 @@ export default function FinancePage() {
 
   const sendNotification = async (type: string, payment: any, recipient: any) => {
     // In real application, this would call email/SMS service
-    const notifications = {
+    const notifications: { [key: string]: any } = {
       payment_reminder: {
-        subject: `Nhắc nhở thanh toán - ${payment.description}`,
-        message: `Kính gửi gia đình, hóa đơn ${payment.invoiceId} đến hạn thanh toán vào ${new Date(payment.dueDate).toLocaleDateString('vi-VN')}. Số tiền: ${formatCurrency(payment.totalAmount)}`
+        subject: 'Nhắc nhở thanh toán',
+        message: 'Vui lòng thanh toán phí dịch vụ đúng hạn để tránh phát sinh phí trễ.'
       },
       payment_success: {
-        subject: `Xác nhận thanh toán thành công - ${payment.description}`,
-        message: `Cảm ơn bạn đã thanh toán thành công. Mã giao dịch: ${payment.transactionId}. Số tiền: ${formatCurrency(payment.amount)}`
+        subject: 'Thanh toán thành công',
+        message: 'Cảm ơn bạn đã thanh toán phí dịch vụ.'
       },
       payment_overdue: {
-        subject: `Thông báo quá hạn thanh toán - ${payment.description}`,
-        message: `Hóa đơn ${payment.invoiceId} đã quá hạn. Phí trễ hạn sẽ được tính thêm. Vui lòng thanh toán sớm nhất có thể.`
+        subject: 'Thanh toán quá hạn',
+        message: 'Bạn đã quá hạn thanh toán, vui lòng thanh toán sớm nhất có thể.'
       }
     };
     
@@ -1222,315 +1342,310 @@ export default function FinancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {familyFinancialData[selectedResident]?.payments
-                    .sort((a, b) => {
-                      const statusA = getPaymentStatus(a);
-                      const statusB = getPaymentStatus(b);
-                      
-                      // Priority order: overdue > grace_period > pending > processing > paid
-                      const statusPriority = {
-                        'overdue': 1,
-                        'grace_period': 2, 
-                        'pending': 3,
-                        'processing': 4,
-                        'paid': 5
-                      };
-                      
-                      // Sort by status priority first
-                      if (statusPriority[statusA] !== statusPriority[statusB]) {
-                        return statusPriority[statusA] - statusPriority[statusB];
-                      }
-                      
-                      // If same status, sort by date (newest first for unpaid, oldest first for paid)
-                      const dateA = new Date(a.dueDate || a.date);
-                      const dateB = new Date(b.dueDate || b.date);
-                      
-                      if (statusA === 'paid') {
-                        return dateB.getTime() - dateA.getTime(); // Newest paid first
-                      } else {
-                        return dateA.getTime() - dateB.getTime(); // Oldest unpaid first (more urgent)
-                      }
-                    })
-                    .map((payment) => (
-                    <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
-                      <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
-                        {payment.description}
-                      </td>
-                      <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
-                        {formatCurrency(payment.amount)}
-                      </td>
-                      <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
-                          <span style={{color: '#111827', fontWeight: 500}}>
-                            {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
-                          </span>
-                          {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
-                            <div style={{
-                              fontSize: '0.65rem',
-                              color: '#dc2626',
-                              fontWeight: 600,
-                              background: '#fef2f2',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.375rem',
-                              border: '1px solid #fecaca',
-                              width: 'fit-content',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              textTransform: 'none',
-                              letterSpacing: 'normal'
-                            }}>
-                              
-                              Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.375rem',
-                          padding: '0.25rem 0.75rem',
-                          background: '#f3f4f6',
-                          borderRadius: '1rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 500,
-                          color: '#374151'
-                        }}>
-                          <BuildingLibraryIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                          Chuyển khoản
-                        </div>
-                      </td>
-                      <td style={{padding: '1rem 0.75rem'}}>
-                        {(() => {
-                          const status = getPaymentStatus(payment);
-                          const statusConfig = {
-                            paid: { 
-                              text: 'Đã thanh toán', 
-                              label: 'Đã thanh toán',
-                              bg: '#e6f9ed', // nền xanh lá nhạt
-                              color: '#16a34a', // chữ xanh lá đậm
-                              border: '#bbf7d0', // border xanh lá pastel
-                              icon: null
-                            },
-                            processing: { 
-                              text: 'Đang xử lý', 
-                              label: 'Đang xử lý',
-                              bg: '#f3f0fd',
-                              color: '#7c3aed',
-                              border: '#ede9fe',
-                              icon: null
-                            },
-                            pending: { 
-                              text: 'Chờ thanh toán', 
-                              label: 'Chờ thanh toán',
-                              bg: '#f0fdf4',
-                              color: '#059669',
-                              border: '#bbf7d0',
-                              icon: null
-                            },
-                            grace_period: { 
-                              text: 'Gia hạn',
-                              label: 'Gia hạn',
-                              bg: '#fefbe9',
-                              color: '#b45309',
-                              border: '#fde68a',
-                              icon: null
-                            },
-                            overdue: { 
-                              text: 'Quá hạn', 
-                              label: 'Quá hạn',
-                              bg: '#fff1f2',
-                              color: '#e11d48',
-                              border: '#fecdd3',
-                              icon: (
-                                <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                              )
-                            }
+                  {Array.isArray(familyFinancialData[selectedResident]?.payments)
+                    ? familyFinancialData[selectedResident].payments
+                        .sort((a: any, b: any) => {
+                          const statusA = getPaymentStatus(a);
+                          const statusB = getPaymentStatus(b);
+                          const statusPriority = {
+                            'overdue': 1,
+                            'grace_period': 2, 
+                            'pending': 3,
+                            'processing': 4,
+                            'paid': 5
                           };
-                          
-                          return (
-                            <div style={{display: 'flex', justifyContent: 'center'}}>
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                padding: '0.18rem 0.7rem',
-                                borderRadius: '0.8rem',
-                                fontSize: '0.92rem',
-                                fontWeight: 500,
-                                background: statusConfig[status].bg,
-                                color: statusConfig[status].color,
-                                border: `1px solid ${statusConfig[status].border}`,
-                                whiteSpace: 'nowrap',
-                                boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
-                                letterSpacing: '0.01em',
-                                lineHeight: 1.32,
-                                fontFamily: 'inherit',
-                                transition: 'background 0.18s, color 0.18s'
-                              }}>
-                                {statusConfig[status].icon}
-                                {statusConfig[status].label}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td style={{padding: '1rem 0.75rem', textAlign: 'center'}}>
-                        {(() => {
-                          const status = getPaymentStatus(payment);
-                          
-                          if (status === 'paid') {
-                            return (
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
-                                <div style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.375rem',
-                                  padding: '0.25rem 0.75rem',
-                                  background: 'rgba(34, 197, 94, 0.1)',
-                                  color: '#16a34a',
-                                  borderRadius: '0.5rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  border: '1px solid rgba(34, 197, 94, 0.3)'
-                                }}>
-                                  <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                  Hoàn thành
-                                </div>
-                                <button
-                                  onClick={() => handleViewInvoice(payment)}
-                                  style={{
-                                    marginTop: '0.25rem',
+                          if (statusPriority[statusA] !== statusPriority[statusB]) {
+                            return statusPriority[statusA] - statusPriority[statusB];
+                          }
+                          const dateA = new Date(a.dueDate || a.date);
+                          const dateB = new Date(b.dueDate || b.date);
+                          if (statusA === 'paid') {
+                            return dateB.getTime() - dateA.getTime();
+                          } else {
+                            return dateA.getTime() - dateB.getTime();
+                          }
+                        })
+                        .map((payment: any) => (
+                          <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
+                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
+                              {payment.description}
+                            </td>
+                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
+                              {formatCurrency(payment.amount)}
+                            </td>
+                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
+                                <span style={{color: '#111827', fontWeight: 500}}>
+                                  {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
+                                </span>
+                                {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
+                                  <div style={{
+                                    fontSize: '0.65rem',
+                                    color: '#dc2626',
+                                    fontWeight: 600,
+                                    background: '#fef2f2',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '0.375rem',
+                                    border: '1px solid #fecaca',
+                                    width: 'fit-content',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '0.375rem',
-                                    padding: '0.375rem 0.75rem',
-                                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    minWidth: '90px'
-                                  }}
-                                  onMouseOver={e => {
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseOut={e => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                  Xem chi tiết
-                                </button>
+                                    gap: '0.25rem',
+                                    textTransform: 'none',
+                                    letterSpacing: 'normal'
+                                  }}>
+                                    
+                                    Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
+                                  </div>
+                                )}
                               </div>
-                            );
-                          }
-                          
-                          if (status === 'processing') {
-                            return (
-                              <span style={{
+                            </td>
+                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
+                              <div style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '0.375rem',
-                                padding: '0.5rem 1rem',
-                                background: 'rgba(59, 130, 246, 0.1)',
-                                color: '#3b82f6',
-                                borderRadius: '0.5rem',
+                                padding: '0.25rem 0.75rem',
+                                background: '#f3f4f6',
+                                borderRadius: '1rem',
                                 fontSize: '0.75rem',
-                                fontWeight: 600
+                                fontWeight: 500,
+                                color: '#374151'
                               }}>
-                                <div style={{
-                                  width: '0.875rem',
-                                  height: '0.875rem',
-                                  border: '2px solid rgba(59, 130, 246, 0.3)',
-                                  borderTop: '2px solid #3b82f6',
-                                  borderRadius: '50%',
-                                  animation: 'spin 1s linear infinite'
-                                }} />
-                                Đang xử lý
-                              </span>
-                            );
-                          }
-                          
-                          if (status === 'pending' || status === 'grace_period' || status === 'overdue') {
-                            const isUrgent = status === 'overdue';
-                            const isWarning = status === 'grace_period';
-                            
-                            return (
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
-                                <button
-                                  onClick={() => handlePayNow(payment)}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.375rem',
-                                    padding: '0.375rem 0.75rem',
-                                    background: isUrgent 
-                                      ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
-                                      : isWarning
-                                      ? 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)'
-                                      : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    minWidth: '90px'
-                                  }}
-                                  onMouseOver={e => {
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseOut={e => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                  {isUrgent ? 'Thanh toán' : 'Thanh toán'}
-                                </button>
-                                <button
-                                  onClick={() => handleViewInvoice(payment)}
-                                  style={{
-                                    marginTop: '0.25rem',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.375rem',
-                                    padding: '0.375rem 0.75rem',
-                                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    minWidth: '90px'
-                                  }}
-                                  onMouseOver={e => {
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseOut={e => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                  }}
-                                >
-                                  <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                  Xem chi tiết
-                                </button>
+                                <BuildingLibraryIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                Chuyển khoản
                               </div>
-                            );
-                          }
-                          
-                          return null;
-                        })()}
-                      </td>
-                    </tr>
-                  ))}
+                            </td>
+                            <td style={{padding: '1rem 0.75rem'}}>
+                              {(() => {
+                                const status = getPaymentStatus(payment);
+                                const statusConfig = {
+                                  paid: { 
+                                    text: 'Đã thanh toán', 
+                                    label: 'Đã thanh toán',
+                                    bg: '#e6f9ed', // nền xanh lá nhạt
+                                    color: '#16a34a', // chữ xanh lá đậm
+                                    border: '#bbf7d0', // border xanh lá pastel
+                                    icon: null
+                                  },
+                                  processing: { 
+                                    text: 'Đang xử lý', 
+                                    label: 'Đang xử lý',
+                                    bg: '#f3f0fd',
+                                    color: '#7c3aed',
+                                    border: '#ede9fe',
+                                    icon: null
+                                  },
+                                  pending: { 
+                                    text: 'Chờ thanh toán', 
+                                    label: 'Chờ thanh toán',
+                                    bg: '#f0fdf4',
+                                    color: '#059669',
+                                    border: '#bbf7d0',
+                                    icon: null
+                                  },
+                                  grace_period: { 
+                                    text: 'Gia hạn',
+                                    label: 'Gia hạn',
+                                    bg: '#fefbe9',
+                                    color: '#b45309',
+                                    border: '#fde68a',
+                                    icon: null
+                                  },
+                                  overdue: { 
+                                    text: 'Quá hạn', 
+                                    label: 'Quá hạn',
+                                    bg: '#fff1f2',
+                                    color: '#e11d48',
+                                    border: '#fecdd3',
+                                    icon: (
+                                      <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                                    )
+                                  }
+                                };
+                                
+                                return (
+                                  <div style={{display: 'flex', justifyContent: 'center'}}>
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      padding: '0.18rem 0.7rem',
+                                      borderRadius: '0.8rem',
+                                      fontSize: '0.92rem',
+                                      fontWeight: 500,
+                                      background: statusConfig[status].bg,
+                                      color: statusConfig[status].color,
+                                      border: `1px solid ${statusConfig[status].border}`,
+                                      whiteSpace: 'nowrap',
+                                      boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
+                                      letterSpacing: '0.01em',
+                                      lineHeight: 1.32,
+                                      fontFamily: 'inherit',
+                                      transition: 'background 0.18s, color 0.18s'
+                                    }}>
+                                      {statusConfig[status].icon}
+                                      {statusConfig[status].label}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td style={{padding: '1rem 0.75rem', textAlign: 'center'}}>
+                              {(() => {
+                                const status = getPaymentStatus(payment);
+                                
+                                if (status === 'paid') {
+                                  return (
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
+                                      <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        padding: '0.25rem 0.75rem',
+                                        background: 'rgba(34, 197, 94, 0.1)',
+                                        color: '#16a34a',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        border: '1px solid rgba(34, 197, 94, 0.3)'
+                                      }}>
+                                        <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                        Hoàn thành
+                                      </div>
+                                      <button
+                                        onClick={() => handleViewInvoice(payment)}
+                                        style={{
+                                          marginTop: '0.25rem',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.375rem',
+                                          padding: '0.375rem 0.75rem',
+                                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '0.5rem',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s ease',
+                                          minWidth: '90px'
+                                        }}
+                                        onMouseOver={e => {
+                                          e.currentTarget.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={e => {
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                      >
+                                        <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                        Xem chi tiết
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                
+                                if (status === 'processing') {
+                                  return (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.375rem',
+                                      padding: '0.5rem 1rem',
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      color: '#3b82f6',
+                                      borderRadius: '0.5rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600
+                                    }}>
+                                      <div style={{
+                                        width: '0.875rem',
+                                        height: '0.875rem',
+                                        border: '2px solid rgba(59, 130, 246, 0.3)',
+                                        borderTop: '2px solid #3b82f6',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite'
+                                      }} />
+                                      Đang xử lý
+                                    </span>
+                                  );
+                                }
+                                
+                                if (status === 'pending' || status === 'grace_period' || status === 'overdue') {
+                                  const isUrgent = status === 'overdue';
+                                  const isWarning = status === 'grace_period';
+                                  
+                                  return (
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
+                                      <button
+                                        onClick={() => handlePayNow(payment)}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.375rem',
+                                          padding: '0.375rem 0.75rem',
+                                          background: isUrgent 
+                                            ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+                                            : isWarning
+                                            ? 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)'
+                                            : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '0.5rem',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s ease',
+                                          minWidth: '90px'
+                                        }}
+                                        onMouseOver={e => {
+                                          e.currentTarget.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={e => {
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                      >
+                                        <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                        {isUrgent ? 'Thanh toán' : 'Thanh toán'}
+                                      </button>
+                                      <button
+                                        onClick={() => handleViewInvoice(payment)}
+                                        style={{
+                                          marginTop: '0.25rem',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.375rem',
+                                          padding: '0.375rem 0.75rem',
+                                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '0.5rem',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s ease',
+                                          minWidth: '90px'
+                                        }}
+                                        onMouseOver={e => {
+                                          e.currentTarget.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={e => {
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                      >
+                                        <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                        Xem chi tiết
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                
+                                return null;
+                              })()}
+                            </td>
+                          </tr>
+                        ))
+                    : null}
                 </tbody>
               </table>
             </div>
@@ -2586,64 +2701,151 @@ export default function FinancePage() {
               <div style={{padding: '2rem 2.2rem', background: 'transparent'}}>
                 {/* Beneficiary & Service Info */}
                 <div style={{
-                  display: 'flex',
-                  gap: '2rem',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                  gap: '1.8rem',
                   marginBottom: '2.2rem',
-                  flexWrap: 'wrap',
                 }}>
                   {/* Beneficiary */}
                   <div style={{
-                    flex: 1,
-                    minWidth: '15rem',
-                    background: 'white',
-                    borderRadius: '1.3rem',
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 1px 4px 0 rgba(51,65,85,0.02)',
-                    padding: '1.3rem 1.5rem',
-                    transition: 'box-shadow 0.18s',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+                    borderRadius: '1.5rem',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 4px 12px 0 rgba(51,65,85,0.08)',
+                    padding: '1.8rem',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}>
-                    <div style={{fontWeight: 500, color: '#8b95a1', fontSize: '0.93rem', marginBottom: '0.6rem', letterSpacing: '0.08em', textTransform:'uppercase'}}>Người cao tuổi</div>
+                    {/* Decorative element */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      background: 'linear-gradient(90deg, #3b82f6, #1d4ed8)',
+                      borderRadius: '1.5rem 1.5rem 0 0'
+                    }} />
+                    
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      marginBottom: '1.2rem'
+                    }}>
+                      <div style={{
+                        width: '2.5rem',
+                        height: '2.5rem',
+                        background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                        borderRadius: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: '1.1rem'
+                      }}>
+                        👤
+                      </div>
+                      <h3 style={{
+                        fontWeight: 600, 
+                        color: '#1e293b', 
+                        fontSize: '1.1rem', 
+                        margin: 0,
+                        letterSpacing: '-0.01em'
+                      }}>
+                        Thông tin người cao tuổi
+                      </h3>
+                    </div>
+                    
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '0.4rem',
+                      gap: '1rem',
                     }}>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <span style={{color:'#8b95a1', fontSize:'0.82rem', fontWeight:500}}>Họ tên:</span>
-                        <span style={{color:'#22223b', fontWeight:600, fontSize:'0.97rem'}}>{familyFinancialData[selectedResident]?.residentName}</span>
+                      <div style={{
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '0.75rem 0',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}>
+                        <span style={{
+                          color:'#64748b', 
+                          fontSize:'0.875rem', 
+                          fontWeight:500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <span style={{fontSize: '0.75rem'}}></span>
+                          Họ tên:
+                        </span>
+                        <span style={{
+                          color:'#0f172a', 
+                          fontWeight:600, 
+                          fontSize:'0.95rem'
+                        }}>
+                          {familyFinancialData[selectedResident]?.residentName}
+                        </span>
                       </div>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <span style={{color:'#8b95a1', fontSize:'0.82rem', fontWeight:500}}>Phòng:</span>
-                        <span style={{color:'#22223b', fontWeight:600, fontSize:'0.97rem'}}>{familyFinancialData[selectedResident]?.room || 'Chưa cập nhật'}</span>
+                      
+                      <div style={{
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '0.75rem 0',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}>
+                        <span style={{
+                          color:'#64748b', 
+                          fontSize:'0.875rem', 
+                          fontWeight:500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <span style={{fontSize: '0.75rem'}}></span>
+                          Phòng:
+                        </span>
+                        <span style={{
+                          color:'#0f172a', 
+                          fontWeight:600, 
+                          fontSize:'0.95rem',
+                          background: '#f1f5f9',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '0.5rem'
+                        }}>
+                          {roomLoading ? 'Đang tải...' : roomNumber}
+                        </span>
                       </div>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <span style={{color:'#8b95a1', fontSize:'0.82rem', fontWeight:500}}>Năm sinh:</span>
-                        <span style={{color:'#22223b', fontWeight:600, fontSize:'0.97rem'}}>{familyFinancialData[selectedResident]?.birthYear || 'Chưa cập nhật'}</span>
+                      
+                      <div style={{
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '0.75rem 0 0 0'
+                      }}>
+                        <span style={{
+                          color:'#64748b', 
+                          fontSize:'0.875rem', 
+                          fontWeight:500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <span style={{fontSize: '0.75rem'}}></span>
+                          Năm sinh:
+                        </span>
+                        <span style={{
+                          color:'#0f172a', 
+                          fontWeight:600, 
+                          fontSize:'0.95rem'
+                        }}>
+                          {formatDob(familyFinancialData[selectedResident]?.residentDob)}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                  {/* Service Packages */}
-                  <div style={{
-                    flex: 1.2,
-                    minWidth: '18rem',
-                    background: 'white',
-                    borderRadius: '1.3rem',
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 1px 4px 0 rgba(51,65,85,0.02)',
-                    padding: '1.1rem 1.3rem',
-                    transition: 'box-shadow 0.18s',
-                  }}>
-                    <div style={{fontWeight: 500, color: '#8b95a1', fontSize: '0.93rem', marginBottom: '0.6rem', letterSpacing: '0.08em', textTransform:'uppercase'}}>Gói dịch vụ sử dụng</div>
-                    <div style={{marginBottom:'0.38rem'}}>
-                      <span style={{color:'#8b95a1', fontWeight:500, fontSize:'0.92rem', letterSpacing:'0.04em'}}>Tên gói:</span>
-                      <span style={{color:'#2563eb', fontWeight:600, marginLeft: 6}}>{getRegisteredServicePackage()?.packageType || 'Chưa đăng ký'}</span>
-                    </div>
-                    <div style={{marginBottom:'0.38rem'}}>
-                      <span style={{color:'#8b95a1', fontWeight:500, fontSize:'0.92rem', letterSpacing:'0.04em'}}>Giá:</span>
-                      <span style={{color:'#16a34a', fontWeight:600, marginLeft: 6}}>{formatCurrency(getRegisteredServicePackage()?.finalPrice || getRegisteredServicePackage()?.price || 0)}</span>
-                    </div>
-                    <div style={{color:'#8b95a1', fontSize:'0.93rem', marginBottom:'0.38rem'}}>Thanh toán: <b style={{fontWeight:500, color:'#334155'}}>Hàng tháng</b></div>
-                    
                   </div>
                 </div>
 
@@ -3104,315 +3306,310 @@ export default function FinancePage() {
                 </tr>
               </thead>
               <tbody>
-                {familyFinancialData[selectedResident]?.payments
-                  .sort((a, b) => {
-                    const statusA = getPaymentStatus(a);
-                    const statusB = getPaymentStatus(b);
-                    
-                    // Priority order: overdue > grace_period > pending > processing > paid
-                    const statusPriority = {
-                      'overdue': 1,
-                      'grace_period': 2, 
-                      'pending': 3,
-                      'processing': 4,
-                      'paid': 5
-                    };
-                    
-                    // Sort by status priority first
-                    if (statusPriority[statusA] !== statusPriority[statusB]) {
-                      return statusPriority[statusA] - statusPriority[statusB];
-                    }
-                    
-                    // If same status, sort by date (newest first for unpaid, oldest first for paid)
-                    const dateA = new Date(a.dueDate || a.date);
-                    const dateB = new Date(b.dueDate || b.date);
-                    
-                    if (statusA === 'paid') {
-                      return dateB.getTime() - dateA.getTime(); // Newest paid first
-                    } else {
-                      return dateA.getTime() - dateB.getTime(); // Oldest unpaid first (more urgent)
-                    }
-                  })
-                  .map((payment) => (
-                  <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
-                    <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
-                      {payment.description}
-                    </td>
-                    <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
-                      {formatCurrency(payment.amount)}
-                    </td>
-                    <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
-                      <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
-                        <span style={{color: '#111827', fontWeight: 500}}>
-                          {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
-                        </span>
-                        {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
-                          <div style={{
-                            fontSize: '0.65rem',
-                            color: '#dc2626',
-                            fontWeight: 600,
-                            background: '#fef2f2',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.375rem',
-                            border: '1px solid #fecaca',
-                            width: 'fit-content',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            textTransform: 'none',
-                            letterSpacing: 'normal'
-                          }}>
-                            
-                            Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        padding: '0.25rem 0.75rem',
-                        background: '#f3f4f6',
-                        borderRadius: '1rem',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#374151'
-                      }}>
-                        <BuildingLibraryIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                        Chuyển khoản
-                      </div>
-                    </td>
-                    <td style={{padding: '1rem 0.75rem'}}>
-                      {(() => {
-                        const status = getPaymentStatus(payment);
-                        const statusConfig = {
-                          paid: { 
-                            text: 'Đã thanh toán', 
-                            label: 'Đã thanh toán',
-                            bg: '#e6f9ed', // nền xanh lá nhạt
-                            color: '#16a34a', // chữ xanh lá đậm
-                            border: '#bbf7d0', // border xanh lá pastel
-                            icon: null
-                          },
-                          processing: { 
-                            text: 'Đang xử lý', 
-                            label: 'Đang xử lý',
-                            bg: '#f3f0fd',
-                            color: '#7c3aed',
-                            border: '#ede9fe',
-                            icon: null
-                          },
-                          pending: { 
-                            text: 'Chờ thanh toán', 
-                            label: 'Chờ thanh toán',
-                            bg: '#f0fdf4',
-                            color: '#059669',
-                            border: '#bbf7d0',
-                            icon: null
-                          },
-                          grace_period: { 
-                            text: 'Gia hạn',
-                            label: 'Gia hạn',
-                            bg: '#fefbe9',
-                            color: '#b45309',
-                            border: '#fde68a',
-                            icon: null
-                          },
-                          overdue: { 
-                            text: 'Quá hạn', 
-                            label: 'Quá hạn',
-                            bg: '#fff1f2',
-                            color: '#e11d48',
-                            border: '#fecdd3',
-                            icon: (
-                              <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                            )
-                          }
+                {Array.isArray(familyFinancialData[selectedResident]?.payments)
+                  ? familyFinancialData[selectedResident].payments
+                      .sort((a: any, b: any) => {
+                        const statusA = getPaymentStatus(a);
+                        const statusB = getPaymentStatus(b);
+                        const statusPriority = {
+                          'overdue': 1,
+                          'grace_period': 2, 
+                          'pending': 3,
+                          'processing': 4,
+                          'paid': 5
                         };
-                        
-                        return (
-                          <div style={{display: 'flex', justifyContent: 'center'}}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              padding: '0.18rem 0.7rem',
-                              borderRadius: '0.8rem',
-                              fontSize: '0.92rem',
-                              fontWeight: 500,
-                              background: statusConfig[status].bg,
-                              color: statusConfig[status].color,
-                              border: `1px solid ${statusConfig[status].border}`,
-                              whiteSpace: 'nowrap',
-                              boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
-                              letterSpacing: '0.01em',
-                              lineHeight: 1.32,
-                              fontFamily: 'inherit',
-                              transition: 'background 0.18s, color 0.18s'
-                            }}>
-                              {statusConfig[status].icon}
-                              {statusConfig[status].label}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td style={{padding: '1rem 0.75rem', textAlign: 'center'}}>
-                      {(() => {
-                        const status = getPaymentStatus(payment);
-                        
-                        if (status === 'paid') {
-                          return (
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.375rem',
-                                padding: '0.25rem 0.75rem',
-                                background: 'rgba(34, 197, 94, 0.1)',
-                                color: '#16a34a',
-                                borderRadius: '0.5rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                border: '1px solid rgba(34, 197, 94, 0.3)'
-                              }}>
-                                <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                Hoàn thành
-                              </div>
-                              <button
-                                onClick={() => handleViewInvoice(payment)}
-                                style={{
-                                  marginTop: '0.25rem',
+                        if (statusPriority[statusA] !== statusPriority[statusB]) {
+                          return statusPriority[statusA] - statusPriority[statusB];
+                        }
+                        const dateA = new Date(a.dueDate || a.date);
+                        const dateB = new Date(b.dueDate || b.date);
+                        if (statusA === 'paid') {
+                          return dateB.getTime() - dateA.getTime();
+                        } else {
+                          return dateA.getTime() - dateB.getTime();
+                        }
+                      })
+                      .map((payment: any) => (
+                        <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
+                          <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
+                            {payment.description}
+                          </td>
+                          <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
+                            {formatCurrency(payment.amount)}
+                          </td>
+                          <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
+                              <span style={{color: '#111827', fontWeight: 500}}>
+                                {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
+                              </span>
+                              {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
+                                <div style={{
+                                  fontSize: '0.65rem',
+                                  color: '#dc2626',
+                                  fontWeight: 600,
+                                  background: '#fef2f2',
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '0.375rem',
+                                  border: '1px solid #fecaca',
+                                  width: 'fit-content',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '0.375rem',
-                                  padding: '0.375rem 0.75rem',
-                                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '0.5rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  minWidth: '90px'
-                                }}
-                                onMouseOver={e => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                }}
-                                onMouseOut={e => {
-                                  e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                              >
-                                <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                Xem chi tiết
-                              </button>
+                                  gap: '0.25rem',
+                                  textTransform: 'none',
+                                  letterSpacing: 'normal'
+                                }}>
+                                  
+                                  Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
+                                </div>
+                              )}
                             </div>
-                          );
-                        }
-                        
-                        if (status === 'processing') {
-                          return (
-                            <span style={{
+                          </td>
+                          <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
+                            <div style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.375rem',
-                              padding: '0.5rem 1rem',
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              color: '#3b82f6',
-                              borderRadius: '0.5rem',
+                              padding: '0.25rem 0.75rem',
+                              background: '#f3f4f6',
+                              borderRadius: '1rem',
                               fontSize: '0.75rem',
-                              fontWeight: 600
+                              fontWeight: 500,
+                              color: '#374151'
                             }}>
-                              <div style={{
-                                width: '0.875rem',
-                                height: '0.875rem',
-                                border: '2px solid rgba(59, 130, 246, 0.3)',
-                                borderTop: '2px solid #3b82f6',
-                                borderRadius: '50%',
-                                animation: 'spin 1s linear infinite'
-                              }} />
-                              Đang xử lý
-                            </span>
-                          );
-                        }
-                        
-                        if (status === 'pending' || status === 'grace_period' || status === 'overdue') {
-                          const isUrgent = status === 'overdue';
-                          const isWarning = status === 'grace_period';
-                          
-                          return (
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
-                              <button
-                                onClick={() => handlePayNow(payment)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.375rem',
-                                  padding: '0.375rem 0.75rem',
-                                  background: isUrgent 
-                                    ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
-                                    : isWarning
-                                    ? 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)'
-                                    : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '0.5rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  minWidth: '90px'
-                                }}
-                                onMouseOver={e => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                }}
-                                onMouseOut={e => {
-                                  e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                              >
-                                <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                {isUrgent ? 'Thanh toán' : 'Thanh toán'}
-                              </button>
-                              <button
-                                onClick={() => handleViewInvoice(payment)}
-                                style={{
-                                  marginTop: '0.25rem',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.375rem',
-                                  padding: '0.375rem 0.75rem',
-                                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '0.5rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  minWidth: '90px'
-                                }}
-                                onMouseOver={e => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                }}
-                                onMouseOut={e => {
-                                  e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                              >
-                                <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                                Xem chi tiết
-                              </button>
+                              <BuildingLibraryIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                              Chuyển khoản
                             </div>
-                          );
-                        }
-                        
-                        return null;
-                      })()}
-                    </td>
-                  </tr>
-                ))}
+                          </td>
+                          <td style={{padding: '1rem 0.75rem'}}>
+                            {(() => {
+                              const status = getPaymentStatus(payment);
+                              const statusConfig = {
+                                paid: { 
+                                  text: 'Đã thanh toán', 
+                                  label: 'Đã thanh toán',
+                                  bg: '#e6f9ed', // nền xanh lá nhạt
+                                  color: '#16a34a', // chữ xanh lá đậm
+                                  border: '#bbf7d0', // border xanh lá pastel
+                                  icon: null
+                                },
+                                processing: { 
+                                  text: 'Đang xử lý', 
+                                  label: 'Đang xử lý',
+                                  bg: '#f3f0fd',
+                                  color: '#7c3aed',
+                                  border: '#ede9fe',
+                                  icon: null
+                                },
+                                pending: { 
+                                  text: 'Chờ thanh toán', 
+                                  label: 'Chờ thanh toán',
+                                  bg: '#f0fdf4',
+                                  color: '#059669',
+                                  border: '#bbf7d0',
+                                  icon: null
+                                },
+                                grace_period: { 
+                                  text: 'Gia hạn',
+                                  label: 'Gia hạn',
+                                  bg: '#fefbe9',
+                                  color: '#b45309',
+                                  border: '#fde68a',
+                                  icon: null
+                                },
+                                overdue: { 
+                                  text: 'Quá hạn', 
+                                  label: 'Quá hạn',
+                                  bg: '#fff1f2',
+                                  color: '#e11d48',
+                                  border: '#fecdd3',
+                                  icon: (
+                                    <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                                  )
+                                }
+                              };
+                              
+                              return (
+                                <div style={{display: 'flex', justifyContent: 'center'}}>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    padding: '0.18rem 0.7rem',
+                                    borderRadius: '0.8rem',
+                                    fontSize: '0.92rem',
+                                    fontWeight: 500,
+                                    background: statusConfig[status].bg,
+                                    color: statusConfig[status].color,
+                                    border: `1px solid ${statusConfig[status].border}`,
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
+                                    letterSpacing: '0.01em',
+                                    lineHeight: 1.32,
+                                    fontFamily: 'inherit',
+                                    transition: 'background 0.18s, color 0.18s'
+                                  }}>
+                                    {statusConfig[status].icon}
+                                    {statusConfig[status].label}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td style={{padding: '1rem 0.75rem', textAlign: 'center'}}>
+                            {(() => {
+                              const status = getPaymentStatus(payment);
+                              
+                              if (status === 'paid') {
+                                return (
+                                  <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
+                                    <div style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.375rem',
+                                      padding: '0.25rem 0.75rem',
+                                      background: 'rgba(34, 197, 94, 0.1)',
+                                      color: '#16a34a',
+                                      borderRadius: '0.5rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      border: '1px solid rgba(34, 197, 94, 0.3)'
+                                    }}>
+                                      <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                      Hoàn thành
+                                    </div>
+                                    <button
+                                      onClick={() => handleViewInvoice(payment)}
+                                      style={{
+                                        marginTop: '0.25rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        padding: '0.375rem 0.75rem',
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        minWidth: '90px'
+                                      }}
+                                      onMouseOver={e => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                      }}
+                                      onMouseOut={e => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                      }}
+                                    >
+                                      <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                      Xem chi tiết
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              
+                              if (status === 'processing') {
+                                return (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.375rem',
+                                    padding: '0.5rem 1rem',
+                                    background: 'rgba(59, 130, 246, 0.1)',
+                                    color: '#3b82f6',
+                                    borderRadius: '0.5rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600
+                                  }}>
+                                    <div style={{
+                                      width: '0.875rem',
+                                      height: '0.875rem',
+                                      border: '2px solid rgba(59, 130, 246, 0.3)',
+                                      borderTop: '2px solid #3b82f6',
+                                      borderRadius: '50%',
+                                      animation: 'spin 1s linear infinite'
+                                    }} />
+                                    Đang xử lý
+                                  </span>
+                                );
+                              }
+                              
+                              if (status === 'pending' || status === 'grace_period' || status === 'overdue') {
+                                const isUrgent = status === 'overdue';
+                                const isWarning = status === 'grace_period';
+                                
+                                return (
+                                  <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
+                                    <button
+                                      onClick={() => handlePayNow(payment)}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        padding: '0.375rem 0.75rem',
+                                        background: isUrgent 
+                                          ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+                                          : isWarning
+                                          ? 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)'
+                                          : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        minWidth: '90px'
+                                      }}
+                                      onMouseOver={e => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                      }}
+                                      onMouseOut={e => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                      }}
+                                    >
+                                      <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                      {isUrgent ? 'Thanh toán' : 'Thanh toán'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleViewInvoice(payment)}
+                                      style={{
+                                        marginTop: '0.25rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        padding: '0.375rem 0.75rem',
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        minWidth: '90px'
+                                      }}
+                                      onMouseOver={e => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                      }}
+                                      onMouseOut={e => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                      }}
+                                    >
+                                      <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                      Xem chi tiết
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              
+                              return null;
+                            })()}
+                          </td>
+                        </tr>
+                      ))
+                  : null}
               </tbody>
             </table>
           </div>

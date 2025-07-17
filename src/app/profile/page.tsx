@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   UserCircleIcon,
   PhoneIcon,
@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
+import { residentAPI, userAPI, carePlansAPI, roomsAPI } from '@/lib/api';
 
 // Family members data (matching family page)
 const familyMembers = [
@@ -42,7 +43,11 @@ const familyMembers = [
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [selectedFamilyMember, setSelectedFamilyMember] = useState(familyMembers[0]);
+  // --- Thay familyMembers thành residents động từ API ---
+  const [residents, setResidents] = useState<any[]>([]);
+  const [selectedResidentId, setSelectedResidentId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [avatarImage, setAvatarImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -52,18 +57,28 @@ export default function ProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomLoading, setRoomLoading] = useState(false);
 
   // Static profile data
-  const profileData = {
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: '+84 123 456 789',
-    address: '123 Đường ABC, Quận 1, TP.HCM',
-    dateOfBirth: '1985-06-15',
-    department: user?.role === 'staff' ? 'Chăm sóc bệnh nhân' : '',
-    startDate: '2020-01-15',
-    relationship: user?.role === 'family' ? 'Con' : '',
-  };
+  // const profileData = { ... } // Xoá hoặc comment dòng này
+  const [userData, setUserData] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState('');
+
+  useEffect(() => {
+    if (user?.id) {
+      setProfileLoading(true);
+      userAPI.getById(user.id)
+        .then(data => {
+          setUserData(data);
+          setProfileError('');
+          if (data.avatar) setAvatarImage(data.avatar);
+        })
+        .catch(() => setProfileError('Không lấy được thông tin tài khoản'))
+        .finally(() => setProfileLoading(false));
+    }
+  }, [user]);
 
     // File validation
   const validateFile = (file: File): string | null => {
@@ -185,6 +200,51 @@ export default function ProfilePage() {
     resetUploadState();
   };
 
+  // Lấy residents động theo user.id nếu là family
+  useEffect(() => {
+    if (user?.role === 'family' && user?.id) {
+      setLoading(true);
+      residentAPI.getByFamilyMemberId(user.id)
+        .then((data) => {
+          const arr = Array.isArray(data) ? data : [data];
+          setResidents(arr);
+          setSelectedResidentId(arr.length > 0 ? arr[0]._id : "");
+          setError('');
+        })
+        .catch((err) => {
+          setError('Không tìm thấy thông tin người thân hoặc lỗi kết nối API.');
+          setResidents([]);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
+  // Lấy resident đang chọn
+  const selectedResident = residents.find(r => r._id === selectedResidentId);
+
+  useEffect(() => {
+    if (!selectedResidentId) {
+      setRoomNumber('Chưa cập nhật');
+      return;
+    }
+    setRoomLoading(true);
+    carePlansAPI.getByResidentId(selectedResidentId)
+      .then((assignments: any[]) => {
+        const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+        const roomId = assignment?.assigned_room_id;
+        if (roomId) {
+          return roomsAPI.getById(roomId)
+            .then((room: any) => {
+              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+            })
+            .catch(() => setRoomNumber('Chưa cập nhật'));
+        } else {
+          setRoomNumber('Chưa cập nhật');
+        }
+      })
+      .catch(() => setRoomNumber('Chưa cập nhật'))
+      .finally(() => setRoomLoading(false));
+  }, [selectedResidentId]);
 
 
   return (
@@ -313,7 +373,7 @@ export default function ProfilePage() {
                     }}
                   />
                 ) : (
-                  user?.name?.substring(0, 2).toUpperCase() || 'ND'
+                  userData?.full_name?.substring(0, 2).toUpperCase() || 'ND'
                 )}
                 {isUploading && (
                   <div style={{
@@ -370,7 +430,7 @@ export default function ProfilePage() {
                 color: '#111827',
                 margin: '0'
               }}>
-                {profileData.name}
+                {userData?.full_name || ''}
               </h2>
             </div>
           </div>
@@ -417,7 +477,7 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <EnvelopeIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                    {profileData.email}
+                    {userData?.email}
                   </div>
               </div>
 
@@ -441,7 +501,7 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <PhoneIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                    {profileData.phone}
+                    {userData?.phone}
                   </div>
               </div>
 
@@ -465,33 +525,11 @@ export default function ProfilePage() {
                       color: '#111827'
                     }}>
                       <MapPinIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                    {profileData.address}
+                    {userData?.address}
                   </div>
               </div>
 
-              <div>
-                <label style={{
-                    fontSize: '0.75rem',
-                  fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginBottom: '0.25rem',
-                    display: 'block'
-                }}>
-                  Ngày sinh
-                </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#111827'
-                    }}>
-                      <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                    {new Date(profileData.dateOfBirth).toLocaleDateString('vi-VN')}
-                  </div>
-                </div>
+             
               </div>
             </div>
 
@@ -506,7 +544,7 @@ export default function ProfilePage() {
                 alignItems: 'center',
                 gap: '0.5rem'
               }}>
-                {user?.role === 'family' ? (
+                {user && user.role === 'family' ? (
                   <>
                     <UserCircleIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
                     Thông tin người thân
@@ -518,76 +556,9 @@ export default function ProfilePage() {
                   </>
                 )}
               </h3>
-
               <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
-                {user?.role === 'family' ? (
-                <>
-                  <div>
-                                          <label style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem',
-                        display: 'block'
-                      }}>
-                        Người thân được chăm sóc
-                      </label>
-                      
-                      {familyMembers.length > 1 ? (
-                        <div>
-                          <select
-                            value={selectedFamilyMember.id}
-                            onChange={(e) => {
-                              const member = familyMembers.find(m => m.id === parseInt(e.target.value));
-                              if (member) setSelectedFamilyMember(member);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem',
-                              borderRadius: '0.375rem',
-                              border: '1px solid #d1d5db',
-                              fontSize: '0.875rem',
-                              backgroundColor: 'white',
-                              marginBottom: '0.5rem'
-                            }}
-                          >
-                            {familyMembers.map(member => (
-                              <option key={member.id} value={member.id}>
-                                {member.name} ({member.relationship})
-                              </option>
-                            ))}
-                          </select>
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280'
-                          }}>
-                            Phòng {selectedFamilyMember.room} • {selectedFamilyMember.age} tuổi • {selectedFamilyMember.status}
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div style={{
-                            fontSize: '0.875rem',
-                            color: '#111827',
-                            fontWeight: 500
-                          }}>
-                            {selectedFamilyMember?.name || 'Chưa được phân công'}
-                          </div>
-                          {selectedFamilyMember && (
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: '#6b7280',
-                              marginTop: '0.25rem'
-                            }}>
-                              Phòng {selectedFamilyMember.room} • {selectedFamilyMember.age} tuổi • {selectedFamilyMember.status}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
+                {user && user.role === 'family' ? (
+                  <>
                     <div>
                       <label style={{
                         fontSize: '0.75rem',
@@ -598,17 +569,90 @@ export default function ProfilePage() {
                         marginBottom: '0.25rem',
                         display: 'block'
                       }}>
-                        Mối quan hệ
+                        Người thân được chăm sóc
                       </label>
-                        <div style={{
-                          fontSize: '0.875rem',
-                      color: '#111827'
-                        }}>
-                      {profileData.relationship}
+                      {loading ? (
+                        <div>Đang tải thông tin người thân...</div>
+                      ) : error ? (
+                        <div style={{color: 'red'}}>{error}</div>
+                      ) : residents.length > 1 ? (
+                        <div>
+                          <select
+                            value={selectedResidentId}
+                            onChange={e => setSelectedResidentId(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #d1d5db',
+                              fontSize: '0.875rem',
+                              backgroundColor: 'white',
+                              marginBottom: '0.5rem'
+                            }}
+                          >
+                            {residents.map(member => (
+                              <option key={member._id} value={member._id}>
+                                {member.full_name} ({member.relationship || 'Chưa rõ'})
+                              </option>
+                            ))}
+                          </select>
+                          {selectedResident && (
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: '#6b7280'
+                            }}>
+                              Phòng {roomLoading ? 'Đang tải...' : roomNumber} • {selectedResident.date_of_birth ? (() => {
+                                const dob = new Date(selectedResident.date_of_birth);
+                                if (!isNaN(dob.getTime())) {
+                                  const today = new Date();
+                                  let age = today.getFullYear() - dob.getFullYear();
+                                  const m = today.getMonth() - dob.getMonth();
+                                  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                                    age--;
+                                  }
+                                  return age + ' tuổi';
+                                }
+                                return '-- tuổi';
+                              })() : '-- tuổi'}
+                            </div>
+                          )}
                         </div>
+                      ) : residents.length === 1 && selectedResident ? (
+                        <div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            color: '#111827',
+                            fontWeight: 500
+                          }}>
+                            {selectedResident.fullName || 'Chưa được phân công'}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.25rem'
+                          }}>
+                            Phòng {selectedResident.room || 'Chưa cập nhật'} • {selectedResident.date_of_birth ? (() => {
+                                const dob = new Date(selectedResident.date_of_birth);
+                                if (!isNaN(dob.getTime())) {
+                                  const today = new Date();
+                                  let age = today.getFullYear() - dob.getFullYear();
+                                  const m = today.getMonth() - dob.getMonth();
+                                  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                                    age--;
+                                  }
+                                  return age + ' tuổi';
+                                }
+                                return '-- tuổi';
+                              })() : '-- tuổi'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>Không có dữ liệu người thân.</div>
+                      )}
                     </div>
                   </>
                 ) : (
+                  // Chỉ hiển thị thông tin công việc cho role khác family
                   <>
                     <div>
                       <label style={{
@@ -622,22 +666,22 @@ export default function ProfilePage() {
                       }}>
                         Phòng ban
                       </label>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.875rem',
-                          color: '#111827'
-                        }}>
-                          <BriefcaseIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                      {profileData.department}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        color: '#111827'
+                      }}>
+                        <BriefcaseIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                        {userData?.department}
                       </div>
-                  </div>
+                    </div>
 
-                  <div>
-                    <label style={{
+                    <div>
+                      <label style={{
                         fontSize: '0.75rem',
-                      fontWeight: 500,
+                        fontWeight: 500,
                         color: '#6b7280',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
@@ -645,20 +689,20 @@ export default function ProfilePage() {
                         display: 'block'
                       }}>
                         Ngày bắt đầu
-                    </label>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
+                      </label>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
                         fontSize: '0.875rem',
                         color: '#111827'
                       }}>
                         <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                        {new Date(profileData.startDate).toLocaleDateString('vi-VN')}
+                        {userData?.startDate ? new Date(userData.startDate).toLocaleDateString('vi-VN') : ''}
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
               </div>
             </div>
           </div>

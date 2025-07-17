@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   ChartBarIcon,
   CurrencyDollarIcon,
@@ -12,6 +12,8 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import BillModal from '../../../components/BillModal';
+import { billsAPI } from '../../../lib/api';
 
 interface FinancialRecord {
   id: string;
@@ -28,77 +30,39 @@ interface FinancialRecord {
 
 export default function FinancialReportsPage() {
   const router = useRouter();
-  const [records] = useState<FinancialRecord[]>([
-    {
-      id: '1',
-      date: '2024-01-18',
-      type: 'income',
-      category: 'Phí chăm sóc',
-      description: 'Phí chăm sóc tháng 1/2024 - Nguyễn Thị Lan',
-      amount: 8000000,
-      paymentMethod: 'Chuyển khoản',
-      residentId: 'R001',
-      residentName: 'Nguyễn Thị Lan',
-      status: 'completed'
-    },
-    {
-      id: '2',
-      date: '2024-01-17',
-      type: 'expense',
-      category: 'Y tế',
-      description: 'Mua thuốc và vật tư y tế',
-      amount: 2500000,
-      paymentMethod: 'Tiền mặt',
-      status: 'completed'
-    },
-    {
-      id: '3',
-      date: '2024-01-16',
-      type: 'income',
-      category: 'Phí dịch vụ',
-      description: 'Phí dịch vụ cao cấp - Lê Văn Hùng',
-      amount: 5000000,
-      paymentMethod: 'Chuyển khoản',
-      residentId: 'R003',
-      residentName: 'Lê Văn Hùng',
-      status: 'completed'
-    },
-    {
-      id: '4',
-      date: '2024-01-15',
-      type: 'expense',
-      category: 'Thực phẩm',
-      description: 'Mua thực phẩm tuần 3 tháng 1',
-      amount: 3200000,
-      paymentMethod: 'Chuyển khoản',
-      status: 'completed'
-    },
-    {
-      id: '5',
-      date: '2024-01-14',
-      type: 'expense',
-      category: 'Lương nhân viên',
-      description: 'Lương tháng 1/2024',
-      amount: 45000000,
-      paymentMethod: 'Chuyển khoản',
-      status: 'completed'
-    },
-    {
-      id: '6',
-      date: '2024-01-12',
-      type: 'income',
-      category: 'Phí chăm sóc',
-      description: 'Phí chăm sóc tháng 1/2024 - Trần Thị Mai',
-      amount: 12000000,
-      paymentMethod: 'Tiền mặt',
-      residentId: 'R002',
-      residentName: 'Trần Thị Mai',
-      status: 'completed'
-    }
-  ]);
-
+  const [records, setRecords] = useState<FinancialRecord[]>([]);
+  const [loading, setLoading] = useState(false);
   const [dateFilter, setDateFilter] = useState<string>('this_month');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showBillModal, setShowBillModal] = useState(false);
+
+  const fetchBills = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await billsAPI.getAll();
+      // Map dữ liệu API về đúng định dạng FinancialRecord nếu cần
+      setRecords(data.map((item: any) => ({
+        id: item.id,
+        date: item.due_date || item.created_at || '',
+        type: item.amount > 0 ? 'income' : 'expense',
+        category: item.category || '',
+        description: item.notes || item.description || '',
+        amount: item.amount,
+        paymentMethod: item.payment_method || '',
+        residentId: item.resident_id,
+        residentName: item.resident_name,
+        status: item.status || 'pending',
+      })));
+    } catch (err) {
+      // Xử lý lỗi nếu cần
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBills();
+  }, [fetchBills]);
 
   const filteredRecords = records.filter(record => {
     const recordDate = new Date(record.date);
@@ -112,9 +76,9 @@ export default function FinancialReportsPage() {
       dateMatch = recordDate >= weekAgo;
     }
     
-    const typeMatch = typeFilter === 'all' || record.type === typeFilter;
+    const statusMatch = statusFilter === 'all' || record.status === statusFilter;
     
-    return dateMatch && typeMatch;
+    return dateMatch && statusMatch;
   });
 
   const totalIncome = filteredRecords
@@ -126,6 +90,16 @@ export default function FinancialReportsPage() {
     .reduce((sum, r) => sum + r.amount, 0);
 
   const netIncome = totalIncome - totalExpense;
+
+  // Mapping trạng thái sang tiếng Việt
+  const statusMap: Record<string, { label: string; className: string }> = {
+    completed: { label: 'Đã thanh toán', className: 'bg-green-100 text-green-800' },
+    paid: { label: 'Đã thanh toán', className: 'bg-green-100 text-green-800' },
+    pending: { label: 'Chưa thanh toán', className: 'bg-yellow-100 text-yellow-800' },
+    unpaid: { label: 'Chưa thanh toán', className: 'bg-yellow-100 text-yellow-800' },
+    cancelled: { label: 'Đã hủy', className: 'bg-red-100 text-red-800' },
+    processing: { label: 'Đang xử lý', className: 'bg-blue-100 text-blue-800' },
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -143,8 +117,16 @@ export default function FinancialReportsPage() {
               </div>
             </div>
           </div>
+          <div className="ml-auto flex items-center">
+            <button
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow transition-all duration-150"
+              onClick={() => setShowBillModal(true)}
+            >
+              + Tạo hóa đơn
+            </button>
+          </div>
         </div>
-
+        <BillModal open={showBillModal} onClose={() => setShowBillModal(false)} onSuccess={fetchBills} />
         {/* Filters */}
         <div className="bg-white rounded-xl p-6 mb-8 shadow-sm border border-gray-100">
           <div className="flex flex-wrap gap-4">
@@ -161,15 +143,16 @@ export default function FinancialReportsPage() {
               </select>
             </div>
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Loại giao dịch</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
               <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               >
-                <option value="all">Tất cả loại</option>
-                <option value="income">Thu nhập</option>
-                <option value="expense">Chi phí</option>
+                <option value="all">Tất cả</option>
+                <option value="completed">Đã thanh toán</option>
+                <option value="pending">Chưa thanh toán</option>
+                <option value="cancelled">Đã hủy</option>
               </select>
             </div>
           </div>
@@ -188,7 +171,6 @@ export default function FinancialReportsPage() {
               <thead className="bg-blue-50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Ngày</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Loại</th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Mô tả</th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Số tiền</th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Trạng thái</th>
@@ -199,15 +181,6 @@ export default function FinancialReportsPage() {
                   <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(record.date).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${
-                        record.type === 'income' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {record.type === 'income' ? 'Thu' : 'Chi'}
-                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div>
@@ -226,11 +199,9 @@ export default function FinancialReportsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${
-                        record.status === 'completed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
+                        statusMap[record.status]?.className || 'bg-gray-100 text-gray-800'
                       }`}>
-                        {record.status === 'completed' ? 'Hoàn thành' : 'Đang xử lý'}
+                        {statusMap[record.status]?.label || 'Không xác định'}
                       </span>
                     </td>
                   </tr>

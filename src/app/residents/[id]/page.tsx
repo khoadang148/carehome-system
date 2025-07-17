@@ -16,7 +16,11 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { residentAPI } from '@/lib/api';
+import { carePlansAPI } from '@/lib/api';
+import { vitalSignsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { careNotesAPI } from '@/lib/api';
 
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
@@ -29,39 +33,53 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
+  const [carePlans, setCarePlans] = useState<any[]>([]);
+  const [vitalSigns, setVitalSigns] = useState<any>(null);
+  const [vitalLoading, setVitalLoading] = useState(true);
+  const [careNotes, setCareNotes] = useState<any[]>([]);
   
   // Get residentId from params directly
   const residentId = params.id;
   
   useEffect(() => {
-    // Simulate API call to fetch resident data
+    // Fetch resident from API
     const fetchResident = async () => {
       try {
-        // In a real application, you would fetch from an API endpoint
-        const id = parseInt(residentId);
-        
-        // Check if there's saved residents data in localStorage
-        let residents = RESIDENTS_DATA;
-        const savedResidents = localStorage.getItem('nurseryHomeResidents');
-        if (savedResidents) {
-          residents = JSON.parse(savedResidents);
-        }
-        
-        const foundResident = residents.find(r => r.id === id);
-        
-        if (foundResident) {
-          setResident(foundResident);
-        } else {
-          // Resident not found, redirect to list
-          router.push('/residents');
+        const data = await residentAPI.getById(residentId);
+        // Map API data về format UI nếu cần
+        const mapped = {
+          id: data._id,
+          name: data.fullName,
+          age: data.dateOfBirth ? (new Date().getFullYear() - new Date(data.dateOfBirth).getFullYear()) : '',
+          room: data.room || '',
+          careLevel: data.careLevel === 'basic' ? 'Cơ bản' : data.careLevel === 'intermediate' ? 'Nâng cao' : data.careLevel === 'advanced' ? 'Cao cấp' : '',
+          emergencyContact: data.emergencyContact?.fullName || '',
+          contactPhone: data.emergencyContact?.phoneNumber || '',
+          ...data
+        };
+        setResident(mapped);
+        // Fetch care plans
+        const plans = await carePlansAPI.getByResidentId(residentId);
+        setCarePlans(Array.isArray(plans) ? plans : []);
+        // Fetch vital signs
+        setVitalLoading(true);
+        const vitalData = await vitalSignsAPI.getByResidentId(residentId);
+        setVitalSigns(Array.isArray(vitalData) && vitalData.length > 0 ? vitalData[0] : null);
+        // Fetch care notes
+        try {
+          const careNotesData = await careNotesAPI.getAll({ resident_id: residentId });
+          setCareNotes(Array.isArray(careNotesData) ? careNotesData : []);
+        } catch {
+          setCareNotes([]);
         }
       } catch (error) {
         console.error('Error fetching resident:', error);
+        router.push('/residents');
       } finally {
         setLoading(false);
+        setVitalLoading(false);
       }
     };
-    
     fetchResident();
   }, [residentId, router, refreshKey]);
   
@@ -313,21 +331,21 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   <span>{resident.room}</span>
                 </span>
                 
-                {/* Trạng thái */}
+                {/* Trạng thái sức khỏe */}
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.25rem 0.75rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
+                  padding: '0.5rem 1rem',
                   borderRadius: '9999px',
-                  backgroundColor: statusStyle.bg,
-                  color: statusStyle.text
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  color: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '#166534' : '#92400e',
+                  border: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24',
+                  marginLeft: '0.5rem'
                 }}>
-                  <statusStyle.icon style={{ width: '0.875rem', height: '0.875rem' }} />
-                  <span>Trạng thái:</span>
-                  <span>{resident.status || 'Đang chăm sóc'}</span>
+                  <div style={{width: '0.5rem', height: '0.5rem', background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
+                  Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                 </span>
               </div>
         </div>
@@ -455,24 +473,16 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                 </div>
                 <div>
                     <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
-                    Tình trạng di chuyển
+                    Ngày nhập viện
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                      {resident.mobilityStatus || 'Chưa cập nhật'}
+                      {resident.admissionDate ? new Date(resident.admissionDate).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
                     </p>
-                </div>
-                <div>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
-                    Chế độ ăn đặc biệt
-                    </p>
-                    <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                    {resident.dietaryRestrictions || 'Không có'}
-                  </p>
                 </div>
               </div>
             </div>
 
-              {/* Care Package Card */}
+              {/* Care Plans Card */}
               <div style={{
                 background: 'rgba(16, 185, 129, 0.05)',
                 borderRadius: '1rem',
@@ -502,65 +512,66 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     margin: 0,
                     color: '#1e293b'
                   }}>
-                    Gói dịch vụ
-                </h3>
+                    Gói dịch vụ đang sử dụng
+                  </h3>
                 </div>
-                
-                {resident.carePackage ? (
+                {carePlans.length > 0 ? (
                   <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  <div>
-                      <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
-                      Tên gói
-                      </p>
-                      <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                        {resident.carePackage.name}
-                      </p>
-                  </div>
-                  <div>
-                      <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
-                      Giá gói
-                      </p>
-                      <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
-                      {new Intl.NumberFormat('vi-VN', {
-                        style: 'currency',
-                        currency: 'VND'
-                      }).format(resident.carePackage.price)}/tháng
-                    </p>
-                  </div>
-                  <div>
-                      <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
-                      Ngày đăng ký
-                      </p>
-                      <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                      {new Date(resident.carePackage.purchaseDate).toLocaleDateString('vi-VN')}
-                    </p>
-                    </div>
+                    {carePlans.map((plan, idx) => (
+                      <div key={plan._id || idx} style={{
+                        background: 'rgba(255,255,255,0.8)',
+                        borderRadius: '0.5rem',
+                        padding: '1rem',
+                        border: '1px solid #d1fae5',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: '1rem', color: '#059669' }}>{plan.planName || 'Gói dịch vụ'}</div>
+                        <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
+                          Giá: {plan.monthlyPrice !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthlyPrice) : '---'}
+                        </div>
+                        {plan.description && (
+                          <div style={{ fontSize: '0.95rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                            {plan.description}
+                          </div>
+                        )}
+                        {Array.isArray(plan.servicesIncluded) && plan.servicesIncluded.length > 0 && (
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <div style={{ fontWeight: 500, color: '#06b6d4', fontSize: '0.95rem', marginBottom: 4 }}>Dịch vụ bao gồm:</div>
+                            <ul style={{ paddingLeft: 18, margin: 0, color: '#10b981', fontSize: '0.95rem' }}>
+                              {plan.servicesIncluded.map((feature: string, i: number) => (
+                                <li key={i} style={{ marginBottom: 3, color: '#374151' }}>✔ {feature}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div>
                     <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>
-                  Chưa đăng ký gói dịch vụ nào
-                </p>
-                <Link
-                  href="/services"
-                  style={{
+                      Chưa đăng ký gói dịch vụ nào
+                    </p>
+                    <Link
+                      href="/services"
+                      style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                    padding: '0.5rem 1rem',
+                        padding: '0.5rem 1rem',
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
+                        color: 'white',
                         borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    textDecoration: 'none'
-                  }}
-                >
-                  Xem các gói dịch vụ
-                </Link>
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      Xem các gói dịch vụ
+                    </Link>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
             </div>
           )}
 
@@ -606,19 +617,17 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                   gap: '1rem'
                 }}>
-                  {(resident.medicalConditions || []).length > 0 ? (
-                    (resident.medicalConditions || []).map((condition: string, index: number) => (
-                      <div key={index} style={{
-                        padding: '0.75rem',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        borderRadius: '0.5rem',
-                        border: '1px solid rgba(239, 68, 68, 0.1)'
-                      }}>
-                        <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                          {condition}
-                        </p>
-                      </div>
-                    ))
+                  {resident.medicalHistory ? (
+                    <div style={{
+                      padding: '0.75rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      borderRadius: '0.5rem',
+                      border: '1px solid rgba(239, 68, 68, 0.1)'
+                    }}>
+                      <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                        {resident.medicalHistory}
+                      </p>
+                    </div>
                   ) : (
                     <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
                       Không có tình trạng sức khỏe đặc biệt
@@ -648,8 +657,8 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                   gap: '1rem'
                 }}>
-                  {(resident.medications || []).length > 0 ? (
-                    (resident.medications || []).map((medication: string, index: number) => (
+                  {(resident.currentMedications || []).length > 0 ? (
+                    (resident.currentMedications || []).map((medication: string, index: number) => (
                       <div key={index} style={{
                         padding: '0.75rem',
                         background: 'rgba(255, 255, 255, 0.8)',
@@ -759,7 +768,9 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     Người liên hệ khẩn cấp
                   </p>
                   <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
-                    {resident.emergencyContact || 'Chưa cập nhật'}
+                    {resident.emergencyContact && typeof resident.emergencyContact === 'object'
+                      ? `${resident.emergencyContact.fullName || ''}${resident.emergencyContact.relationship ? ' (' + resident.emergencyContact.relationship + ')' : ''}`
+                      : (resident.emergencyContact || 'Chưa cập nhật')}
                   </p>
                 </div>
                 <div>
@@ -793,7 +804,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   Ghi chú chăm sóc
                 </h3>
                 <CareNotesDisplay
-                  careNotes={resident.careNotes || []}
+                  careNotes={careNotes}
                   isStaff={user?.role === 'staff'}
                 />
           </div>

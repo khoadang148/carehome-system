@@ -13,7 +13,7 @@ import {
   PhotoIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { residentAPI, activitiesAPI, photosAPI, staffAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 interface PhotoData {
@@ -37,6 +37,7 @@ interface PhotoData {
   approvedDate: string | null;
   viewCount: number;
   familyViewed: boolean;
+  familyId: string; // Thêm trường familyId
 }
 
 export default function PhotoGalleryPage() {
@@ -50,21 +51,76 @@ export default function PhotoGalleryPage() {
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoData | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [residents, setResidents] = useState<Array<any>>([]);
+  const [activityTypes, setActivityTypes] = useState<string[]>([]);
+  const [staffs, setStaffs] = useState<Array<any>>([]);
 
-  // Load photos from localStorage
+  // Load photos from API
   useEffect(() => {
-    const savedPhotos = localStorage.getItem('uploadedPhotos');
-    if (savedPhotos) {
+    const fetchPhotos = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const parsedPhotos = JSON.parse(savedPhotos);
-        setPhotos(parsedPhotos);
-      } catch (error) {
-        console.error('Error parsing saved photos:', error);
+        // Chuẩn bị params lọc nếu có
+        const params: any = {};
+        if (filterResident) params.residentId = filterResident;
+        if (filterActivityType) params.activityType = filterActivityType;
+        // Có thể thêm params ngày nếu backend hỗ trợ
+        // if (filterDateRange !== 'all') params.dateRange = filterDateRange;
+        const data = await photosAPI.getAll(params);
+        setPhotos(Array.isArray(data) ? data : []);
+      } catch (error: any) {
         setPhotos([]);
+        setError(error?.message || 'Không thể tải ảnh');
+      } finally {
+        setLoading(false);
       }
-    }
-  }, []);
+    };
+    fetchPhotos();
+  }, [filterResident, filterActivityType, filterDateRange]);
    
+  // Load residents from API cho dropdown filter
+  useEffect(() => {
+    const fetchResidents = async () => {
+      try {
+        const data = await residentAPI.getAll();
+        setResidents(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setResidents([]);
+      }
+    };
+    fetchResidents();
+  }, []);
+
+  // Load activity types from API
+  useEffect(() => {
+    const fetchActivityTypes = async () => {
+      try {
+        const data = await activitiesAPI.getAll();
+        // Lấy các activityName duy nhất
+        const uniqueTypes = Array.from(new Set((Array.isArray(data) ? data : []).map((a: any) => a.activityName).filter(Boolean)));
+        setActivityTypes(uniqueTypes);
+      } catch (err) {
+        setActivityTypes([]);
+      }
+    };
+    fetchActivityTypes();
+  }, []);
+
+  // Load staff từ API cho mapping uploadedBy
+  useEffect(() => {
+    const fetchStaffs = async () => {
+      try {
+        const data = await staffAPI.getAll();
+        setStaffs(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setStaffs([]);
+      }
+    };
+    fetchStaffs();
+  }, []);
 
   useEffect(() => {
     console.log('Modal states:', {showModal });
@@ -94,30 +150,18 @@ export default function PhotoGalleryPage() {
       return;
     }
     
-    if (!['admin', 'staff', 'family'].includes(user.role)) {
+    if (!['admin', 'staff', 'family'].includes(String(user.role))) {
       router.push('/');
       return;
     }
   }, [user, router]);
 
-  const ACTIVITY_TYPES = [
-    'Hoạt động thể chất',
-    'Hoạt động tinh thần',
-    'Bữa ăn',
-    'Y tế/Chăm sóc',
-    'Hoạt động xã hội',
-    'Giải trí',
-    'Học tập',
-    'Thăm viếng gia đình',
-    'Sinh nhật/Lễ hội',
-    'Khác'
-  ];
-
   // Filter photos based on criteria
   const filteredPhotos = photos.filter(photo => {
-    const matchesSearch = photo.caption.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         photo.residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         photo.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch =
+      (photo.caption && photo.caption.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (photo.residentName && photo.residentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (Array.isArray(photo.tags) && photo.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm.toLowerCase())));
 
     const matchesResident = filterResident === '' || photo.residentId === filterResident;
     
@@ -147,7 +191,7 @@ export default function PhotoGalleryPage() {
     }
 
     // For family users, only show photos shared with family
-    if (user?.role === 'family') {
+    if (user && String(user.role) === 'family') {
       return matchesSearch && matchesResident && matchesActivityType && matchesDate && photo.shareWithFamily;
     }
 
@@ -183,6 +227,27 @@ export default function PhotoGalleryPage() {
   const closeModal = () => {
     setShowModal(false);
     setSelectedPhoto(null);
+  };
+
+  // Hàm lấy URL ảnh từ filePath
+  const getPhotoUrl = (photo: any) => {
+    if (!photo || !photo.filePath) return '/window.svg';
+    // Chuẩn hóa dấu gạch chéo
+    const cleanPath = photo.filePath.replace(/\\/g, '/').replace(/\"/g, '/');
+    // Nếu backend chạy local, sửa lại host cho đúng
+    return `http://localhost:8000/${cleanPath}`;
+  };
+
+  // Hàm lấy tên resident từ residentId
+  const getResidentNameByResidentId = (residentId: string) => {
+    const resident = residents.find((r: any) => r._id === residentId);
+    return resident ? resident.fullName : 'Không rõ';
+  };
+
+  // Hàm lấy tên staff từ staffId
+  const getStaffNameById = (staffId: string) => {
+    const staff = staffs.find((s: any) => s._id === staffId);
+    return staff ? staff.fullName : 'Không rõ';
   };
 
   return (
@@ -294,51 +359,13 @@ export default function PhotoGalleryPage() {
                 }}
               >
                 <option value="">Tất cả người cao tuổi</option>
-                {RESIDENTS_DATA.map(resident => (
-                  <option key={resident.id} value={resident.id.toString()}>
-                    {resident.name} - Phòng {resident.room}
+                {residents.map((resident: any) => (
+                  <option key={resident._id} value={resident._id}>
+                    {resident.fullName} {resident.room ? `- Phòng ${resident.room}` : ''}
                   </option>
                 ))}
               </select>
 
-              {/* Activity Type Filter */}
-              <select
-                value={filterActivityType}
-                onChange={(e) => setFilterActivityType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.75rem',
-                  border: '2px solid #e5e7eb',
-                  fontSize: '0.95rem',
-                  outline: 'none'
-                }}
-              >
-                <option value="">Tất cả hoạt động</option>
-                {ACTIVITY_TYPES.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-
-              {/* Date Range Filter */}
-              <select
-                value={filterDateRange}
-                onChange={(e) => setFilterDateRange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.75rem',
-                  border: '2px solid #e5e7eb',
-                  fontSize: '0.95rem',
-                  outline: 'none'
-                }}
-              >
-                <option value="all">Tất cả thời gian</option>
-                <option value="today">Hôm nay</option>
-                <option value="week">7 ngày qua</option>
-                <option value="month">30 ngày qua</option>
-                <option value="3months">3 tháng qua</option>
-              </select>
             </div>
 
             <div style={{
@@ -371,6 +398,12 @@ export default function PhotoGalleryPage() {
         </div>
 
         {/* Photo Grid */}
+        {loading && (
+          <div style={{textAlign: 'center', color: '#64748b', margin: '2rem 0'}}>Đang tải ảnh...</div>
+        )}
+        {error && (
+          <div style={{textAlign: 'center', color: '#ef4444', margin: '2rem 0'}}>{error}</div>
+        )}
         {sortedPhotos.length === 0 ? (
           <div style={{
             background: 'white',
@@ -403,7 +436,7 @@ export default function PhotoGalleryPage() {
           }}>
             {sortedPhotos.map((photo) => (
               <div
-                key={photo.id}
+                key={photo.id || photo.url || Math.random()}
                 onClick={() => handlePhotoClick(photo)}
                 
                 style={{
@@ -427,7 +460,7 @@ export default function PhotoGalleryPage() {
                 {/* Photo */}
                 <div style={{
                   height: '200px',
-                  background: `url(${photo.url}) center/cover`,
+                  background: `url(${getPhotoUrl(photo)}) center/cover`,
                   position: 'relative'
                 }}>
                   
@@ -448,13 +481,15 @@ export default function PhotoGalleryPage() {
                     paddingBottom: '0.5rem'
                   }}>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Tên:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.residentName}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>
+                      {getResidentNameByResidentId(photo.residentId)}
+                    </span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Phòng:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.residentRoom}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.residentRoom || ''}</span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Hoạt động:</span>
                     <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.activityType}</span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Đăng bởi:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.uploadedBy}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{getStaffNameById(photo.uploadedBy)}</span>
                   </div>
 
                   {/* Mô tả */}
@@ -478,7 +513,7 @@ export default function PhotoGalleryPage() {
                       <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem'}}>Tags:</span>
                       {photo.tags.slice(0, 3).map((tag, index) => (
                         <span
-                          key={index}
+                          key={tag + '-' + index}
                           style={{
                             background: 'rgba(34, 197, 94, 0.12)',
                             color: '#22c55e',
@@ -589,7 +624,7 @@ export default function PhotoGalleryPage() {
               {/* Image Section */}
               <div style={{position: 'relative'}}>
                 <img
-                  src={selectedPhoto.url}
+                  src={getPhotoUrl(selectedPhoto)}
                   alt={selectedPhoto.caption}
                   style={{
                     width: '100%',
@@ -597,6 +632,7 @@ export default function PhotoGalleryPage() {
                     objectFit: 'cover',
                     display: 'block'
                   }}
+                  onError={e => { e.currentTarget.src = '/window.svg'; }}
                 />
                 <div style={{
                   position: 'absolute',
@@ -613,7 +649,7 @@ export default function PhotoGalleryPage() {
                     margin: '0 0 0.5rem 0',
                     textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
                   }}>
-                    {selectedPhoto.residentName}
+                    {getResidentNameByResidentId(selectedPhoto.residentId)}
                   </h2>
                   <p style={{
                     fontSize: '1rem',
@@ -683,7 +719,7 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        {selectedPhoto.residentName}
+                        {getResidentNameByResidentId(selectedPhoto.residentId)}
                       </div>
                     </div>
 
@@ -758,7 +794,7 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        {selectedPhoto.uploadedBy}
+                        {getStaffNameById(selectedPhoto.uploadedBy)}
                       </div>
                     </div>
 
@@ -793,23 +829,7 @@ export default function PhotoGalleryPage() {
                       borderRadius: '0.75rem',
                       border: '1px solid #e2e8f0'
                     }}>
-                      <div style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: '#64748b',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem'
-                      }}>
-                        Lượt xem
-                      </div>
-                      <div style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: '#1e293b'
-                      }}>
-                        {selectedPhoto.viewCount} lượt
-                      </div>
+                      
                     </div>
 
                     <div style={{
@@ -943,7 +963,7 @@ export default function PhotoGalleryPage() {
                       }}>
                         {selectedPhoto.tags.map((tag, index) => (
                           <span
-                            key={index}
+                            key={tag + '-' + index}
                             style={{
                               background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                               color: 'white',
@@ -964,7 +984,7 @@ export default function PhotoGalleryPage() {
                 )}
 
                 {/* Staff Notes */}
-                {selectedPhoto.staffNotes && user?.role !== 'family' && (
+                {selectedPhoto.staffNotes && String(user?.role) !== 'family' && (
                   <div style={{
                     background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
                     borderRadius: '1rem',

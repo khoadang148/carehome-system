@@ -11,6 +11,8 @@ import {
   CogIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import { userAPI } from '../../lib/api';
+import NotificationModal from '@/components/NotificationModal';
 
 // Validation interfaces
 interface ValidationErrors {
@@ -39,6 +41,9 @@ export default function SettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({ score: 0, feedback: '', color: '#d1d5db' });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'success' | 'error'>('success');
+  const [modalMessage, setModalMessage] = useState('');
 
   // Validation functions
   const validateCurrentPassword = (password: string): string => {
@@ -171,22 +176,20 @@ export default function SettingsPage() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log('Password changed successfully');
-      setPasswordSuccess(true);
+      await userAPI.changePassword({ oldPassword: currentPassword, newPassword });
+      setModalType('success');
+      setModalMessage('Đổi mật khẩu thành công!');
+      setModalOpen(true);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setErrors({});
       setPasswordStrength({ score: 0, feedback: '', color: '#d1d5db' });
-      
-      setTimeout(() => {
-        setPasswordSuccess(false);
-      }, 4000);
-    } catch (error) {
-      setErrors({ currentPassword: 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.' });
+    } catch (error: any) {
+      setModalType('error');
+      setModalMessage(error?.message || 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.');
+      setModalOpen(true);
+      setErrors({ currentPassword: error?.message || 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -604,6 +607,13 @@ export default function SettingsPage() {
           
         </div>
       </div>
+      {/* Cuối cùng, thêm modal vào JSX */}
+      <NotificationModal
+        open={modalOpen}
+        type={modalType}
+        message={modalMessage}
+        onClose={() => setModalOpen(false)}
+      />
     </>
   );
 } 

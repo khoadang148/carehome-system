@@ -23,11 +23,17 @@ import {
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useActivities } from '@/lib/contexts/activities-context';
+import { useResidents } from '@/lib/contexts/residents-context';
+import ResidentEvaluationModal from '@/components/ResidentEvaluationModal';
+import DatePicker from 'react-datepicker';
+import { format, parse } from 'date-fns';
+import 'react-datepicker/dist/react-datepicker.css';
 
 // Map context data to match component expectations
 const mapActivities = (contextActivities: any[]) => {
   return contextActivities.map(activity => ({
     ...activity,
+    // Keep the existing id from context, don't override with _id
     category: getCategoryLabel(activity.category),
     scheduledTime: formatTime(activity.startTime),
     recurring: getRecurringLabel(activity.recurring)
@@ -46,7 +52,8 @@ const getCategoryLabel = (categoryId: string) => {
   return categoryMap[categoryId] || categoryId;
 };
 
-const formatTime = (time: string) => {
+const formatTime = (time: string | undefined) => {
+  if (!time || typeof time !== 'string' || !time.includes(':')) return '';
   const [hours, minutes] = time.split(':');
   const hour24 = parseInt(hours);
   const ampm = hour24 >= 12 ? 'PM' : 'AM';
@@ -66,15 +73,24 @@ const getRecurringLabel = (recurring: string) => {
 };
 
 const categories = ['Tất cả', 'Thể chất', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục'];
-const locations = ['Tất cả', 'Phòng sinh hoạt chung', 'Phòng hoạt động', 'Khu vườn', 'Phòng giải trí', 'Phòng ăn'];
+const locations = ['Tất cả', 'Phòng sinh hoạt chung', 'Phòng hoạt động', 'Sân vườn', 'Phòng giải trí', 'Phòng ăn'];
 
 export default function ActivitiesPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { activities: contextActivities } = useActivities();
+  const { residents } = useResidents();
+  const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<any>(null);
   
   // Map activities from context to match component expectations
   const activities = mapActivities(contextActivities);
+  
+  // Debug: Log activities to see if they have proper IDs
+  useEffect(() => {
+    console.log('Activities from context:', contextActivities);
+    console.log('Mapped activities:', activities);
+  }, [contextActivities, activities]);
   
   // Check access permissions
   useEffect(() => {
@@ -90,8 +106,10 @@ export default function ActivitiesPage() {
   }, [user, router]);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('Tất cả');
+  // State for selected date filter (as Date object)
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [filterLocation, setFilterLocation] = useState('Tất cả');
+  const [filterCategory, setFilterCategory] = useState('Tất cả');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedWeek, setSelectedWeek] = useState(0);
   
@@ -115,13 +133,17 @@ export default function ActivitiesPage() {
   
   // Filter activities based on search term and filters
   const filteredActivities = activities.filter((activity) => {
-    const matchesSearch = activity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          activity.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = filterCategory === 'Tất cả' || activity.category === filterCategory;
+    const name = activity.name || '';
+    const description = activity.description || '';
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLocation = filterLocation === 'Tất cả' || activity.location === filterLocation;
-    
-    return matchesSearch && matchesCategory && matchesLocation;
+    const matchesCategory = filterCategory === 'Tất cả' || activity.category === filterCategory;
+    // Convert selectedDate (Date) to yyyy-MM-dd for comparison
+    const filterDate = format(selectedDate, 'yyyy-MM-dd');
+    const activityDate = activity.date || '';
+    const matchesSelectedDate = activityDate === filterDate;
+    return matchesSearch && matchesLocation && matchesSelectedDate && matchesCategory;
   });
 
   // Filter activities for current week when in calendar view
@@ -183,16 +205,27 @@ export default function ActivitiesPage() {
   };
   
   // Handler functions for button actions
-  const handleViewActivity = (activityId: number) => {
+  const handleViewActivity = (activityId: string) => {
+    // Check if it's a temporary ID
+    if (activityId.startsWith('temp-')) {
+      alert('Hoạt động này chưa có ID hợp lệ. Vui lòng thử lại sau khi dữ liệu được đồng bộ.');
+      return;
+    }
     router.push(`/activities/${activityId}`);
   };
 
-  const handleEditActivity = (activityId: number) => {
+  const handleEditActivity = (activityId: string) => {
     router.push(`/activities/${activityId}/edit`);
   };
 
   const handleCreateActivity = () => {
     router.push('/activities/new');
+  };
+
+  // Handler for opening evaluation modal
+  const handleOpenEvaluation = (activity: any) => {
+    setSelectedActivity(activity);
+    setEvaluationModalOpen(true);
   };
 
   return (
@@ -424,26 +457,30 @@ export default function ActivitiesPage() {
                 color: '#374151',
                 marginBottom: '0.5rem'
                 }}>
-                  Danh mục
+                  Ngày
                 </label>
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
-                >
-                  {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                  ))}
-                </select>
-              </div>
+                <DatePicker
+  selected={selectedDate}
+  onChange={date => setSelectedDate(date as Date)}
+  dateFormat="dd/MM/yyyy"
+  className="datepicker-input"
+  placeholderText="dd/mm/yyyy"
+  wrapperClassName="w-full"
+  customInput={
+    <input
+      type="text"
+      style={{
+        width: '100%',
+        padding: '0.75rem',
+        borderRadius: '0.5rem',
+        border: '1px solid #d1d5db',
+        fontSize: '0.875rem'
+      }}
+    />
+  }
+/>
+              {/* Optionally, show a warning if the date is invalid */}
+            </div>
               
             <div>
                 <label style={{
@@ -473,6 +510,9 @@ export default function ActivitiesPage() {
                 ))}
               </select>
             </div>
+
+            {/* Filter by category */}
+            {/* Removed category filter button group as requested */}
           </div>
         </div>
 
@@ -563,13 +603,13 @@ export default function ActivitiesPage() {
               gridTemplateColumns: 'repeat(7, 1fr)',
               gap: '1rem'
             }}>
-              {weekDates.map((date, index) => {
+              {weekDates.map((date) => {
                 const dayActivities = getActivitiesForDate(date);
                 const today = isToday(date);
 
                 return (
                   <div
-                    key={index}
+                    key={date.toISOString()}
                     style={{
                       background: today ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#f8fafc',
                       borderRadius: '0.75rem',
@@ -600,9 +640,9 @@ export default function ActivitiesPage() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      {dayActivities.slice(0, 3).map((activity, activityIndex) => (
+                      {dayActivities.slice(0, 3).map((activity, index) => (
                         <div
-                          key={activityIndex}
+                          key={activity.id || `activity-${index}-${date.toISOString()}`}
                           style={{
                             background: today ? 'rgba(255, 255, 255, 0.2)' : getCategoryColor(activity.category),
                             color: today ? 'white' : 'white',
@@ -611,28 +651,29 @@ export default function ActivitiesPage() {
                             fontSize: '0.75rem',
                             fontWeight: 600,
                             textAlign: 'center',
-                            cursor: 'pointer'
+                            cursor: activity.id ? 'pointer' : 'not-allowed',
+                            opacity: activity.id ? 1 : 0.5
                           }}
-                          onClick={() => handleViewActivity(activity.id)}
+                          onClick={() => activity.id && handleViewActivity(activity.id)}
                         >
                           {activity.name}
                         </div>
                       ))}
                       {dayActivities.length > 3 && (
-                        <div style={{
+                        <div key={date.toISOString() + '-more'} style={{
                           fontSize: '0.75rem',
                           textAlign: 'center',
                           opacity: 0.7,
                           marginTop: '0.25rem'
                         }}>
                           +{dayActivities.length - 3} khác
-              </div>
+                        </div>
                       )}
-            </div>
-          </div>
+                    </div>
+                  </div>
                 );
               })}
-        </div>
+            </div>
           </div>
         )}
         
@@ -649,15 +690,17 @@ export default function ActivitiesPage() {
               if (viewMode === 'calendar') {
                 return new Date(a.date).getTime() - new Date(b.date).getTime();
               }
-              return a.startTime.localeCompare(b.startTime);
+              const aStart = a.startTime || '';
+              const bStart = b.startTime || '';
+              return aStart.localeCompare(bStart);
             })
-            .map((activity) => {
+            .map((activity, index) => {
               const statusColor = getStatusColor(activity.status);
               const categoryColor = getCategoryColor(activity.category);
 
               return (
             <div
-              key={activity.id}
+              key={activity.id || `activity-${index}`}
               style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 borderRadius: '1rem',
@@ -749,7 +792,21 @@ export default function ActivitiesPage() {
                     <ClockIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Thời gian</div>
-                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.startTime} - {activity.endTime}</div>
+                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.startTime} - {activity.endTime} ({activity.duration} Phút)</div>
+                    </div>
+                  </div>
+                  
+                  {/* Date */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Ngày</div>
+                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.date ? new Date(activity.date).toLocaleDateString('vi-VN') : '-'}</div>
                     </div>
                   </div>
                   
@@ -764,25 +821,6 @@ export default function ActivitiesPage() {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Địa điểm</div>
                       <div style={{ color: '#111827', fontWeight: 600 }}>{activity.location}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Category */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}>
-                    <div style={{
-                      width: '1rem',
-                      height: '1rem',
-                      borderRadius: '0.25rem',
-                      background: categoryColor
-                    }} />
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Danh mục</div>
-                      <div style={{ color: '#111827', fontWeight: 600 }}>{activity.category}</div>
                     </div>
                   </div>
                   
@@ -801,20 +839,7 @@ export default function ActivitiesPage() {
                   </div>
                 </div>
 
-                  {/* Facilitator */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: 'rgba(59, 130, 246, 0.1)',
-                    borderRadius: '0.5rem',
-                    padding: '0.625rem',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <UserIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />
-                    <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Hướng dẫn viên:</span>
-                    <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>{activity.facilitator}</span>
-        </div>
+                 
 
               {/* Actions */}
               <div style={{
@@ -823,7 +848,8 @@ export default function ActivitiesPage() {
                     justifyContent: 'flex-end'
               }}>
                 <button
-                  onClick={() => handleViewActivity(activity.id)}
+                  onClick={() => activity.id && handleViewActivity(activity.id)}
+                  disabled={!activity.id || activity.id.startsWith('temp-')}
                   style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -835,12 +861,13 @@ export default function ActivitiesPage() {
                         color: '#374151',
                         fontSize: '0.875rem',
                         fontWeight: 500,
-                    cursor: 'pointer',
-                        transition: 'all 0.2s ease'
+                    cursor: (!activity.id || activity.id.startsWith('temp-')) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        opacity: (!activity.id || activity.id.startsWith('temp-')) ? 0.5 : 1
                       }}
                     >
                       <EyeIcon style={{ width: '1rem', height: '1rem' }} />
-                      Xem chi tiết
+                      Xem chi tiết {activity.id?.startsWith('temp-') && '(Tạm thời)'}
                 </button>
                     {['admin', 'staff'].includes(user?.role || '') && (
                 <button
@@ -864,6 +891,26 @@ export default function ActivitiesPage() {
                         Chỉnh sửa
                 </button>
                     )}
+                  <button
+                    onClick={() => handleOpenEvaluation(activity)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #10b981',
+                      background: 'white',
+                      color: '#10b981',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <UserGroupIcon style={{ width: '1rem', height: '1rem' }} />
+                    Đánh giá tham gia
+                  </button>
               </div>
             </div>
               );
@@ -930,6 +977,15 @@ export default function ActivitiesPage() {
           </div>
         )}
       </div>
+      {/* Resident Evaluation Modal */}
+      {evaluationModalOpen && selectedActivity && (
+        <ResidentEvaluationModal
+          open={evaluationModalOpen}
+          onClose={() => setEvaluationModalOpen(false)}
+          activity={selectedActivity}
+          residents={residents}
+        />
+      )}
     </div>
   );
 } 

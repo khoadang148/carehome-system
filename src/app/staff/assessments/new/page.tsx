@@ -8,6 +8,8 @@ import {
   HeartIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
+import { careNotesAPI } from '@/lib/api';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 interface CareNoteData {
   residentId: string;
@@ -52,6 +54,8 @@ export default function NewCareNotePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   
+  const { user } = useAuth();
+
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CareNoteData>({
     defaultValues: {
       residentId: searchParams?.get('residentId') || '',
@@ -69,28 +73,28 @@ export default function NewCareNotePage() {
 
   const onSubmit = async (data: CareNoteData) => {
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Save care note to localStorage
-    const careNotes = JSON.parse(localStorage.getItem('nurseryHomeCareNotes') || '[]');
-    const newCareNote = {
-      id: Date.now(),
-      ...data,
-      createdAt: new Date().toISOString(),
-      createdBy: 'Current Staff'
-    };
-    
-    careNotes.push(newCareNote);
-    localStorage.setItem('nurseryHomeCareNotes', JSON.stringify(careNotes));
-    
-    setIsSubmitting(false);
-    setShowSuccess(true);
-    
-    setTimeout(() => {
-      router.push('/staff/care-notes');
-    }, 2000);
+    try {
+      // Gộp date và time thành ISO string
+      const dateTimeISO = new Date(`${data.date}T${data.time}:00`).toISOString();
+      const payload = {
+        date: dateTimeISO,
+        notes: data.noteContent,
+        resident_id: String(data.residentId),
+        conducted_by: String(user?.id),
+        assessment_type: data.category || 'Đánh giá tổng quát',
+        recommendations: '',
+      };
+      console.log('Payload gửi lên careNotesAPI.create:', payload);
+      await careNotesAPI.create(payload);
+      setIsSubmitting(false);
+      setShowSuccess(true);
+      setTimeout(() => {
+        router.push('/staff/assessments');
+      }, 2000);
+    } catch (error) {
+      setIsSubmitting(false);
+      alert('Lưu ghi chú thất bại. Vui lòng thử lại!');
+    }
   };
 
   const insertTemplate = (template: string) => {
@@ -236,7 +240,8 @@ export default function NewCareNotePage() {
                 )}
               </div>
 
-              <div>
+              {/* Thay thế input staffName bằng hiển thị thông tin nhân viên */}
+              <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
@@ -244,93 +249,19 @@ export default function NewCareNotePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Nhân viên ghi chú *
+                  Nhân viên ghi chú
                 </label>
-                <input
-                  {...register('staffName', { required: 'Vui lòng nhập tên nhân viên' })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                  placeholder="Nhập tên nhân viên"
-                />
-                {errors.staffName && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    {errors.staffName.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
+                <div style={{
+                  padding: '0.75rem',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '0.5rem',
                   fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
+                  backgroundColor: '#f9fafb',
+                  color: '#2563eb',
+                  fontWeight: 600
                 }}>
-                  Danh mục *
-                </label>
-                <select
-                  {...register('category', { required: 'Vui lòng chọn danh mục' })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                >
-                  {categoryOptions.map(category => (
-                    <option key={category.value} value={category.value}>
-                      {category.icon} {category.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.category && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    {errors.category.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Mức độ ưu tiên *
-                </label>
-                <select
-                  {...register('priority', { required: 'Vui lòng chọn mức độ ưu tiên' })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                >
-                  {priorityOptions.map(priority => (
-                    <option key={priority.value} value={priority.value}>
-                      {priority.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.priority && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    {errors.priority.message}
-                  </p>
-                )}
+                  {user?.name ? user.name : (user && 'fullName' in user ? (user as any).fullName : '---')}
+                </div>
               </div>
             </div>
 

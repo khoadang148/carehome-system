@@ -15,6 +15,8 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { residentAPI } from '@/lib/api';
+import { carePlansAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 
@@ -24,9 +26,10 @@ export default function ResidentsPage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCareLevel, setFilterCareLevel] = useState('');
-  const [residentsData, setResidentsData] = useState(RESIDENTS_DATA);
+  const [residentsData, setResidentsData] = useState<any[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState<number | null>(null);
+  const [carePlanOptions, setCarePlanOptions] = useState<any[]>([]);
   
 
   
@@ -47,29 +50,42 @@ export default function ResidentsPage() {
   
 
   
-  // Load residents from localStorage when component mounts
+  // Load residents from API when component mounts
   useEffect(() => {
-    const savedResidents = localStorage.getItem('nurseryHomeResidents');
-    if (savedResidents) {
+    const fetchResidents = async () => {
       try {
-        const parsedResidents = JSON.parse(savedResidents);
-        const updatedResidents = parsedResidents.map((resident: any) => ({
-          ...resident,
-          careLevel: resident.careLevel === 'High' ? 'Cao cấp' : 
-                    resident.careLevel === 'Medium' ? 'Nâng cao' : 
-                    resident.careLevel === 'Low' ? 'Cơ bản' : 
-                    resident.careLevel
+        const apiData = await residentAPI.getAll();
+        // Map API data về đúng format UI
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mapped = apiData.map((r: any, idx: number) => ({
+          id: r._id,
+          name: r.fullName,
+          age: r.dateOfBirth ? (new Date().getFullYear() - new Date(r.dateOfBirth).getFullYear()) : '',
+          room: r.room || '', // nếu có trường room
+          carePlanIds: r.carePlanIds || (r.carePlanId ? [r.carePlanId] : []),
+          emergencyContact: r.emergencyContact?.fullName || '',
+          contactPhone: r.emergencyContact?.phoneNumber || '',
+          // ...map thêm các trường khác nếu cần
         }));
-        setResidentsData(updatedResidents);
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
-      } catch (error) {
-        console.error('Error parsing saved residents data:', error);
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
-        setResidentsData(RESIDENTS_DATA);
+        setResidentsData(mapped);
+      } catch (err) {
+        setResidentsData([]);
       }
-    } else {
-      localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
-    }
+    };
+    fetchResidents();
+  }, []);
+
+  // Load care plans for filter dropdown
+  useEffect(() => {
+    const fetchCarePlans = async () => {
+      try {
+        const data = await carePlansAPI.getAll();
+        setCarePlanOptions(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setCarePlanOptions([]);
+      }
+    };
+    fetchCarePlans();
   }, []);
   
 
@@ -79,9 +95,17 @@ export default function ResidentsPage() {
     const matchesSearch = resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           resident.room.includes(searchTerm);
     
-    const matchesCareLevel = filterCareLevel === '' || 
-                            (filterCareLevel === 'CHUA_DANG_KY' && !resident.careLevel) ||
-                            resident.careLevel === filterCareLevel;
+    let matchesCareLevel = true;
+    if (filterCareLevel === 'CHUA_DANG_KY') {
+      matchesCareLevel = !resident.carePlanIds || resident.carePlanIds.length === 0;
+    } else if (filterCareLevel !== '') {
+      // Tìm tên gói tương ứng với từng carePlanId
+      const planNames = (resident.carePlanIds || []).map((id: string) => {
+        const plan = carePlanOptions.find((p: any) => p._id === id);
+        return plan?.planName;
+      });
+      matchesCareLevel = planNames.includes(filterCareLevel);
+    }
     
     return matchesSearch && matchesCareLevel;
   });
@@ -108,7 +132,7 @@ export default function ResidentsPage() {
       setResidentsData(updatedResidents);
       
       // Save to localStorage after deleting
-      localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+      // localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents)); // This line is removed as per the edit hint
       
       setShowDeleteModal(false);
       setResidentToDelete(null);
@@ -320,9 +344,10 @@ export default function ResidentsPage() {
                   }}
                 >
                   <option value="">Tất cả gói</option>
-                  <option value="Cơ bản">Cơ bản</option>
-                  <option value="Nâng cao">Nâng cao</option>
-                  <option value="Cao cấp">Cao cấp</option>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {carePlanOptions.map((plan: any, idx: number) => (
+                    <option key={plan._id} value={plan.planName}>{plan.planName}</option>
+                  ))}
                   <option value="CHUA_DANG_KY">Chưa đăng ký</option>
                 </select>
                 <FunnelIcon style={{
@@ -500,21 +525,25 @@ export default function ResidentsPage() {
                       </span>
                     </td>
                     <td style={{padding: '1rem'}}>
-                      {resident.careLevel ? (
-                        <span style={{
-                          background: resident.careLevel === 'Cao cấp' ? 'rgba(139, 92, 246, 0.1)' :
-                                     resident.careLevel === 'Nâng cao' ? 'rgba(59, 130, 246, 0.1)' : 
-                                     'rgba(245, 158, 11, 0.1)',
-                          color: resident.careLevel === 'Cao cấp' ? '#8b5cf6' :
-                                 resident.careLevel === 'Nâng cao' ? '#3b82f6' : 
-                                 '#f59e0b',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
-                          {resident.careLevel}
-                        </span>
+                      {resident.carePlanIds && resident.carePlanIds.length > 0 ? (
+                        resident.carePlanIds.map((planId: string, idx: number) => {
+                          const plan = carePlanOptions.find((p: any) => p._id === planId);
+                          if (!plan || !plan.planName) return null;
+                          return (
+                            <span key={planId + '-' + idx} style={{
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              color: '#3b82f6',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              marginRight: '0.5rem',
+                              display: 'inline-block'
+                            }}>
+                              {plan.planName}
+                            </span>
+                          );
+                        })
                       ) : (
                         <span style={{
                           background: 'rgba(107, 114, 128, 0.1)',

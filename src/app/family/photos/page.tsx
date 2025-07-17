@@ -1,24 +1,24 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownTrayIcon, XMarkIcon, EyeIcon } from "@heroicons/react/24/outline";
-
-const mockPhotos = [
-  { id: 1, url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&h=400&fit=crop', caption: 'Hoạt động tập thể dục buổi sáng', date: '2024-01-15' },
-  { id: 2, url: 'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=600&h=400&fit=crop', caption: 'Bữa ăn tối cùng bạn bè', date: '2024-01-14' },
-  { id: 3, url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=600&h=400&fit=crop', caption: 'Chăm sóc vườn hoa', date: '2024-01-13' },
-  { id: 4, url: 'https://images.unsplash.com/photo-1573764446-fbca3cefb9c9?w=600&h=400&fit=crop', caption: 'Sinh nhật tháng 1', date: '2024-01-12' },
-  { id: 5, url: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=600&h=400&fit=crop', caption: 'Thư giãn đọc sách', date: '2024-01-11' },
-  { id: 6, url: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=600&h=400&fit=crop', caption: 'Hoạt động vẽ tranh', date: '2024-01-10' }
-];
+import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownTrayIcon, XMarkIcon, EyeIcon, UsersIcon } from "@heroicons/react/24/outline";
+import { useAuth } from "@/lib/contexts/auth-context";
+import { staffAPI } from "@/lib/api";
+import { residentAPI } from "@/lib/api";
 
 export default function FamilyPhotosPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [allPhotos, setAllPhotos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [detailPhoto, setDetailPhoto] = useState<any | null>(null);
   const [detailPhotoIndex, setDetailPhotoIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [residents, setResidents] = useState<any[]>([]);
+  const [selectedResidentId, setSelectedResidentId] = useState<string>('all');
 
   // CSS animations
   const styles = `
@@ -71,41 +71,93 @@ export default function FamilyPhotosPage() {
      };
       }, [detailPhoto]);
 
-   useEffect(() => {
-    try {
-      const uploadedPhotos = localStorage.getItem("uploadedPhotos");
-      if (uploadedPhotos) {
-        const parsedPhotos = JSON.parse(uploadedPhotos);
-        const residentPhotos = parsedPhotos.map((photo: any) => ({
-          id: `uploaded_${photo.id}`,
-          url: photo.url,
-          caption: photo.caption,
-          date: new Date(photo.uploadDate).toISOString().split("T")[0],
-          uploadedBy: photo.uploadedBy,
-          isUploaded: true,
-        }));
-        const combinedPhotos = [...mockPhotos, ...residentPhotos];
-        // Sort: ảnh mới nhất (index 0) → ảnh cũ nhất (index max)  
-        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setAllPhotos(combinedPhotos);
-      } else {
-        setAllPhotos(mockPhotos);
-      }
-    } catch (error) {
-      setAllPhotos(mockPhotos);
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      setError("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
+      return;
     }
+    const accessToken = sessionStorage.getItem("access_token");
+    if (!accessToken) {
+      setLoading(false);
+      setError("Không tìm thấy access token. Vui lòng đăng nhập lại.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const familyId = user.id;
+    fetch(`http://localhost:8000/resident-photos?family_member_id=${familyId}`, {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "accept": "*/*"
+      }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Lỗi khi lấy ảnh");
+        return res.json();
+      })
+      .then(data => {
+        console.log("API resident-photos data:", data);
+        // Map lại dữ liệu cho đúng định dạng UI mong muốn
+        const mapped = Array.isArray(data) ? data.map(item => {
+          let senderName = item.uploadedByName;
+          if (!senderName && item.uploadedBy && staffList.length > 0) {
+            const staff = staffList.find(s => String(s._id) === String(item.uploadedBy));
+            senderName = staff ? (staff.fullName || staff.name || staff.username || staff.email) : undefined;
+          }
+          return {
+            ...item,
+            id: item._id,
+            url: item.filePath ? `http://localhost:8000${item.filePath.startsWith('/') ? '' : '/'}${item.filePath}` : "",
+            caption: item.caption || "",
+            date: item.takenDate
+              ? new Date(item.takenDate).toISOString().split("T")[0]
+              : (item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : ""),
+            uploadedByName: senderName,
+          };
+        }) : [];
+        setAllPhotos(mapped);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message || "Lỗi không xác định");
+        setLoading(false);
+      });
+  }, [user]);
+
+  // Fetch staff list
+  useEffect(() => {
+    staffAPI.getAll().then(data => {
+      setStaffList(Array.isArray(data) ? data : []);
+    }).catch(() => setStaffList([]));
   }, []);
 
-  // Filter/search logic
+  // Fetch residents của user
+  useEffect(() => {
+    if (user?.id) {
+      residentAPI.getByFamilyMemberId(user.id)
+        .then((data) => {
+          const arr = Array.isArray(data) ? data : [data];
+          setResidents(arr && arr.filter(r => r && r._id));
+        })
+        .catch(() => setResidents([]));
+    } else {
+      setResidents([]);
+    }
+  }, [user]);
+
+  // Filter/search logic (thêm filter theo resident)
   const filteredPhotos = useMemo(() =>
     allPhotos.filter((photo: any) => {
       const matchSearch =
         photo.caption.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (photo.uploadedBy && photo.uploadedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
         photo.date.includes(searchTerm);
-      return matchSearch;
+      // Sửa logic lọc residentId: nếu chọn 'all' thì hiển thị tất cả, nếu không thì so sánh photo.residentId với selectedResidentId
+      const matchResident = selectedResidentId === 'all' || String(photo.residentId) === String(selectedResidentId) || String(photo.resident_id) === String(selectedResidentId);
+      return matchSearch && matchResident;
     }),
-    [allPhotos, searchTerm]
+    [allPhotos, searchTerm, selectedResidentId]
   );
 
   // Group by date
@@ -134,13 +186,23 @@ export default function FamilyPhotosPage() {
   const nextLightbox = () => setLightboxIndex(i => (i !== null && i < filteredPhotos.length - 1 ? i + 1 : i));
 
   // Download
-  const downloadPhoto = (url: string, name: string) => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name || "photo.jpg";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const downloadPhoto = async (url: string, name: string) => {
+    try {
+      const accessToken = sessionStorage.getItem("access_token");
+      const response = await fetch(url, {
+        headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
+      });
+      const blob = await response.blob();
+      const a = document.createElement("a");
+      a.href = window.URL.createObjectURL(blob);
+      a.download = name || "photo.jpg";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(a.href);
+    } catch (err) {
+      alert("Không thể tải ảnh. Vui lòng thử lại!");
+    }
   };
 
   // Keyboard navigation for photo modal
@@ -189,6 +251,9 @@ export default function FamilyPhotosPage() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [detailPhoto, detailPhotoIndex, filteredPhotos]);
+
+  if (loading) return <div style={{textAlign: 'center', marginTop: '3rem', color: '#64748b', fontSize: '1.2rem'}}>Đang tải ảnh...</div>;
+  if (error) return <div style={{textAlign: 'center', marginTop: '3rem', color: 'red', fontSize: '1.2rem'}}>Lỗi: {error}</div>;
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", padding: "0", fontFamily: 'Inter, sans-serif' }}>
@@ -303,6 +368,67 @@ export default function FamilyPhotosPage() {
   </div>
 </div>
 
+      {/* Filter resident dropdown */}
+      <div style={{
+        maxWidth: 1240,
+        margin: 0,
+        padding: '0 2.5rem 0.5rem 2.5rem',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        marginLeft: '150px',
+        marginBottom: '17px'
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          border: '1.5px solid #bbf7d0',
+          borderRadius: '1.5rem',
+          boxShadow: '0 1px 6px rgba(16,185,129,0.05)',
+          padding: '0.6rem 1.3rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.7rem',
+          minWidth: 0,
+          maxWidth: 'unset',
+          width: 'auto',
+          margin: 0,
+          flexWrap: 'nowrap',
+        }}>
+          <UsersIcon style={{ width: 24, height: 24, color: '#10b981', flexShrink: 0 }} />
+          <label htmlFor="resident-filter" style={{ fontWeight: 700, color: '#222', fontSize: '1.08rem', letterSpacing: '-0.01em', marginRight: 2, whiteSpace: 'nowrap' }}>
+            Lọc theo người thân:
+          </label>
+          <select
+            id="resident-filter"
+            value={selectedResidentId}
+            onChange={e => setSelectedResidentId(e.target.value)}
+            style={{
+              padding: '0.6rem 1.1rem',
+              borderRadius: '0.9rem',
+              border: '1.5px solid #bbf7d0',
+              fontSize: '1.02rem',
+              background: 'white',
+              color: '#222',
+              fontWeight: 600,
+              minWidth: 120,
+              boxShadow: '0 1px 3px rgba(16,185,129,0.07)',
+              outline: 'none',
+              transition: 'border 0.2s, box-shadow 0.2s',
+              cursor: 'pointer',
+            }}
+            onFocus={e => { e.currentTarget.style.border = '1.5px solid #10b981'; e.currentTarget.style.boxShadow = '0 0 0 3px #bbf7d0'; }}
+            onBlur={e => { e.currentTarget.style.border = '1.5px solid #bbf7d0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(16,185,129,0.07)'; }}
+          >
+            <option value="all">Tất cả người thân</option>
+            {residents.map((r: any) => {
+              const value = r._id || r.id;
+              const label = r.name || r.full_name || value || 'Không rõ tên';
+              return <option key={value} value={value}>{label}</option>;
+            })}
+          </select>
+        </div>
+      </div>
+
       {/* Gallery */}
       <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 2.5rem 3rem 2.5rem' }}>
         {sortedDates.length === 0 ? (
@@ -312,9 +438,9 @@ export default function FamilyPhotosPage() {
             <div key={date} style={{ marginBottom: "2.5rem" }}>
               <div style={{ fontWeight: 700, fontSize: "1.13rem", color: "#64748b", margin: "0 0 1.2rem 0", letterSpacing: "0.01em", textShadow: "0 1px 4px rgba(30,41,59,0.07)" }}>{new Date(date).toLocaleDateString("vi-VN")}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "2.1rem" }}>
-                {groupedPhotos[date].map(photo => (
+                {groupedPhotos[date].map((photo, idx) => (
                   <div
-                    key={photo.id}
+                    key={photo.id || idx}
                     style={{ position: "relative", borderRadius: "14px", overflow: "hidden", background: '#f8fafc', boxShadow: '0 2px 12px rgba(30,41,59,0.07)', fontFamily: 'Inter, Roboto, Arial, Helvetica, sans-serif' }}
                   >
                     <img 
@@ -341,7 +467,7 @@ export default function FamilyPhotosPage() {
                     
                     {/* Nút tải ảnh */}
                       <button
-                      onClick={() => downloadPhoto(photo.url, photo.caption || "photo.jpg")}
+                      onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
                       style={{ 
                         position: 'absolute', 
                         top: 12, 
@@ -470,12 +596,14 @@ export default function FamilyPhotosPage() {
           <div style={{ position: "absolute", bottom: 56, left: 0, right: 0, textAlign: "center", display: "flex", justifyContent: "center", pointerEvents: "none" }}>
             <div style={{ background: "rgba(30,41,59,0.68)", borderRadius: 20, padding: "22px 36px", display: "inline-block", color: "#fff", minWidth: 260, fontWeight: 700, textShadow: "0 2px 8px rgba(30,41,59,0.5)", fontSize: '1.18rem' }}>
               <div style={{ fontSize: "1.32rem", fontWeight: 700, marginBottom: 10 }}>{filteredPhotos[lightboxIndex].caption}</div>
-              {filteredPhotos[lightboxIndex].uploadedBy && (
-                <div style={{ fontSize: "1.09em", fontWeight: 500, opacity: 0.92, marginBottom: 6 }}>Người gửi: {filteredPhotos[lightboxIndex].uploadedBy}</div>
-              )}
-              <div style={{ fontSize: "1.09em", fontWeight: 500, opacity: 0.92 }}>Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString("vi-VN")}</div>
+              <div style={{ fontSize: "1.09em", fontWeight: 500, opacity: 0.92, marginBottom: 6 }}>
+                Người gửi: {filteredPhotos[lightboxIndex].uploadedByName || filteredPhotos[lightboxIndex].uploadedBy || "Không rõ"}
+              </div>
+              <div style={{ fontSize: "1.09em", fontWeight: 500, opacity: 0.92 }}>
+                Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString("vi-VN")}
+              </div>
               <button
-                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].caption || "photo.jpg"); }}
+                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || "photo.jpg"); }}
                 style={{ marginTop: 18, background: 'linear-gradient(90deg, #ff5858 0%, #ffb347 100%)', color: 'white', border: 'none', borderRadius: 14, padding: '12px 34px', fontWeight: 700, fontSize: '1.13rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(255,88,88,0.08)', transition: 'background 0.2s' }}
                 onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #ff5858 0%, #ff9147 100%)'; }}
                 onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #ff5858 0%, #ffb347 100%)'; }}
@@ -751,29 +879,27 @@ export default function FamilyPhotosPage() {
                   Ngày gửi: {new Date(detailPhoto.date).toLocaleDateString('vi-VN')}
                 </div>
                 
-                {detailPhoto.uploadedBy && (
-                                      <div style={{ 
-                     fontSize: '0.95rem', 
-                     color: 'rgba(0, 0, 0, 0.6)', 
-                     fontWeight: 500,
-                     display: 'flex',
-                     alignItems: 'center',
-                     justifyContent: 'center',
-                     gap: '8px',
-                     letterSpacing: '0.01em'
-                   }}>
-                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ opacity: 0.6 }}>
-                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                       <circle cx="12" cy="7" r="4"/>
-                     </svg>
-                     Người gửi: {detailPhoto.uploadedBy}
-                   </div>
-                )}
+                <div style={{ 
+                 fontSize: '0.95rem', 
+                 color: 'rgba(0, 0, 0, 0.6)', 
+                 fontWeight: 500,
+                 display: 'flex',
+                 alignItems: 'center',
+                 justifyContent: 'center',
+                 gap: '8px',
+                 letterSpacing: '0.01em'
+               }}>
+                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ opacity: 0.6 }}>
+                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                   <circle cx="12" cy="7" r="4"/>
+                 </svg>
+                 Người gửi: {detailPhoto.uploadedByName || detailPhoto.uploadedBy || "Không rõ"}
+               </div>
               </div>
 
               {/* Enhanced Nút tải ảnh */}
             <button
-              onClick={() => downloadPhoto(detailPhoto.url, detailPhoto.caption || "photo.jpg")}
+              onClick={() => downloadPhoto(detailPhoto.url, detailPhoto.fileName || detailPhoto.caption || "photo.jpg")}
                 style={{ 
                   background: 'rgba(59, 130, 246, 0.9)', 
                   color: 'white', 
