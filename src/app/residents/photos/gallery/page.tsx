@@ -14,30 +14,28 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { residentAPI, activitiesAPI, photosAPI, staffAPI } from '@/lib/api';
+import { carePlansAPI, roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
+// Update PhotoData interface to match new API
 interface PhotoData {
-  id: number;
-  url: string;
-  fileName: string;
-  fileSize: number;
+  _id: string;
+  resident_id: string;
+  uploaded_by: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
   caption: string;
-  activityType: string;
-  staffNotes: string;
+  activity_type: string;
   tags: string[];
-  residentId: string;
-  residentName: string;
-  residentRoom: string;
-  uploadDate: string;
-  uploadedBy: string;
-  uploadedByRole: string;
-  shareWithFamily: boolean;
-  reviewStatus: string;
-  approvedBy: string | null;
-  approvedDate: string | null;
-  viewCount: number;
-  familyViewed: boolean;
-  familyId: string; // Thêm trường familyId
+  upload_date: string;
+  taken_date?: string;
+  staff_notes?: string;
+  related_activity_id?: string | null;
+  family_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export default function PhotoGalleryPage() {
@@ -56,6 +54,7 @@ export default function PhotoGalleryPage() {
   const [residents, setResidents] = useState<Array<any>>([]);
   const [activityTypes, setActivityTypes] = useState<string[]>([]);
   const [staffs, setStaffs] = useState<Array<any>>([]);
+  const [roomNumbers, setRoomNumbers] = useState<{ [residentId: string]: string }>({});
 
   // Load photos from API
   useEffect(() => {
@@ -65,8 +64,8 @@ export default function PhotoGalleryPage() {
       try {
         // Chuẩn bị params lọc nếu có
         const params: any = {};
-        if (filterResident) params.residentId = filterResident;
-        if (filterActivityType) params.activityType = filterActivityType;
+        if (filterResident) params.resident_id = filterResident;
+        if (filterActivityType) params.activity_type = filterActivityType;
         // Có thể thêm params ngày nếu backend hỗ trợ
         // if (filterDateRange !== 'all') params.dateRange = filterDateRange;
         const data = await photosAPI.getAll(params);
@@ -122,6 +121,31 @@ export default function PhotoGalleryPage() {
     fetchStaffs();
   }, []);
 
+  // Lấy số phòng cho từng resident xuất hiện trong gallery
+  useEffect(() => {
+    const fetchRooms = async () => {
+      const residentIds = Array.from(new Set(photos.map((p) => p.resident_id)));
+      for (const residentId of residentIds) {
+        if (!residentId || roomNumbers[residentId]) continue;
+        try {
+          const assignments = await carePlansAPI.getByResidentId(residentId);
+          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
+          const roomId = assignment?.assigned_room_id;
+          if (roomId) {
+            const room = await roomsAPI.getById(roomId);
+            setRoomNumbers((prev) => ({ ...prev, [residentId]: room?.room_number || 'Chưa cập nhật' }));
+          } else {
+            setRoomNumbers((prev) => ({ ...prev, [residentId]: 'Chưa cập nhật' }));
+          }
+        } catch {
+          setRoomNumbers((prev) => ({ ...prev, [residentId]: 'Chưa cập nhật' }));
+        }
+      }
+    };
+    if (photos.length > 0) fetchRooms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos]);
+
   useEffect(() => {
     console.log('Modal states:', {showModal });
     // Only hide header for modals, not the main page
@@ -160,20 +184,18 @@ export default function PhotoGalleryPage() {
   const filteredPhotos = photos.filter(photo => {
     const matchesSearch =
       (photo.caption && photo.caption.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (photo.residentName && photo.residentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (getResidentNameByResidentId(photo.resident_id).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (Array.isArray(photo.tags) && photo.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm.toLowerCase())));
 
-    const matchesResident = filterResident === '' || photo.residentId === filterResident;
-    
-    const matchesActivityType = filterActivityType === '' || photo.activityType === filterActivityType;
+    const matchesResident = filterResident === '' || photo.resident_id === filterResident;
+    const matchesActivityType = filterActivityType === '' || photo.activity_type === filterActivityType;
 
     // Date filter
     let matchesDate = true;
     if (filterDateRange !== 'all') {
-      const photoDate = new Date(photo.uploadDate);
+      const photoDate = new Date(photo.upload_date);
       const now = new Date();
       const daysDiff = Math.floor((now.getTime() - photoDate.getTime()) / (1000 * 60 * 60 * 24));
-      
       switch (filterDateRange) {
         case 'today':
           matchesDate = daysDiff === 0;
@@ -189,17 +211,15 @@ export default function PhotoGalleryPage() {
           break;
       }
     }
-
-    // For family users, only show photos shared with family
+    // For family users, only show photos with family_id matching user or shared logic if needed
     if (user && String(user.role) === 'family') {
-      return matchesSearch && matchesResident && matchesActivityType && matchesDate && photo.shareWithFamily;
+      return matchesSearch && matchesResident && matchesActivityType && matchesDate && (user as any)?.family_id && photo.family_id === (user as any).family_id;
     }
-
     return matchesSearch && matchesResident && matchesActivityType && matchesDate;
   });
 
   // Sort photos by upload date (newest first)
-  const sortedPhotos = filteredPhotos.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+  const sortedPhotos = filteredPhotos.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime());
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -216,12 +236,7 @@ export default function PhotoGalleryPage() {
     setSelectedPhoto(photo);
     setShowModal(true);
     
-    // Update view count
-    const updatedPhotos = photos.map(p => 
-      p.id === photo.id ? { ...p, viewCount: p.viewCount + 1 } : p
-    );
-    setPhotos(updatedPhotos);
-    localStorage.setItem('uploadedPhotos', JSON.stringify(updatedPhotos));
+    // No viewCount in new API, just open modal
   };
 
   const closeModal = () => {
@@ -229,25 +244,27 @@ export default function PhotoGalleryPage() {
     setSelectedPhoto(null);
   };
 
-  // Hàm lấy URL ảnh từ filePath
+  // Hàm lấy URL ảnh từ file_path
   const getPhotoUrl = (photo: any) => {
-    if (!photo || !photo.filePath) return '/window.svg';
+    if (!photo || !photo.file_path) return '/window.svg';
+    // Nếu là URL tuyệt đối thì trả về luôn
+    if (photo.file_path.startsWith('http')) return photo.file_path;
     // Chuẩn hóa dấu gạch chéo
-    const cleanPath = photo.filePath.replace(/\\/g, '/').replace(/\"/g, '/');
+    const cleanPath = photo.file_path.replace(/\\/g, '/').replace(/"/g, '/');
     // Nếu backend chạy local, sửa lại host cho đúng
-    return `http://localhost:8000/${cleanPath}`;
+    return `http://localhost:8000/${cleanPath.replace(/^\//, '')}`;
   };
 
-  // Hàm lấy tên resident từ residentId
+  // Hàm lấy tên resident từ resident_id
   const getResidentNameByResidentId = (residentId: string) => {
     const resident = residents.find((r: any) => r._id === residentId);
-    return resident ? resident.fullName : 'Không rõ';
+    return resident ? resident.full_name : 'Không rõ';
   };
 
-  // Hàm lấy tên staff từ staffId
+  // Hàm lấy tên staff từ uploaded_by
   const getStaffNameById = (staffId: string) => {
     const staff = staffs.find((s: any) => s._id === staffId);
-    return staff ? staff.fullName : 'Không rõ';
+    return staff ? staff.full_name : 'Không rõ';
   };
 
   return (
@@ -361,7 +378,7 @@ export default function PhotoGalleryPage() {
                 <option value="">Tất cả người cao tuổi</option>
                 {residents.map((resident: any) => (
                   <option key={resident._id} value={resident._id}>
-                    {resident.fullName} {resident.room ? `- Phòng ${resident.room}` : ''}
+                    {resident.full_name} {resident.room ? `- Phòng ${resident.room}` : ''}
                   </option>
                 ))}
               </select>
@@ -436,7 +453,7 @@ export default function PhotoGalleryPage() {
           }}>
             {sortedPhotos.map((photo) => (
               <div
-                key={photo.id || photo.url || Math.random()}
+                key={photo._id}
                 onClick={() => handlePhotoClick(photo)}
                 
                 style={{
@@ -482,14 +499,14 @@ export default function PhotoGalleryPage() {
                   }}>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Tên:</span>
                     <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>
-                      {getResidentNameByResidentId(photo.residentId)}
+                      {getResidentNameByResidentId(photo.resident_id)}
                     </span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Phòng:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.residentRoom || ''}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{roomNumbers[photo.resident_id] || 'Chưa cập nhật'}</span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Hoạt động:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.activityType}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.activity_type}</span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Đăng bởi:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{getStaffNameById(photo.uploadedBy)}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{getStaffNameById(photo.uploaded_by)}</span>
                   </div>
 
                   {/* Mô tả */}
@@ -550,7 +567,7 @@ export default function PhotoGalleryPage() {
                     <div style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
                       <CalendarDaysIcon style={{width: '1rem', height: '1rem'}} />
                       <span style={{fontWeight: 600}}>Ngày đăng:</span>
-                      <span style={{color: '#64748b'}}>{formatDate(photo.uploadDate)}</span>
+                      <span style={{color: '#64748b'}}>{formatDate(photo.upload_date)}</span>
                     </div>
                     
                   </div>
@@ -649,7 +666,7 @@ export default function PhotoGalleryPage() {
                     margin: '0 0 0.5rem 0',
                     textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
                   }}>
-                    {getResidentNameByResidentId(selectedPhoto.residentId)}
+                    {getResidentNameByResidentId(selectedPhoto.resident_id)}
                   </h2>
                   <p style={{
                     fontSize: '1rem',
@@ -719,7 +736,7 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        {getResidentNameByResidentId(selectedPhoto.residentId)}
+                        {getResidentNameByResidentId(selectedPhoto.resident_id)}
                       </div>
                     </div>
 
@@ -744,7 +761,7 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        Phòng {selectedPhoto.residentRoom}
+                        Phòng {roomNumbers[selectedPhoto.resident_id] || 'Chưa cập nhật'}
                       </div>
                     </div>
 
@@ -769,7 +786,7 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        {selectedPhoto.activityType}
+                        {selectedPhoto.activity_type}
                       </div>
                     </div>
 
@@ -794,72 +811,12 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        {getStaffNameById(selectedPhoto.uploadedBy)}
+                        {getStaffNameById(selectedPhoto.uploaded_by)}
                       </div>
                     </div>
 
-                    <div style={{
-                      background: 'white',
-                      padding: '1rem',
-                      borderRadius: '0.75rem',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <div style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: '#64748b',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem'
-                      }}>
-                        Ngày đăng tải
-                      </div>
-                      <div style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: '#1e293b'
-                      }}>
-                        {formatDate(selectedPhoto.uploadDate)}
-                      </div>
-                    </div>
-
-                    <div style={{
-                      background: 'white',
-                      padding: '1rem',
-                      borderRadius: '0.75rem',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      
-                    </div>
-
-                    <div style={{
-                      background: 'white',
-                      padding: '1rem',
-                      borderRadius: '0.75rem',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <div style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: '#64748b',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem'
-                      }}>
-                        Chia sẻ với gia đình
-                      </div>
-                      <div style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: selectedPhoto.shareWithFamily ? '#22c55e' : '#ef4444',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <span>{selectedPhoto.shareWithFamily ? '✅' : '❌'}</span>
-                        <span>{selectedPhoto.shareWithFamily ? 'Có' : 'Không'}</span>
-                      </div>
-                    </div>
+                    
+                    {/* Chia sẻ với gia đình: Không còn trong API mới, bỏ qua */}
                   </div>
                 </div>
 
@@ -984,7 +941,7 @@ export default function PhotoGalleryPage() {
                 )}
 
                 {/* Staff Notes */}
-                {selectedPhoto.staffNotes && String(user?.role) !== 'family' && (
+                {selectedPhoto.staff_notes && String(user?.role) !== 'family' && (
                   <div style={{
                     background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
                     borderRadius: '1rem',
@@ -1030,7 +987,7 @@ export default function PhotoGalleryPage() {
                         lineHeight: '1.6',
                         color: '#1e293b'
                       }}>
-                        {selectedPhoto.staffNotes}
+                        {selectedPhoto.staff_notes}
                       </div>
                     </div>
                   </div>

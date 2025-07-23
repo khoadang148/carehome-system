@@ -176,7 +176,11 @@ export default function SettingsPage() {
     setIsSubmitting(true);
 
     try {
-      await userAPI.changePassword({ oldPassword: currentPassword, newPassword });
+      await userAPI.changePassword({
+        currentPassword,
+        newPassword,
+        confirmPassword
+      });
       setModalType('success');
       setModalMessage('Đổi mật khẩu thành công!');
       setModalOpen(true);

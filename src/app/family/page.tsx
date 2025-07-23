@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -33,6 +33,8 @@ import { careNotesAPI } from '@/lib/api';
 import { staffAPI } from '@/lib/api';
 import { carePlansAPI, roomsAPI } from '@/lib/api';
 import { userAPI } from '@/lib/api';
+import { activityParticipationsAPI } from '@/lib/api';
+import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 // Add CSS animations
 const styles = `
@@ -99,6 +101,21 @@ const formatDob = (dob: string) => {
   return `${day}-${month}-${year}`;
 };
 
+// Helper function to get full avatar URL
+const getAvatarUrl = (avatarPath: string | null | undefined) => {
+  if (!avatarPath) return '/default-avatar.svg';
+  
+  // If it's already a full URL, return as is
+  if (avatarPath.startsWith('http')) return avatarPath;
+  
+  // If it's a base64 data URL, return as is
+  if (avatarPath.startsWith('data:')) return avatarPath;
+  
+  // Convert relative path to full URL
+  const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${cleanPath.replace(/^\//, '')}`;
+};
+
 export default function FamilyPortalPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -148,6 +165,12 @@ export default function FamilyPortalPage() {
   // Activity history states
   const [selectedActivityDate, setSelectedActivityDate] = useState('2024-05-10');
   const [showActivityHistory, setShowActivityHistory] = useState(false);
+
+  // Thêm state cho activity participations
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityHistory, setActivityHistory] = useState<any[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activitiesError, setActivitiesError] = useState('');
 
   // Thêm state cho vital signs
   const [vitalSigns, setVitalSigns] = useState<any>(null);
@@ -202,15 +225,25 @@ export default function FamilyPortalPage() {
   const selectedResident = residents.find(r => r._id === selectedResidentId);
 
   // Lấy danh sách nhân viên phụ trách (không trùng lặp)
-  const staffInCharge = selectedResident && selectedResident.careNotes ? Array.from(new Set(
+  const staffInCharge: string[] = selectedResident && selectedResident.careNotes ? Array.from(new Set(
     selectedResident.careNotes.map((note: any) => {
       let staffName = note.staff;
-      if (note.staff.includes(',')) {
-        staffName = note.staff.split(',')[0].trim();
+      if (typeof staffName === 'object' && staffName !== null) {
+        staffName = staffName.full_name || staffName.fullName || staffName.name || staffName.username || staffName.email || '';
+      }
+      if (typeof staffName === 'string' && staffName.includes(',')) {
+        staffName = staffName.split(',')[0].trim();
       }
       return staffName;
     })
   )) : [];
+
+  // Tạo danh sách staff cho modal
+  const staffMembers = staffInCharge.map((staffName: string, index: number) => ({
+    id: `staff-${index}`,
+    name: staffName,
+    role: 'Nhân viên chăm sóc'
+  }));
 
   // Handler functions for button actions
   const handleContactStaff = () => {
@@ -318,29 +351,8 @@ export default function FamilyPortalPage() {
     }
   };
 
-  // Mock data
-  const mockPhotos = [
-    { id: 1, url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&h=200&fit=crop', caption: 'Hoạt động tập thể dục buổi sáng', date: '2024-01-15' },
-    { id: 2, url: 'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=300&h=200&fit=crop', caption: 'Bữa ăn tối cùng bạn bè', date: '2024-01-14' },
-    { id: 3, url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=300&h=200&fit=crop', caption: 'Chăm sóc vườn hoa', date: '2024-01-13' },
-    { id: 4, url: 'https://images.unsplash.com/photo-1573764446-fbca3cefb9c9?w=300&h=200&fit=crop', caption: 'Sinh nhật tháng 1', date: '2024-01-12' },
-    { id: 5, url: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=300&h=200&fit=crop', caption: 'Thư giãn đọc sách', date: '2024-01-11' },
-    { id: 6, url: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=300&h=200&fit=crop', caption: 'Hoạt động vẽ tranh', date: '2024-01-10' }
-  ];
 
-  // Định nghĩa staffMembers chuẩn (object, giống contact-staff)
-  const staffMembers = [
-    { id: 1, name: 'Nguyễn Thị Lan', role: 'Y tá trưởng', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
-    { id: 2, name: 'Dr. Trần Văn Nam', role: 'Bác sĩ', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
-    { id: 3, name: 'Lê Thị Hoa', role: 'Nhân viên chăm sóc', avatar: 'https://randomuser.me/api/portraits/women/68.jpg' },
-    { id: 4, name: 'Phạm Văn Minh', role: 'Chuyên viên hoạt động', avatar: 'https://randomuser.me/api/portraits/men/45.jpg' },
-    { id: 5, name: 'Vũ Thị Mai', role: 'Quản lý ca', avatar: 'https://randomuser.me/api/portraits/women/22.jpg' }
-  ];
-
-  const residentMembers = [
-    'Nguyễn Văn Nam - Cha',
-    ' Lê Thị Hoa - Mẹ'
-  ];
+  
 
   useEffect(() => {
     // Load uploaded photos from localStorage and combine with mock photos
@@ -361,20 +373,13 @@ export default function FamilyPortalPage() {
             isUploaded: true
           }));
         }
-        
-        // Combine with mock photos
-        const combinedPhotos = [...mockPhotos, ...residentPhotos];
-        // Sort by date (newest first)
-        combinedPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a).getTime());
-        setAllPhotos(combinedPhotos);
-      } else {
-        setAllPhotos(mockPhotos);
       }
     } catch (error) {
       console.error('Error loading photos:', error);
-      setAllPhotos(mockPhotos);
     }
   }, [selectedResident]);
+    
+
 
   useEffect(() => {
     console.log('Modal states:', { showMessageModal, showStaffModal });
@@ -479,6 +484,93 @@ export default function FamilyPortalPage() {
           setCareNotes([]);
         })
         .finally(() => setCareNotesLoading(false));
+    }
+  }, [selectedResidentId]);
+
+  // Fetch activity participations khi đổi resident
+  useEffect(() => {
+    if (selectedResidentId) {
+      setActivitiesLoading(true);
+      setActivitiesError('');
+      
+      console.log('Fetching activity participations for resident:', selectedResidentId);
+      
+      activityParticipationsAPI.getByResidentId(selectedResidentId)
+        .then((data) => {
+          console.log('Activity participations response:', data);
+          const participations = Array.isArray(data) ? data : [];
+          
+          // Sử dụng toLocaleDateString để tránh lệch múi giờ
+          const today = new Date();
+          const todayStr = today.toLocaleDateString('en-CA'); // "YYYY-MM-DD"
+          
+          // Filter for today's activities
+          const todayParticipations = participations.filter(p => {
+            const participationDate = new Date(p.date).toLocaleDateString('en-CA');
+            return participationDate === todayStr;
+          });
+          // Gom theo activity_id + ngày, ưu tiên bản ghi 'Không tham gia'
+          const todayActivitiesMap: { [key: string]: any } = {};
+          todayParticipations.forEach(p => {
+            const key = (p.activity_id?._id || p.activity_id) + '_' + new Date(p.date).toLocaleDateString('en-CA');
+            // Nếu chưa có hoặc bản ghi hiện tại là 'Không tham gia', thì ghi đè
+            if (!todayActivitiesMap[key] || p.attendance_status !== 'attended') {
+              todayActivitiesMap[key] = p;
+            }
+          });
+          const todayActivities = Object.values(todayActivitiesMap).map((p: any) => ({
+            id: p._id,
+            name: p.activity_id?.activity_name || 'Hoạt động không xác định',
+            time: new Date(p.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            participated: p.attendance_status === 'attended',
+            notes: p.performance_notes || '',
+            staff: p.staff_id?.full_name || 'Không xác định',
+            absenceReason: p.attendance_status !== 'attended' ? (p.performance_notes || '') : ''
+          }));
+          
+          // Group historical activities by date
+          const groupedByDate: { [key: string]: any[] } = {};
+          participations.forEach(p => {
+            const date = new Date(p.date).toLocaleDateString('en-CA');
+            if (!groupedByDate[date]) {
+              groupedByDate[date] = [];
+            }
+            groupedByDate[date].push({
+              id: p._id,
+              name: p.activity_id?.activity_name || 'Hoạt động không xác định',
+              time: new Date(p.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+              participated: p.attendance_status === 'attended',
+              reason: p.attendance_status !== 'attended' ? 'Không tham gia' : undefined,
+              notes: p.performance_notes || '',
+              staff: p.staff_id?.full_name || 'Không xác định'
+            });
+          });
+          
+          // Convert to activity history format
+          const historyArray = Object.keys(groupedByDate)
+            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+            .map(date => ({
+              date,
+              activities: groupedByDate[date]
+            }));
+          
+          console.log('Activity history:', historyArray);
+          
+          setActivities(todayActivities);
+          setActivityHistory(historyArray);
+          
+          // Set default selected date for history to the latest available date
+          if (historyArray.length > 0) {
+            setSelectedActivityDate(historyArray[0].date);
+          }
+        })
+        .catch((error) => {
+          console.error('Error fetching activity participations:', error);
+          setActivitiesError(`Không lấy được dữ liệu hoạt động: ${error.message || 'Lỗi không xác định'}`);
+          setActivities([]);
+          setActivityHistory([]);
+        })
+        .finally(() => setActivitiesLoading(false));
     }
   }, [selectedResidentId]);
 
@@ -800,28 +892,66 @@ export default function FamilyPortalPage() {
             </div>
           </div>
         </div>
-        {/* Dropdown chọn resident có avatar bằng react-select */}
+        
+        {/* Enhanced Family Member Selector */}
         {residents.length > 1 && (
-          <div style={{ marginBottom: '2rem', maxWidth: 400 }}>
-            <label style={{ 
-              fontWeight: 600,
-              marginRight: 8, 
+          <div style={{ 
+            marginBottom: '2.5rem', 
+            maxWidth: 500,
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              marginBottom: 12,
-              color: '#374151',
-              fontSize: '0.95rem'
+              gap: '1rem',
+              marginBottom: '1.5rem'
             }}>
-              <UsersIcon style={{width: '1.25rem', height: '1.25rem', color: '#8b5cf6'}} />
-              Chọn người thân để xem thông tin
-            </label>
-            {/* react-select custom dropdown */}
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+              }}>
+                <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
+              </div>
+              <div>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Chọn người thân để xem thông tin
+                </h3>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Chọn từ danh sách người thân của bạn
+                </p>
+              </div>
+            </div>
+            
+            {/* Enhanced react-select dropdown */}
             <Select
               options={residents.map((r: any) => ({
                 value: r._id,
                 label: r.full_name || r.fullName || 'Chưa rõ',
-                avatar: r.avatar || '/default-avatar.svg',
+                avatar: getAvatarUrl(r.avatar || r.avatarUrl) || '/default-avatar.svg',
                 relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
               }))}
               value={(() => {
@@ -829,7 +959,7 @@ export default function FamilyPortalPage() {
                 return found ? {
                   value: found._id,
                   label: found.full_name || found.fullName || 'Chưa rõ',
-                  avatar: found.avatar || '/default-avatar.svg',
+                  avatar: getAvatarUrl(found.avatar || found.avatarUrl) || '/default-avatar.svg',
                   relationship: found.relationship || found.emergency_contact?.relationship || found.emergencyContact?.relationship || 'Chưa rõ'
                 } : null;
               })()}
@@ -837,31 +967,81 @@ export default function FamilyPortalPage() {
               formatOptionLabel={formatOptionLabel}
               isSearchable
               styles={{
-                control: (base) => ({
+                control: (base, state) => ({
                   ...base,
-                  borderRadius: 12,
-                  minHeight: 60,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                  borderColor: '#e5e7eb',
-                  paddingLeft: 4
+                  borderRadius: '1rem',
+                  minHeight: 70,
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  boxShadow: state.isFocused 
+                    ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)' 
+                    : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                  borderColor: state.isFocused ? '#8b5cf6' : '#e5e7eb',
+                  borderWidth: state.isFocused ? '2px' : '1px',
+                  paddingLeft: '1rem',
+                  paddingRight: '1rem',
+                  transition: 'all 0.2s ease',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)'
                 }),
                 option: (base, state) => ({
                   ...base,
-                  background: state.isSelected ? '#f5f3ff' : state.isFocused ? '#f3f4f6' : '#fff',
-                  color: '#111827',
+                  background: state.isSelected 
+                    ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' 
+                    : state.isFocused 
+                    ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' 
+                    : '#fff',
+                  color: state.isSelected ? '#7c3aed' : '#111827',
                   cursor: 'pointer',
-                  paddingTop: 12,
-                  paddingBottom: 12,
-                  fontSize: 20,
+                  paddingTop: '1rem',
+                  paddingBottom: '1rem',
+                  paddingLeft: '1.5rem',
+                  paddingRight: '1.5rem',
+                  fontSize: '1.125rem',
+                  fontWeight: state.isSelected ? 700 : 600,
+                  borderBottom: '1px solid #f1f5f9',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateX(4px)'
+                  }
+                }),
+                menu: (base) => ({
+                  ...base,
+                  borderRadius: '1rem',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  overflow: 'hidden'
+                }),
+                menuList: (base) => ({
+                  ...base,
+                  padding: '0.5rem'
+                }),
+                singleValue: (base) => ({
+                  ...base,
+                  color: '#7c3aed',
                   fontWeight: 700
+                }),
+                placeholder: (base) => ({
+                  ...base,
+                  color: '#9ca3af',
+                  fontWeight: 500
+                }),
+                dropdownIndicator: (base) => ({
+                  ...base,
+                  color: '#8b5cf6',
+                  '&:hover': {
+                    color: '#7c3aed'
+                  }
+                }),
+                indicatorSeparator: (base) => ({
+                  ...base,
+                  backgroundColor: '#e5e7eb'
                 })
               }}
               placeholder='Chọn người thân...'
             />
-                      </div>
-                    )}
+          </div>
+        )}
         {/* Resident Overview */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -875,7 +1055,7 @@ export default function FamilyPortalPage() {
             <div style={{display: 'flex', flexWrap: 'wrap', gap: '3.5rem', alignItems: 'center', width: '100%'}}>
               <div>
                 <img 
-                  src={selectedResident?.avatar || selectedResident?.avatarUrl || '/default-avatar.svg'}
+                  src={getAvatarUrl(selectedResident?.avatar || selectedResident?.avatarUrl)}
                   alt={selectedResident?.fullName || 'avatar'} 
                   style={{
                     height: '10rem', 
@@ -915,35 +1095,85 @@ export default function FamilyPortalPage() {
                     Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                   </span>
                 </div>
-                <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
-                  {/* Nút xem nhân viên phụ trách */}
+                
+                {/* Quick Action Buttons */}
+                <div style={{
+                  display: 'flex', 
+                  gap: '1rem', 
+                  flexWrap: 'wrap',
+                  marginBottom: '1rem'
+                }}>
                   <button
-                    onClick={() => setShowStaffModal(true)}
+                    onClick={() => router.push('/family/photos')}
                     style={{
-                      padding: '0.75rem 1.5rem',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.25rem',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '0.75rem',
-                      fontSize: '1rem',
+                      fontSize: '0.875rem',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(99,102,241,0.15)',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                      minWidth: '140px',
+                      justifyContent: 'center'
                     }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)';
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
                     }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
                     }}
                   >
-                    <UsersIcon style={{width: '1.25rem', height: '1.25rem', color: 'white'}} />
-                    Nhân viên chăm sóc
+                    <PhotoIcon style={{width: '1.125rem', height: '1.125rem'}} />
+                    Xem ảnh
                   </button>
+                  
+                  <button
+                    onClick={() => router.push('/family/schedule-visit')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.25rem',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.75rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                      minWidth: '140px',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                    }}
+                  >
+                    <CalendarDaysIcon style={{width: '1.125rem', height: '1.125rem'}} />
+                    Đặt lịch thăm
+                  </button>
+                </div>
+                
+                <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
+                 
                 </div>
               </div>
               
@@ -996,9 +1226,7 @@ export default function FamilyPortalPage() {
                     color: '#6b7280', 
                     margin: '0 0 1rem 0'
                   }}>
-                    <span style={{fontWeight: 600}}>Lần cập nhật gần nhất:</span> {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? new Date(vitalSigns.date_time).toLocaleDateString('vi-VN', {
-                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                    }) : 'Không có dữ liệu'}
+                    <span style={{fontWeight: 600}}>Lần cập nhật gần nhất:</span> {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYY(vitalSigns.date_time) : 'Không có dữ liệu'}
                   </p>
                   
                   <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
@@ -1119,6 +1347,8 @@ export default function FamilyPortalPage() {
                 Chỉ số sức khỏe
               </Tab>
             </Tab.List>
+
+            
             <Tab.Panels>
               <Tab.Panel style={{padding: '2rem'}}>
                 <div style={{
@@ -1151,11 +1381,11 @@ export default function FamilyPortalPage() {
                           if (!date) return;
                           // Chỉ cho phép chọn ngày có trong activityHistory
                           const iso = date.toISOString().slice(0, 10);
-                          if (selectedResident?.activityHistory.some((day: { date: string }) => day.date === iso)) {
+                          if (activityHistory.some((day: { date: string }) => day.date === iso)) {
                             setSelectedActivityDate(iso);
                           }
                         }}
-                        includeDates={(selectedResident?.activityHistory ?? []).map((day: { date: string }) => new Date(day.date))}
+                        includeDates={activityHistory.map((day: { date: string }) => new Date(day.date))}
                         dateFormat="EEEE, d 'tháng' M, yyyy"
                         locale={vi}
                         popperPlacement="bottom"
@@ -1176,9 +1406,7 @@ export default function FamilyPortalPage() {
                               boxShadow: '0 2px 8px rgba(59,130,246,0.07)'
                             }}
                           >
-                            {new Date(selectedActivityDate).toLocaleDateString('vi-VN', {
-                              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                            })}
+                            {formatDateDDMMYYYY(selectedActivityDate)}
                           </button>
                         }
                       />
@@ -1241,12 +1469,7 @@ export default function FamilyPortalPage() {
                           fontWeight: 600,
                           color: '#0369a1'
                         }}>
-                          Lịch sử hoạt động - {new Date(selectedActivityDate).toLocaleDateString('vi-VN', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
+                          Lịch sử hoạt động - {formatDateDDMMYYYY(selectedActivityDate)}
                         </span>
                       </div>
                       <p style={{
@@ -1259,63 +1482,64 @@ export default function FamilyPortalPage() {
                     </div>
 
                     <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                      {(selectedResident?.activityHistory ?? [])
-                        .find((day: { date: string; activities: any[] }) => day.date === selectedActivityDate)?.activities
-                        ?.map((activity: any) => (
-                        <div
-                          key={activity.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '1rem',
-                            borderRadius: '0.75rem',
-                            background: activity.participated 
-                              ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
-                              : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                            border: '1px solid',
-                            borderColor: activity.participated ? '#86efac' : '#d1d5db'
-                          }}
-                        >
-                          <div style={{marginRight: '1rem'}}>
-                            {activity.participated ? (
-                              <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
-                            ) : (
-                              <XCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#dc2626'}} />
-                            )}
-                          </div>
-                          <div style={{flex: 1}}>
-                            <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                              <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
+                      {activitiesLoading ? (
+                        <div>Đang tải dữ liệu hoạt động...</div>
+                      ) : activitiesError ? (
+                        <div style={{color: 'red'}}>{activitiesError}</div>
+                      ) : Array.isArray(activities) && activities.length > 0 ? (
+                        activities.map((activity: any) => (
+                          <div
+                            key={activity.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '1rem',
+                              borderRadius: '0.75rem',
+                              background: activity.participated 
+                                ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                                : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                              border: '1px solid',
+                              borderColor: activity.participated ? '#86efac' : '#d1d5db'
+                            }}
+                          >
+                            <div style={{marginRight: '1rem'}}>
+                              {activity.participated ? (
+                                <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
+                              ) : (
+                                <ClockIcon style={{width: '1.5rem', height: '1.5rem', color: '#6b7280'}} />
+                              )}
                             </div>
-                            <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem'}}>
-                              <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
-                            </div>
-                            <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#dc2626', display: 'block', marginBottom: !activity.participated && activity.reason ? '0.25rem' : 0}}>
-                              <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Không tham gia'}
-                            </span>
-                            {!activity.participated && activity.reason && (
-                              <div style={{
-                                fontSize: '0.75rem', 
-                                color: '#dc2626', 
-                                fontStyle: 'italic',
-                                background: 'rgba(220, 38, 38, 0.07)',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.25rem',
-                                border: '1px solid rgba(220, 38, 38, 0.15)',
-                                marginTop: 0
-                              }}>
-                                <span style={{fontWeight: 600}}>Lý do: </span>{activity.reason}
+                            <div style={{flex: 1}}>
+                              <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
+                                <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
                               </div>
-                            )}
+                              <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem'}}>
+                                <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
+                              </div>
+                              <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
+                                <span style={{fontWeight: 600}}>Trạng thái: </span>
+                                {activity.participated
+                                  ? 'Đã tham gia'
+                                  : activity.absenceReason
+                                    ? <>Không tham gia{activity.absenceReason && <> - Lý do: <span style={{color: '#ef4444'}}>{activity.absenceReason}</span></>}</>
+                                    : 'Chưa tham gia'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <div>Không có dữ liệu hoạt động</div>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                    {Array.isArray(selectedResident?.activities) && selectedResident?.activities.length > 0 ? (
-                      selectedResident.activities.map((activity: any) => (
+                    {activitiesLoading ? (
+                      <div>Đang tải dữ liệu hoạt động...</div>
+                    ) : activitiesError ? (
+                      <div style={{color: 'red'}}>{activitiesError}</div>
+                    ) : Array.isArray(activities) && activities.length > 0 ? (
+                      activities.map((activity: any) => (
                       <div
                         key={activity.id}
                         style={{
@@ -1345,7 +1569,12 @@ export default function FamilyPortalPage() {
                             <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
                           </div>
                           <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
-                            <span style={{fontWeight: 600}}>Trạng thái: </span>{activity.participated ? 'Đã tham gia' : 'Chưa tham gia'}
+                            <span style={{fontWeight: 600}}>Trạng thái: </span>
+                            {activity.participated
+                              ? 'Đã tham gia'
+                              : activity.absenceReason
+                                ? <>Không tham gia{activity.absenceReason && <> - Lý do: <span style={{color: '#ef4444'}}>{activity.absenceReason}</span></>}</>
+                                : 'Chưa tham gia'}
                           </span>
                         </div>
                       </div>
@@ -1385,7 +1614,7 @@ export default function FamilyPortalPage() {
                           return (
                             <tr key={note._id} style={{borderTop: '1px solid #e5e7eb'}}>
                               <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}>
-                                {note.date ? new Date(note.date).toLocaleDateString('vi-VN') : ''}
+                                {note.date ? formatDateDDMMYYYY(note.date) : ''}
                               </td>
                               <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}>
                                 <div style={{fontWeight: 700, marginBottom: 4}}>{note.assessment_type || 'Đánh giá'}</div>
@@ -1395,31 +1624,41 @@ export default function FamilyPortalPage() {
                               <td style={{padding: '0.75rem', fontSize: '0.95em'}}>
                                 <span style={{fontWeight: 700, color: '#8b5cf6'}}>{
                                   (() => {
-                                    const staff = staffList.find((s: any) => String(s._id) === String(note.conducted_by));
+                                    let conductedBy = note.conducted_by;
+                                    if (typeof conductedBy === 'object' && conductedBy !== null) {
+                                      conductedBy = conductedBy.full_name || conductedBy.fullName || conductedBy.name || conductedBy.username || conductedBy.email || '';
+                                    }
+                                    
+                                    // Nếu conductedBy là tên (có dấu tiếng Việt), hiển thị trực tiếp
+                                    if (conductedBy && /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/.test(conductedBy)) {
+                                      return conductedBy;
+                                    }
+                                    
+                                    const staff = staffList.find((s: any) => String(s._id) === String(conductedBy));
                                     if (staff) {
                                       return staff.fullName || staff.full_name || staff.name || staff.username || staff.email;
                                     }
-                                    if (note.conducted_by && fetchedStaffNames[note.conducted_by]) {
-                                      return fetchedStaffNames[note.conducted_by];
+                                    if (conductedBy && fetchedStaffNames[conductedBy]) {
+                                      return fetchedStaffNames[conductedBy];
                                     }
-                                    if (note.conducted_by && !fetchedStaffNames[note.conducted_by]) {
+                                    if (conductedBy && !fetchedStaffNames[conductedBy]) {
                                       // Dùng userAPI.getById để lấy tên staff
-                                      userAPI.getById(note.conducted_by)
+                                      userAPI.getById(conductedBy)
                                         .then(data => {
                                           setFetchedStaffNames(prev => ({
                                             ...prev,
-                                            [note.conducted_by]: (data.full_name || data.fullName || data.name || data.username || data.email || note.conducted_by) + (data.position ? ` (${data.position})` : '')
+                                            [conductedBy]: (data.full_name || data.fullName || data.name || data.username || data.email || conductedBy) + (data.position ? ` (${data.position})` : '')
                                           }));
                                         })
                                         .catch(() => {
                                           setFetchedStaffNames(prev => ({
                                             ...prev,
-                                            [note.conducted_by]: note.conducted_by
+                                            [conductedBy]: conductedBy
                                           }));
                                         });
                                       return 'Đang tải...';
                                     }
-                                    return '---';
+                                    return conductedBy || '---';
                                   })()
                                 }</span>
                               </td>
@@ -1482,7 +1721,7 @@ export default function FamilyPortalPage() {
                               transition: 'background 0.2s'
                             }}>
                             <td style={{padding: '1rem', fontWeight: 600, color: '#374151'}}>
-                              {vital.date_time ? new Date(vital.date_time).toLocaleDateString('vi-VN') : ''}
+                              {vital.date_time ? formatDateDDMMYYYY(vital.date_time) : ''}
                             </td>
                             <td style={{padding: '1rem', color: '#6b7280'}}>
                               {vital.date_time ? new Date(vital.date_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}

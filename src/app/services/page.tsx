@@ -657,10 +657,10 @@ export default function ServicesPage() {
 
           {/* Action Buttons */}
           <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {/* View Registered Package Button for Family */}
-            {user?.role === 'family' && (
+            {/* Nút xem danh sách đăng ký dịch vụ cho staff/admin */}
+            {(user?.role === 'staff' || user?.role === 'admin') && (
               <button
-                onClick={handleViewServicePackage}
+                onClick={() => router.push('/services/assignments')}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -689,117 +689,10 @@ export default function ServicesPage() {
                   e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
                 }}
               >
-                <svg
-                  style={{ width: '1.25rem', height: '1.25rem' }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                {(() => {
-                  const allPackages = getAllRegisteredServicePackages();
-                  const count = allPackages.length;
-                  if (count === 0) return 'Chưa có gói dịch vụ';
-                  if (count === 1) return 'Gói dịch vụ đã đăng ký';
-                  return `Gói dịch vụ đã đăng ký `;
-                })()}
-                
-                {(() => {
-                  // Lọc chỉ lấy các gói active
-                  const allPackages = getAllRegisteredServicePackages().filter((pkg: any) => pkg.status === 'active');
-                  return (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-0.5rem',
-                      right: '-0.5rem',
-                      background: '#3b82f6',
-                      color: 'white',
-                      borderRadius: '50%',
-                      width: '1.5rem',
-                      height: '1.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      border: '2px solid white'
-                    }}>
-                      {allPackages.length}
-                    </span>
-                  );
-                })()}
+                Xem danh sách đăng ký dịch vụ
               </button>
             )}
-            
-            {/* Service Package Approval Button for Admin */}
-            {user?.role === 'admin' && (
-              <button
-                onClick={() => setShowApprovalModal(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '1rem 2rem',
-                  background: pendingPackages.length > 0 
-                    ? 'rgba(245, 158, 11, 0.2)' 
-                    : 'rgba(107, 114, 128, 0.2)',
-                  color: 'white',
-                  border: pendingPackages.length > 0 
-                    ? '2px solid rgba(245, 158, 11, 0.5)' 
-                    : '2px solid rgba(107, 114, 128, 0.3)',
-                  borderRadius: '50px',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-                  position: 'relative'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = pendingPackages.length > 0 
-                    ? 'rgba(245, 158, 11, 0.3)' 
-                    : 'rgba(255, 255, 255, 0.25)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = pendingPackages.length > 0 
-                    ? 'rgba(245, 158, 11, 0.2)' 
-                    : 'rgba(107, 114, 128, 0.2)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
-                }}
-              >
-                <svg style={{width: '1.25rem', height: '1.25rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Duyệt gói dịch vụ
-                {pendingPackages.length > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-0.5rem',
-                    right: '-0.5rem',
-                    background: '#ef4444',
-                    color: 'white',
-                    borderRadius: '50%',
-                    width: '1.5rem',
-                    height: '1.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    border: '2px solid white'
-                  }}>
-                    {pendingPackages.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Business Rules Button for all users */}
+            {/* Nút Điều Khoản & Quy Định */}
             <button
               onClick={() => setShowBusinessRulesModal(true)}
               style={{
@@ -807,9 +700,9 @@ export default function ServicesPage() {
                 alignItems: 'center',
                 gap: '0.75rem',
                 padding: '1rem 2rem',
-                background: 'rgba(255, 255, 255, 0.15)',
+                background: 'rgba(255, 255, 255, 0.2)',
                 color: 'white',
-                border: '2px solid rgba(255, 255, 255, 0.25)',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
                 borderRadius: '50px',
                 fontSize: '1rem',
                 fontWeight: 600,
@@ -825,7 +718,7 @@ export default function ServicesPage() {
                 e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
               }}

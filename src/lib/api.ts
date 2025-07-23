@@ -77,35 +77,36 @@ apiClient.interceptors.response.use(
     console.log('Response error:', error.response?.status);
     console.log('Original request:', originalRequest);
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      console.log('Attempting token refresh...');
+    // Tắt hoàn toàn logic refresh token để tránh vòng lặp login
+    // if (error.response?.status === 401 && !originalRequest._retry) {
+    //   originalRequest._retry = true;
+    //   console.log('Attempting token refresh...');
+    //   try {
+    //     const response = await apiClient.post('/auth/refresh');
+    //     const { access_token } = response.data;
+    //     console.log('Got new token:', access_token);
+    //     if (typeof window !== 'undefined') {
+    //       localStorage.setItem('access_token', access_token);
+    //     }
+    //     originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
+    //     return apiClient(originalRequest);
+    //   } catch (refreshError) {
+    //     console.error('Token refresh failed:', refreshError);
+    //     if (typeof window !== 'undefined') {
+    //       localStorage.removeItem('access_token');
+    //     }
+    //     window.location.href = '/login';
+    //     return Promise.reject(refreshError);
+    //   }
+    // }
 
-      try {
-        // Thử refresh token
-        const response = await apiClient.post('/auth/refresh');
-        const { access_token } = response.data;
-        console.log('Got new token:', access_token);
-
-        // Lưu token mới vào localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', access_token);
-        }
-
-        // Cập nhật token trong header của request gốc
-        originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-        
-        // Thử lại request ban đầu
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
-        // Xóa token và chuyển về login nếu refresh lỗi
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-        }
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
+    // Nếu gặp 401 thì chỉ logout, không thử refresh
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
       }
+      window.location.href = '/login';
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);
@@ -161,6 +162,10 @@ const endpoints = {
   visits: '/visits',
   // Care plans
   carePlans: '/care-plans',
+  // Beds
+  beds: '/beds',
+  // Room types
+  roomTypes: '/room-types',
 };
 
 // Auth API
@@ -222,6 +227,15 @@ export const authAPI = {
 
 // User API
 export const userAPI = {
+  getAll: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/users', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  },
   getProfile: async () => {
     try {
       const response = await apiClient.get('/users/me');
@@ -231,10 +245,19 @@ export const userAPI = {
       throw error;
     }
   },
+  getAuthProfile: async () => {
+    try {
+      const response = await apiClient.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching auth profile:', error);
+      throw error;
+    }
+  },
 
   updateProfile: async (userData: any) => {
     try {
-      const response = await apiClient.put('/users/me', userData);
+      const response = await apiClient.put('/auth/profile', userData);
       return response.data;
     } catch (error) {
       console.error('Error updating user profile:', error);
@@ -244,7 +267,7 @@ export const userAPI = {
 
   changePassword: async (passwordData: any) => {
     try {
-      const response = await apiClient.patch('/users/change-password', passwordData);
+      const response = await apiClient.patch('/auth/change-password', passwordData);
       return response.data;
     } catch (error) {
       console.error('Error changing password:', error);
@@ -258,6 +281,44 @@ export const userAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching user with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  update: async (id: string, data: any) => {
+    try {
+      const response = await apiClient.patch(`/users/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  },
+
+  updateAvatar: async (id: string, avatarFile: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('avatar', avatarFile);
+      
+      // Thử endpoint /auth/profile trước (cho family members)
+      try {
+        const response = await apiClient.put('/auth/profile', formData, {
+          headers: {
+            // KHÔNG set 'Content-Type' để browser tự động set boundary
+          },
+        });
+        return response.data;
+      } catch (profileError) {
+        // Nếu /auth/profile không được, thử /users/{id}/avatar (cho admin/staff)
+        const response = await apiClient.patch(`/users/${id}/avatar`, formData, {
+          headers: {
+            // KHÔNG set 'Content-Type' để browser tự động set boundary
+          },
+        });
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Error updating user avatar:', error);
       throw error;
     }
   },
@@ -470,7 +531,7 @@ export const activitiesAPI = {
 
   update: async (id: string, activity: any) => {
     try {
-      const response = await apiClient.put(`${endpoints.activities}/${id}`, activity);
+      const response = await apiClient.patch(`${endpoints.activities}/${id}`, activity);
       return response.data;
     } catch (error) {
       console.error(`Error updating activity with ID ${id}:`, error);
@@ -597,6 +658,21 @@ export const activityParticipationsAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching family today activities:', error);
+      throw error;
+    }
+  },
+
+  getByResidentId: async (residentId: string, params?: any) => {
+    try {
+      const response = await apiClient.get(endpoints.activityParticipations, { 
+        params: { 
+          resident_id: residentId,
+          ...params 
+        } 
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching activity participations for resident ${residentId}:`, error);
       throw error;
     }
   },
@@ -1398,6 +1474,24 @@ export const billsAPI = {
       throw error;
     }
   },
+  update: async (id: string, data: any) => {
+    try {
+      const response = await apiClient.patch(`/bills/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating bill:', error);
+      throw error;
+    }
+  },
+  delete: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/bills/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting bill:', error);
+      throw error;
+    }
+  },
   getByResidentId: async (residentId: string) => {
     try {
       const response = await apiClient.get(`/bills/by-resident`, { params: { resident_id: residentId } });
@@ -1417,5 +1511,77 @@ export const billsAPI = {
     }
   },
 };
+
+// Beds API
+export const bedsAPI = {
+  getAll: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/beds', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching beds:', error);
+      throw error;
+    }
+  },
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/beds/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching bed with ID ${id}:`, error);
+      throw error;
+    }
+  },
+};
+
+export const roomTypesAPI = {
+  getAll: async () => {
+    try {
+      const response = await apiClient.get('/room-types');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching room types:', error);
+      throw error;
+    }
+  }
+};
+
+// Bed Assignments API
+export const bedAssignmentsAPI = {
+  getAll: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/bed-assignments', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching bed assignments:', error);
+      throw error;
+    }
+  },
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/bed-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching bed assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+};
+
+// Payment API
+export const paymentAPI = {
+  createPayment: async (billId: string) => {
+    try {
+      const response = await apiClient.post('/payment', { bill_id: billId });
+      // Trả về response.data.data để lấy thông tin thanh toán
+      return response.data.data;
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Tạo mã thanh toán');
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+export { apiClient };
 
 

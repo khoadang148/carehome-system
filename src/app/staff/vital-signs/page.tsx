@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   HeartIcon,
@@ -15,7 +15,8 @@ import {
   ScaleIcon,
   BeakerIcon,
   HandRaisedIcon,
-  CloudIcon
+  CloudIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 import { 
   HeartIcon as HeartIconSolid,
@@ -23,67 +24,61 @@ import {
   CloudIcon as CloudIconSolid
 } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
-import { residentAPI, vitalSignsAPI, staffAPI } from '@/lib/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format, parseISO } from 'date-fns';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-interface VitalSigns {
-  id: string; // đổi sang string để khớp với API
-  residentId: string;
-  residentName: string;
-  date: string;
-  time: string;
-  bloodPressureSystolic: number;
-  bloodPressureDiastolic: number;
-  heartRate: number;
-  temperature: number;
-  oxygenSaturation: number;
-  respiratoryRate: number;
-  weight?: number;
-  bloodSugar?: number;
-  notes?: string;
-  recordedBy: string;
-  status: 'normal' | 'warning' | 'critical';
-}
-
-interface Resident {
-  id: string;
-  name: string;
-  room: string;
-  age: number;
-}
+import { useVitalSigns, VitalSigns } from '@/hooks/useVitalSigns';
+import { getVitalSignsStatusColor } from '@/lib/utils/vital-signs-utils';
+import { VITAL_SIGNS_STATUS_LABELS } from '@/lib/constants/vital-signs';
+import VitalSignsForm from '@/components/VitalSignsForm';
 
 export default function StaffVitalSignsPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [vitalSigns, setVitalSigns] = useState<VitalSigns[]>([]);
-  const [residents, setResidents] = useState<Resident[]>([]);
+  
+  // Check access permissions
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!user.role || !['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
+  
+  // Use the custom hook for data management
+  const {
+    vitalSigns,
+    residents,
+    staffMap,
+    loading,
+    addVitalSigns,
+    validateForm,
+    getFilteredVitalSigns
+  } = useVitalSigns();
+
+  // UI state
   const [selectedResident, setSelectedResident] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [addDate, setAddDate] = useState<Date | null>(new Date());
   const [filterDate, setFilterDate] = useState<Date | null>(new Date());
-  const [loading, setLoading] = useState(true);
-  const [staffMap, setStaffMap] = useState<{[id: string]: string}>({});
+  const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationIdRef = useRef(0);
+  const [pendingSuccess, setPendingSuccess] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Modal management effect
   useEffect(() => {
-    loadData();
-  }, [currentDate]);
-
-  useEffect(() => {
-    console.log('Modal states:', { showAddForm });
-    // Only hide header for modals, not the main page
-    const hasModalOpen = showAddForm;
-    
-    if (hasModalOpen) {
-      console.log('Modal is open - adding hide-header class');
+    if (showAddForm) {
       document.body.classList.add('hide-header');
       document.body.style.overflow = 'hidden';
     } else {
-      console.log('No modal open - removing hide-header class');
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     }
@@ -94,148 +89,51 @@ export default function StaffVitalSignsPage() {
     };
   }, [showAddForm]);
 
-  useEffect(() => {
-    // Lấy danh sách staff từ API
-    staffAPI.getAll().then((list: any[]) => {
-      const map: {[id: string]: string} = {};
-      list.forEach(staff => {
-        map[staff._id || staff.id] = staff.fullName || staff.username || staff.email;
-      });
-      setStaffMap(map);
-    });
-  }, []);
-
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // Lấy residents từ API
-      const resList = await residentAPI.getAll();
-      const mappedResidents: Resident[] = resList.map((r: any) => ({
-        id: r._id || r.id,
-        name: r.fullName || r.name,
-        room: r.room || r.roomNumber || '',
-        age: r.age || 0,
-      }));
-      setResidents(mappedResidents);
-
-      // Lấy vital signs từ API
-      const vsList = await vitalSignsAPI.getAll();
-      const mappedVitalSigns: VitalSigns[] = vsList.map((vs: any) => {
-        // Tìm resident name
-        const resident = mappedResidents.find(r => r.id === (vs.residentId || vs.resident_id));
-        // Tách ngày và giờ
-        let date = '', time = '';
-        if (vs.dateTime) {
-          const dt = new Date(vs.dateTime);
-          date = dt.toISOString().split('T')[0];
-          time = dt.toTimeString().slice(0, 5);
-        } else if (vs.date && vs.time) {
-          date = vs.date;
-          time = vs.time;
-        }
-        // Tách huyết áp
-        let bloodPressureSystolic = 0, bloodPressureDiastolic = 0;
-        if (vs.bloodPressure && typeof vs.bloodPressure === 'string' && vs.bloodPressure.includes('/')) {
-          const [sys, dia] = vs.bloodPressure.split('/');
-          bloodPressureSystolic = parseInt(sys);
-          bloodPressureDiastolic = parseInt(dia);
-        } else {
-          bloodPressureSystolic = vs.bloodPressureSystolic || 0;
-          bloodPressureDiastolic = vs.bloodPressureDiastolic || 0;
-        }
-        return {
-          id: vs._id || vs.id,
-          residentId: vs.residentId || vs.resident_id,
-          residentName: resident?.name || '',
-          date,
-          time,
-          bloodPressureSystolic,
-          bloodPressureDiastolic,
-          heartRate: vs.heartRate,
-          temperature: vs.temperature,
-          oxygenSaturation: vs.oxygenLevel || vs.oxygenSaturation,
-          respiratoryRate: vs.respiratoryRate,
-          weight: vs.weight,
-          bloodSugar: vs.bloodSugar,
-          notes: vs.notes,
-          recordedBy: vs.recordedBy || 'Staff',
-          status: getVitalSignsStatus({
-            bloodPressureSystolic,
-            bloodPressureDiastolic,
-            heartRate: vs.heartRate,
-            temperature: vs.temperature,
-            oxygenSaturation: vs.oxygenLevel || vs.oxygenSaturation,
-          })
-        };
-      });
-      setVitalSigns(mappedVitalSigns);
-    } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert('Lỗi khi tải dữ liệu chỉ số sinh lý hoặc danh sách người cao tuổi!');
-    }
-    setLoading(false);
-  };
-
+  // Handle form submission
   const handleAddVitalSigns = async (data: Partial<VitalSigns>) => {
     try {
-      // Tìm resident
-      const resident = residents.find(r => r.id === data.residentId);
-      // Ghép ngày và giờ thành ISO string
-      const dateTime = data.date && data.time ? `${data.date}T${data.time}:00.000Z` : undefined;
-      // Ghép huyết áp
-      const bloodPressure = `${data.bloodPressureSystolic}/${data.bloodPressureDiastolic}`;
-      // Gửi lên API
-      await vitalSignsAPI.create({
-        residentId: data.residentId,
-        dateTime,
-        temperature: data.temperature,
-        heartRate: data.heartRate,
-        bloodPressure,
-        respiratoryRate: data.respiratoryRate,
-        oxygenLevel: data.oxygenSaturation,
-        weight: data.weight,
-        notes: data.notes,
-      });
+      await addVitalSigns(data);
       setShowAddForm(false);
-      await loadData();
-      toast.success('Thêm chỉ số sinh lý thành công!', { position: 'top-right' });
-    } catch (err) {
-      toast.error('Lỗi khi thêm chỉ số sinh lý!', { position: 'top-right' });
+      setShowSuccessModal(true);
+      setTimeout(() => setShowSuccessModal(false), 1500);
+    } catch (error) {
+      toast.error('Lỗi khi thêm chỉ số sức khỏe!', { position: 'top-right' });
+      notificationIdRef.current += 1;
+      setNotifications(prev => [
+        {
+          id: notificationIdRef.current,
+          message: 'Lỗi khi thêm chỉ số sức khỏe!',
+          type: 'error',
+          time: new Date().toLocaleString('vi-VN')
+        },
+        ...prev
+      ]);
+      throw error;
     }
   };
 
-  const getVitalSignsStatus = (data: Partial<VitalSigns>): 'normal' | 'warning' | 'critical' => {
-    // Basic rules for vital signs assessment
-    if (data.bloodPressureSystolic! > 160 || data.bloodPressureDiastolic! > 100 ||
-        data.heartRate! > 100 || data.heartRate! < 60 ||
-        data.temperature! > 38 || data.temperature! < 35 ||
-        data.oxygenSaturation! < 95) {
-      return 'critical';
+  // Khi modal đóng, nếu vừa submit thành công thì show toast/notification ở page
+  useEffect(() => {
+    if (!showAddForm && pendingSuccess) {
+      toast.success('Thêm chỉ số sức khỏe thành công!', { position: 'top-right' });
+      notificationIdRef.current += 1;
+      setNotifications(prev => [
+        {
+          id: notificationIdRef.current,
+          message: 'Thêm chỉ số sức khỏe thành công!',
+          type: 'success',
+          time: new Date().toLocaleString('vi-VN')
+        },
+        ...prev
+      ]);
+      setPendingSuccess(false);
     }
-    if (data.bloodPressureSystolic! > 140 || data.bloodPressureDiastolic! > 90 ||
-        data.heartRate! > 90 || data.temperature! > 37.5 ||
-        data.oxygenSaturation! < 98) {
-      return 'warning';
-    }
-    return 'normal';
-  };
+  }, [showAddForm, pendingSuccess]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'normal': return '#10b981';
-      case 'warning': return '#f59e0b';
-      case 'critical': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
+  // Get filtered data
+  const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, currentDate);
 
-  const filteredVitalSigns = vitalSigns.filter(vs => {
-    const matchResident = selectedResident ? vs.residentId === selectedResident : true;
-    const matchDate = currentDate ? vs.date === currentDate : true;
-    return matchResident && matchDate;
-  });
-
+  // Loading state
   if (loading) {
     return (
       <div style={{
@@ -266,882 +164,481 @@ export default function StaffVitalSignsPage() {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.1); }
           }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
         `
       }} />
+      
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
         padding: '2rem'
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Back Button */}
-        <button
-          onClick={() => router.push('/')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            background: 'white',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            marginBottom: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-          }}
-        >
-          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
-          Quay lại
-        </button>
+          {/* Back Button */}
+          <button
+            onClick={() => router.push('/')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1rem',
+              background: 'white',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.5rem',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              marginBottom: '1rem',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+          >
+            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+            Quay lại
+          </button>
 
-        {/* Header */}
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
+          {/* Header */}
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            marginBottom: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
           }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  borderRadius: '1rem',
-                  padding: '1rem',
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    borderRadius: '1rem',
+                    padding: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                  }}>
+                    <HeartIconSolid style={{ width: '2rem', height: '2rem', color: 'white' }} />
+                  </div>
+                  <div>
+                    <h1 style={{
+                      fontSize: '1.875rem',
+                      fontWeight: 700,
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      margin: '0 0 0.5rem 0'
+                    }}>
+                      Theo Dõi Các Chỉ Số Sức Khỏe
+                    </h1>
+                    <p style={{ color: '#6b7280', margin: 0 }}>
+                      Ghi nhận và theo dõi các thông số sinh lý quan trọng của người cao tuổi
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddForm(true)}
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
                   boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-                }}>
-                  <HeartIconSolid style={{ width: '2rem', height: '2rem', color: 'white' }} />
-                </div>
-                <div>
-                  <h1 style={{
-                    fontSize: '1.875rem',
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    margin: '0 0 0.5rem 0'
-                  }}>
-                    Theo Dõi Các Chỉ Số Sức Khỏe
-                  </h1>
-                  <p style={{ color: '#6b7280', margin: 0 }}>
-                    Ghi nhận và theo dõi các thông số sinh lý quan trọng của người cao tuổi
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowAddForm(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.75rem',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              <PlusIcon style={{ width: '1rem', height: '1rem' }} />
-              Thêm chỉ số sức khỏe
-            </button>
-          </div>
-        </div>
-
-
-
-        {/* Filters */}
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem'
-          }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem', 
-                marginLeft: '2rem'
-              }}>
-                Ngày
-              </label>
-              <DatePicker
-                selected={filterDate}
-                onChange={(date) => {
-                  setFilterDate(date);
-                  setCurrentDate(date ? format(date, 'yyyy-MM-dd') : '');
-                }}
-                dateFormat="dd/MM/yyyy"
-                className="form-control"
-                wrapperClassName="date-picker-wrapper"
-                customInput={<input style={{
-                  width: '600px',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                  marginLeft: '2rem'
-                  
-                }} />}
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Người cao tuổi
-              </label>
-              <select
-                value={selectedResident || ''}
-                onChange={(e) => setSelectedResident(e.target.value ? e.target.value : null)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  background: 'white'
                 }}
               >
-                <option value="">Chọn người cao tuổi</option>
-                {residents.map(resident => (
-                  <option key={resident.id} value={resident.id}>
-                    {resident.name} - {resident.room}
-                  </option>
-                ))}
-              </select>
+                <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                Thêm chỉ số
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Vital Signs Records */}
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ display: 'grid', gap: '1.5rem' }}>
-            {filteredVitalSigns.map((record) => (
-              <div key={record.id} style={{
-                padding: '1.5rem',
-                background: '#f9fafb',
-                borderRadius: '0.75rem',
-                border: `2px solid ${getStatusColor(record.status)}20`
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '1rem'
-                }}>
-                  <div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1rem',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Người cao tuổi:</span>
-                        <h3 style={{
-                          fontSize: '1.125rem',
-                          fontWeight: 700,
-                          color: '#1f2937',
-                          margin: 0
-                        }}>
-                          {record.residentName}
-                        </h3>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Tình trạng:</span>
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '0.375rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          background: `${getStatusColor(record.status)}20`,
-                          color: getStatusColor(record.status)
-                        }}>
-                          {record.status === 'normal' ? 'Ổn định' :
-                           record.status === 'warning' ? 'Bất thường' : 'Nguy kịch'}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <span style={{ fontWeight: 500 }}>Ngày:</span>
-                        <span>
-                          {record.date
-                            ? format(parseISO(record.date), 'dd/MM/yyyy')
-                            : ''}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <span style={{ fontWeight: 500 }}>Giờ:</span>
-                        <span>{record.time}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <span style={{ fontWeight: 500 }}>Đo đạc bởi:</span>
-                        <span>{staffMap[record.recordedBy] || record.recordedBy}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))',
-                  gap: '0.5rem',
-                  marginBottom: '1rem'
-                }}>
-                  {/* Blood Pressure */}
-                  <div style={{
-                    padding: '0.5rem',
-                    background: '#fef2f2',
-                    borderRadius: '0.375rem',
-                    textAlign: 'center',
-                    border: '1px solid #fecaca'
-                  }}>
-                    <p style={{ fontSize: '0.625rem', color: '#991b1b', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                      Huyết áp
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                      {record.bloodPressureSystolic}/{record.bloodPressureDiastolic}
-                    </p>
-                  </div>
-
-                  {/* Heart Rate */}
-                  <div style={{
-                    padding: '0.5rem',
-                    background: '#fef2f2',
-                    borderRadius: '0.375rem',
-                    textAlign: 'center',
-                    border: '1px solid #fca5a5'
-                  }}>
-                    <p style={{ fontSize: '0.625rem', color: '#991b1b', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                      Mạch
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                      {record.heartRate} bpm
-                    </p>
-                  </div>
-
-                  {/* Temperature */}
-                  <div style={{
-                    padding: '0.5rem',
-                    background: '#fef3c7',
-                    borderRadius: '0.375rem',
-                    textAlign: 'center',
-                    border: '1px solid #fde68a'
-                  }}>
-                    <p style={{ fontSize: '0.625rem', color: '#92400e', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                      Nhiệt độ
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                      {record.temperature}°C
-                    </p>
-                  </div>
-
-                  {/* Oxygen Saturation */}
-                  <div style={{
-                    padding: '0.5rem',
-                    background: '#dbeafe',
-                    borderRadius: '0.375rem',
-                    textAlign: 'center',
-                    border: '1px solid #bfdbfe'
-                  }}>
-                    <p style={{ fontSize: '0.625rem', color: '#1e40af', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                      SpO₂
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                      {record.oxygenSaturation}%
-                    </p>
-                  </div>
-
-                  {/* Respiratory Rate */}
-                  <div style={{
-                    padding: '0.5rem',
-                    background: '#ecfdf5',
-                    borderRadius: '0.375rem',
-                    textAlign: 'center',
-                    border: '1px solid #a7f3d0'
-                  }}>
-                    <p style={{ fontSize: '0.625rem', color: '#065f46', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                      Nhịp thở
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                      {record.respiratoryRate}/phút
-                    </p>
-                  </div>
-
-                  {/* Weight */}
-                  {record.weight && (
-                    <div style={{
-                      padding: '0.5rem',
-                      background: '#f3e8ff',
-                      borderRadius: '0.375rem',
-                      textAlign: 'center',
-                      border: '1px solid #c4b5fd'
-                    }}>
-                      <p style={{ fontSize: '0.625rem', color: '#6b21a8', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                        Cân nặng
-                      </p>
-                      <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                        {record.weight}kg
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Blood Sugar */}
-                  {record.bloodSugar && (
-                    <div style={{
-                      padding: '0.5rem',
-                      background: '#fdf4ff',
-                      borderRadius: '0.375rem',
-                      textAlign: 'center',
-                      border: '1px solid #f3e8ff'
-                    }}>
-                      <p style={{ fontSize: '0.625rem', color: '#7c2d92', margin: '0 0 0.125rem 0', fontWeight: 600 }}>
-                        Glucose
-                      </p>
-                      <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                        {record.bloodSugar}mg/dL
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {record.notes && (
-                  <div style={{
-                    padding: '1rem',
-                    background: '#fef3c7',
-                    border: '1px solid #fde68a',
-                    borderRadius: '0.5rem'
-                  }}>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#92400e',
-                      margin: '0 0 0.5rem 0',
-                      fontWeight: 600
-                    }}>
-                      Ghi chú:
-                    </p>
-                    <p style={{
-                      color: '#92400e',
-                      margin: 0
-                    }}>
-                      {record.notes}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {filteredVitalSigns.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem'
-            }}>
-              <HeartIcon style={{
-                width: '3rem',
-                height: '3rem',
-                margin: '0 auto 1rem',
-                color: '#d1d5db'
-              }} />
-              <p style={{ fontSize: '1.125rem', fontWeight: 500, color: '#6b7280', margin: 0 }}>
-                Chưa có dữ liệu chỉ số sinh lý
-              </p>
-              <p style={{ color: '#9ca3af', margin: '0.5rem 0 0 0' }}>
-                Hãy thực hiện đo đạc đầu tiên
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Add Form Modal */}
-        {showAddForm && (
+          {/* Filters */}
           <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              {/* Resident Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Lọc theo người cao tuổi
+                </label>
+                <select
+                  value={selectedResident || ''}
+                  onChange={(e) => setSelectedResident(e.target.value || null)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="">Tất cả người cao tuổi</option>
+                  {residents.map(resident => (
+                    <option key={resident.id} value={resident.id}>
+                      {resident.name} - Phòng {resident.room}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Lọc theo ngày
+                </label>
+                <DatePicker
+                  selected={filterDate}
+                  onChange={(date: Date | null) => {
+                    setFilterDate(date);
+                    if (date) {
+                      const yyyy = date.getFullYear();
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      setCurrentDate(`${yyyy}-${mm}-${dd}`);
+                    } else {
+                      setCurrentDate('');
+                    }
+                  }}
+                  dateFormat="dd/MM/yyyy"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+            </div>
+          </div>
+
+          {/* Vital Signs List */}
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            overflow: 'hidden',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              background: '#f9fafb'
+            }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: 600,
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Danh sách chỉ số sức khỏe({filteredVitalSigns.length})
+              </h2>
+            </div>
+
+            {filteredVitalSigns.length === 0 ? (
+              <div style={{
+                padding: '3rem',
+                textAlign: 'center',
+                color: '#6b7280'
+              }}>
+                <HeartIcon style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem', opacity: 0.5 }} />
+                <p style={{ fontSize: '1.125rem', fontWeight: 500, margin: '0 0 0.5rem 0' }}>
+                  Chưa có chỉ số sức khỏe nào
+                </p>
+                <p style={{ margin: 0 }}>
+                  Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe
+                </p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f9fafb' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Người cao tuổi
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Ngày giờ
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Huyết áp
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Nhịp tim
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Nhiệt độ
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        SpO2
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Ghi chú
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                        Người nhập chỉ số
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredVitalSigns.map((vs, index) => (
+                      <tr 
+                        key={vs.id}
+                        style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          background: index % 2 === 0 ? 'white' : '#fafafa'
+                        }}
+                      >
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'white',
+                              fontSize: '0.875rem',
+                              fontWeight: 600
+                            }}>
+                              {vs.residentName.charAt(0)}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 500, color: '#1f2937' }}>
+                                {vs.residentName}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                          <div>
+                            {format(parseISO(vs.date), 'dd/MM/yyyy')}
+                          </div>
+                          <div style={{ color: '#6b7280' }}>
+                            {vs.date_time ? vs.date_time.slice(11, 16) : vs.time || ''}
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                          {vs.bloodPressure}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                          {vs.heartRate} bpm
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                          {vs.temperature}°C
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                          {vs.oxygenSaturation}%
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                          {vs.notes || ''}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                          {staffMap[vs.recordedBy] || vs.recordedBy}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add Form Modal */}
+      <VitalSignsForm
+        isOpen={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        onSubmit={handleAddVitalSigns}
+        residents={residents}
+        validateForm={validateForm}
+      />
+
+      {/* Notification Center Button */}
+      <div style={{ position: 'fixed', top: 24, right: 32, zIndex: 2000 }}>
+        <button
+          onClick={() => setShowNotifications(v => !v)}
+          style={{
+            position: 'relative',
+            background: 'white',
+            border: '1px solid #d1d5db',
+            borderRadius: '9999px',
+            width: '3rem',
+            height: '3rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            cursor: 'pointer',
+          }}
+        >
+          <BellIcon style={{ width: '1.5rem', height: '1.5rem', color: '#ef4444' }} />
+          {notifications.length > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              background: '#ef4444',
+              color: 'white',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              padding: '0.15rem 0.5rem',
+              minWidth: '1.25rem',
+              textAlign: 'center',
+              lineHeight: 1
+            }}>{notifications.length}</span>
+          )}
+        </button>
+        {/* Notification List Popup */}
+        {showNotifications && (
+          <div style={{
+            position: 'absolute',
+            top: '3.5rem',
+            right: 0,
+            width: '350px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '1rem',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            zIndex: 2100,
             padding: '1rem'
           }}>
-            <div style={{
-              background: 'white',
-              borderRadius: '1rem',
-              padding: '2rem',
-              maxWidth: '600px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  borderRadius: '0.75rem',
-                  padding: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-                }}>
-                  <HeartIconSolid style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-                </div>
-                <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  margin: 0,
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '0.01em'
-                }}>
-                  Đo đạc các chỉ số sức khỏe
-                </h2>
-              </div>
-
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const data = {
-                  residentId: formData.get('residentId') as string,
-                  date: addDate ? format(addDate, 'yyyy-MM-dd') : '',
-                  time: formData.get('time') as string,
-                  bloodPressureSystolic: parseInt(formData.get('bloodPressureSystolic') as string),
-                  bloodPressureDiastolic: parseInt(formData.get('bloodPressureDiastolic') as string),
-                  heartRate: parseInt(formData.get('heartRate') as string),
-                  temperature: parseFloat(formData.get('temperature') as string),
-                  oxygenSaturation: parseInt(formData.get('oxygenSaturation') as string),
-                  respiratoryRate: parseInt(formData.get('respiratoryRate') as string),
-                  weight: formData.get('weight') ? parseFloat(formData.get('weight') as string) : undefined,
-                  bloodSugar: formData.get('bloodSugar') ? parseInt(formData.get('bloodSugar') as string) : undefined,
-                  notes: formData.get('notes') as string || undefined
-                };
-                handleAddVitalSigns(data);
-              }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '1rem',
-                  marginBottom: '1.5rem'
-                }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Người cao tuổi *
-                    </label>
-                    <select
-                      name="residentId" 
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    >
-                      <option value="">Chọn người cao tuổi</option>
-                      {residents.map(resident => (
-                        <option key={resident.id} value={resident.id}>
-                          {resident.name} - {resident.room}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Ngày *
-                    </label>
-                   <DatePicker
-                     selected={addDate}
-                     onChange={(date) => setAddDate(date)}
-                     dateFormat="dd/MM/yyyy"
-                     className="form-control"
-                     required
-                     wrapperClassName="date-picker-wrapper"
-                     customInput={<input style={{
-                       width: '100%',
-                       padding: '0.75rem',
-                       border: '1px solid #d1d5db',
-                       borderRadius: '0.5rem',
-                       fontSize: '0.875rem',
-                       background: 'white'
-                     }} />}
-                   />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Giờ *
-                    </label>
-                    <input
-                      type="time"
-                      name="time"
-                      defaultValue={new Date().toTimeString().slice(0, 5)}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Huyết áp tâm thu *
-                    </label>
-                    <input
-                      type="number"
-                      name="bloodPressureSystolic"
-                      placeholder="120"
-                      min="60"
-                      max="250"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Huyết áp tâm trương *
-                    </label>
-                    <input
-                      type="number"
-                      name="bloodPressureDiastolic"
-                      placeholder="80"
-                      min="40"
-                      max="150"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Nhịp tim (bpm) *
-                    </label>
-                    <input
-                      type="number"
-                      name="heartRate"
-                      placeholder="72"
-                      min="30"
-                      max="200"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Nhiệt độ (°C) *
-                    </label>
-                    <input
-                      type="number"
-                      name="temperature"
-                      placeholder="36.5"
-                      min="30"
-                      max="45"
-                      step="0.1"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      SpO2 (%) *
-                    </label>
-                    <input
-                      type="number"
-                      name="oxygenSaturation"
-                      placeholder="98"
-                      min="70"
-                      max="100"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Nhịp thở (lần/phút) *
-                    </label>
-                    <input
-                      type="number"
-                      name="respiratoryRate"
-                      placeholder="16"
-                      min="5"
-                      max="60"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Cân nặng (kg)
-                    </label>
-                    <input
-                      type="number"
-                      name="weight"
-                      placeholder="65"
-                      min="20"
-                      max="200"
-                      step="0.1"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Đường huyết (mg/dL)
-                    </label>
-                    <input
-                      type="number"
-                      name="bloodSugar"
-                      placeholder="120"
-                      min="50"
-                      max="500"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ghi chú
-                  </label>
-                  <textarea
-                    name="notes"
-                    placeholder="Ghi chú về tình trạng người cao tuổi..."
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '1rem'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#f3f4f6',
-                      color: '#374151',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Lưu dữ liệu
-                  </button>
-                </div>
-              </form>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '1rem', color: '#1f2937' }}>Thông báo</span>
+              <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: '1.25rem' }}>×</button>
             </div>
+            {notifications.length === 0 ? (
+              <div style={{ color: '#6b7280', textAlign: 'center', padding: '1rem 0' }}>Không có thông báo nào</div>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {notifications.map(n => (
+                  <li key={n.id} style={{
+                    marginBottom: '0.75rem',
+                    background: n.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                    border: n.type === 'success' ? '1px solid #6ee7b7' : '1px solid #fca5a5',
+                    borderRadius: '0.75rem',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span style={{ fontSize: '1.25rem' }}>{n.type === 'success' ? '✅' : '❌'}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, color: n.type === 'success' ? '#065f46' : '#991b1b' }}>{n.message}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>{n.time}</div>
+                    </div>
+                    <button onClick={() => setNotifications(prev => prev.filter(x => x.id !== n.id))} style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: '1.25rem', cursor: 'pointer' }}>×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
-    </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 3000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            animation: 'slideUp 0.3s ease-out'
+          }}>
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 10px 25px rgba(16,185,129,0.3)'
+            }}>
+              <CheckCircleIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', margin: '0 0 1rem 0' }}>
+              Thêm chỉ số sức khỏe thành công!
+            </h2>
+            <p style={{ fontSize: '1rem', color: '#6b7280', margin: 0 }}>
+              Dữ liệu đã được cập nhật vào hệ thống.
+            </p>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              style={{
+                marginTop: '2rem',
+                padding: '0.75rem 2rem',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.75rem',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16,185,129,0.3)'
+              }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 } 

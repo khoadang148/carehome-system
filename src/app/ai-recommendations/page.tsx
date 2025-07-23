@@ -17,18 +17,16 @@ import {
   PlusIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-import { 
-  aiRecommendationEngine, 
-  convertToAIProfile, 
-  AIRecommendation 
-} from '@/lib/ai-recommendations';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { aiRecommendationEngine, convertToAIProfile, AIRecommendation } from '@/lib/ai-recommendations';
+import { activitiesAPI } from '@/lib/api';
+import NotificationModal from '@/components/NotificationModal';
+import { residentAPI, carePlansAPI, roomsAPI } from '@/lib/api';
 
 
 export default function AIRecommendationsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [selectedResident, setSelectedResident] = useState<number | null>(null);
+  const [selectedResident, setSelectedResident] = useState<string | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<string>('morning');
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [groupRecommendations, setGroupRecommendations] = useState<AIRecommendation[]>([]);
@@ -36,6 +34,9 @@ export default function AIRecommendationsPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'individual' | 'group'>('individual');
   const [residents, setResidents] = useState<any[]>([]);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [notification, setNotification] = useState<{ open: boolean; type: 'success' | 'error'; message: string }>({ open: false, type: 'success', message: '' });
+  const [searchText, setSearchText] = useState('');
 
   // Check access permissions
   useEffect(() => {
@@ -50,14 +51,39 @@ export default function AIRecommendationsPage() {
     }
   }, [user, router]);
 
+  // Thay đổi useEffect lấy residents từ API thật
   useEffect(() => {
-    // Load residents and initialize AI engine
-    const savedResidents = localStorage.getItem('nurseryHomeResidents');
-    const residentData = savedResidents ? JSON.parse(savedResidents) : RESIDENTS_DATA;
-    setResidents(residentData);
+    const fetchResidents = async () => {
+      try {
+        const apiData = await residentAPI.getAll();
+        // Map lại dữ liệu giống trang residents
+        const mapped = await Promise.all(apiData.map(async (r: any) => {
+          let room = '';
+          try {
+            const assignments = await carePlansAPI.getByResidentId(r._id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
+            if (assignment?.assigned_room_id) {
+              const roomData = await roomsAPI.getById(assignment.assigned_room_id);
+              room = roomData?.room_number || '';
+            }
+          } catch {}
+          return {
+            id: r._id,
+            name: r.full_name || '',
+            room,
+          };
+        }));
+        setResidents(mapped);
+      } catch (err) {
+        setResidents([]);
+      }
+    };
+    fetchResidents();
+  }, []);
 
+  useEffect(() => {
     // Load resident profiles into AI engine
-    residentData.forEach((resident: any) => {
+    residents.forEach((resident: any) => {
       const aiProfile = convertToAIProfile({
         ...resident,
         conditions: resident.conditions || ['diabetes', 'arthritis'],
@@ -85,7 +111,7 @@ export default function AIRecommendationsPage() {
       });
       aiRecommendationEngine.loadResidentProfile(aiProfile);
     });
-  }, []);
+  }, [residents]);
 
   const generateIndividualRecommendations = async () => {
     if (!selectedResident) return;
@@ -149,10 +175,51 @@ export default function AIRecommendationsPage() {
     }).join(', ');
   };
 
-  const handleCreateActivity = (recommendation: AIRecommendation) => {
-    // Store recommendation data for the new activity form
-    localStorage.setItem('aiRecommendationData', JSON.stringify(recommendation));
-    router.push('/activities/new?source=ai');
+  // Helper to get ISO string for schedule_time (use today and optimalTime if possible)
+  const getScheduleTime = (optimalTime: string) => {
+    // Try to parse time from optimalTime string (e.g., '8:00-11:00')
+    const today = new Date();
+    let hour = 8, minute = 0;
+    if (optimalTime && /\d{1,2}:\d{2}/.test(optimalTime)) {
+      const match = optimalTime.match(/(\d{1,2}):(\d{2})/);
+      if (match) {
+        hour = parseInt(match[1], 10);
+        minute = parseInt(match[2], 10);
+      }
+    } else if (optimalTime && optimalTime.includes('sáng')) {
+      hour = 8;
+    } else if (optimalTime && optimalTime.includes('chiều')) {
+      hour = 14;
+    } else if (optimalTime && optimalTime.includes('tối')) {
+      hour = 19;
+    }
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute, 0);
+    return date.toISOString();
+  };
+
+  const handleCreateActivity = async (recommendation: AIRecommendation) => {
+    setCreateLoading(true);
+    try {
+      const activityData = {
+        activity_name: recommendation.activityName,
+        description: recommendation.reasons?.join('\n') || '',
+        duration: recommendation.suggestedDuration || 45,
+        schedule_time: getScheduleTime(recommendation.optimalTime),
+        location: '', // No location in AIRecommendation, leave blank or set default
+        capacity: recommendation.recommendedParticipants?.length || 20,
+        // Optionally add more fields if your API supports (category, etc.)
+      };
+      await activitiesAPI.create(activityData);
+      setNotification({ open: true, type: 'success', message: 'Tạo hoạt động thành công!' });
+      setTimeout(() => {
+        setNotification({ open: false, type: 'success', message: '' });
+        router.push('/activities');
+      }, 1500);
+    } catch (error: any) {
+      setNotification({ open: true, type: 'error', message: error?.message || 'Không thể tạo hoạt động' });
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   return (
@@ -311,7 +378,7 @@ export default function AIRecommendationsPage() {
                   </label>
                   <select
                     value={selectedResident || ''}
-                    onChange={(e) => setSelectedResident(Number(e.target.value))}
+                    onChange={(e) => setSelectedResident(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -324,7 +391,7 @@ export default function AIRecommendationsPage() {
                     <option value="">Chọn người cao tuổi...</option>
                     {residents.map(resident => (
                       <option key={resident.id} value={resident.id}>
-                        {resident.name} - Phòng {resident.room}
+                        {resident.name}{resident.room ? ` - Phòng ${resident.room}` : ''}
                       </option>
                     ))}
                   </select>
@@ -413,29 +480,46 @@ export default function AIRecommendationsPage() {
                 }}>
                   Chọn người cao tuổi (tối thiểu 2 người)
                 </label>
+                {/* Ô tìm kiếm */}
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm người cao tuổi..."
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                  style={{
+                    width: '100%',
+                    marginBottom: '0.5rem',
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.95em'
+                  }}
+                />
+                {/* List dọc thay cho grid */}
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-                  gap: '0.5rem',
-                  maxHeight: '200px',
-                  overflow: 'auto',
-                  padding: '0.5rem',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
                   border: '1px solid #d1d5db',
                   borderRadius: '0.5rem',
                   background: '#f9fafb'
                 }}>
-                  {residents.map(resident => (
+                  {residents
+                    .filter(resident =>
+                      resident.name.toLowerCase().includes(searchText.toLowerCase()) ||
+                      (resident.room || '').toLowerCase().includes(searchText.toLowerCase())
+                    )
+                    .map(resident => (
                     <label
                       key={resident.id}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem',
-                        borderRadius: '0.25rem',
-                        background: selectedResidents.includes(resident.id) ? '#e0e7ff' : 'white',
+                        gap: '1rem',
+                        padding: '0.75rem 1rem',
+                        borderBottom: '1px solid #e5e7eb',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease'
+                        background: selectedResidents.includes(resident.id) ? '#e0e7ff' : 'transparent',
+                        transition: 'background 0.2s'
                       }}
                     >
                       <input
@@ -444,11 +528,9 @@ export default function AIRecommendationsPage() {
                         onChange={() => handleResidentToggle(resident.id)}
                         style={{ margin: 0 }}
                       />
-                      <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                        {resident.name}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                        Phòng {resident.room}
+                      <span style={{ fontWeight: 500 }}>{resident.name}</span>
+                      <span style={{ color: '#6b7280', fontSize: '0.85em' }}>
+                        {resident.room ? `Phòng ${resident.room}` : ''}
                       </span>
                     </label>
                   ))}
@@ -863,15 +945,16 @@ export default function AIRecommendationsPage() {
                       {user?.role === 'admin' || (user?.role === 'staff' && rec.recommendationScore > 60) ? (
                         <button
                           onClick={() => handleCreateActivity(rec)}
+                          disabled={createLoading}
                           style={{
                             flex: 1,
                             padding: '0.75rem',
                             borderRadius: '0.5rem',
                             border: 'none',
-                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            background: createLoading ? '#9ca3af' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                             color: 'white',
                             fontWeight: 600,
-                            cursor: 'pointer',
+                            cursor: createLoading ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -880,15 +963,23 @@ export default function AIRecommendationsPage() {
                             transition: 'all 0.2s ease'
                           }}
                           onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(22, 163, 74, 0.3)';
+                            if (!createLoading) {
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 4px 8px rgba(22, 163, 74, 0.3)';
+                            }
                           }}
                           onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
+                            if (!createLoading) {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }
                           }}
                         >
-                          <PlusIcon style={{ width: '1rem', height: '1rem' }} />
+                          {createLoading ? (
+                            <div style={{ width: '1rem', height: '1rem', border: '2px solid transparent', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                          ) : (
+                            <PlusIcon style={{ width: '1rem', height: '1rem' }} />
+                          )}
                           Tạo hoạt động
                         </button>
                       ) : (
@@ -952,6 +1043,13 @@ export default function AIRecommendationsPage() {
           </div>
         )}
       </div>
+
+      <NotificationModal
+        open={notification.open}
+        type={notification.type}
+        message={notification.message}
+        onClose={() => setNotification({ ...notification, open: false })}
+      />
 
       <style jsx>{`
         @keyframes spin {

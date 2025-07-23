@@ -21,36 +21,25 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { staffAPI, familyMembersAPI } from '@/lib/api';
+import { userAPI } from '@/lib/api';
 import axios from 'axios';
 
-// Interfaces
-interface StaffUser {
-  id: number;
-  name: string;
+// Interface cho user mới
+interface User {
+  _id: string;
+  avatar?: string | null;
+  full_name: string;
   email: string;
-  role: string;
-  permissions: string[];
-  department: string;
-  lastActive: string;
-  status: 'active' | 'inactive';
-  avatar?: string;
-}
-
-interface FamilyAccount {
-  id: string;
-  username: string;
-  email: string;
-  fullName: string;
   phone: string;
-  relationship: string;
-  residentName: string;
-  residentId: string;
+  username: string;
+  role: 'admin' | 'staff' | 'family';
   status: 'active' | 'inactive' | 'suspended';
-  lastLogin: string;
-  createdDate: string;
-  emergencyContact: string;
-  address: string;
+  is_super_admin?: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Các trường khác nếu cần
+  [key: string]: any;
 }
 
 // Thêm hàm gọi API activate/deactivate
@@ -92,8 +81,8 @@ export default function AccountManagementPage() {
   }, []);
 
   // State for managing data
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  const [familyAccounts, setFamilyAccounts] = useState<FamilyAccount[]>([]);
+  const [staffUsers, setStaffUsers] = useState<User[]>([]);
+  const [familyAccounts, setFamilyAccounts] = useState<User[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [activeTab, setActiveTab] = useState<'staff' | 'family'>('staff');
   const [searchTerm, setSearchTerm] = useState('');
@@ -105,7 +94,7 @@ export default function AccountManagementPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<StaffUser | FamilyAccount | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<User | null>(null);
   
   // Form data states
   const [formData, setFormData] = useState<any>({});
@@ -143,14 +132,14 @@ export default function AccountManagementPage() {
     };
   }, [showCreateModal, showEditModal, showDetailModal, showDeleteModal]);
 
-  // Fetch accounts from API
+  // Fetch accounts từ API mới
   useEffect(() => {
     async function fetchAccounts() {
       setLoadingData(true);
       try {
-        const allUsers = await staffAPI.getAll();
-        const staff = allUsers.filter((u: any) => Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('staff')));
-        const family = allUsers.filter((u: any) => Array.isArray(u.roles) && u.roles.includes('family'));
+        const allUsers: User[] = await userAPI.getAll();
+        const staff = allUsers.filter((u) => u.role === 'admin' || u.role === 'staff');
+        const family = allUsers.filter((u) => u.role === 'family');
         setStaffUsers(staff);
         setFamilyAccounts(family);
       } catch (err) {
@@ -160,7 +149,7 @@ export default function AccountManagementPage() {
       }
     }
     fetchAccounts();
-  }, []); // Không thay đổi dependency array này
+  }, []);
 
   // CRUD Functions
   const handleCreate = () => {
@@ -188,18 +177,18 @@ export default function AccountManagementPage() {
     setShowCreateModal(true);
   };
 
-  const handleEdit = (account: StaffUser | FamilyAccount) => {
+  const handleEdit = (account: User) => {
     setSelectedAccount(account);
     setFormData(account);
     setShowEditModal(true);
   };
 
-  const handleView = (account: StaffUser | FamilyAccount) => {
+  const handleView = (account: User) => {
     setSelectedAccount(account);
     setShowDetailModal(true);
   };
 
-  const handleDelete = (account: StaffUser | FamilyAccount) => {
+  const handleDelete = (account: User) => {
     setSelectedAccount(account);
     setShowDeleteModal(true);
   };
@@ -216,15 +205,17 @@ export default function AccountManagementPage() {
           setLoadingData(false);
           return;
         }
-        await staffAPI.delete(String(selectedAccount.id));
-        const data = await staffAPI.getAll();
-        setStaffUsers(data);
-        alert(`Đã xóa tài khoản ${selectedAccount.name} thành công!`);
+        // TODO: Gọi API xóa user khi có endpoint phù hợp
+        // await userAPI.delete(String(selectedAccount._id));
+        // const data = await userAPI.getAll();
+        // setStaffUsers(data);
+        // alert(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
       } else {
-        await familyMembersAPI.delete(String(selectedAccount.id));
-        const data = await familyMembersAPI.getAll();
-        setFamilyAccounts(data);
-        alert(`Đã xóa tài khoản ${selectedAccount.fullName} thành công!`);
+        // TODO: Gọi API xóa user khi có endpoint phù hợp
+        // await userAPI.delete(String(selectedAccount._id));
+        // const data = await userAPI.getAll();
+        // setFamilyAccounts(data);
+        // alert(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
       }
       setShowDeleteModal(false);
       setSelectedAccount(null);
@@ -240,57 +231,22 @@ export default function AccountManagementPage() {
     try {
       if (activeTab === 'staff') {
         if (showCreateModal) {
-          await staffAPI.create({
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-            department: formData.department,
-            password: formData.password,
-          });
-          alert(`Đã tạo tài khoản nhân viên cho ${formData.name} thành công!`);
+          // TODO: Gọi API tạo user khi có endpoint phù hợp
         } else if (showEditModal && selectedAccount) {
-          // Kiểm tra nếu status thay đổi
-          if (formData.status && formData.status !== selectedAccount.status) {
-            if (formData.status === 'active') {
-              await activateUser(String(selectedAccount.id));
-            } else {
-              await deactivateUser(String(selectedAccount.id));
-            }
-          }
-          // Xóa trường status khỏi formData trước khi update
-          const { status, ...updateData } = formData;
-          if (activeTab === 'staff') {
-            await staffAPI.update(String(selectedAccount.id), updateData);
-            alert(`Đã cập nhật tài khoản ${formData.name} thành công!`);
-            const data = await staffAPI.getAll();
-            setStaffUsers(data);
-          } else {
-            await familyMembersAPI.update(String(selectedAccount.id), updateData);
-            alert(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
-            const data = await familyMembersAPI.getAll();
-            setFamilyAccounts(data);
-          }
+          // Gọi API update user cho staff/admin
+          await userAPI.update(String(selectedAccount._id), formData);
+          alert(`Đã cập nhật tài khoản ${formData.name || formData.full_name} thành công!`);
+          const data = await userAPI.getAll();
+          setStaffUsers(data.filter((u: any) => u.role === 'admin' || u.role === 'staff'));
         }
       } else {
         if (showCreateModal) {
-          await familyMembersAPI.create({
-            username: formData.username,
-            email: formData.email,
-            fullName: formData.fullName,
-            phone: formData.phone,
-            relationship: formData.relationship,
-            residentName: formData.residentName,
-            residentId: formData.residentId,
-            password: formData.password,
-            emergencyContact: formData.emergencyContact,
-            address: formData.address,
-          });
-          alert(`Đã tạo tài khoản gia đình cho ${formData.fullName} thành công!`);
+          // TODO: Gọi API tạo user khi có endpoint phù hợp
         } else if (showEditModal && selectedAccount) {
-          await familyMembersAPI.update(String(selectedAccount.id), formData);
+          await userAPI.update(String(selectedAccount._id), formData);
           alert(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
-          const data = await familyMembersAPI.getAll();
-          setFamilyAccounts(data);
+          const data = await userAPI.getAll();
+          setFamilyAccounts(data.filter((u: any) => u.role === 'family'));
         }
       }
       setShowCreateModal(false);
@@ -357,205 +313,97 @@ export default function AccountManagementPage() {
     </button>
   );
 
-  const StaffListItem = ({ user }: { user: StaffUser }) => {
-    const roleColors = {
-      'Quản trị viên': { bg: '#f0f9ff', color: '#1e40af', border: '#93c5fd' },
-      'Bác sĩ': { bg: '#ecfdf5', color: '#166534', border: '#86efac' },
-      'Y tá': { bg: '#f0fdf4', color: '#15803d', border: '#a3e635' },
-      'Kế toán': { bg: '#fffbeb', color: '#92400e', border: '#fbbf24' }
-    };
-    const colors = roleColors[user.role as keyof typeof roleColors] || { bg: '#f8fafc', color: '#4338ca', border: '#c7d2fe' };
-
-    const isAdmin = Array.isArray(user.roles) && user.roles.includes('admin');
-
+  const StaffListItem = ({ user }: { user: User }) => {
     return (
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '0.5rem',
-        padding: '0.875rem 1rem',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
-        border: '1px solid #f1f5f9',
-        transition: 'all 0.15s ease',
-        cursor: 'pointer',
+      <div
+        style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.75rem',
-        marginBottom: '0.5rem'
-      }}
-      onMouseOver={(e) => {
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.12)';
-        e.currentTarget.style.borderColor = '#e2e8f0';
-      }}
-      onMouseOut={(e) => {
-        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.08)';
-        e.currentTarget.style.borderColor = '#f1f5f9';
+          background: '#fff',
+          borderRadius: '1rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          border: '1px solid #e5e7eb',
+          padding: '1.25rem 2rem',
+          marginBottom: '1.25rem',
+          gap: '1.5rem',
+          transition: 'box-shadow 0.2s',
       }}
       >
         {/* Avatar */}
-        <div style={{
-          width: '3rem',
-          height: '3rem',
-          background: colors.bg,
-          borderRadius: '0.75rem',
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: '#f3f4f6',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: `1px solid ${colors.border}`,
-          flexShrink: 0
-        }}>
-          <UserCircleIcon style={{ width: '1.5rem', height: '1.5rem', color: colors.color }} />
+            fontSize: 28,
+            fontWeight: 700,
+            color: '#6366f1',
+            border: '2px solid #e0e7ff',
+            flexShrink: 0,
+          }}
+        >
+          <UserCircleIcon style={{ width: 36, height: 36 }} />
         </div>
 
-        {/* Main Info */}
+        {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Name */}
-          <h3 style={{ 
-            margin: '0 0 0.5rem 0', 
-            fontWeight: 600, 
-            color: '#1f2937', 
-            fontSize: '1rem',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden'
-          }}>
-            {user.name}
-          </h3>
-          
-          {/* Role & Department */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 500 }}>Chức vụ:</span>
-              <span style={{
-                background: colors.bg,
-                color: colors.color,
-                padding: '0.25rem 0.75rem',
-                borderRadius: '0.5rem',
-                fontSize: '0.65rem',
-                fontWeight: 600,
-                border: `1px solid ${colors.border}`
-              }}>
-                {user.role}
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b', marginBottom: 8 }}>
+            {user.full_name}
+          </div>
+          <div style={{ display: 'flex', gap: '2.5rem', marginBottom: 6 }}>
+            <span style={{ color: '#6366f1', fontWeight: 600 }}>
+              <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Chức vụ:</span> {user.position || user.role}
+            </span>
+            <span style={{ color: '#64748b', fontWeight: 500 }}>
+              <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Username:</span> {user.username}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 500 }}>Phòng ban:</span>
-              <span style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: 500 }}>{user.department}</span>
+          <div style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: 2 }}>
+            <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Email:</span> {user.email}
             </div>
           </div>
           
-          {/* Email */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.625rem', color: '#9ca3af', fontWeight: 500 }}>Email:</span>
-            <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>{user.email}</span>
-          </div>
-        </div>
-
-        {/* Status & Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.375rem', flexShrink: 0 }}>
-          {/* Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 500 }}>Trạng thái:</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <span style={{
-                width: '0.475rem',
-                height: '0.475rem',
-                borderRadius: '50%',
-                background: user.status === 'active' ? '#10b981' : '#ef4444'
-              }} />
-              <span style={{ fontSize: '0.625rem', color: '#6b7280', fontWeight: 500 }}>
-                {getStatusDisplay(user.status)}
-              </span>
-            </div>
-          </div>
-          
-          
+        {/* Status + Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          {/* Status badge */}
+          <span
+              style={{
+              display: 'inline-block',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '999px',
+              background: user.status === 'active' ? '#dcfce7' : user.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
+              color: user.status === 'active' ? '#16a34a' : user.status === 'inactive' ? '#64748b' : '#b45309',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              marginBottom: 8,
+            }}
+          >
+            <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Trạng thái:</span>
+            {user.status === 'active'
+              ? 'Hoạt động'
+              : user.status === 'inactive'
+              ? 'Không hoạt động'
+              : 'Tạm khóa'}
+          </span>
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.125rem' }}>
-            <button 
-              title="Xem chi tiết"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleView(user);
-              }}
-              style={{
-                padding: '0.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '0.5rem',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
-              }}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button title="Xem chi tiết" onClick={(e) => { e.stopPropagation(); handleView(user); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#e0e7ef'}
+              onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
             >
-              <EyeIcon style={{ width: '1rem', height: '1rem' }} />
+              <EyeIcon style={{ width: 20, height: 20, color: '#0ea5e9' }} />
             </button>
-            <button 
-              title="Chỉnh sửa"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEdit(user);
-              }}
-              style={{
-                padding: '0.5rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                border: 'none',
-                borderRadius: '0.5rem',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
-              }}
+            <button title="Chỉnh sửa" onClick={(e) => { e.stopPropagation(); router.push(`/admin/account-management/edit/${user._id}`); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#e0e7ef'}
+              onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
             >
-              <PencilIcon style={{ width: '1rem', height: '1rem' }} />
-            </button>
-            <button 
-              title="Xóa"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isAdmin) handleDelete(user);
-              }}
-              style={{
-                padding: '0.5rem',
-                background: isAdmin ? '#e5e7eb' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                border: 'none',
-                borderRadius: '0.5rem',
-                color: isAdmin ? '#9ca3af' : 'white',
-                cursor: isAdmin ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: isAdmin ? 'none' : '0 2px 4px rgba(239, 68, 68, 0.3)'
-              }}
-              disabled={isAdmin}
-              onMouseOver={(e) => {
-                if (!isAdmin) {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.4)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!isAdmin) {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.3)';
-                }
-              }}
-            >
-              <TrashIcon style={{ width: '1rem', height: '1rem' }} />
+              <PencilIcon style={{ width: 20, height: 20, color: '#6366f1' }} />
             </button>
           </div>
         </div>
@@ -563,185 +411,96 @@ export default function AccountManagementPage() {
     );
   };
 
-  const FamilyListItem = ({ account }: { account: FamilyAccount }) => {
-    const statusColors = {
-      active: { bg: '#ecfdf5', color: '#065f46', border: '#6ee7b7' },
-      inactive: { bg: '#f9fafb', color: '#374151', border: '#d1d5db' },
-      suspended: { bg: '#fef2f2', color: '#991b1b', border: '#fca5a5' }
-    };
-    const defaultColors = { bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' };
-    const colors = statusColors[account.status] || defaultColors;
-
+  const FamilyListItem = ({ account }: { account: User }) => {
     return (
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '0.5rem',
-        padding: '0.875rem 1rem',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
-        border: '1px solid #f1f5f9',
-        transition: 'all 0.15s ease',
-        cursor: 'pointer',
+      <div
+        style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.75rem',
-        marginBottom: '0.5rem'
-      }}
-      onMouseOver={(e) => {
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.12)';
-        e.currentTarget.style.borderColor = '#e2e8f0';
-      }}
-      onMouseOut={(e) => {
-        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.08)';
-        e.currentTarget.style.borderColor = '#f1f5f9';
+          background: '#fff',
+          borderRadius: '1rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          border: '1px solid #e5e7eb',
+          padding: '1.25rem 2rem',
+          marginBottom: '1.25rem',
+          gap: '1.5rem',
+          transition: 'box-shadow 0.2s',
       }}
       >
         {/* Avatar */}
-        <div style={{
-          width: '2.5rem',
-          height: '2.5rem',
-          background: colors.bg,
-          borderRadius: '0.5rem',
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: '#f3f4f6',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: `1px solid ${colors.border}`,
-          flexShrink: 0
-        }}>
-          <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: colors.color }} />
+            fontSize: 28,
+            fontWeight: 700,
+            color: '#f59e42',
+            border: '2px solid #fde68a',
+            flexShrink: 0,
+          }}
+        >
+          <UserIcon style={{ width: 36, height: 36 }} />
         </div>
 
-        {/* Main Info */}
+        {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Name */}
-          <h3 style={{ 
-            margin: '0 0 0.375rem 0', 
-            fontWeight: 600, 
-            color: '#1f2937', 
-            fontSize: '0.875rem',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden'
-          }}>
-            {account.fullName}
-          </h3>
-          
-          {/* Username & Relationship */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.375rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.625rem', color: '#9ca3af', fontWeight: 500 }}>Username:</span>
-              <span style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: 500 }}>@{account.username}</span>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b', marginBottom: 8 }}>
+            {account.full_name}
+            </div>
+          <div style={{ display: 'flex', gap: '2.5rem', marginBottom: 6 }}>
+            <span style={{ color: '#f59e42', fontWeight: 600 }}>
+              <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Username:</span> {account.username}
+            </span>
+            
+            
+          </div>
+          <div style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: 2 }}>
+            <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Email:</span> {account.email}
             </div>
           </div>
           
-          {/* Email */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.625rem', color: '#9ca3af', fontWeight: 500 }}>Email:</span>
-            <span style={{ color: '#6b7280', fontSize: '0.75rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{account.email}</span>
-          </div>
-        </div>
-
-        {/* Contact & Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.375rem', flexShrink: 0 }}>
-          {/* Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <span style={{ fontSize: '0.625rem', color: '#9ca3af', fontWeight: 500 }}>Trạng thái:</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <span style={{
-                width: '0.375rem',
-                height: '0.375rem',
-                borderRadius: '50%',
-                background: account.status === 'active' ? '#10b981' : account.status === 'inactive' ? '#6b7280' : '#ef4444'
-              }} />
-              <span style={{ fontSize: '0.625rem', color: '#6b7280', fontWeight: 500 }}>
-                {account.status === 'active' ? 'Hoạt động' : account.status === 'inactive' ? 'Không hoạt động' : 'Tạm khóa'}
-              </span>
-            </div>
-          </div>
-          
-         
-          
+        {/* Status + Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          {/* Status badge */}
+          <span
+              style={{
+              display: 'inline-block',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '999px',
+              background: account.status === 'active' ? '#dcfce7' : account.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
+              color: account.status === 'active' ? '#16a34a' : account.status === 'inactive' ? '#64748b' : '#b45309',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              marginBottom: 8,
+            }}
+          >
+            <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Trạng thái:</span>
+            {account.status === 'active'
+              ? 'Hoạt động'
+              : account.status === 'inactive'
+              ? 'Không hoạt động'
+              : 'Tạm khóa'}
+          </span>
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.125rem' }}>
-            <button 
-              title="Xem chi tiết"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleView(account);
-              }}
-              style={{
-                padding: '0.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '0.5rem',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
-              }}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button title="Xem chi tiết" onClick={(e) => { e.stopPropagation(); handleView(account); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#e0e7ef'}
+              onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
             >
-              <EyeIcon style={{ width: '1rem', height: '1rem' }} />
+              <EyeIcon style={{ width: 20, height: 20, color: '#0ea5e9' }} />
             </button>
-            <button 
-              title="Chỉnh sửa"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEdit(account);
-              }}
-              style={{
-                padding: '0.5rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                border: 'none',
-                borderRadius: '0.5rem',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
-              }}
+            <button title="Chỉnh sửa" onClick={(e) => { e.stopPropagation(); router.push(`/admin/account-management/edit/${account._id}`); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#e0e7ef'}
+              onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
             >
-              <PencilIcon style={{ width: '1rem', height: '1rem' }} />
-            </button>
-            <button 
-              title="Xóa"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(account);
-              }}
-              style={{
-                padding: '0.5rem',
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                border: 'none',
-                borderRadius: '0.5rem',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.3)';
-              }}
-            >
-              <TrashIcon style={{ width: '1rem', height: '1rem' }} />
+              <PencilIcon style={{ width: 20, height: 20, color: '#6366f1' }} />
             </button>
           </div>
         </div>
@@ -922,7 +681,7 @@ export default function AccountManagementPage() {
             </div>
             
             <button 
-              onClick={handleCreate}
+              onClick={() => router.push('/admin/account-management/new')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -979,16 +738,16 @@ export default function AccountManagementPage() {
                   }}>
                     <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
                     Tài khoản Nhân viên ({staffUsers.filter(user => 
-                      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     ).length} tài khoản)
                   </div>
                   {staffUsers
                     .filter(user => 
-                      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     )
-                    .map((user, idx) => <StaffListItem key={user.id ? String(user.id) : `staff-${idx}`} user={user} /> )
+                    .map((user, idx) => <StaffListItem key={user._id ? String(user._id) : `staff-${idx}`} user={user} /> )
                   }
                 </div>
               ) : (
@@ -1004,18 +763,18 @@ export default function AccountManagementPage() {
                   }}>
                     <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
                     Tài khoản Gia đình ({familyAccounts.filter(account => 
-                      (account.fullName && account.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     ).length} tài khoản)
                   </div>
                   {familyAccounts
                     .filter(account => 
-                      (account.fullName && account.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                      (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     )
-                    .map((account, idx) => <FamilyListItem key={account.id ? String(account.id) : `family-${idx}`} account={account} />)
+                    .map((account, idx) => <FamilyListItem key={account._id ? String(account._id) : `family-${idx}`} account={account} />)
                   }
                 </div>
               )}
@@ -1025,11 +784,11 @@ export default function AccountManagementPage() {
 
         {/* Empty State - show inside the content area if no results */}
         {((activeTab === 'staff' && staffUsers.filter(user => 
-          (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
         ).length === 0) || 
         (activeTab === 'family' && familyAccounts.filter(account => 
-          (account.fullName && account.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
         ).length === 0)) && searchTerm && (
@@ -1176,38 +935,7 @@ export default function AccountManagementPage() {
                   </span>
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <select
-                    value={formData.selectedStaffId || ''}
-                    onChange={(e) => handleStaffSelection(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 1rem',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      transition: 'all 0.2s ease',
-                      background: 'white',
-                      appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 1rem center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '1rem'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#10b981';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#e2e8f0';
-                    }}
-                  >
-                    <option value="">-- Chọn nhân viên --</option>
-                    {availableStaff.map(staff => (
-                      <option key={staff.id} value={staff.id}>
-                        {staff.name} - {staff.role} ({staff.department})
-                      </option>
-                    ))}
-                  </select>
+                  {/* TODO: Bổ sung select nhân viên chưa có tài khoản */}
                 </div>
               </div>
               
@@ -1439,11 +1167,7 @@ export default function AccountManagementPage() {
                   onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                 >
                   <option value="">-- Chọn người giám hộ --</option>
-                  {availableGuardians.map(guardian => (
-                    <option key={guardian.id} value={guardian.id}>
-                      {guardian.name} - {guardian.relationship} của {guardian.residentName}
-                    </option>
-                  ))}
+                  {/* TODO: Hiển thị danh sách người giám hộ chưa có tài khoản */}
                 </select>
               </div>
 
@@ -1764,10 +1488,10 @@ export default function AccountManagementPage() {
                     </label>
                     <input
                       type="text"
-                      value={formData.name || ''}
-                      onChange={(e) => {
-                        setFormData({...formData, name: e.target.value});
-                        if (errors.name) setErrors({...errors, name: ''});
+                      value={formData.name || formData.full_name || ''}
+                      onChange={e => {
+                        setFormData({ ...formData, name: e.target.value, full_name: e.target.value });
+                        if (errors.name) setErrors({ ...errors, name: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1778,8 +1502,8 @@ export default function AccountManagementPage() {
                         outline: 'none',
                         transition: 'border-color 0.2s ease'
                       }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = errors.name ? '#ef4444' : '#e5e7eb'}
+                      onFocus={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                      onBlur={e => e.currentTarget.style.borderColor = errors.name ? '#ef4444' : '#e5e7eb'}
                     />
                     {errors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.name}</span>}
                   </div>
@@ -1846,11 +1570,9 @@ export default function AccountManagementPage() {
                       onBlur={(e) => e.currentTarget.style.borderColor = errors.role ? '#ef4444' : '#e5e7eb'}
                     >
                       <option value="">Chọn vai trò</option>
-                      <option value="Quản trị viên">Quản trị viên</option>
-                      <option value="Bác sĩ">Bác sĩ</option>
-                      <option value="Y tá">Y tá</option>
-                      <option value="Kế toán">Kế toán</option>
-                      <option value="Nhân viên">Nhân viên</option>
+                      <option value="admin">Quản trị viên</option>
+                      <option value="staff">Nhân viên</option>
+                      <option value="family">Gia đình</option>
                     </select>
                     {errors.role && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.role}</span>}
                   </div>
@@ -1862,28 +1584,26 @@ export default function AccountManagementPage() {
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
-                      Phòng ban <span style={{ color: '#ef4444' }}>*</span>
+                      Chức vụ <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.department || ''}
+                      value={formData.position || ''}
                       onChange={(e) => {
-                        setFormData({...formData, department: e.target.value});
-                        if (errors.department) setErrors({...errors, department: ''});
+                        setFormData({...formData, position: e.target.value});
                       }}
                       style={{
                         width: '100%',
                         padding: '0.875rem',
-                        border: `2px solid ${errors.department ? '#ef4444' : '#e5e7eb'}`,
+                        border: '2px solid #e5e7eb',
                         borderRadius: '0.75rem',
                         fontSize: '0.875rem',
                         outline: 'none',
                         transition: 'border-color 0.2s ease'
                       }}
                       onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = errors.department ? '#ef4444' : '#e5e7eb'}
+                      onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                     />
-                    {errors.department && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.department}</span>}
                   </div>
                 </div>
                 
@@ -2207,8 +1927,9 @@ export default function AccountManagementPage() {
   function DetailModal() {
     if (!selectedAccount) return null;
 
-    // Determine if the selected account is a staff user or family account
-    const isStaffAccount = 'role' in selectedAccount;
+    // Determine role
+    const isStaff = selectedAccount.role === 'staff' || selectedAccount.role === 'admin';
+    const isFamily = selectedAccount.role === 'family';
 
     return (
       <div style={{
@@ -2228,9 +1949,9 @@ export default function AccountManagementPage() {
         <div style={{
           background: 'white',
           borderRadius: '1rem',
-          padding: '0',
+          padding: 0,
           width: '90%',
-          maxWidth: '700px',
+          maxWidth: '600px',
           maxHeight: '90vh',
           overflow: 'hidden',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -2238,628 +1959,138 @@ export default function AccountManagementPage() {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          {/* Header with gradient */}
+          {/* Header */}
           <div style={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: isStaff ? 'linear-gradient(135deg, #6366f1 0%, #60a5fa 100%)' : 'linear-gradient(135deg, #f59e42 0%, #fbbf24 100%)',
             padding: '2rem 2.5rem',
             borderRadius: '1rem 1rem 0 0',
-            color: 'white'
-          }}>
-            <div style={{
+            color: 'white',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start'
+            alignItems: 'center',
+            gap: '1.5rem',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: '0.75rem',
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.18)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
+              fontSize: 32,
+              fontWeight: 700,
+              border: isStaff ? '2px solid #e0e7ff' : '2px solid #fde68a',
                 }}>
-                  {isStaffAccount ? (
-                    <UserIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+              {isStaff ? (
+                <UserCircleIcon style={{ width: 40, height: 40, color: '#fff' }} />
                   ) : (
-                    <HomeIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                <UserIcon style={{ width: 40, height: 40, color: '#fff' }} />
                   )}
                 </div>
                 <div>
-                  <h2 style={{ 
-                    fontSize: '1.5rem', 
-                    fontWeight: 700, 
-                    margin: '0 0 0.5rem 0'
-                  }}>
-                    Chi tiết tài khoản {isStaffAccount ? 'nhân viên' : 'gia đình'}
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
+                {selectedAccount.full_name}
                   </h2>
-                  <p style={{ 
-                    fontSize: '0.95rem', 
-                    opacity: 0.9,
-                    margin: 0 
-                  }}>
-                    {isStaffAccount ? 'Thông tin chi tiết tài khoản nhân viên hệ thống' : 'Thông tin chi tiết tài khoản người giám hộ'}
-                  </p>
+              <div style={{ fontSize: '1rem', opacity: 0.9, marginTop: 4 }}>
+                {isStaff ? 'Nhân viên/Quản trị viên' : 'Tài khoản Gia đình'}
                 </div>
-              </div>
-            </div>
-          </div>
+                        </div>
+                        <span style={{
+              marginLeft: 'auto',
+              alignSelf: 'flex-start',
+              display: 'inline-block',
+                          padding: '0.25rem 0.75rem',
+              borderRadius: '999px',
+              background: selectedAccount.status === 'active' ? '#dcfce7' : selectedAccount.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
+              color: selectedAccount.status === 'active' ? '#16a34a' : selectedAccount.status === 'inactive' ? '#64748b' : '#b45309',
+                          fontWeight: 600, 
+                          fontSize: '0.95rem',
+            }}>
+              {selectedAccount.status === 'active'
+                ? 'Hoạt động'
+                : selectedAccount.status === 'inactive'
+                ? 'Không hoạt động'
+                : 'Tạm khóa'}
+            </span>
+                  </div>
 
-          {/* Body with enhanced styling */}
-          <div style={{ 
-            padding: '2.5rem',
+          {/* Body */}
+                  <div style={{
+            padding: '2rem 2.5rem',
             overflow: 'auto',
             background: '#fafafa',
             flex: 1,
             minHeight: 0
           }}>
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              {isStaffAccount ? (
-                <>
-                  {/* Personal Information Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Thông tin cá nhân
-                    </h3>
-                    <div style={{ display: 'grid', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Họ và tên:
+            <div style={{ display: 'grid', gap: '1.25rem' }}>
+              {/* Thông tin chung */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Họ và tên:</div>
+                  <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.full_name}</div>
                         </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as StaffUser).name}
+                <div>
+                  <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Username:</div>
+                  <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.username}</div>
                         </div>
+                <div>
+                  <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Email:</div>
+                  <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.email}</div>
                       </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Email:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {selectedAccount.email}
-                        </div>
-                      </div>
+                <div>
+                  <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Số điện thoại:</div>
+                  <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.phone}</div>
                     </div>
                   </div>
 
-                  {/* Job Information Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Thông tin công việc
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Chức vụ:
+              {/* Thông tin riêng theo role */}
+              {isStaff && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                  <div>
+                    <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Chức vụ:</div>
+                    <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.position || selectedAccount.role}</div>
                         </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as StaffUser).role}
+                  <div>
+                    <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Bằng cấp:</div>
+                    <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.qualification || '—'}</div>
                         </div>
+                  <div>
+                    <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Ngày vào làm:</div>
+                    <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.join_date ? new Date(selectedAccount.join_date).toLocaleDateString('vi-VN') : '—'}</div>
                       </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Phòng ban:
+                  <div>
+                    <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Ghi chú:</div>
+                    <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.notes || '—'}</div>
                         </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as StaffUser).department}
                         </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status & Activity Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Trạng thái & Hoạt động
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Trạng thái:
-                        </div>
-                        <span style={{
-                          background: (selectedAccount as StaffUser).status === 'active' ? '#dcfce7' : '#fef2f2',
-                          color: (selectedAccount as StaffUser).status === 'active' ? '#166534' : '#dc2626',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '0.375rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
-                          {(selectedAccount as StaffUser).status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-                        </span>
-                      </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '140px'
-                        }}>
-                          Hoạt động cuối:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as StaffUser).lastActive}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-
-                </>
-              ) : (
-                <>
-                  {/* Basic Information Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Thông tin cơ bản
-                    </h3>
-                    <div style={{ display: 'grid', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '140px'
-                        }}>
-                          Tên đăng nhập:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as FamilyAccount).username}
-                        </div>
-                      </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '140px'
-                        }}>
-                          Họ và tên:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as FamilyAccount).fullName}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contact Information Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Thông tin liên hệ
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '100px'
-                        }}>
-                          Email:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {selectedAccount.email}
-                        </div>
-                      </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '100px'
-                        }}>
-                          Số điện thoại:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as FamilyAccount).phone}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div style={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0.75rem 0',
-                      marginTop: '1rem'
-                    }}>
-                      <div style={{ 
-                        fontWeight: 600, 
-                        color: '#6b7280', 
-                        fontSize: '0.875rem',
-                        minWidth: '100px'
-                      }}>
-                        Địa chỉ:
-                      </div>
-                      <div style={{ 
-                        color: '#1f2937',
-                        fontSize: '0.95rem',
-                        fontWeight: 500
-                      }}>
-                        {(selectedAccount as FamilyAccount).address}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Family Information Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Thông tin gia đình
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Mối quan hệ:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as FamilyAccount).relationship}
-                        </div>
-                      </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '120px'
-                        }}>
-                          Trạng thái:
-                        </div>
-                        <span style={{
-                          background: (selectedAccount as FamilyAccount).status === 'active' ? '#dcfce7' : 
-                                     (selectedAccount as FamilyAccount).status === 'inactive' ? '#fef2f2' : '#fef3c7',
-                          color: (selectedAccount as FamilyAccount).status === 'active' ? '#166534' : 
-                                 (selectedAccount as FamilyAccount).status === 'inactive' ? '#dc2626' : '#d97706',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '0.375rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
-                          {(selectedAccount as FamilyAccount).status === 'active' ? 'Hoạt động' : 
-                           (selectedAccount as FamilyAccount).status === 'inactive' ? 'Không hoạt động' : 'Tạm khóa'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0.75rem 0',
-                      marginTop: '1rem',
-                      borderTop: '1px solid #f3f4f6'
-                    }}>
-                      <div style={{ 
-                        fontWeight: 600, 
-                        color: '#6b7280', 
-                        fontSize: '0.875rem',
-                        minWidth: '180px'
-                      }}>
-                        Người thân được chăm sóc:
-                      </div>
-                      <div style={{ 
-                        color: '#1f2937',
-                        fontSize: '0.95rem',
-                        fontWeight: 500
-                      }}>
-                        {(selectedAccount as FamilyAccount).residentName} 
-                        <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                          {' '}(ID: {(selectedAccount as FamilyAccount).residentId})
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0.75rem 0'
-                    }}>
-                      <div style={{ 
-                        fontWeight: 600, 
-                        color: '#6b7280', 
-                        fontSize: '0.875rem',
-                        minWidth: '180px'
-                      }}>
-                        Liên hệ khẩn cấp:
-                      </div>
-                      <div style={{ 
-                        color: '#1f2937',
-                        fontSize: '0.95rem',
-                        fontWeight: 500
-                      }}>
-                        {(selectedAccount as FamilyAccount).emergencyContact}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Activity Information Section */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      margin: '0 0 1.25rem 0',
-                      paddingBottom: '0.75rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      Thông tin hoạt động
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '160px'
-                        }}>
-                          Ngày tạo tài khoản:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {new Date((selectedAccount as FamilyAccount).createdDate).toLocaleDateString('vi-VN')}
-                        </div>
-                      </div>
-
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem 0',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 600, 
-                          color: '#6b7280', 
-                          fontSize: '0.875rem',
-                          minWidth: '160px'
-                        }}>
-                          Đăng nhập gần nhất:
-                        </div>
-                        <div style={{ 
-                          color: '#1f2937',
-                          fontSize: '0.95rem',
-                          fontWeight: 500
-                        }}>
-                          {(selectedAccount as FamilyAccount).lastLogin 
-                            ? new Date((selectedAccount as FamilyAccount).lastLogin).toLocaleDateString('vi-VN')
-                            : 'Chưa đăng nhập lần nào'
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
               )}
-            </div>
-          </div>
+              {isFamily && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                  <div>
+                    <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Địa chỉ:</div>
+                    <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.address || '—'}</div>
+                      </div>
+                  <div>
+                    <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Ghi chú:</div>
+                    <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.notes || '—'}</div>
+                    </div>
+                      </div>
+              )}
 
-          {/* Footer with enhanced button */}
+              {/* Thông tin hệ thống */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Trạng thái:</div>
+                  <div style={{ color: selectedAccount.status === 'active' ? '#16a34a' : selectedAccount.status === 'inactive' ? '#64748b' : '#b45309', fontWeight: 700 }}>
+                    {selectedAccount.status === 'active' ? 'Hoạt động' : selectedAccount.status === 'inactive' ? 'Không hoạt động' : 'Tạm khóa'}
+                        </div>
+                      </div>
+
+                        </div>
+                      </div>
+                    </div>
+
+          {/* Footer */}
           <div style={{ 
             background: 'white',
             padding: '1.5rem 2.5rem',
@@ -2873,24 +2104,18 @@ export default function AccountManagementPage() {
               onClick={() => setShowDetailModal(false)}
               style={{
                 padding: '0.875rem 2rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: isStaff ? 'linear-gradient(135deg, #6366f1 0%, #60a5fa 100%)' : 'linear-gradient(135deg, #f59e42 0%, #fbbf24 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '0.5rem',
                 cursor: 'pointer',
                 fontWeight: 600,
-                fontSize: '0.875rem',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)'
+                fontSize: '0.95rem',
+                transition: 'all 0.2s',
+                boxShadow: isStaff ? '0 2px 4px rgba(99,102,241,0.15)' : '0 2px 4px rgba(245,158,66,0.15)'
               }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(102, 126, 234, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.3)';
-              }}
+              onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
+              onMouseOut={e => e.currentTarget.style.opacity = '1'}
             >
               Đóng
             </button>
@@ -2945,8 +2170,8 @@ export default function AccountManagementPage() {
             Bạn có chắc chắn muốn xóa tài khoản{' '}
             <strong style={{ color: '#1f2937' }}>
               {activeTab === 'staff' 
-                ? (selectedAccount as StaffUser).name 
-                : (selectedAccount as FamilyAccount).fullName}
+                ? (selectedAccount as User).full_name 
+                : (selectedAccount as User).full_name}
             </strong>?
             <br />
             <span style={{ color: '#dc2626', fontSize: '0.875rem' }}>

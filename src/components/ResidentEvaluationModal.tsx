@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { UserGroupIcon, UserIcon, CheckCircleIcon, XCircleIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useActivityEvaluation } from '@/hooks/useActivityEvaluation';
 
 interface Resident {
-  id: number;
+  id: string;
   name: string;
   room: string;
-  age: number;
-  status: string;
+  age: number | string;
+  status?: string;
   photo?: string;
-}
-
-interface ResidentEvaluation {
-  residentId: number;
-  participated: boolean;
-  reason?: string;
 }
 
 interface ResidentEvaluationModalProps {
@@ -22,66 +17,58 @@ interface ResidentEvaluationModalProps {
   onClose: () => void;
   activity: any;
   residents: Resident[];
+  user: any;
 }
 
-export default function ResidentEvaluationModal({ open, onClose, activity, residents }: ResidentEvaluationModalProps) {
-  const [evaluations, setEvaluations] = useState<ResidentEvaluation[]>(
-    residents.map(resident => {
-      const existing = activity.residentEvaluations?.find((ev: ResidentEvaluation) => ev.residentId === resident.id);
-      return existing || { residentId: resident.id, participated: true, reason: '' };
-    })
-  );
-  const [saving, setSaving] = useState(false);
+export default function ResidentEvaluationModal({ open, onClose, activity, residents, user }: ResidentEvaluationModalProps) {
   const [search, setSearch] = useState('');
   const [showReasonAll, setShowReasonAll] = useState(false);
   const [reasonAll, setReasonAll] = useState('');
 
+  const {
+    evaluations,
+    loading,
+    saving,
+    error,
+    handleEvaluationChange,
+    handleReasonChange,
+    handleSelectAll,
+    handleSaveEvaluations
+  } = useActivityEvaluation({
+    activityId: activity.id,
+    residents,
+    user,
+    activityDate: activity.date // truyền ngày hoạt động
+  });
+
   // Lọc cư dân theo tìm kiếm
   const filteredResidents = residents.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.room.toLowerCase().includes(search.toLowerCase())
+    (r.room?.toLowerCase() || '').includes(search.toLowerCase())
   );
 
   // Chọn tất cả Có/Không
   const setAll = (participated: boolean) => {
-    setEvaluations(evals => evals.map(ev => ({ ...ev, participated, reason: participated ? '' : reasonAll })));
+    handleSelectAll(participated);
     setShowReasonAll(!participated);
   };
 
   // Khi nhập lý do chung
   const handleReasonAllChange = (val: string) => {
     setReasonAll(val);
-    setEvaluations(evals => evals.map(ev =>
-      !ev.participated ? { ...ev, reason: val } : ev
-    ));
-  };
-
-  const handleChange = (residentId: number, participated: boolean) => {
-    setEvaluations(evals => evals.map(ev =>
-      ev.residentId === residentId ? { ...ev, participated, reason: participated ? '' : reasonAll } : ev
-    ));
-  };
-
-  const handleReasonChange = (residentId: number, reason: string) => {
-    setEvaluations(evals => evals.map(ev =>
-      ev.residentId === residentId ? { ...ev, reason } : ev
-    ));
+    filteredResidents.forEach(resident => {
+      if (!evaluations[resident.id] || !evaluations[resident.id].participated) {
+        handleReasonChange(resident.id, val);
+      }
+    });
   };
 
   const handleSave = async () => {
-    setSaving(true);
     try {
-      // Update activity in localStorage and context
-      const saved = localStorage.getItem('activities');
-      let activities = saved ? JSON.parse(saved) : [];
-      const idx = activities.findIndex((a: any) => a.id === activity.id);
-      if (idx !== -1) {
-        activities[idx].residentEvaluations = evaluations;
-        localStorage.setItem('activities', JSON.stringify(activities));
-      }
+      await handleSaveEvaluations(activity);
       onClose();
-    } finally {
-      setSaving(false);
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra khi lưu đánh giá.');
     }
   };
 
@@ -150,7 +137,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
               <div className="text-center text-gray-400 py-8">Không tìm thấy cư dân phù hợp.</div>
             )}
             {filteredResidents.map(resident => {
-              const ev = evaluations.find(e => e.residentId === resident.id)!;
+              const ev = evaluations[resident.id] || { participated: true, reason: '' };
               return (
                 <div key={resident.id} className="flex items-center gap-3 py-3">
                   <div className="flex-shrink-0">
@@ -169,7 +156,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
                       <input
                         type="radio"
                         checked={ev.participated}
-                        onChange={() => handleChange(resident.id, true)}
+                        onChange={() => handleEvaluationChange(resident.id, true)}
                       />
                       <span className="text-green-700 font-medium">Có</span>
                     </label>
@@ -177,7 +164,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
                       <input
                         type="radio"
                         checked={!ev.participated}
-                        onChange={() => handleChange(resident.id, false)}
+                        onChange={() => handleEvaluationChange(resident.id, false)}
                       />
                       <span className="text-red-700 font-medium">Không</span>
                     </label>
@@ -211,7 +198,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
               type="button"
               onClick={handleSave}
               className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 font-semibold"
-              disabled={saving || evaluations.some(ev => !ev.participated && !ev.reason)}
+              disabled={saving || filteredResidents.some(r => !evaluations[r.id]?.participated && !evaluations[r.id]?.reason)}
             >
               {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
             </button>

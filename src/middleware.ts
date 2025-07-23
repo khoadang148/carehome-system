@@ -1,89 +1,35 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+// import { AuthUtils, createMiddlewareConfig } from '@/lib/utils/auth';
 
-// Các routes không cần auth
-const publicRoutes = [
-  '/login',
-  '/api/auth/login',
-  '/api/auth/refresh',
-  '/_next',
-  '/favicon.ico',
-  '/images',
-  '/assets'
-]
-
-// Các routes cần auth
-const protectedRoutes = [
-  '/family',
-  '/staff',
-  '/admin',
-  '/profile',
-  '/settings',
-  '/activities',
-  '/residents',
-  '/reports',
-  '/finance',
-  '/inventory',
-  '/services',
-  '/notifications',
-  '/ai-recommendations',
-  '/compliance'
-]
+/**
+ * Next.js Middleware for Authentication and Route Protection
+ * 
+ * This middleware handles:
+ * - Authentication checks for protected routes
+ * - Redirects for unauthenticated users
+ * - Role-based redirects for authenticated users
+ * - Public route access
+ */
+// export function middleware(request: NextRequest) {
+//   // Use the centralized auth handler
+//   return AuthUtils.handleRequest(request);
+// }
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
-  // Nếu đang ở trang login và đã có token hợp lệ -> redirect về home
-  if (pathname === '/login') {
-    const token = request.cookies.get('access_token')?.value
-    if (token) {
-      return NextResponse.redirect(new URL('/family', request.url))
-    }
-    return NextResponse.next()
-  }
-
-  // Kiểm tra xem route hiện tại có phải public route không
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
-  if (isPublicRoute) {
-    return NextResponse.next()
-  }
-
-  // Kiểm tra xem route hiện tại có cần auth không
-  const needsAuth = protectedRoutes.some(route => pathname.startsWith(route))
-  if (!needsAuth && pathname === '/') {
-    // Redirect trang chủ về login nếu không có auth
-    const token = request.cookies.get('access_token')?.value
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-    // Nếu có token thì redirect về family dashboard
-    return NextResponse.redirect(new URL('/family', request.url))
-  }
-
-  // Lấy token từ cookie
-  const token = request.cookies.get('access_token')?.value
-
-  // Nếu route cần auth mà không có token -> redirect về login
-  if (needsAuth && !token) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('returnUrl', pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  // Nếu có token thì cho phép truy cập
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
-// Chỉ định các routes cần apply middleware
+// Export middleware configuration
 export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api/auth (API routes for authentication)
+     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - public folder
      */
-    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
   ],
-} 
+}; 

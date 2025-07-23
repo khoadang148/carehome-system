@@ -3,111 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeftIcon, PencilIcon, CalendarIcon } from '@heroicons/react/24/outline';
-
-// Mock staff data (same as in the staff page)
-const initialStaffMembers = [
-  { 
-    id: 1, 
-    name: 'John Smith', 
-    firstName: 'John',
-    lastName: 'Smith',
-    position: 'Y tá', 
-    department: 'Y tế', 
-    shiftType: 'Sáng', 
-    hireDate: '2022-03-15',
-    dateOfBirth: '1985-06-12',
-    gender: 'male',
-    email: 'john.smith@example.com',
-    certification: 'RN, BSN',
-    contactPhone: '555-123-4567',
-    address: '123 Maple Street, Anytown',
-    emergencyContact: 'Mary Smith',
-    emergencyPhone: '555-987-6543',
-    notes: 'Chuyên môn về chăm sóc người cao tuổi. Kinh nghiệm 10 năm trong lĩnh vực y tế.'
-  },
-  { 
-    id: 2, 
-    name: 'Sarah Johnson', 
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    position: 'Người chăm sóc', 
-    department: 'Chăm sóc người cao tuổi', 
-    shiftType: 'Chiều', 
-    hireDate: '2022-05-20',
-    dateOfBirth: '1990-04-23',
-    gender: 'female',
-    email: 'sarah.j@example.com',
-    certification: 'CNA',
-    contactPhone: '555-234-5678',
-    address: '456 Oak Avenue, Hometown',
-    emergencyContact: 'Robert Johnson',
-    emergencyPhone: '555-876-5432',
-    notes: 'Tốt nghiệp xuất sắc ngành điều dưỡng. Khả năng giao tiếp tốt với người cao tuổi.'
-  },
-  { 
-    id: 3, 
-    name: 'Michael Brown', 
-    firstName: 'Michael',
-    lastName: 'Brown',
-    position: 'Chuyên viên vật lý trị liệu', 
-    department: 'Phục hồi chức năng', 
-    shiftType: 'Ngày', 
-    hireDate: '2021-11-10',
-    dateOfBirth: '1988-10-05',
-    gender: 'male',
-    email: 'mb@example.com',
-    certification: 'DPT',
-    contactPhone: '555-345-6789',
-    address: '789 Pine Road, Cityville',
-    emergencyContact: 'Jessica Brown',
-    emergencyPhone: '555-765-4321',
-    notes: 'Chuyên về phục hồi chức năng cho bệnh nhân sau đột quỵ. Tham gia nhiều khóa đào tạo đặc biệt.'
-  },
-  { 
-    id: 4, 
-    name: 'Emily Davis', 
-    firstName: 'Emily',
-    lastName: 'Davis',
-    position: 'Trợ lý y tá', 
-    department: 'Chăm sóc người cao tuổi', 
-    shiftType: 'Đêm', 
-    hireDate: '2023-01-05',
-    dateOfBirth: '1992-12-18',
-    gender: 'female',
-    email: 'emily.d@example.com',
-    certification: 'CNA',
-    contactPhone: '555-456-7890',
-    address: '321 Cedar Lane, Townsville',
-    emergencyContact: 'Mark Davis',
-    emergencyPhone: '555-654-3210',
-    notes: 'Có kinh nghiệm chăm sóc ban đêm. Đặc biệt giỏi trong việc giúp người cao tuổi có giấc ngủ ngon.'
-  },
-  { 
-    id: 5, 
-    name: 'David Wilson', 
-    firstName: 'David',
-    lastName: 'Wilson',
-    position: 'Điều phối viên hoạt động', 
-    department: 'Hoạt động', 
-    shiftType: 'Ngày', 
-    hireDate: '2022-08-22',
-    dateOfBirth: '1987-03-30',
-    gender: 'male',
-    email: 'dwilson@example.com',
-    certification: 'Liệu pháp giải trí',
-    contactPhone: '555-567-8901',
-    address: '654 Birch Street, Villagetown',
-    emergencyContact: 'Linda Wilson',
-    emergencyPhone: '555-543-2109',
-    notes: 'Rất sáng tạo trong việc phát triển các hoạt động giải trí cho người cao tuổi. Đặc biệt giỏi về âm nhạc và nghệ thuật.'
-  },
-];
+import { ArrowLeftIcon, PencilIcon, CalendarIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { staffAPI } from '@/lib/api';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 export default function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [staff, setStaff] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   
   useEffect(() => {
@@ -122,23 +27,59 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (!resolvedParams) return;
     
-    // Simulate API call to fetch staff data
+    // Check if this is a valid staff ID (should be a valid ObjectId or number)
+    const staffId = resolvedParams.id;
+    
+    // If the ID is not a valid format, redirect to staff list
+    if (!staffId || staffId === 'visits' || staffId === 'add' || staffId.includes('/')) {
+      router.replace('/staff');
+      return;
+    }
+    
     const fetchStaff = async () => {
       try {
-        // In a real application, you would fetch from an API endpoint
-        const staffId = parseInt(resolvedParams.id);
+        console.log('Fetching staff with ID:', staffId);
         
-        // Find the staff member from the mock data
-        const foundStaff = initialStaffMembers.find(s => s.id === staffId);
+        // Try to fetch from API first
+        const apiStaff = await staffAPI.getById(staffId);
         
-        if (foundStaff) {
-          setStaff(foundStaff);
+        if (apiStaff) {
+          // Transform API data to match UI expectations
+          const transformedStaff = {
+            id: apiStaff._id || apiStaff.id,
+            name: apiStaff.full_name || apiStaff.name || `${apiStaff.firstName} ${apiStaff.lastName}`,
+            firstName: apiStaff.firstName || apiStaff.full_name?.split(' ')[0] || '',
+            lastName: apiStaff.lastName || apiStaff.full_name?.split(' ').slice(1).join(' ') || '',
+            position: apiStaff.position || 'Chưa cập nhật',
+            department: apiStaff.department || 'Chưa cập nhật',
+            shiftType: apiStaff.shiftType || apiStaff.shift_type || 'Chưa cập nhật',
+            hireDate: apiStaff.hireDate || apiStaff.hire_date || apiStaff.created_at || '',
+            dateOfBirth: apiStaff.dateOfBirth || apiStaff.date_of_birth || '',
+            gender: apiStaff.gender || '',
+            email: apiStaff.email || '',
+            certification: apiStaff.certification || '',
+            contactPhone: apiStaff.contactPhone || apiStaff.phone_number || apiStaff.phone || '',
+            address: apiStaff.address || '',
+            emergencyContact: apiStaff.emergencyContact || apiStaff.emergency_contact?.name || '',
+            emergencyPhone: apiStaff.emergencyPhone || apiStaff.emergency_contact?.phone || '',
+            notes: apiStaff.notes || ''
+          };
+          
+          setStaff(transformedStaff);
+          setError('');
         } else {
-          // Staff not found, could redirect to 404 page
-          console.error('Staff not found');
+          setError('Không tìm thấy thông tin nhân viên.');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching staff:', error);
+        
+        if (error.response?.status === 404) {
+          setError('Không tìm thấy thông tin nhân viên.');
+        } else if (error.response?.status === 403) {
+          setError('Bạn không có quyền xem thông tin này.');
+        } else {
+          setError('Có lỗi xảy ra khi tải thông tin nhân viên.');
+        }
       } finally {
         setLoading(false);
       }
@@ -155,17 +96,87 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   // Show loading state while fetching data
   if (loading || !resolvedParams) {
     return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
-        <p style={{fontSize: '1rem', color: '#6b7280'}}>Đang tải thông tin...</p>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '2rem',
+          background: 'white',
+          borderRadius: '1rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p style={{fontSize: '1rem', color: '#6b7280', margin: 0}}>Đang tải thông tin...</p>
+        </div>
       </div>
     );
   }
   
-  // If staff is not found
-  if (!staff) {
+  // If staff is not found or there's an error
+  if (error || !staff) {
     return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
-        <p style={{fontSize: '1rem', color: '#6b7280'}}>Không tìm thấy thông tin nhân viên.</p>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '1rem',
+          padding: '3rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center',
+          maxWidth: '400px'
+        }}>
+          <ExclamationTriangleIcon style={{
+            width: '3rem',
+            height: '3rem',
+            color: '#f59e0b',
+            margin: '0 auto 1rem'
+          }} />
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1f2937',
+            margin: '0 0 0.5rem 0'
+          }}>
+            {error || 'Không tìm thấy thông tin nhân viên'}
+          </h2>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#6b7280',
+            margin: '0 0 1.5rem 0'
+          }}>
+            Nhân viên này có thể đã bị xóa hoặc không tồn tại
+          </p>
+          <Link
+            href="/staff"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              color: 'white',
+              borderRadius: '0.5rem',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 500
+            }}
+          >
+            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+            Quay lại danh sách
+          </Link>
+        </div>
       </div>
     );
   }
@@ -179,145 +190,218 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
       
     const textColor = 
       shift === 'Sáng' ? '#1e40af' : 
-      shift === 'Chiều' ? '#7e22ce' :
-      shift === 'Đêm' ? '#4338ca' : '#166534';
-      
+      shift === 'Chiều' ? '#7c3aed' :
+      shift === 'Đêm' ? '#3730a3' : '#166534';
+    
     return (
       <span style={{
-        display: 'inline-flex', 
-        padding: '0.25rem 0.75rem', 
-        fontSize: '0.75rem', 
-        fontWeight: 500, 
+        background: bgColor,
+        color: textColor,
+        padding: '0.25rem 0.75rem',
         borderRadius: '9999px',
-        backgroundColor: bgColor,
-        color: textColor
+        fontSize: '0.875rem',
+        fontWeight: 500
       }}>
         {shift}
       </span>
     );
   };
-  
+
+  // Format date function
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Chưa cập nhật';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('vi-VN');
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Calculate age function
+  const calculateAge = (dateOfBirth: string) => {
+    if (!dateOfBirth) return 'Chưa cập nhật';
+    try {
+      const birth = new Date(dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return `${age} tuổi`;
+    } catch {
+      return 'Chưa cập nhật';
+    }
+  };
+
   return (
-    <div style={{maxWidth: '1100px', margin: '0 auto', marginTop: 32, marginBottom: 32}}>
-      {/* Header lớn với avatar và action */}
-      <div style={{
-        background: 'linear-gradient(90deg, #f8fafc 0%,rgb(244, 247, 250) 100%)',
-        borderRadius: '1.5rem',
-        padding: '2rem 2rem 1.5rem 2rem',
-        marginBottom: 32,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 32,
-        boxShadow: '0 2px 12px 0 rgba(100,116,139,0.06)'
-      }}>
-        <Link href="/staff" style={{color: '#64748b', display: 'flex', alignItems: 'center', marginRight: 18}}>
-          <ArrowLeftIcon style={{width: 24, height: 24}} />
-        </Link>
-        {/* Avatar */}
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      padding: '2rem 1rem'
+    }}>
+      <div style={{maxWidth: 1200, margin: '0 auto'}}>
+        
+        {/* Header Section */}
         <div style={{
-          width: 76, height: 76, borderRadius: '50%', background: 'linear-gradient(135deg, #a5b4fc 0%, #f0abfc 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(59,130,246,0.10)'
+          background: 'linear-gradient(90deg, #f8fafc 0%,rgb(244, 247, 250) 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem 2rem 1.5rem 2rem',
+          marginBottom: 32,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 32,
+          boxShadow: '0 2px 12px 0 rgba(100,116,139,0.06)'
         }}>
-          {staff.name?.[0] || '?'}
-        </div>
-        <div style={{flex: 1}}>
-          <h1 style={{fontSize: '2.1rem', fontWeight: 800, color: '#334155', margin: 0, letterSpacing: '-0.01em'}}>{staff.name}</h1>
-          <p style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-  Chức vụ: {staff.position} 
-</p>
-
-<p style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-  Khoa :{staff.department}
-</p>
-
-        </div>
-        <div style={{display: 'flex', gap: 14}}>
+          <Link href="/staff" style={{color: '#64748b', display: 'flex', alignItems: 'center', marginRight: 18}}>
+            <ArrowLeftIcon style={{width: 24, height: 24}} />
+          </Link>
+          {/* Avatar */}
+          <div style={{
+            width: 76, height: 76, borderRadius: '50%', background: 'linear-gradient(135deg, #a5b4fc 0%, #f0abfc 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(59,130,246,0.10)'
+          }}>
+            {staff.name?.[0] || '?'}
+          </div>
+          <div style={{flex: 1}}>
+            <h1 style={{fontSize: '2.1rem', fontWeight: 800, color: '#334155', margin: 0, letterSpacing: '-0.01em'}}>{staff.name}</h1>
+            <p style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+              Chức vụ: {staff.position} 
+            </p>
+            <p style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+              Khoa: {staff.department}
+            </p>
+          </div>
           
-          <button
-            onClick={handleEditClick}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.2rem', background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', color: 'white', borderRadius: '0.75rem', border: 'none', fontSize: '0.97rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s'
-            }}
-          >
-            <PencilIcon style={{ width: '1rem', height: '1rem' }} />Chỉnh sửa
-          </button>
-        </div>
-      </div>
-      {/* Card section */}
-      <div style={{background: '#fff', borderRadius: '1.25rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px 0 rgba(100,116,139,0.04)', overflow: 'hidden'}}>
-        {/* Header với thông tin cơ bản */}
-        <div style={{background: '#f1f5f9', padding: '2rem 2rem 1.5rem 2rem', borderBottom: '1px solid #ffffff'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 24}}>
-            <div>
-              <h2 style={{fontSize: '1.35rem', fontWeight: 700, color: '#0f172a', margin: 0}}>Thông tin nhân viên</h2>
-             
-            </div>
-            <div>
-              <p style={{fontSize: '0.97rem', color: '#64748b', margin: 0}}>
-                <span style={{fontWeight: 600}}>Ngày vào làm:</span>{' '}
-                {new Date(staff.hireDate).toLocaleDateString()}
-              </p>
-            </div>
+          {/* Action Buttons */}
+          <div style={{display: 'flex', gap: 12}}>
+            <button
+              onClick={handleEditClick}
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                border: 'none',
+                borderRadius: '0.75rem',
+                padding: '0.75rem 1.25rem',
+                color: 'white',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s'
+              }}
+            >
+              <PencilIcon style={{width: 16, height: 16}} />
+              Chỉnh sửa
+            </button>
           </div>
         </div>
-        {/* Main content */}
-        <div style={{padding: '2.5rem'}}>
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem'}}>
-            {/* Thông tin cá nhân */}
-            <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
+
+        {/* Main Content */}
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem'}}>
+          
+          {/* Left Column */}
+          <div>
+            {/* Personal Information */}
+            <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem', marginBottom: '2.5rem'}}>
               <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
                 Thông tin cá nhân
               </h3>
               <div style={{display: 'grid', gap: '1.1rem'}}>
                 <div>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Họ và tên:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.name}</span>
+                </div>
+                <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Ngày sinh:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}><strong>Ngày sinh:</strong> {staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{formatDate(staff.dateOfBirth)}</span>
+                </div>
+                <div>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Tuổi:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{calculateAge(staff.dateOfBirth)}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Giới tính:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}><strong>Giới tính:</strong> {staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Khác'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>
+                    {staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Chưa cập nhật'}
+                  </span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Địa chỉ:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}><strong>Địa chỉ:</strong> {staff.address || 'N/A'}</span>
-                </div>
-                <div>
-                  <span style={{fontWeight: 600, color: '#475569'}}>Chứng chỉ:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.certification || 'Không có'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.address || 'Chưa cập nhật'}</span>
                 </div>
               </div>
             </div>
-            {/* Thông tin liên hệ */}
+
+            {/* Work Information */}
             <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
+              <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
+                Thông tin công việc
+              </h3>
+              <div style={{display: 'grid', gap: '1.1rem'}}>
+                <div>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Chức vụ:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.position}</span>
+                </div>
+                <div>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Khoa/Phòng ban:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.department}</span>
+                </div>
+                <div style={{display: 'flex', alignItems: 'center'}}>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Ca làm việc:</span>
+                  <span style={{marginLeft: 8}}>{renderShiftType(staff.shiftType)}</span>
+                </div>
+                <div>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Ngày vào làm:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{formatDate(staff.hireDate)}</span>
+                </div>
+                <div>
+                  <span style={{fontWeight: 600, color: '#475569'}}>Chứng chỉ:</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.certification || 'Chưa cập nhật'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div>
+            {/* Contact Information */}
+            <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem', marginBottom: '2.5rem'}}>
               <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
                 Thông tin liên hệ
               </h3>
               <div style={{display: 'grid', gap: '1.1rem'}}>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Email:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.email || 'N/A'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.email || 'Chưa cập nhật'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Số điện thoại:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.contactPhone}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.contactPhone || 'Chưa cập nhật'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Liên hệ khẩn cấp:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyContact || 'N/A'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyContact || 'Chưa cập nhật'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>SĐT khẩn cấp:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyPhone || 'N/A'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyPhone || 'Chưa cập nhật'}</span>
                 </div>
               </div>
             </div>
-          </div>
-          {/* Notes Section */}
-          <div style={{marginTop: '2.5rem', borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
-            <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
-              Ghi chú
-            </h3>
-            <p style={{fontSize: '1.05rem', color: '#64748b', margin: 0}}>{staff.notes || 'Không có ghi chú.'}</p>
+            
+            {/* Notes Section */}
+            <div style={{borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#f9fafb', padding: '2rem'}}>
+              <h3 style={{fontSize: '1.12rem', fontWeight: 700, color: '#334155', marginTop: 0, marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 8}}>
+                Ghi chú
+              </h3>
+              <p style={{fontSize: '1.05rem', color: '#64748b', margin: 0, lineHeight: 1.6}}>
+                {staff.notes || 'Không có ghi chú.'}
+              </p>
+            </div>
           </div>
         </div>
       </div>

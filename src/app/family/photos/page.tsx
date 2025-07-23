@@ -98,6 +98,7 @@ export default function FamilyPhotosPage() {
       })
       .then(data => {
         console.log("API resident-photos data:", data);
+        console.log("Sample photo item:", data[0]);
         // Map lại dữ liệu cho đúng định dạng UI mong muốn
         const mapped = Array.isArray(data) ? data.map(item => {
           let senderName = item.uploadedByName;
@@ -105,15 +106,28 @@ export default function FamilyPhotosPage() {
             const staff = staffList.find(s => String(s._id) === String(item.uploadedBy));
             senderName = staff ? (staff.fullName || staff.name || staff.username || staff.email) : undefined;
           }
+          
+          // Xử lý đường dẫn ảnh
+          let imageUrl = "";
+          if (item.file_path) {
+            // Chuyển đổi backslash thành forward slash và loại bỏ dấu ngoặc kép
+            const cleanPath = item.file_path.replace(/\\/g, '/').replace(/"/g, '');
+            imageUrl = `http://localhost:8000/${cleanPath}`;
+            console.log('Original file_path:', item.file_path);
+            console.log('Clean path:', cleanPath);
+            console.log('Final image URL:', imageUrl);
+          }
+          
           return {
             ...item,
             id: item._id,
-            url: item.filePath ? `http://localhost:8000${item.filePath.startsWith('/') ? '' : '/'}${item.filePath}` : "",
+            url: imageUrl,
             caption: item.caption || "",
             date: item.takenDate
               ? new Date(item.takenDate).toISOString().split("T")[0]
               : (item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : ""),
             uploadedByName: senderName,
+            residentId: item.resident_id,
           };
         }) : [];
         setAllPhotos(mapped);
@@ -463,6 +477,36 @@ export default function FamilyPhotosPage() {
                       }}
                       onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
                       onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                      onError={(e) => {
+                        console.error('Image failed to load:', photo.url);
+                        e.currentTarget.style.display = 'none';
+                        // Hiển thị placeholder khi ảnh lỗi
+                        const placeholder = document.createElement('div');
+                        placeholder.innerHTML = `
+                          <div style="
+                            width: 100%; 
+                            height: 220px; 
+                            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
+                            border-radius: 14px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: #6b7280;
+                            font-size: 0.875rem;
+                            font-weight: 500;
+                          ">
+                            <div style="text-align: center;">
+                              <svg width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style="margin-bottom: 8px; opacity: 0.5;">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21,15 16,10 5,21"/>
+                              </svg>
+                              <div>Không thể tải ảnh</div>
+                            </div>
+                          </div>
+                        `;
+                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                      }}
                     />
                     
                     {/* Nút tải ảnh */}

@@ -9,6 +9,7 @@ import {
   PhotoIcon
 } from '@heroicons/react/24/outline';
 import { residentAPI, photosAPI } from '@/lib/api';
+import { carePlansAPI, roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 export default function PhotoUploadPage() {
@@ -36,8 +37,21 @@ export default function PhotoUploadPage() {
     const fetchResidents = async () => {
       try {
         const data = await residentAPI.getAll();
-        // Đảm bảo giữ nguyên trường familyId khi setResidents
-        setResidents(Array.isArray(data) ? data : []);
+        const residentsWithRoom = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
+          let room_number = '';
+          try {
+            const assignments = await carePlansAPI.getByResidentId(resident._id);
+            const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+            const roomId = assignment?.assigned_room_id;
+            if (roomId) {
+              const room = await roomsAPI.getById(roomId);
+              room_number = room?.room_number || '';
+            }
+          } catch {}
+          return { ...resident, room_number };
+        }));
+        setResidents(residentsWithRoom);
+        console.log('Residents with room_number:', residentsWithRoom);
       } catch (err) {
         setResidents([]);
       }
@@ -179,9 +193,9 @@ export default function PhotoUploadPage() {
     try {
       // Lấy resident object từ danh sách residents (so sánh kiểu string)
       const residentObj = residents.find(r => String(r._id) === String(selectedResident));
-      console.log("selectedResident:", selectedResident);
-      console.log("residentObj:", residentObj);
-      if (!residentObj || !residentObj.familyMemberId) {
+      console.log('residentObj:', residentObj);
+      const familyId = residentObj.family_member_id || residentObj.familyId || residentObj.family_id;
+      if (!residentObj || !familyId) {
         setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người thân (familyId)'}));
         setIsUploading(false);
         return;
@@ -189,28 +203,28 @@ export default function PhotoUploadPage() {
       // Upload song song tất cả ảnh
       const uploadPromises = selectedFiles.map((file, i) => {
         const formData = new FormData();
-        formData.append('file', file);
-        formData.append('familyId', residentObj.familyMemberId); // id của account family
-        formData.append('residentId', residentObj._id);    // id của resident/người cao tuổi
+        formData.append('file', file); // Đảm bảo đúng key 'file'
+        formData.append('resident_id', residentObj._id); // Đúng key snake_case cho backend
         formData.append('caption', photoDescription.trim());
-        formData.append('activityType', activityType);
+        formData.append('activity_type', activityType);
         photoTags.forEach(tag => formData.append('tags', tag));
-        formData.append('takenDate', new Date().toISOString());
-        // Truyền thêm tên người gửi (fix linter: chỉ dùng user.email nếu không có fullName/username)
+        formData.append('taken_date', new Date().toISOString());
+        // Truyền thêm tên người gửi
         let senderName = 'Nhân viên';
         if (user) {
-          if ('fullName' in user && user.fullName) senderName = user.fullName;
+          if ('full_name' in user && user.full_name) senderName = user.full_name;
           else if ('username' in user && user.username) senderName = user.username;
           else if ('email' in user && user.email) senderName = user.email;
         }
-        formData.append('uploadedByName', String(senderName));
-        // formData.append('relatedActivityId', '');
+        formData.append('staff_notes', String(senderName));
+        // formData.append('related_activity_id', '');
         return photosAPI.upload(formData)
           .then(() => {
             successCount++;
           })
-          .catch(() => {
+          .catch((err) => {
             errorCount++;
+            console.error('Upload error:', err);
           })
           .finally(() => {
             setCurrentUploading(prev => prev + 1);
@@ -341,7 +355,7 @@ export default function PhotoUploadPage() {
               <option value="">-- Chọn người cao tuổi --</option>
               {residents.map((resident: any) => (
                 <option key={resident._id} value={resident._id}>
-                  {resident.fullName} {resident.room ? `- Phòng ${resident.room}` : ''}
+                  {resident.full_name} {resident.room_number ? `- Phòng ${resident.room_number}` : ''}
                 </option>
               ))}
             </select>

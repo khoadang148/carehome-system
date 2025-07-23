@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ClipboardDocumentListIcon, PlusIcon, UserIcon } from '@heroicons/react/24/outline';
+import { userAPI } from '@/lib/api';
+import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 interface CareNotesDisplayProps {
   careNotes: any[];
@@ -9,28 +11,36 @@ interface CareNotesDisplayProps {
 }
 
 export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNotesDisplayProps) {
-  
+  const [staffNames, setStaffNames] = useState<{[id: string]: string}>({});
+  const requestedIds = useRef<Set<string>>(new Set());
+
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) return 'Hôm qua';
-    if (diffDays <= 3) return `${diffDays} ngày trước`;
-    return date.toLocaleDateString('vi-VN');
+    if (!dateString) return '';
+    return formatDateDDMMYYYY(dateString);
   };
 
-  const getPriorityColor = (note: string) => {
-    const lowerNote = (note || '').toLowerCase();
-    if (lowerNote.includes('cần theo dõi') || lowerNote.includes('khẩn cấp') || lowerNote.includes('nguy hiểm')) {
-      return { bg: '#fee2e2', border: '#fca5a5', text: '#dc2626' };
-    }
-    if (lowerNote.includes('chú ý') || lowerNote.includes('quan trọng')) {
-      return { bg: '#fef3c7', border: '#fbbf24', text: '#d97706' };
-    }
+  const getPriorityColor = () => {
     return { bg: '#f3f4f6', border: '#d1d5db', text: '#374151' };
   };
+
+  // Fetch staff names by conducted_by if needed
+  useEffect(() => {
+    (async () => {
+      if (!careNotes) return;
+      for (const note of careNotes) {
+        if (note.conducted_by && !note.staff && !staffNames[note.conducted_by] && !requestedIds.current.has(note.conducted_by)) {
+          requestedIds.current.add(note.conducted_by);
+          try {
+            const user = await userAPI.getById(note.conducted_by);
+            setStaffNames(prev => ({ ...prev, [note.conducted_by]: user.full_name || user.username || user.email || '---' }));
+          } catch {
+            setStaffNames(prev => ({ ...prev, [note.conducted_by]: '---' }));
+          }
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [careNotes]);
 
   if (!careNotes || careNotes.length === 0) {
     return (
@@ -51,9 +61,21 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       {careNotes.map((careNote, idx) => {
-        const colors = getPriorityColor(careNote.note);
-        
+        const colors = getPriorityColor();
         const key = careNote.id || careNote._id || idx;
+        // Lấy tên nhân viên
+        let staffName = '---';
+        if (careNote.staff) {
+          staffName = careNote.staff.split(',')[0]?.trim();
+        } else if (careNote.conducted_by_name) {
+          staffName = careNote.conducted_by_name;
+        } else if (careNote.conducted_by && staffNames[careNote.conducted_by]) {
+          staffName = staffNames[careNote.conducted_by];
+        } else if (careNote.conducted_by_full_name) {
+          staffName = careNote.conducted_by_full_name;
+        } else if (careNote.full_name) {
+          staffName = careNote.full_name;
+        }
         return (
           <div
             key={key}
@@ -65,6 +87,7 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
               borderLeft: `4px solid ${colors.text}`
             }}
           >
+            {/* Nhân viên */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -82,50 +105,48 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
                   fontWeight: 600,
                   color: colors.text
                 }}>
-                  {(careNote.staff ? careNote.staff.split(',')[0]?.trim() : 'Nhân viên') || 'Nhân viên'}
+                  Nhân viên: {staffName}
                 </span>
-                {careNote.staff && careNote.staff.includes(',') && (
-                  <span style={{
-                    fontSize: '0.75rem',
-                    color: '#6b7280',
-                    fontStyle: 'italic'
-                  }}>
-                    ({careNote.staff.split(',')[1]?.trim()})
-                  </span>
-                )}
               </div>
               <span style={{
                 fontSize: '0.75rem',
                 color: '#6b7280'
               }}>
-                {formatDate(careNote.date)}
+                Ngày: {formatDate(careNote.date)}
               </span>
             </div>
 
+            {/* Assessment type */}
+            {careNote.assessment_type && (
+              <div style={{
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                color: '#059669',
+                marginBottom: '0.25rem'
+              }}>
+                Loại đánh giá: {careNote.assessment_type}
+              </div>
+            )}
+
+            {/* Notes content */}
             <div style={{
               fontSize: '0.875rem',
               color: '#374151',
               lineHeight: '1.6',
               marginBottom: '0.5rem'
             }}>
-              {careNote.note || careNote.content || 'Không có nội dung ghi chú'}
+              <span style={{fontWeight: 600}}>Nội dung: </span>{careNote.notes || careNote.note || careNote.content || 'Không có nội dung ghi chú'}
             </div>
 
-            {/* Priority indicator for high priority notes */}
-            {((careNote.note || '').toLowerCase().includes('cần theo dõi') || 
-              ((careNote.note || '').toLowerCase().includes('khẩn cấp'))) && (
+            {/* Recommendations */}
+            {careNote.recommendations && (
               <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: '#dc2626',
-                color: 'white',
-                borderRadius: '0.5rem',
-                fontSize: '0.75rem',
-                fontWeight: 500
+                fontSize: '0.85rem',
+                color: '#3b82f6',
+                marginBottom: '0.25rem',
+                fontStyle: 'italic'
               }}>
-                ⚠️ Cần theo dõi
+                <span style={{fontWeight: 600}}>Khuyến nghị: </span>{careNote.recommendations}
               </div>
             )}
           </div>

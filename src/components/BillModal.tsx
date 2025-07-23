@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog } from '@headlessui/react';
-import { residentAPI, familyMembersAPI, staffAPI, billsAPI } from '../lib/api';
+import { residentAPI, staffAPI, billsAPI, carePlansAPI } from '../lib/api';
+import { useAuth } from '@/lib/contexts/auth-context';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 interface BillModalProps {
   open: boolean;
@@ -9,46 +12,114 @@ interface BillModalProps {
 }
 
 export default function BillModal({ open, onClose, onSuccess }: BillModalProps) {
+  const { user } = useAuth();
   const [residents, setResidents] = useState<any[]>([]);
+  const [resident_id, setResidentId] = useState('');
+  const [loadingResidents, setLoadingResidents] = useState(false);
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<any>({
-    family_id: '',
-    resident_id: '',
-    care_plan_id: '',
-    staff_id: '',
-    amount: '',
-    due_date: '',
-    paid_date: '',
-    payment_method: '',
-    status: 'pending',
-    notes: '',
-  });
+  const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [care_plan_assignment_id, setCarePlanAssignmentId] = useState('');
+  const [staff_id, setStaffId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [due_date, setDueDate] = useState('');
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Fetch residents, staffs on open
   useEffect(() => {
     if (open) {
-      residentAPI.getAll().then(setResidents);
+      setLoadingResidents(true);
+      residentAPI.getAll()
+        .then(data => setResidents(data))
+        .catch(() => setResidents([]))
+        .finally(() => setLoadingResidents(false));
       staffAPI.getAll().then(setStaffs);
+      // Auto-select current user as staff if role is staff or admin
+      if (user && (user.role === 'staff' || user.role === 'admin')) {
+        setStaffId(user.id);
+      } else {
+        setStaffId('');
+      }
     }
-  }, [open]);
+  }, [open, user]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  // Fetch care plan assignments when resident changes
+  useEffect(() => {
+    if (resident_id) {
+      setLoadingAssignments(true);
+      carePlansAPI.getByResidentId(resident_id)
+        .then(data => setCarePlanAssignments(Array.isArray(data) ? data : []))
+        .catch(() => setCarePlanAssignments([]))
+        .finally(() => setLoadingAssignments(false));
+      setCarePlanAssignmentId('');
+      setAmount('');
+    } else {
+      setCarePlanAssignments([]);
+      setCarePlanAssignmentId('');
+      setAmount('');
+    }
+  }, [resident_id]);
+
+  // Set amount when care plan assignment changes
+  useEffect(() => {
+    if (care_plan_assignment_id) {
+      const assignment = carePlanAssignments.find((a: any) => a._id === care_plan_assignment_id);
+      setAmount(assignment ? assignment.total_monthly_cost?.toString() : '');
+      // Gợi ý title/notes tự động
+      if (assignment) {
+        const planName = assignment.care_plan_ids && assignment.care_plan_ids[0]?.plan_name ? assignment.care_plan_ids[0].plan_name : '';
+        const month = due_date ? new Date(due_date).getMonth() + 1 : '';
+        const year = due_date ? new Date(due_date).getFullYear() : '';
+        setTitle(`Hóa đơn tháng ${month}/${year} cho gói chăm sóc ${planName}`);
+        setNotes(`Chưa thanh toán cho ${planName}${assignment.room_type ? ' + phòng ' + assignment.room_type : ''} tháng ${month}/${year}`);
+      } else {
+        setTitle('');
+        setNotes('');
+      }
+    } else {
+      setAmount('');
+      setTitle('');
+      setNotes('');
+    }
+  }, [care_plan_assignment_id, carePlanAssignments, due_date]);
+
+  // Update title/notes when due_date changes
+  useEffect(() => {
+    if (care_plan_assignment_id && due_date) {
+      const assignment = carePlanAssignments.find((a: any) => a._id === care_plan_assignment_id);
+      const planName = assignment?.care_plan_ids && assignment.care_plan_ids[0]?.plan_name ? assignment.care_plan_ids[0].plan_name : '';
+      const month = new Date(due_date).getMonth() + 1;
+      const year = new Date(due_date).getFullYear();
+      setTitle(`Hóa đơn tháng ${month}/${year} cho gói chăm sóc ${planName}`);
+      setNotes(`Chưa thanh toán cho ${planName}${assignment?.room_type ? ' + phòng ' + assignment.room_type : ''} tháng ${month}/${year}`);
+    }
+  }, [due_date]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setSuccess(null);
+    // Defensive: check required fields
+    if (!resident_id || !care_plan_assignment_id || !staff_id || !amount || !due_date || !title) {
+      setError('Vui lòng nhập đầy đủ thông tin bắt buộc.');
+      setLoading(false);
+      return;
+    }
     try {
-      const payload = {
-        ...form,
-        amount: Number(form.amount),
-      };
-      await billsAPI.create(payload);
+      await billsAPI.create({
+        resident_id,
+        care_plan_assignment_id,
+        staff_id,
+        amount: Number(amount),
+        due_date: due_date ? new Date(due_date).toISOString() : '',
+        title,
+        notes
+      });
       setSuccess('Tạo hóa đơn thành công!');
       if (onSuccess) onSuccess();
       setTimeout(() => {
@@ -70,61 +141,83 @@ export default function BillModal({ open, onClose, onSuccess }: BillModalProps) 
           <Dialog.Title className="text-xl font-bold mb-4">Tạo hóa đơn mới</Dialog.Title>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Cư dân</label>
-              <select name="resident_id" value={form.resident_id} onChange={handleChange} required className="w-full border rounded px-3 py-2">
+              <label className="block font-medium mb-1">Cư dân <span className="text-red-500">*</span></label>
+              <select value={resident_id} onChange={e => setResidentId(e.target.value)} required className="w-full border rounded px-3 py-2">
                 <option value="">Chọn cư dân</option>
-                {residents.map((r: any) => (
-                  <option key={r.id} value={r.id}>{r.name || r.fullName}</option>
+                {residents.length === 0 && !loadingResidents && (
+                  <option value="" disabled>Không có cư dân nào</option>
+                )}
+                {residents.map(r => (
+                  <option key={r?._id} value={r?._id}>{r?.full_name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Nhân viên phụ trách</label>
-              <select name="staff_id" value={form.staff_id} onChange={handleChange} required className="w-full border rounded px-3 py-2">
+              <label className="block font-medium mb-1">Gói chăm sóc <span className="text-red-500">*</span></label>
+              <select value={care_plan_assignment_id} onChange={e => setCarePlanAssignmentId(e.target.value)} required className="w-full border rounded px-3 py-2" disabled={!resident_id || loadingAssignments}>
+                <option value="">{loadingAssignments ? 'Đang tải...' : 'Chọn gói'}</option>
+                {carePlanAssignments.map(cp => (
+                  <option key={cp?._id} value={cp?._id}>
+                    {cp?.care_plan_ids && cp.care_plan_ids[0]?.plan_name ? cp.care_plan_ids[0].plan_name : 'Gói'}
+                    {cp?.total_monthly_cost ? ` - ${Number(cp.total_monthly_cost).toLocaleString('vi-VN')} đ/tháng` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block font-medium mb-1">Nhân viên tạo hóa đơn <span className="text-red-500">*</span></label>
+              <select value={staff_id} onChange={e => setStaffId(e.target.value)} required className="w-full border rounded px-3 py-2">
                 <option value="">Chọn nhân viên</option>
-                {staffs.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.name || s.fullName || s.email}</option>
+                {staffs.map(s => (
+                  <option key={s?._id} value={s?._id}>{s?.full_name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Số tiền</label>
-              <input name="amount" type="number" value={form.amount} onChange={handleChange} required className="w-full border rounded px-3 py-2" min={0} />
+              <label className="block font-medium mb-1">Số tiền <span className="text-red-500">*</span></label>
+              <input type="number" value={amount} readOnly className="w-full border rounded px-3 py-2 bg-gray-100 cursor-not-allowed" placeholder="Tự động từ gói" required />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Ngày đến hạn</label>
-              <input name="due_date" type="date" value={form.due_date} onChange={handleChange} required className="w-full border rounded px-3 py-2" />
+              <label className="block font-medium mb-1">Ngày đến hạn <span className="text-red-500">*</span></label>
+              <DatePicker
+                selected={due_date ? (() => {
+                  const [y, m, d] = due_date.split('-');
+                  if (y && m && d) return new Date(Number(y), Number(m) - 1, Number(d));
+                  return null;
+                })() : null}
+                onChange={date => {
+                  if (date instanceof Date && !isNaN(date.getTime())) {
+                    const yyyy = date.getFullYear();
+                    const mm = String(date.getMonth() + 1).padStart(2, '0');
+                    const dd = String(date.getDate()).padStart(2, '0');
+                    setDueDate(`${yyyy}-${mm}-${dd}`);
+                  } else {
+                    setDueDate('');
+                  }
+                }}
+                dateFormat="dd/MM/yyyy"
+                placeholderText="dd/mm/yyyy"
+                className="w-full border rounded px-3 py-2"
+                required
+                autoComplete="off"
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode="select"
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Ngày thanh toán</label>
-              <input name="paid_date" type="date" value={form.paid_date} onChange={handleChange} className="w-full border rounded px-3 py-2" />
+              <label className="block font-medium mb-1">Tiêu đề <span className="text-red-500">*</span></label>
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required className="w-full border rounded px-3 py-2" placeholder="Hóa đơn tháng 2/2024 cho gói chăm sóc cao cấp" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Phương thức thanh toán</label>
-              <select name="payment_method" value={form.payment_method} onChange={handleChange} required className="w-full border rounded px-3 py-2">
-                <option value="">Chọn phương thức</option>
-                <option value="bank_transfer">Chuyển khoản</option>
-                <option value="cash">Tiền mặt</option>
-                <option value="other">Khác</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Trạng thái</label>
-              <select name="status" value={form.status} onChange={handleChange} required className="w-full border rounded px-3 py-2">
-                <option value="pending">Chưa thanh toán</option>
-                <option value="completed">Đã thanh toán</option>
-                <option value="cancelled">Đã hủy</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Ghi chú</label>
-              <textarea name="notes" value={form.notes} onChange={handleChange} className="w-full border rounded px-3 py-2" rows={2} />
+              <label className="block font-medium mb-1">Ghi chú</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Chưa thanh toán cho gói cao cấp + phòng 2 giường tháng 2/2024" />
             </div>
             {error && <div className="text-red-600 text-sm">{error}</div>}
             {success && <div className="text-green-600 text-sm">{success}</div>}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Hủy</button>
-              <button type="submit" disabled={loading} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold">
+              <button type="submit" disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold">
                 {loading ? 'Đang tạo...' : 'Tạo hóa đơn'}
               </button>
             </div>

@@ -5,6 +5,8 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { residentAPI } from '@/lib/api';
 import { careNotesAPI } from '@/lib/api';
+import { carePlansAPI, roomsAPI } from '@/lib/api';
+import { userAPI } from '@/lib/api';
 import { 
   HeartIcon, 
   MagnifyingGlassIcon,
@@ -12,17 +14,18 @@ import {
   UserIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 
 interface Resident {
   id: number | string;
-  name: string;
-  room: string;
+  full_name: string;
+  room_number: string;
   age: number | string;
   careLevel: string;
   lastNote?: string;
   notesCount?: number;
-  dateOfBirth?: string;
+  date_of_birth?: string;
 }
 
 export default function CareNotesPage() {
@@ -43,6 +46,7 @@ export default function CareNotesPage() {
     setTimeout(() => setNotification(null), 2000);
   };
   const [confirmDelete, setConfirmDelete] = useState<{ note: any } | null>(null);
+  const [staffNames, setStaffNames] = useState<Record<string, string>>({});
 
 
   useEffect(() => {
@@ -55,8 +59,8 @@ export default function CareNotesPage() {
 
   useEffect(() => {
     const filtered = residents.filter(resident =>
-      resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resident.room.toLowerCase().includes(searchTerm.toLowerCase())
+      (resident.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (resident.room_number || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredResidents(filtered);
   }, [residents, searchTerm]);
@@ -64,10 +68,10 @@ export default function CareNotesPage() {
   const loadResidents = async () => {
     try {
       const data = await residentAPI.getAll();
-      const residentsWithNotes = (Array.isArray(data) ? data : []).map((resident: any) => {
+      const residentsWithNotes = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
         let age = resident.age;
-        if ((!age || age === '') && resident.dateOfBirth) {
-          const dob = new Date(resident.dateOfBirth);
+        if ((!age || age === '') && resident.date_of_birth) {
+          const dob = new Date(resident.date_of_birth);
           const now = new Date();
           age = now.getFullYear() - dob.getFullYear();
           const m = now.getMonth() - dob.getMonth();
@@ -75,15 +79,26 @@ export default function CareNotesPage() {
             age--;
           }
         }
+        // Lấy số phòng giống family
+        let room_number = '';
+        try {
+          const assignments = await carePlansAPI.getByResidentId(resident._id || resident.id);
+          const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+          const roomId = assignment?.assigned_room_id;
+          if (roomId) {
+            const room = await roomsAPI.getById(roomId);
+            room_number = room?.room_number || '';
+          }
+        } catch {}
         return {
           id: resident._id || resident.id,
-          name: resident.fullName || resident.name,
-          room: resident.room || '',
+          full_name: resident.full_name || resident.name || resident.fullName || '',
+          room_number,
           age: age || '',
-          careLevel: resident.careLevel || '',
-          dateOfBirth: resident.dateOfBirth || '',
+          careLevel: resident.care_level || resident.careLevel || '',
+          date_of_birth: resident.date_of_birth || resident.dateOfBirth || '',
         };
-      });
+      }));
       setResidents(residentsWithNotes);
       // Load care notes cho từng resident song song
       const notesMap: Record<string, any[]> = {};
@@ -110,7 +125,7 @@ export default function CareNotesPage() {
   const handleCloseModal = () => setSelectedResidentId(null);
 
   const handleCreateCareNote = (resident: Resident) => {
-    router.push(`/staff/assessments/new?residentId=${resident.id}&residentName=${encodeURIComponent(resident.name)}`);
+    router.push(`/staff/assessments/new?residentId=${resident.id}&residentName=${encodeURIComponent(resident.full_name)}`);
   };
 
 
@@ -243,12 +258,12 @@ export default function CareNotesPage() {
                   <UserIcon style={{ width: '1.1rem', height: '1.1rem', color: 'white' }} />
                 </div>
                 <div style={{ fontSize: '0.97rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Họ và tên:</span> <span style={{ fontWeight: 600 }}>{resident.name}</span></span>
+                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Họ và tên:</span> <span style={{ fontWeight: 600 }}>{resident.full_name}</span></span>
                   <span style={{ color: '#d1d5db' }}>|</span>
-                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Phòng:</span> {resident.room}</span>
-                  {resident.dateOfBirth && (
+                  <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Phòng:</span> {resident.room_number}</span>
+                  {resident.date_of_birth && (
                     (() => {
-                      const dob = new Date(resident.dateOfBirth);
+                      const dob = new Date(resident.date_of_birth);
                       const now = new Date();
                       let age = now.getFullYear() - dob.getFullYear();
                       const m = now.getMonth() - dob.getMonth();
@@ -422,9 +437,35 @@ export default function CareNotesPage() {
                       flexDirection: 'column',
                       gap: 6
                     }}>
-                      <div style={{ fontWeight: 600, color: '#2563eb', fontSize: 15 }}>{new Date(note.date).toLocaleString('vi-VN')}</div>
-                      <div style={{ color: '#334155', margin: '4px 0', fontSize: 16, fontWeight: 500, whiteSpace: 'pre-line' }}>{note.content}</div>
-                      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Người ghi: {note.staffName || note.staffId || '---'}</div>
+                      <div style={{ fontWeight: 600, color: '#2563eb', fontSize: 15 }}>
+                        Ngày: {note.date ? formatDateDDMMYYYY(note.date) : '---'}
+                      </div>
+                      <div style={{ fontSize: 15, color: '#374151', marginBottom: 2 }}>
+                        <span style={{ fontWeight: 600 }}>Loại đánh giá: </span>{note.assessment_type || '---'}
+                      </div>
+                      <div style={{ color: '#334155', margin: '4px 0', fontSize: 16, fontWeight: 500, whiteSpace: 'pre-line' }}>
+                        <span style={{ fontWeight: 600 }}>Nội dung: </span>{note.notes || note.content || 'Không có ghi chú'}
+                      </div>
+                      <div style={{ fontSize: 15, color: '#374151', marginBottom: 2 }}>
+                        <span style={{ fontWeight: 600 }}>Khuyến nghị: </span>{note.recommendations || '---'}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600 }}>Nhân viên: </span>{
+                          (() => {
+                            const staffId = note.conducted_by;
+                            if (!staffId) return '---';
+                            if (staffNames[staffId]) return staffNames[staffId];
+                            userAPI.getById(staffId)
+                              .then(data => {
+                                setStaffNames(prev => ({ ...prev, [staffId]: data.full_name || data.username || data.email || staffId }));
+                              })
+                              .catch(() => {
+                                setStaffNames(prev => ({ ...prev, [staffId]: staffId }));
+                              });
+                            return 'Đang tải...';
+                          })()
+                        }
+                      </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                         <button
                           onClick={() => { setEditNote(note); setEditContent(note.content); }}
@@ -494,16 +535,67 @@ export default function CareNotesPage() {
             }}>
               <button onClick={() => setEditNote(null)} style={{ position: 'absolute', top: 12, right: 16, fontWeight: 700, fontSize: 20, border: 'none', background: 'none', cursor: 'pointer' }}>×</button>
               <h3 style={{ color: '#2563eb', fontWeight: 700, marginTop: 0 }}>Sửa ghi chú</h3>
-              <textarea
-                value={editContent}
-                onChange={e => setEditContent(e.target.value)}
-                rows={5}
-                style={{ width: '100%', padding: 10, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15, marginBottom: 16 }}
-              />
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>Loại đánh giá:</label>
+                <input
+                  type="text"
+                  value={editNote.assessment_type || ''}
+                  onChange={e => setEditNote({ ...editNote, assessment_type: e.target.value })}
+                  style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15 }}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>Nội dung:</label>
+                <textarea
+                  value={editContent}
+                  onChange={e => setEditContent(e.target.value)}
+                  rows={5}
+                  style={{ width: '100%', padding: 10, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15, marginBottom: 4 }}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>Khuyến nghị:</label>
+                <input
+                  type="text"
+                  value={editNote.recommendations || ''}
+                  onChange={e => setEditNote({ ...editNote, recommendations: e.target.value })}
+                  style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15 }}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600 }}>Ngày:</label>
+                <input
+                  type="text"
+                  value={editNote.date ? formatDateDDMMYYYY(editNote.date) : ''}
+                  disabled
+                  style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15, background: '#f3f4f6' }}
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600 }}>Nhân viên:</label>
+                <input
+                  type="text"
+                  value={(() => {
+                    const staffId = editNote.conducted_by;
+                    if (!staffId) return '---';
+                    if (staffNames[staffId]) return staffNames[staffId];
+                    userAPI.getById(staffId)
+                      .then(data => {
+                        setStaffNames(prev => ({ ...prev, [staffId]: data.full_name || data.username || data.email || staffId }));
+                      })
+                      .catch(() => {
+                        setStaffNames(prev => ({ ...prev, [staffId]: staffId }));
+                      });
+                    return 'Đang tải...';
+                  })()}
+                  disabled
+                  style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15, background: '#f3f4f6' }}
+                />
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button
                   onClick={async () => {
-                    if (!editContent.trim()) { showNotification('Nội dung không được để trống!', 'error'); return; }
+                    if (!editContent || !editContent.trim()) { showNotification('Nội dung không được để trống!', 'error'); return; }
                     try {
                       await careNotesAPI.update(editNote._id, {
                         assessment_type: editNote.assessment_type || 'Đánh giá tổng quát',
@@ -513,9 +605,9 @@ export default function CareNotesPage() {
                         resident_id: editNote.resident_id || editNote.residentId,
                         conducted_by: editNote.conducted_by || editNote.staffId,
                       });
-                      // Reload notes
-                      const notes = await careNotesAPI.getAll({ residentId: editNote.resident_id || editNote.residentId });
-                      setCareNotesMap(prev => ({ ...prev, [editNote.resident_id || editNote.residentId]: Array.isArray(notes) ? notes : [] }));
+                      const residentId = editNote.resident_id || editNote.residentId;
+                      const notes = await careNotesAPI.getAll({ resident_id: residentId });
+                      setCareNotesMap(prev => ({ ...prev, [residentId]: Array.isArray(notes) ? notes : [] }));
                       setEditNote(null);
                       showNotification('Cập nhật đánh giá thành công!', 'success');
                     } catch (err) {

@@ -16,25 +16,19 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
-interface VitalSign {
-  id: number;
-  residentId: number;
+interface VitalSigns {
+  id: string;
   date: string;
-  time: string;
-  bloodPressure: {
-    systolic: number;
-    diastolic: number;
-  };
   heartRate: number;
+  bloodPressure: string;
   temperature: number;
-  respiratoryRate: number;
-  oxygenSaturation: number;
-  weight: number;
-  bloodSugar?: number;
-  notes: string;
-  measuredBy: string;
-  alertLevel: 'normal' | 'warning' | 'critical';
+  oxygenLevel: number;
+  weight?: number;
+  notes?: string;
 }
 
 export default function VitalsPage() {
@@ -43,9 +37,9 @@ export default function VitalsPage() {
   const residentId = parseInt(params.id as string);
   
   const [resident, setResident] = useState<any>(null);
-  const [vitals, setVitals] = useState<VitalSign[]>([]);
+  const [vitals, setVitals] = useState<VitalSigns[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedVital, setSelectedVital] = useState<VitalSign | null>(null);
+  const [selectedVital, setSelectedVital] = useState<VitalSigns | null>(null);
   const [dateFilter, setDateFilter] = useState('7days');
 
   useEffect(() => {
@@ -60,54 +54,36 @@ export default function VitalsPage() {
 
   const loadVitalsData = () => {
     // Mock vitals data
-    const mockVitals: VitalSign[] = [
+    const mockVitals: VitalSigns[] = [
       {
-        id: 1,
-        residentId: residentId,
-        date: '2024-01-15',
-        time: '08:00',
-        bloodPressure: { systolic: 120, diastolic: 80 },
+        id: '1',
+        date: new Date().toISOString(),
         heartRate: 72,
+        bloodPressure: "120/80",
         temperature: 36.5,
-        respiratoryRate: 16,
-        oxygenSaturation: 98,
-        weight: 65.5,
-        bloodSugar: 95,
-        notes: 'Chỉ số bình thường',
-        measuredBy: 'Y tá Nguyễn Văn A',
-        alertLevel: 'normal'
+        oxygenLevel: 98,
+        weight: 70,
+        notes: "Bình thường"
       },
       {
-        id: 2,
-        residentId: residentId,
-        date: '2024-01-14',
-        time: '20:00',
-        bloodPressure: { systolic: 135, diastolic: 88 },
+        id: '2',
+        date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         heartRate: 78,
+        bloodPressure: "135/88",
         temperature: 36.8,
-        respiratoryRate: 18,
-        oxygenSaturation: 96,
-        weight: 65.3,
-        bloodSugar: 110,
-        notes: 'Huyết áp hơi cao, cần theo dõi',
-        measuredBy: 'Y tá Trần Thị B',
-        alertLevel: 'warning'
+        oxygenLevel: 97,
+        weight: 70.2,
+        notes: "Huyết áp hơi cao"
       },
       {
-        id: 3,
-        residentId: residentId,
-        date: '2024-01-13',
-        time: '08:00',
-        bloodPressure: { systolic: 150, diastolic: 95 },
-        heartRate: 85,
-        temperature: 37.2,
-        respiratoryRate: 20,
-        oxygenSaturation: 94,
-        weight: 65.1,
-        bloodSugar: 140,
-        notes: 'Huyết áp cao, sốt nhẹ. Đã báo bác sĩ',
-        measuredBy: 'Y tá Lê Văn C',
-        alertLevel: 'critical'
+        id: '3',
+        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        heartRate: 75,
+        bloodPressure: "150/95",
+        temperature: 37.0,
+        oxygenLevel: 96,
+        weight: 69.8,
+        notes: "Huyết áp cao, cần theo dõi"
       }
     ];
     setVitals(mockVitals);
@@ -131,25 +107,20 @@ export default function VitalsPage() {
     }
   };
 
-  const isVitalNormal = (vital: VitalSign) => {
-    const ranges = {
-      systolic: [90, 130],
-      diastolic: [60, 85],
-      heartRate: [60, 100],
-      temperature: [36.0, 37.2],
-      respiratoryRate: [12, 20],
-      oxygenSaturation: [95, 100],
-      bloodSugar: [70, 140]
-    };
+  // Normal ranges for vital signs
+  const normalRanges = {
+    heartRate: [60, 100],
+    bloodPressure: "90/60-140/90",
+    temperature: [36.0, 37.5],
+    oxygenLevel: [95, 100],
+  };
 
+  // Function to check if vital signs are within normal range
+  const isWithinNormalRange = (vital: VitalSigns) => {
     return (
-      vital.bloodPressure.systolic >= ranges.systolic[0] && vital.bloodPressure.systolic <= ranges.systolic[1] &&
-      vital.bloodPressure.diastolic >= ranges.diastolic[0] && vital.bloodPressure.diastolic <= ranges.diastolic[1] &&
-      vital.heartRate >= ranges.heartRate[0] && vital.heartRate <= ranges.heartRate[1] &&
-      vital.temperature >= ranges.temperature[0] && vital.temperature <= ranges.temperature[1] &&
-      vital.respiratoryRate >= ranges.respiratoryRate[0] && vital.respiratoryRate <= ranges.respiratoryRate[1] &&
-      vital.oxygenSaturation >= ranges.oxygenSaturation[0] && vital.oxygenSaturation <= ranges.oxygenSaturation[1] &&
-      (!vital.bloodSugar || (vital.bloodSugar >= ranges.bloodSugar[0] && vital.bloodSugar <= ranges.bloodSugar[1]))
+      vital.heartRate >= normalRanges.heartRate[0] && vital.heartRate <= normalRanges.heartRate[1] &&
+      vital.temperature >= normalRanges.temperature[0] && vital.temperature <= normalRanges.temperature[1] &&
+      vital.oxygenLevel >= normalRanges.oxygenLevel[0] && vital.oxygenLevel <= normalRanges.oxygenLevel[1]
     );
   };
 
@@ -293,7 +264,7 @@ export default function VitalsPage() {
                   </p>
                 </div>
                 <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                  {latestVitals.bloodPressure.systolic}/{latestVitals.bloodPressure.diastolic}
+                  {latestVitals.bloodPressure}
                 </p>
                 <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>mmHg</p>
               </div>
@@ -540,24 +511,15 @@ export default function VitalsPage() {
                     cursor: 'pointer'
                   }}
                   onClick={() => setSelectedVital(vital)}>
-                    <td style={{ padding: '1rem' }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#1f2937' }}>
-                          {new Date(vital.date).toLocaleDateString('vi-VN')}
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          {vital.time}
-                        </div>
-                      </div>
+                    <td style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                      {formatDateDDMMYYYY(vital.date)}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <span style={{
                         fontWeight: 600,
-                        color: (vital.bloodPressure.systolic > 130 || vital.bloodPressure.diastolic > 85) ? '#ef4444' :
-                               (vital.bloodPressure.systolic < 90 || vital.bloodPressure.diastolic < 60) ? '#f59e0b' :
-                               '#10b981'
+                        color: '#10b981'
                       }}>
-                        {vital.bloodPressure.systolic}/{vital.bloodPressure.diastolic}
+                        {vital.bloodPressure}
                       </span>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>

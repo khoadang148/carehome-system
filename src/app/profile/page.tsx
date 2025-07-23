@@ -20,6 +20,21 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { residentAPI, userAPI, carePlansAPI, roomsAPI } from '@/lib/api';
 
+// Helper function to get full avatar URL
+const getAvatarUrl = (avatarPath: string | null | undefined) => {
+  if (!avatarPath) return undefined;
+  
+  // If it's already a full URL, return as is
+  if (avatarPath.startsWith('http')) return avatarPath;
+  
+  // If it's a base64 data URL, return as is
+  if (avatarPath.startsWith('data:')) return avatarPath;
+  
+  // Convert relative path to full URL
+  const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${cleanPath.replace(/^\//, '')}`;
+};
+
 // Family members data (matching family page)
 const familyMembers = [
   { 
@@ -39,6 +54,8 @@ const familyMembers = [
     status: 'Khá'
   }
 ];
+
+
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -67,9 +84,9 @@ export default function ProfilePage() {
   const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
-    if (user?.id) {
+    if (user) {
       setProfileLoading(true);
-      userAPI.getById(user.id)
+      userAPI.getAuthProfile()
         .then(data => {
           setUserData(data);
           setProfileError('');
@@ -166,8 +183,30 @@ export default function ProfilePage() {
     // Simulate processing
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    if (previewUrl) {
-      setAvatarImage(previewUrl);
+    if (selectedFile && user?.id) {
+      try {
+        // Gọi API upload avatar với file gốc
+        const response = await userAPI.updateAvatar(user.id, selectedFile);
+        console.log('Avatar upload response:', response);
+        
+        // Cập nhật avatar image với đường dẫn mới từ response
+        if (response.avatar) {
+          setAvatarImage(response.avatar);
+        }
+      } catch (err) {
+        console.error('Avatar upload error:', err);
+        const errorMessage = (err as Error)?.message || 'Lỗi khi cập nhật ảnh đại diện.';
+        
+        // Kiểm tra nếu là lỗi 403 (Forbidden) - có thể family members không có quyền
+        if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+          setUploadError('Tài khoản của bạn không có quyền thay đổi ảnh đại diện. Vui lòng liên hệ quản trị viên.');
+        } else {
+          setUploadError(errorMessage);
+        }
+        
+        setIsUploading(false);
+        return;
+      }
     }
     
     setIsUploading(false);
@@ -360,9 +399,9 @@ export default function ProfilePage() {
                 overflow: 'hidden',
                 position: 'relative'
               }}>
-                {avatarImage ? (
+                {avatarImage && getAvatarUrl(avatarImage) ? (
                   <img 
-                    src={avatarImage}
+                    src={getAvatarUrl(avatarImage)!}
                     alt="Avatar"
                     style={{
                       width: '100%',
@@ -435,6 +474,115 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* Nếu là admin chỉ hiển thị 4 trường */}
+          {userData?.role === 'admin' ? (
+            <div style={{
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr', 
+              gap: '1.25rem', 
+              maxWidth: 600,
+              margin: '0 auto'
+            }}>
+              <div>
+                <label style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '0.25rem',
+                  display: 'block'
+                }}>
+                  Họ tên
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827',
+                  fontWeight: 600
+                }}>
+                  <UserIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                  {userData.full_name}
+                </div>
+              </div>
+              <div>
+                <label style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '0.25rem',
+                  display: 'block'
+                }}>
+                  Email
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827',
+                  fontWeight: 600
+                }}>
+                  <EnvelopeIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                  {userData.email}
+                </div>
+              </div>
+              <div>
+                <label style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '0.25rem',
+                  display: 'block'
+                }}>
+                  Số điện thoại
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827',
+                  fontWeight: 600
+                }}>
+                  <PhoneIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                  {userData.phone}
+                </div>
+              </div>
+              <div>
+                <label style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '0.25rem',
+                  display: 'block'
+                }}>
+                  Username
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#111827',
+                  fontWeight: 600
+                }}>
+                  <UserCircleIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                  {userData.username}
+                </div>
+              </div>
+            </div>
+          ) : (
+            
+            <>
           {/* Information Grid */}
           <div style={{
             display: 'grid',
@@ -592,7 +740,7 @@ export default function ProfilePage() {
                           >
                             {residents.map(member => (
                               <option key={member._id} value={member._id}>
-                                {member.full_name} ({member.relationship || 'Chưa rõ'})
+                                     {member.full_name}
                               </option>
                             ))}
                           </select>
@@ -706,6 +854,8 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+            </>
+          )}
         </div>
 
         {/* Upload Modal */}

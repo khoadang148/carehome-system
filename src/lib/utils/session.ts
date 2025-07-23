@@ -1,8 +1,8 @@
-// Session timeout in milliseconds (30 minutes)
-export const SESSION_TIMEOUT = 30 * 60 * 1000;
+// Session timeout in milliseconds (2 hours)
+export const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
 
-// Warning time before session expires (5 minutes)
-export const WARNING_TIME = 5 * 60 * 1000;
+// Warning time before session expires (10 minutes)
+export const WARNING_TIME = 10 * 60 * 1000;
 
 /**
  * Clear all session data
@@ -69,6 +69,6 @@ export function initializeSession(token: string, userData: any) {
   sessionStorage.setItem('user', JSON.stringify(userData));
   sessionStorage.setItem('session_start', Date.now().toString());
   
-  // Set cookie with shorter expiration
-  document.cookie = `access_token=${token}; path=/; max-age=1800; SameSite=Strict`;
+  // Set cookie with expiration matching session timeout (2 hours)
+  document.cookie = `access_token=${token}; path=/; max-age=7200; SameSite=Strict`;
 } 

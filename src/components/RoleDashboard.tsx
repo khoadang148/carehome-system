@@ -40,12 +40,12 @@ const ROLE_DASHBOARDS = {
     cards: [
      
       {
-        title: 'Phê duyệt hoạt động',
-        description: 'Phê duyệt yêu cầu thăm và đăng kí dịch vụ',
-        icon: ClipboardDocumentCheckIcon,
-        href: '/admin/activity-approvals',
+        title: 'Lịch thăm',
+        description: 'Xem danh sách lịch thăm',
+        icon: CalendarDaysIcon,
+        href: '/staff/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        stats: '5 yêu cầu chờ'
+        
       },
       {
         title: 'Quản lý phòng/giường',
@@ -53,7 +53,7 @@ const ROLE_DASHBOARDS = {
         icon: BuildingOfficeIcon,
         href: '/admin/room-management',
         gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-        stats: '24 phòng'
+        
       },
       /*{
         title: 'Quản lý kho',
@@ -70,10 +70,10 @@ const ROLE_DASHBOARDS = {
     description: ' Công cụ điều hành cho đội ngũ y tế!',
     cards: [
       {
-        title: 'Nhiệm vụ',
-        description: 'Thực hiện và báo cáo nhiệm vụ',
-        icon: ClipboardDocumentListIcon,
-        href: '/staff/tasks',
+        title: 'Lịch thăm',
+        description: 'Xem danh sách lịch thăm',
+        icon: CalendarDaysIcon,
+        href: '/staff/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         
       },
@@ -85,14 +85,6 @@ const ROLE_DASHBOARDS = {
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       
       },
-     /* {
-        title: 'Hỗ trợ',
-        description: 'Kiểm kê kho',
-        icon: CubeIcon,
-        href: '/staff/administrative',
-        gradient: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)',
-        stats: '2 báo cáo chờ'
-      }*/
     ]
   },
   family: {

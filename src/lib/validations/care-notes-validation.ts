@@ -47,8 +47,8 @@ export const MEDICAL_KEYWORDS = {
 export const NOTE_TEMPLATES = [
   {
     category: 'Theo dõi sức khỏe',
-    template: 'Huyết áp: [systolic]/[diastolic] mmHg, Mạch: [pulse] lần/phút, Nhiệt độ: [temp]°C. Tình trạng chung: [general_condition].',
-    requiredFields: ['systolic', 'diastolic', 'pulse', 'temp', 'general_condition']
+    template: 'Huyết áp: [bloodPressure] mmHg, Mạch: [pulse] lần/phút, Nhiệt độ: [temp]°C. Tình trạng chung: [general_condition].',
+    requiredFields: ['bloodPressure', 'pulse', 'temp', 'general_condition']
   },
   {
     category: 'Dùng thuốc',

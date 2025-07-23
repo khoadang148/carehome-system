@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { 
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { careNotesAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { userAPI } from '@/lib/api';
 
 interface CareNoteData {
   residentId: string;
@@ -55,6 +56,18 @@ export default function NewCareNotePage() {
   const [showSuccess, setShowSuccess] = useState(false);
   
   const { user } = useAuth();
+  const [staffName, setStaffName] = useState<string>('');
+
+  useEffect(() => {
+    if (user && (user as any).full_name) {
+      setStaffName((user as any).full_name);
+    } else if (user?.id) {
+      setStaffName('Đang tải...');
+      userAPI.getById(user.id)
+        .then(data => setStaffName(data.full_name || data.username || data.email || '---'))
+        .catch(() => setStaffName('---'));
+    }
+  }, [user]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CareNoteData>({
     defaultValues: {
@@ -77,14 +90,13 @@ export default function NewCareNotePage() {
       // Gộp date và time thành ISO string
       const dateTimeISO = new Date(`${data.date}T${data.time}:00`).toISOString();
       const payload = {
-        date: dateTimeISO,
+        assessment_type: data.category || 'Đánh giá tổng quát',
         notes: data.noteContent,
+        recommendations: '',
+        date: dateTimeISO,
         resident_id: String(data.residentId),
         conducted_by: String(user?.id),
-        assessment_type: data.category || 'Đánh giá tổng quát',
-        recommendations: '',
       };
-      console.log('Payload gửi lên careNotesAPI.create:', payload);
       await careNotesAPI.create(payload);
       setIsSubmitting(false);
       setShowSuccess(true);
@@ -260,7 +272,7 @@ export default function NewCareNotePage() {
                   color: '#2563eb',
                   fontWeight: 600
                 }}>
-                  {user?.name ? user.name : (user && 'fullName' in user ? (user as any).fullName : '---')}
+                  {staffName}
                 </div>
               </div>
             </div>

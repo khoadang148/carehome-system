@@ -1,35 +1,23 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { 
+import React, { useState, useEffect } from 'react';
+import {
   HeartIcon,
+  FireIcon, // Use FireIcon instead of ThermometerIcon
   ScaleIcon,
-  FireIcon,
-  LungIcon,
-  DropletIcon,
   PlusIcon,
   ExclamationTriangleIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
-interface VitalSign {
-  id: number;
-  residentId: number;
+interface VitalSigns {
   date: string;
-  time: string;
-  bloodPressure: {
-    systolic: number;
-    diastolic: number;
-  };
   heartRate: number;
+  bloodPressure: string;
   temperature: number;
-  respiratoryRate: number;
-  oxygenSaturation: number;
-  weight: number;
-  bloodSugar?: number;
-  notes: string;
-  measuredBy: string;
-  alertLevel: 'normal' | 'warning' | 'critical';
+  oxygenLevel: number;
+  weight?: number;
+  notes?: string;
 }
 
 interface VitalSignsMonitorProps {
@@ -39,7 +27,7 @@ interface VitalSignsMonitorProps {
 }
 
 export default function VitalSignsMonitor({ residentId, showAddButton = false, onAddVital }: VitalSignsMonitorProps) {
-  const [vitals, setVitals] = useState<VitalSign[]>([]);
+  const [vitals, setVitals] = useState<VitalSigns[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,38 +36,24 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
 
   const loadVitalsData = () => {
     // Mock data - trong thực tế sẽ load từ API
-    const mockVitals: VitalSign[] = [
+    const mockVitals: VitalSigns[] = [
       {
-        id: 1,
-        residentId: residentId,
-        date: '2024-01-15',
-        time: '08:00',
-        bloodPressure: { systolic: 120, diastolic: 80 },
+        date: new Date().toISOString(),
         heartRate: 72,
+        bloodPressure: "120/80",
         temperature: 36.5,
-        respiratoryRate: 16,
-        oxygenSaturation: 98,
-        weight: 65.5,
-        bloodSugar: 95,
-        notes: 'Chỉ số bình thường',
-        measuredBy: 'Y tá Nguyễn Văn A',
-        alertLevel: 'normal'
+        oxygenLevel: 98,
+        weight: 70,
+        notes: "Bình thường"
       },
       {
-        id: 2,
-        residentId: residentId,
-        date: '2024-01-14',
-        time: '20:00',
-        bloodPressure: { systolic: 135, diastolic: 88 },
+        date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         heartRate: 78,
+        bloodPressure: "135/88",
         temperature: 36.8,
-        respiratoryRate: 18,
-        oxygenSaturation: 96,
-        weight: 65.3,
-        bloodSugar: 110,
-        notes: 'Huyết áp hơi cao, cần theo dõi',
-        measuredBy: 'Y tá Trần Thị B',
-        alertLevel: 'warning'
+        oxygenLevel: 97,
+        weight: 70.2,
+        notes: "Huyết áp hơi cao"
       }
     ];
     
@@ -90,8 +64,8 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
   const getLatestVitals = () => {
     if (vitals.length === 0) return null;
     return vitals.reduce((latest, current) => {
-      const latestDate = new Date(`${latest.date} ${latest.time}`);
-      const currentDate = new Date(`${current.date} ${current.time}`);
+      const latestDate = new Date(`${latest.date}`);
+      const currentDate = new Date(`${current.date}`);
       return currentDate > latestDate ? current : latest;
     });
   };
@@ -112,6 +86,15 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
       case 'critical': return 'Nguy hiểm';
       default: return level;
     }
+  };
+
+  const getAlertLevel = (vital: VitalSigns) => {
+    if (vital.heartRate > 100 || vital.temperature > 37.5 || vital.oxygenLevel < 95) {
+      return 'critical';
+    } else if (vital.heartRate > 90 || vital.temperature > 37.0 || vital.oxygenLevel < 97) {
+      return 'warning';
+    }
+    return 'normal';
   };
 
   const latestVitals = getLatestVitals();
@@ -182,7 +165,7 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
       borderRadius: '1rem',
       padding: '2rem',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-      border: `2px solid ${getAlertColor(latestVitals.alertLevel)}20`
+      border: `2px solid ${getAlertColor(getAlertLevel(latestVitals))}20`
     }}>
       <div style={{
         display: 'flex',
@@ -204,10 +187,10 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
             borderRadius: '0.5rem',
             fontSize: '0.875rem',
             fontWeight: 600,
-            background: `${getAlertColor(latestVitals.alertLevel)}20`,
-            color: getAlertColor(latestVitals.alertLevel)
+            background: `${getAlertColor(getAlertLevel(latestVitals))}20`,
+            color: getAlertColor(getAlertLevel(latestVitals))
           }}>
-            {getAlertText(latestVitals.alertLevel)}
+            {getAlertText(getAlertLevel(latestVitals))}
           </span>
           {showAddButton && (
             <button
@@ -252,7 +235,7 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
             Huyết áp
           </p>
           <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-            {latestVitals.bloodPressure.systolic}/{latestVitals.bloodPressure.diastolic}
+            <span style={{ fontWeight: 600 }}>{latestVitals.bloodPressure}</span>
           </p>
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>mmHg</p>
         </div>
@@ -301,12 +284,12 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
           border: '1px solid #bfdbfe',
           textAlign: 'center'
         }}>
-          <DropletIcon style={{ width: '1.5rem', height: '1.5rem', color: '#2563eb', margin: '0 auto 0.5rem' }} />
+          <HeartIcon style={{ width: '1.5rem', height: '1.5rem', color: '#2563eb', margin: '0 auto 0.5rem' }} />
           <p style={{ fontSize: '0.875rem', color: '#1e40af', fontWeight: 600, margin: '0 0 0.25rem 0' }}>
-            SpO2
+            Oxy
           </p>
           <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-            {latestVitals.oxygenSaturation}
+            {latestVitals.oxygenLevel}
           </p>
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>%</p>
         </div>
@@ -330,24 +313,7 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
         </div>
 
         {/* Blood Sugar (if available) */}
-        {latestVitals.bloodSugar && (
-          <div style={{
-            padding: '1rem',
-            background: '#ecfdf5',
-            borderRadius: '0.75rem',
-            border: '1px solid #a7f3d0',
-            textAlign: 'center'
-          }}>
-            <DropletIcon style={{ width: '1.5rem', height: '1.5rem', color: '#059669', margin: '0 auto 0.5rem' }} />
-            <p style={{ fontSize: '0.875rem', color: '#065f46', fontWeight: 600, margin: '0 0 0.25rem 0' }}>
-              Đường huyết
-            </p>
-            <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
-              {latestVitals.bloodSugar}
-            </p>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>mg/dL</p>
-          </div>
-        )}
+        {/* Removed bloodSugar as it's not in the interface */}
       </div>
 
       {/* Notes and Details */}
@@ -375,19 +341,19 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
             color: '#9ca3af',
             margin: 0
           }}>
-            {new Date(`${latestVitals.date} ${latestVitals.time}`).toLocaleString('vi-VN')}
+            {new Date(`${latestVitals.date}`).toLocaleString('vi-VN')}
           </p>
         </div>
         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0' }}>
           {latestVitals.notes}
         </p>
         <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>
-          Đo bởi: {latestVitals.measuredBy}
+          Đo lúc: {new Date(`${latestVitals.date}`).toLocaleString('vi-VN')}
         </p>
       </div>
 
       {/* Alert Messages */}
-      {latestVitals.alertLevel === 'critical' && (
+      {getAlertLevel(latestVitals) === 'critical' && (
         <div style={{
           marginTop: '1rem',
           padding: '1rem',
@@ -419,7 +385,7 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
         </div>
       )}
 
-      {latestVitals.alertLevel === 'warning' && (
+      {getAlertLevel(latestVitals) === 'warning' && (
         <div style={{
           marginTop: '1rem',
           padding: '1rem',
@@ -451,7 +417,7 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
         </div>
       )}
 
-      {latestVitals.alertLevel === 'normal' && (
+      {getAlertLevel(latestVitals) === 'normal' && (
         <div style={{
           marginTop: '1rem',
           padding: '1rem',
@@ -479,6 +445,71 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
             }}>
               Tất cả chỉ số đều trong phạm vi an toàn
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* History Section */}
+      {vitals.length > 0 && (
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1f2937', marginBottom: '1rem' }}>
+            Lịch sử chỉ số gần đây
+          </h3>
+          <div style={{ maxHeight: '20rem', overflow: 'auto' }}>
+            {vitals.slice(0, 5).map((vital, index) => (
+              <div key={index} style={{
+                padding: '1rem',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                marginBottom: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    {new Date(vital.date).toLocaleString('vi-VN')}
+                  </span>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    borderRadius: '9999px',
+                    backgroundColor: getAlertLevel(vital) === 'normal' ? '#dcfce7' : 
+                                    getAlertLevel(vital) === 'warning' ? '#fef3c7' : '#fecaca',
+                    color: getAlertLevel(vital) === 'normal' ? '#166534' : 
+                          getAlertLevel(vital) === 'warning' ? '#92400e' : '#991b1b'
+                  }}>
+                    {getAlertLevel(vital) === 'normal' ? 'Bình thường' : 
+                     getAlertLevel(vital) === 'warning' ? 'Cần chú ý' : 'Cảnh báo'}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', fontSize: '0.875rem' }}>
+                  <div>
+                    <span style={{ color: '#6b7280' }}>Huyết áp:</span>
+                    <div style={{ fontWeight: 600 }}>{vital.bloodPressure} mmHg</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#6b7280' }}>Nhịp tim:</span>
+                    <div style={{ fontWeight: 600 }}>{vital.heartRate} bpm</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#6b7280' }}>Nhiệt độ:</span>
+                    <div style={{ fontWeight: 600 }}>{vital.temperature}°C</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#6b7280' }}>SpO₂:</span>
+                    <div style={{ fontWeight: 600 }}>{vital.oxygenLevel}%</div>
+                  </div>
+                </div>
+
+                {vital.notes && (
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                    <strong>Ghi chú:</strong> {vital.notes}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

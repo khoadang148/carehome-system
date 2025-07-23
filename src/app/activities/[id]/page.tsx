@@ -4,49 +4,61 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useActivities } from '@/lib/contexts/activities-context';
 import { useResidents } from '@/lib/contexts/residents-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { activitiesAPI, activityParticipationsAPI } from '@/lib/api';
+import { Dialog } from '@headlessui/react';
 
 export default function ActivityDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { getActivityById, updateActivity } = useActivities();
-  const { residents } = useResidents();
+  const { residents, loading: residentsLoading, error: residentsError } = useResidents();
+  const { user } = useAuth();
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [participations, setParticipations] = useState<any[]>([]);
   const [evaluationMode, setEvaluationMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [evaluations, setEvaluations] = useState<{[key: string]: {participated: boolean, reason?: string}}>({});
   const [saving, setSaving] = useState(false);
+  const [addResidentModalOpen, setAddResidentModalOpen] = useState(false);
+  const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
+  const [addingResident, setAddingResident] = useState(false);
+  
+  // Check access permissions
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!user.role || !['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
   
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const activityId = params.id; // KHÔNG parseInt
-        // Lấy từ context trước cho nhanh
-        const contextActivity = getActivityById(activityId);
-        if (contextActivity) {
-          setActivity(mapActivity(contextActivity));
-        }
-        // Luôn gọi API để lấy dữ liệu mới nhất
+        setLoading(true);
+        setError(null);
+        const activityId = params.id;
         const apiActivity = await activitiesAPI.getById(activityId);
         if (apiActivity) {
-          setActivity(mapActivity(apiActivity));
-          // Nếu dữ liệu API khác context, có thể cập nhật lại context (nếu muốn)
-          // updateActivity(activityId, apiActivity); // Nếu muốn đồng bộ context
+          setActivity(mapActivityFromAPI(apiActivity));
         } else {
-          router.push('/activities');
+          setError('Không tìm thấy hoạt động');
         }
       } catch (error) {
         console.error('Error fetching activity:', error);
-        router.push('/activities');
+        setError('Không thể tải thông tin hoạt động. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
       }
     };
     fetchActivity();
-  }, [params, getActivityById, router]);
+  }, [params.id]);
 
   // Fetch participations for this activity
   useEffect(() => {
@@ -55,48 +67,48 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       
       try {
         const participationsData = await activityParticipationsAPI.getAll({
-          activityId: activity.id
+          activity_id: activity.id
         });
         console.log('Fetched participations:', participationsData);
         console.log('Available residents:', residents);
         setParticipations(participationsData);
         
         // Initialize evaluations from existing participations
-        // Handle the nested residentId object structure from API
+        // Handle the nested resident_id object structure from API
         const initialEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
         participationsData.forEach((participation: any) => {
-          // Extract residentId from the nested object structure
-          const residentId = participation.residentId?._id || participation.residentId;
-          const participated = participation.attendanceStatus === 'attended';
-          const reason = participation.performanceNotes || '';
+          // Extract resident_id from the nested object structure
+          const residentId = participation.resident_id?._id || participation.resident_id;
+          const participated = participation.attendance_status === 'attended';
+          const reason = participation.performance_notes || '';
           
           if (residentId) {
             console.log('Processing participation for residentId:', residentId);
-            // Map API residentId to residents context ID
+            // Map API resident_id to residents context ID
             // Now both use string IDs
             const matchingResident = residents.find(r => r.id === residentId);
             console.log('Matching resident found by ID:', matchingResident);
             
             // If no match by ID, try to match by name from API
-            if (!matchingResident && participation.residentId?.fullName) {
+            if (!matchingResident && participation.resident_id?.full_name) {
               const matchingResidentByName = residents.find(r => 
-                r.name.toLowerCase() === participation.residentId.fullName.toLowerCase()
+                r.name.toLowerCase() === participation.resident_id.full_name.toLowerCase()
               );
               console.log('Matching resident found by name:', matchingResidentByName);
               
-                          if (matchingResidentByName) {
-              initialEvaluations[matchingResidentByName.id] = {
+              if (matchingResidentByName) {
+                initialEvaluations[matchingResidentByName.id] = {
+                  participated,
+                  reason
+                };
+              }
+            } else if (matchingResident) {
+              initialEvaluations[matchingResident.id] = {
                 participated,
                 reason
               };
-            }
-          } else if (matchingResident) {
-            initialEvaluations[matchingResident.id] = {
-              participated,
-              reason
-            };
             } else {
-              console.log('No matching resident found for ID:', residentId, 'or name:', participation.residentId?.fullName);
+              console.log('No matching resident found for ID:', residentId, 'or name:', participation.resident_id?.full_name);
             }
           }
         });
@@ -110,48 +122,84 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
     fetchParticipations();
   }, [activity?.id]);
 
-  // Map API/context data về đúng format cho component
-  const mapActivity = (apiActivity: any) => ({
-    id: apiActivity._id,
-    name: apiActivity.activityName || apiActivity.name || '',
-    description: apiActivity.description || '',
-    category: getCategoryLabel(apiActivity.category || 'physical'), // Default to physical if not provided
-    scheduledTime: apiActivity.scheduleTime ? new Date(apiActivity.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
-    startTime: apiActivity.scheduleTime ? new Date(apiActivity.scheduleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
-    endTime: apiActivity.scheduleTime && apiActivity.duration ? 
-      new Date(new Date(apiActivity.scheduleTime).getTime() + apiActivity.duration * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '',
-    duration: apiActivity.duration || 0,
-    date: apiActivity.scheduleTime ? new Date(apiActivity.scheduleTime).toISOString().split('T')[0] : '',
-    location: apiActivity.location || '',
-    capacity: apiActivity.capacity || 0,
-    participants: apiActivity.participants || 0,
-    facilitator: apiActivity.facilitator || 'Chưa phân công',
-    status: apiActivity.status || 'Đã lên lịch',
-    level: apiActivity.level || 'Trung bình',
-    recurring: getRecurringLabel(apiActivity.recurring || 'none'),
-    materials: apiActivity.materials || '',
-    specialNotes: apiActivity.specialNotes || '',
-    ageGroupSuitability: apiActivity.ageGroupSuitability || ['Người cao tuổi'],
-    healthRequirements: apiActivity.healthRequirements || ['Không có yêu cầu đặc biệt'],
-    createdAt: apiActivity.created_at || apiActivity.createdAt || '',
-    updatedAt: apiActivity.updated_at || apiActivity.updatedAt || '',
-    residentEvaluations: apiActivity.residentEvaluations || [],
-    // Additional fields for display
-    benefits: ['Cải thiện sức khỏe', 'Tăng cường tinh thần', 'Giao lưu xã hội'],
-    notes: apiActivity.specialNotes || 'Không có ghi chú đặc biệt.',
-  });
+  // Map API data to match component expectations
+  const mapActivityFromAPI = (apiActivity: any) => {
+    try {
+      // Validate schedule_time
+      if (!apiActivity.schedule_time || typeof apiActivity.schedule_time !== 'string') {
+        console.warn('Invalid schedule_time for activity:', apiActivity._id);
+        return null;
+      }
+
+      // Parse schedule_time as UTC and keep it as is, don't add timezone offset
+      const scheduleTimeStr = apiActivity.schedule_time.endsWith('Z') 
+        ? apiActivity.schedule_time 
+        : `${apiActivity.schedule_time}Z`;
+      const scheduleTime = new Date(scheduleTimeStr);
+
+      // Check if date is valid
+      if (isNaN(scheduleTime.getTime())) {
+        console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
+        return null;
+      }
+
+      // Calculate end time safely
+      const durationInMinutes = typeof apiActivity.duration === 'number' ? apiActivity.duration : 0;
+      const endTime = new Date(scheduleTime.getTime() + durationInMinutes * 60000);
+
+      // Check if end time is valid
+      if (isNaN(endTime.getTime())) {
+        console.error('Invalid end time calculated for activity:', apiActivity._id);
+        return null;
+      }
+
+      return {
+        id: apiActivity._id,
+        name: apiActivity.activity_name,
+        description: apiActivity.description,
+        category: getCategoryLabel(apiActivity.activity_type),
+        scheduledTime: scheduleTime.toISOString().slice(11, 16), // Get HH:mm from UTC
+        startTime: scheduleTime.toISOString().slice(11, 16), // Get HH:mm from UTC
+        endTime: endTime.toISOString().slice(11, 16), // Calculate end time in UTC
+        duration: apiActivity.duration,
+        date: scheduleTime.toISOString().slice(0, 10), // Get yyyy-MM-dd from UTC
+        location: apiActivity.location,
+        capacity: apiActivity.capacity,
+        participants: 0, // API không có field này, sẽ cần fetch riêng
+        facilitator: 'Chưa phân công',
+        status: 'Đã lên lịch',
+        level: 'Trung bình',
+        recurring: 'Không lặp lại',
+        materials: '',
+        specialNotes: '',
+        ageGroupSuitability: ['Người cao tuổi'],
+        healthRequirements: ['Không có yêu cầu đặc biệt'],
+        createdAt: apiActivity.created_at || '',
+        updatedAt: apiActivity.updated_at || '',
+        residentEvaluations: [],
+        benefits: ['Cải thiện sức khỏe', 'Tăng cường tinh thần', 'Giao lưu xã hội'],
+        notes: 'Không có ghi chú đặc biệt.',
+      };
+    } catch (error) {
+      console.error('Error mapping activity:', apiActivity._id, error);
+      return null;
+    }
+  };
 
   // Helper functions for data mapping
-  const getCategoryLabel = (categoryId: string) => {
+  const getCategoryLabel = (activityType: string) => {
     const categoryMap: { [key: string]: string } = {
-      'physical': 'Thể chất',
-      'creative': 'Sáng tạo', 
-      'therapy': 'Trị liệu',
-      'cognitive': 'Nhận thức',
-      'social': 'Xã hội',
-      'educational': 'Giáo dục'
+      'Nhận thức': 'Nhận thức',
+      'Thể thao': 'Thể chất',
+      'Y tế': 'Y tế',
+      'Tâm lý': 'Tâm lý',
+      'Xã hội': 'Xã hội',
+      'Học tập': 'Giáo dục',
+      'Sáng tạo': 'Sáng tạo',
+      'the_thao': 'Thể chất',
+      'giai_tri': 'Giải trí'
     };
-    return categoryMap[categoryId] || categoryId;
+    return categoryMap[activityType] || activityType;
   };
 
   const formatTime = (time: string | undefined) => {
@@ -203,51 +251,74 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   };
 
   const handleSelectAll = (participated: boolean) => {
-    const newEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
-    residents.forEach(resident => {
-      newEvaluations[resident.id] = {
-        participated,
-        reason: participated ? '' : 'Không có lý do cụ thể'
-      };
+    setEvaluations(prev => {
+      const newEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+      filteredResidents.forEach(resident => {
+        newEvaluations[resident.id] = {
+          participated,
+          reason: participated
+            ? ''
+            : (prev[resident.id]?.reason || '')
+        };
+      });
+      return newEvaluations;
     });
-    setEvaluations(newEvaluations);
   };
 
   const handleSaveEvaluations = async () => {
     if (!activity?.id) return;
     
+    // Validate evaluations before saving
+    const invalidEvaluations = Object.entries(evaluations).filter(([_, evaluation]) => {
+      return !evaluation.participated && (!evaluation.reason || evaluation.reason.trim() === '');
+    });
+    
+    if (invalidEvaluations.length > 0) {
+      alert(`Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`);
+      return;
+    }
+    
     setSaving(true);
     try {
       // Update or create participations for each resident
       for (const [residentId, evaluation] of Object.entries(evaluations)) {
-        // Find existing participation by matching residentId._id
-        const existingParticipation = participations.find(p => 
-          (p.residentId?._id || p.residentId) === residentId
-        );
+        // Find existing participation by matching resident_id and date
+        const existingParticipation = participations.find(p => {
+          const pResidentId = p.resident_id?._id || p.resident_id;
+          const pDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
+          return (
+            pResidentId === residentId &&
+            pDate === activity.date
+          );
+        });
         
         if (existingParticipation) {
           // Update existing participation
           await activityParticipationsAPI.update(existingParticipation._id, {
-            attendanceStatus: evaluation.participated ? 'attended' : 'absent',
-            performanceNotes: evaluation.participated ? 
-              'Tham gia tích cực' : 
-              (evaluation.reason || 'Không có lý do cụ thể')
+            staff_id: user?.id || "664f1b2c2f8b2c0012a4e750",
+            activity_id: activity.id,
+            resident_id: residentId,
+            date: activity.date + "T00:00:00Z",
+            performance_notes: evaluation.participated ? 
+              'Tham gia tích cực, tinh thần tốt' : 
+              (evaluation.reason || 'Không có lý do cụ thể'),
+            attendance_status: evaluation.participated ? 'attended' : 'absent'
           });
         } else {
           // Create new participation
           // Find the resident to get their API ID
           const resident = residents.find(r => r.id === residentId);
           if (resident) {
-            // Use the resident's actual ID
+            // Use the resident's actual ID and follow API schema
             await activityParticipationsAPI.create({
-              activityId: activity.id,
-              residentId: resident.id, // Use actual resident ID
-              date: new Date().toISOString().split('T')[0], // Today's date
-              attendanceStatus: evaluation.participated ? 'attended' : 'absent',
-              performanceNotes: evaluation.participated ? 
-                'Tham gia tích cực' : 
+              staff_id: user?.id || "664f1b2c2f8b2c0012a4e750", // Use current user's ID or fallback
+              activity_id: activity.id,
+              resident_id: resident.id, // Use actual resident ID
+              date: activity.date + "T00:00:00Z", // Use activity date instead of current date
+              performance_notes: evaluation.participated ? 
+                'Tham gia tích cực, tinh thần tốt' : 
                 (evaluation.reason || 'Không có lý do cụ thể'),
-              approvalStatus: 'pending'
+              attendance_status: evaluation.participated ? 'attended' : 'absent'
             });
           }
         }
@@ -255,7 +326,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       
       // Refresh participations
       const participationsData = await activityParticipationsAPI.getAll({
-        activityId: activity.id
+        activity_id: activity.id
       });
       setParticipations(participationsData);
       
@@ -269,46 +340,108 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
     }
   };
 
-  // Filter residents based on search term
-  const filteredResidents = residents.filter(resident =>
+  // Debug: Log residents data
+  console.log('Residents data:', residents);
+  console.log('Residents loading:', residentsLoading);
+  console.log('Residents error:', residentsError);
+  console.log('Participations data:', participations);
+  
+  const activityDate = activity?.date ? new Date(activity.date).toISOString().split('T')[0] : null;
+  type ActivityResident = {
+    id: string;
+    name: string;
+    room: string;
+    age: string | number;
+    participationId: string;
+    participated: boolean;
+    reason: string;
+    evaluationDate: string;
+  };
+  // Map participations to ActivityResident[]
+  const allResidentsForDay: ActivityResident[] = participations
+    .filter((p: any) => {
+      // Lọc đúng ngày
+      const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
+      return activityDate && participationDate === activityDate;
+    })
+    .map((p: any) => {
+      const residentId = p.resident_id?._id || p.resident_id;
+      const residentInfo = residents.find((r: any) => r.id === residentId);
+      return {
+        id: residentId,
+        name: p.resident_id?.full_name || residentInfo?.name || 'N/A',
+        room: residentInfo?.room || '',
+        age: residentInfo?.age || '',
+        participationId: p._id,
+        participated: p.attendance_status === 'attended',
+        reason: p.performance_notes || '',
+        evaluationDate: p.date
+      };
+    });
+// Chỉ giữ lại 1 bản ghi cho mỗi cư dân/ngày, ưu tiên bản ghi 'Không tham gia'
+const activityResidents: ActivityResident[] = Object.values(
+  allResidentsForDay.reduce((acc, curr) => {
+    // Key theo residentId
+    const key = curr.id;
+    // Nếu chưa có hoặc bản ghi hiện tại là 'Không tham gia', thì ghi đè
+    if (!acc[key] || (!curr.participated)) {
+      acc[key] = curr;
+    }
+    return acc;
+  }, {} as { [residentId: string]: ActivityResident })
+);
+  // Filter activity residents based on search term
+  const filteredResidents: ActivityResident[] = activityResidents.filter((resident: ActivityResident) =>
     resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    resident.room?.toLowerCase().includes(searchTerm.toLowerCase())
+    (resident.room?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
   
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        fontSize: '1.125rem',
-        color: '#6b7280'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-      }}>
-        Đang tải thông tin hoạt động...
-        </div>
-      </div>
-    );
-  }
+  // Lấy danh sách cư dân chưa tham gia hoạt động này vào đúng ngày
+  const joinedResidentIds = Array.from(new Set(
+    participations
+      .filter((p: any) => {
+        const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
+        return activityDate && participationDate === activityDate;
+      })
+      .map((p: any) => p.resident_id?._id || p.resident_id)
+  ));
+  const residentsNotJoined = residents.filter((r: any) => !joinedResidentIds.includes(r.id));
+
+  // Thêm cư dân vào hoạt động
+  const handleAddResident = async () => {
+    if (!selectedResidentId || !activity?.id || !activity.date) return;
+    setAddingResident(true);
+    try {
+      await activityParticipationsAPI.create({
+        staff_id: user?.id || '',
+        activity_id: activity.id,
+        resident_id: selectedResidentId,
+        date: activity.date + 'T00:00:00Z',
+        attendance_status: 'attended',
+        performance_notes: ''
+      });
+      setAddResidentModalOpen(false);
+      setSelectedResidentId(null);
+      // Reload participations
+      const participationsData = await activityParticipationsAPI.getAll({
+        activity_id: activity.id
+      });
+      setParticipations(participationsData);
+    } catch (err) {
+      alert('Không thể thêm cư dân vào hoạt động.');
+    } finally {
+      setAddingResident(false);
+    }
+  };
   
-  if (!activity) {
+  if (loading || residentsLoading) {
     return (
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
         display: 'flex',
-        flexDirection: 'column',
         justifyContent: 'center',
-        alignItems: 'center',
-        fontSize: '1.125rem',
-        color: '#6b7280'
+        alignItems: 'center'
       }}>
         <div style={{
           background: 'white',
@@ -317,18 +450,93 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
           textAlign: 'center'
         }}>
-          <h2 style={{fontSize: '1.5rem', marginBottom: '1rem', color: '#374151'}}>Không tìm thấy hoạt động</h2>
-          <Link href="/activities" style={{
-            color: '#6366f1',
-            textDecoration: 'none',
+          <div style={{
+            width: '3rem',
+            height: '3rem',
+            border: '3px solid #e5e7eb',
+            borderTopColor: '#f59e0b',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem'
+          }} />
+          <h3 style={{
+            fontSize: '1.125rem',
             fontWeight: 600,
-            padding: '0.5rem 1rem',
-            borderRadius: '0.5rem',
-            background: '#eef2ff',
-            display: 'inline-block'
+            color: '#374151',
+            marginBottom: '0.5rem'
           }}>
-          Quay lại danh sách hoạt động
-        </Link>
+            {loading ? 'Đang tải thông tin hoạt động...' : 'Đang tải danh sách cư dân...'}
+          </h3>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#6b7280'
+          }}>
+            Vui lòng chờ trong giây lát
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || residentsError || !activity) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '1rem',
+          padding: '3rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            width: '3rem',
+            height: '3rem',
+            background: '#fee2e2',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1rem'
+          }}>
+            <SparklesIcon style={{ width: '1.5rem', height: '1.5rem', color: '#ef4444' }} />
+          </div>
+          <h3 style={{
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
+            {error || residentsError || 'Không tìm thấy hoạt động'}
+          </h3>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#6b7280',
+            marginBottom: '1rem'
+          }}>
+            {error || residentsError || 'Hoạt động này không tồn tại hoặc đã bị xóa.'}
+          </p>
+          <Link href="/activities" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            textDecoration: 'none'
+          }}>
+            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+            Quay lại danh sách hoạt động
+          </Link>
         </div>
       </div>
     );
@@ -682,7 +890,9 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                 <UserGroupIcon style={{ width: '1.125rem', height: '1.125rem' }} />
                 <div>
                   <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Số người tham gia:</label>
-                  <span>{activity.participants || 0}/{activity.capacity} người</span>
+                  <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
+                    {joinedResidentIds.length}/{activity.capacity} người
+                  </span>
                 </div>
             </div>
           </div>
@@ -798,20 +1008,6 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                 </div>
                 
 
-                
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem'
-                  }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Thời lượng:</span>
-                    <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                      {activity.duration} phút
-                    </span>
-                  </div>
 
               </div>
             </div>
@@ -841,44 +1037,28 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   <div style={{
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem'
+                    flexDirection: 'column',
+                    gap: 8
                   }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Sức chứa:</span>
-                    <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                      {activity.capacity} người
-                    </span>
-                </div>
-                
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem'
-                  }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Đã đăng ký:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                    {activity.participants || 0} người 
-                      </span>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.375rem',
-                        background: (activity.participants || 0) >= activity.capacity ? '#fef2f2' : '#f0fdf4',
-                        color: (activity.participants || 0) >= activity.capacity ? '#dc2626' : '#16a34a'
-                      }}>
-                        {(activity.participants || 0) >= activity.capacity ? 'Đầy' : `Còn ${activity.capacity - (activity.participants || 0)} chỗ`}
+                    <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>Sức chứa: {activity.capacity} người</div>
+                    <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>
+                      Đã đăng ký: {joinedResidentIds.length} người
+                      <span style={{ color: '#10b981', marginLeft: 8 }}>
+                        Còn {activity.capacity - joinedResidentIds.length} chỗ
                       </span>
                     </div>
                   </div>
                   
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                    <button
+                      onClick={() => setAddResidentModalOpen(true)}
+                      style={{
+                        background: '#10b981', color: 'white', border: 'none', borderRadius: 6, padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer'
+                      }}
+                    >
+                      + Thêm cư dân
+                    </button>
+                  </div>
 
               </div>
             </div>
@@ -905,18 +1085,43 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
               alignItems: 'center',
               marginBottom: '1.25rem'
             }}>
-              <h3 style={{
-                fontSize: '1.125rem',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
-                Đánh giá tham gia hoạt động
-              </h3>
+              <div>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
+                  Đánh giá tham gia hoạt động
+                  {activity.date && (
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: '#6b7280',
+                      marginLeft: '0.5rem'
+                    }}>
+                      - Ngày {new Date(activity.date).toLocaleDateString('vi-VN')}
+                    </span>
+                  )}
+                </h3>
+                {participations.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    marginTop: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#6b7280'
+                  }}>
+                    <span>Tham gia: <strong style={{ color: '#10b981' }}>{activityResidents.filter(r => r.participated).length}</strong></span>
+                    <span>Vắng: <strong style={{ color: '#dc2626' }}>{activityResidents.filter(r => !r.participated).length}</strong></span>
+                    <span>Tổng: <strong>{activityResidents.length}</strong></span>
+                  </div>
+                )}
+              </div>
               {!evaluationMode && (
                 <button
                   onClick={() => setEvaluationMode(true)}
@@ -1019,8 +1224,8 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
 
                 {/* Participants list */}
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                     {filteredResidents.map((resident) => {
-                     const evaluation = evaluations[resident.id] || { participated: false, reason: '' };
+                  {filteredResidents.map((resident) => {
+                    const evaluation = evaluations[resident.id] || { participated: resident.participated, reason: resident.reason };
                     return (
                       <div
                         key={resident.id}
@@ -1051,9 +1256,9 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                           <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
                             {resident.name}
                           </div>
-                                                     <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                             Phòng: {resident.room || 'N/A'} | Tuổi: {resident.age || 'N/A'}
-                           </div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            Phòng: {resident.room || 'N/A'} | Tuổi: {resident.age || 'N/A'}
+                          </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -1077,12 +1282,30 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                             <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Không</span>
                           </label>
                         </div>
+                        {!evaluation.participated && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <input
+                              type="text"
+                              placeholder="Lý do vắng mặt..."
+                              value={evaluation.reason || ''}
+                              onChange={(e) => handleReasonChange(resident.id, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid #d1d5db',
+                                fontSize: '0.875rem',
+                                background: '#fef2f2'
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                   {filteredResidents.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                      Không tìm thấy cư dân nào.
+                      {participations.length === 0 ? 'Chưa có đánh giá tham gia nào cho hoạt động này.' : 'Không tìm thấy cư dân nào phù hợp với từ khóa tìm kiếm.'}
                     </div>
                   )}
                 </div>
@@ -1122,9 +1345,22 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                       borderRadius: '0.5rem',
                       fontSize: '0.875rem',
                       fontWeight: 600,
-                      cursor: saving ? 'not-allowed' : 'pointer'
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
                     }}
                   >
+                    {saving && (
+                      <div style={{
+                        width: '1rem',
+                        height: '1rem',
+                        border: '2px solid transparent',
+                        borderTopColor: 'white',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                    )}
                     {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
                   </button>
                 </div>
@@ -1137,33 +1373,43 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                       <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên cư dân</th>
                       <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Tham gia</th>
                       <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Lý do (nếu vắng)</th>
+                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Ngày đánh giá</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {participations.map((participation) => {
-                      // Extract residentId from the nested object structure
-                      const residentId = participation.residentId?._id || participation.residentId;
-                      const resident = residents.find(r => r.id === residentId);
-                      const participated = participation.attendanceStatus === 'attended';
+                    {activityResidents.map((resident) => {
+                      const participated = resident.participated;
+                      
+                      // Validate performance notes for absent residents
+                      const performanceNotes = resident.reason;
+                      const isValidAbsenceReason = !participated && performanceNotes && 
+                        !performanceNotes.includes('Tham gia tích cực') && 
+                        !performanceNotes.includes('tinh thần tốt');
                       
                       return (
-                        <tr key={participation._id} style={{ background: participated ? '#f0fdf4' : '#fef2f2' }}>
+                        <tr key={resident.participationId} style={{ background: participated ? '#f0fdf4' : '#fef2f2' }}>
                           <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', fontWeight: 500 }}>
-                            {resident ? resident.name : (participation.residentId?.fullName || 'Cư dân #' + residentId)}
+                            {resident.name}
                           </td>
                           <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: participated ? '#10b981' : '#dc2626', fontWeight: 600 }}>
                             {participated ? 'Có' : 'Không'}
                           </td>
                           <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
-                            {!participated ? (participation.performanceNotes || <span style={{ color: '#f59e0b' }}>Chưa nhập lý do</span>) : '-'}
+                            {participated ? '-' : (
+                              isValidAbsenceReason ? performanceNotes : 
+                              <span style={{ color: '#f59e0b' }}>Chưa nhập lý do hoặc lý do không hợp lệ</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.875rem' }}>
+                            {resident.evaluationDate ? new Date(resident.evaluationDate).toLocaleDateString('vi-VN') : 'N/A'}
                           </td>
                         </tr>
                       );
                     })}
-                    {participations.length === 0 && (
+                    {activityResidents.length === 0 && (
                       <tr>
-                        <td colSpan={3} style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>
-                          Chưa có đánh giá tham gia nào.
+                        <td colSpan={4} style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>
+                          Chưa có đánh giá tham gia nào cho ngày này.
                         </td>
                       </tr>
                     )}
@@ -1175,6 +1421,50 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
           </div>
         </div>
       </div>
+
+      {/* Modal chọn cư dân */}
+      <Dialog open={addResidentModalOpen} onClose={() => setAddResidentModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
+          <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
+            <Dialog.Title className="text-lg font-bold mb-4">Chọn cư dân để thêm vào hoạt động</Dialog.Title>
+            <select
+              value={selectedResidentId || ''}
+              onChange={e => setSelectedResidentId(e.target.value)}
+              className="w-full border rounded px-3 py-2 mb-4"
+            >
+              <option value="">-- Chọn cư dân --</option>
+              {residentsNotJoined.map((r: any) => (
+                <option key={r.id} value={r.id}>{r.name} (Phòng: {r.room || 'N/A'})</option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAddResidentModalOpen(false)}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 font-semibold"
+                disabled={addingResident}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAddResident}
+                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 font-semibold"
+                disabled={addingResident || !selectedResidentId}
+              >
+                {addingResident ? 'Đang thêm...' : 'Thêm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+
+      <style jsx>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 } 

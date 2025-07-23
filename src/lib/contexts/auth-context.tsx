@@ -41,6 +41,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  console.log("[AuthProvider] Mounted");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -77,11 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Login function: only allow family role
   const login = async (email: string, password: string) => {
     try {
+      console.log('Auth context: Starting login process...');
       const response = await authAPI.login(email, password);
-      console.log('API login response:', response); // Thêm log để kiểm tra dữ liệu trả về
+      console.log('Auth context: API login response:', response);
       if (response.access_token) {
         const userProfile = response.user;
         const userRole = userProfile.role;
+        console.log('Auth context: User role:', userRole);
         // Cho phép family, staff, admin
         if (userRole === 'family' || userRole === 'staff' || userRole === 'admin') {
           const userObj = {
@@ -91,21 +94,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
+          console.log('Auth context: Creating user object:', userObj);
+          
           // Initialize session with new data
           initializeSession(response.access_token, userObj);
+          console.log('Auth context: Session initialized');
           
           // Set user state ngay lập tức
           setUser(userObj);
+          console.log('Auth context: User state set, returning true');
           
-          // Không redirect ở đây nữa!
+          // Không redirect ở đây, để login page xử lý
           return true;
         } else {
           throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
         }
       }
+      console.log('Auth context: No access token, returning false');
       return false;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Auth context: Login error:', error);
       throw error;
     }
   };

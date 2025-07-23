@@ -19,8 +19,7 @@ interface VitalSigns {
   id: number;
   date: string;
   time: string;
-  bloodPressureSystolic: number;
-  bloodPressureDiastolic: number;
+  bloodPressure: string;
   heartRate: number;
   temperature: number;
   oxygenSaturation: number;
@@ -68,8 +67,7 @@ export default function FamilyVitalSignsPage() {
         id: 1,
         date: '2024-01-15',
         time: '08:00',
-        bloodPressureSystolic: 140,
-        bloodPressureDiastolic: 90,
+        bloodPressure: '140/90',
         heartRate: 78,
         temperature: 36.5,
         oxygenSaturation: 98,
@@ -84,8 +82,7 @@ export default function FamilyVitalSignsPage() {
         id: 2,
         date: '2024-01-14',
         time: '08:15',
-        bloodPressureSystolic: 135,
-        bloodPressureDiastolic: 85,
+        bloodPressure: '135/85',
         heartRate: 72,
         temperature: 36.7,
         oxygenSaturation: 99,
@@ -99,8 +96,7 @@ export default function FamilyVitalSignsPage() {
         id: 3,
         date: '2024-01-13',
         time: '08:30',
-        bloodPressureSystolic: 130,
-        bloodPressureDiastolic: 80,
+        bloodPressure: '130/80',
         heartRate: 75,
         temperature: 36.8,
         oxygenSaturation: 98,
@@ -347,7 +343,7 @@ export default function FamilyVitalSignsPage() {
                 <HeartIcon style={{ width: '2rem', height: '2rem', color: '#ef4444', margin: '0 auto 0.75rem' }} />
                 <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0' }}>Huyết áp</p>
                 <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-                  {latest.bloodPressureSystolic}/{latest.bloodPressureDiastolic}
+                  {latest.bloodPressure}
                 </p>
                 <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>mmHg</p>
                 {previous && (
@@ -359,10 +355,10 @@ export default function FamilyVitalSignsPage() {
                     alignItems: 'center',
                     gap: '0.25rem'
                   }}>
-                    {getVitalTrend(latest.bloodPressureSystolic, previous.bloodPressureSystolic) === 'up' && (
+                    {getVitalTrend(latest.heartRate, previous.heartRate) === 'up' && (
                       <ArrowTrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
                     )}
-                    {getVitalTrend(latest.bloodPressureSystolic, previous.bloodPressureSystolic) === 'down' && (
+                    {getVitalTrend(latest.heartRate, previous.heartRate) === 'down' && (
                       <ArrowTrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
                     )}
                   </div>
@@ -403,10 +399,10 @@ export default function FamilyVitalSignsPage() {
                     gap: '0.25rem'
                   }}>
                     {getVitalTrend(latest.heartRate, previous.heartRate) === 'up' && (
-                      <TrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
+                      <ArrowTrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
                     )}
                     {getVitalTrend(latest.heartRate, previous.heartRate) === 'down' && (
-                      <TrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                      <ArrowTrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
                     )}
                   </div>
                 )}
@@ -446,10 +442,10 @@ export default function FamilyVitalSignsPage() {
                     gap: '0.25rem'
                   }}>
                     {getVitalTrend(latest.temperature, previous.temperature) === 'up' && (
-                      <TrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
+                      <ArrowTrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
                     )}
                     {getVitalTrend(latest.temperature, previous.temperature) === 'down' && (
-                      <TrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                      <ArrowTrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
                     )}
                   </div>
                 )}
@@ -489,10 +485,10 @@ export default function FamilyVitalSignsPage() {
                     gap: '0.25rem'
                   }}>
                     {getVitalTrend(latest.oxygenSaturation, previous.oxygenSaturation) === 'up' && (
-                      <TrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                      <ArrowTrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
                     )}
                     {getVitalTrend(latest.oxygenSaturation, previous.oxygenSaturation) === 'down' && (
-                      <TrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
+                      <ArrowTrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
                     )}
                   </div>
                 )}
@@ -533,10 +529,10 @@ export default function FamilyVitalSignsPage() {
                       gap: '0.25rem'
                     }}>
                       {getVitalTrend(latest.weight, previous.weight) === 'up' && (
-                        <TrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                        <ArrowTrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
                       )}
                       {getVitalTrend(latest.weight, previous.weight) === 'down' && (
-                        <TrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
+                        <ArrowTrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
                       )}
                     </div>
                   )}
@@ -578,10 +574,10 @@ export default function FamilyVitalSignsPage() {
                       gap: '0.25rem'
                     }}>
                       {getVitalTrend(latest.bloodSugar, previous.bloodSugar) === 'up' && (
-                        <TrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
+                        <ArrowTrendingUpIcon style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
                       )}
                       {getVitalTrend(latest.bloodSugar, previous.bloodSugar) === 'down' && (
-                        <TrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                        <ArrowTrendingDownIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
                       )}
                     </div>
                   )}
@@ -723,7 +719,7 @@ export default function FamilyVitalSignsPage() {
                   }}>
                     <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Huyết áp</p>
                     <p style={{ fontSize: '1rem', fontWeight: 600, color: '#1f2937', margin: 0 }}>
-                      {record.bloodPressureSystolic}/{record.bloodPressureDiastolic}
+                      {record.bloodPressure}
                     </p>
                   </div>
 

@@ -17,6 +17,7 @@ import {
 import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { residentAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
+import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 
@@ -25,11 +26,11 @@ export default function ResidentsPage() {
   const router = useRouter();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCareLevel, setFilterCareLevel] = useState('');
   const [residentsData, setResidentsData] = useState<any[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState<number | null>(null);
   const [carePlanOptions, setCarePlanOptions] = useState<any[]>([]);
+  const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
   
 
   
@@ -55,19 +56,34 @@ export default function ResidentsPage() {
     const fetchResidents = async () => {
       try {
         const apiData = await residentAPI.getAll();
-        // Map API data về đúng format UI
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapped = apiData.map((r: any, idx: number) => ({
+        // Map API data về đúng format UI với key mới
+        const mapped = apiData.map((r: any) => ({
           id: r._id,
-          name: r.fullName,
-          age: r.dateOfBirth ? (new Date().getFullYear() - new Date(r.dateOfBirth).getFullYear()) : '',
-          room: r.room || '', // nếu có trường room
-          carePlanIds: r.carePlanIds || (r.carePlanId ? [r.carePlanId] : []),
-          emergencyContact: r.emergencyContact?.fullName || '',
-          contactPhone: r.emergencyContact?.phoneNumber || '',
-          // ...map thêm các trường khác nếu cần
+          name: r.full_name || '',
+          age: r.date_of_birth ? (new Date().getFullYear() - new Date(r.date_of_birth).getFullYear()) : '',
+          careLevel: r.care_level || '',
+          emergencyContact: r.emergency_contact?.name || '',
+          contactPhone: r.emergency_contact?.phone || '',
+          avatar: Array.isArray(r.avatar) ? r.avatar[0] : r.avatar || null,
+          gender: (r.gender || '').toLowerCase(),
         }));
         setResidentsData(mapped);
+        // Lấy số phòng cho từng resident
+        mapped.forEach(async (resident: any) => {
+          try {
+            const assignments = await carePlansAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
+            const roomId = assignment?.assigned_room_id;
+            if (roomId) {
+              const room = await roomsAPI.getById(roomId);
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+            } else {
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+            }
+          } catch {
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+          }
+        });
       } catch (err) {
         setResidentsData([]);
       }
@@ -90,24 +106,13 @@ export default function ResidentsPage() {
   
 
   
-  // Filter residents based on search term and care level filter
+  // Filter residents chỉ theo search term
   const filteredResidents = residentsData.filter((resident) => {
-    const matchesSearch = resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          resident.room.includes(searchTerm);
-    
-    let matchesCareLevel = true;
-    if (filterCareLevel === 'CHUA_DANG_KY') {
-      matchesCareLevel = !resident.carePlanIds || resident.carePlanIds.length === 0;
-    } else if (filterCareLevel !== '') {
-      // Tìm tên gói tương ứng với từng carePlanId
-      const planNames = (resident.carePlanIds || []).map((id: string) => {
-        const plan = carePlanOptions.find((p: any) => p._id === id);
-        return plan?.planName;
-      });
-      matchesCareLevel = planNames.includes(filterCareLevel);
-    }
-    
-    return matchesSearch && matchesCareLevel;
+    const searchValue = (searchTerm || '').toString();
+    const residentName = (resident.name || '').toString();
+    const residentRoom = (roomNumbers[resident.id] || '').toString();
+    return residentName.toLowerCase().includes(searchValue.toLowerCase()) ||
+           residentRoom.toLowerCase().includes(searchValue.toLowerCase());
   });
   
   // Handle view resident details
@@ -318,51 +323,6 @@ export default function ResidentsPage() {
               </div>
             </div>
 
-            {/* Care Level Filter */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Gói chăm sóc
-              </label>
-              <div style={{position: 'relative'}}>
-                <select
-                  value={filterCareLevel}
-                  onChange={(e) => setFilterCareLevel(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 2.5rem 0.75rem 1rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem',
-                    background: 'white',
-                    appearance: 'none'
-                  }}
-                >
-                  <option value="">Tất cả gói</option>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {carePlanOptions.map((plan: any, idx: number) => (
-                    <option key={plan._id} value={plan.planName}>{plan.planName}</option>
-                  ))}
-                  <option value="CHUA_DANG_KY">Chưa đăng ký</option>
-                </select>
-                <FunnelIcon style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '1rem',
-                  height: '1rem',
-                  color: '#9ca3af',
-                  pointerEvents: 'none'
-                }} />
-              </div>
-            </div>
-
             {/* Results Count */}
             <div style={{
               background: 'rgba(102, 126, 234, 0.1)',
@@ -431,7 +391,7 @@ export default function ResidentsPage() {
                     fontWeight: 600,
                     color: '#374151'
                   }}>
-                    Gói chăm sóc
+                    Giới tính
                   </th>
                   <th style={{
                     padding: '1rem',
@@ -480,9 +440,22 @@ export default function ResidentsPage() {
                           justifyContent: 'center',
                           color: 'white',
                           fontWeight: 600,
-                          fontSize: '0.875rem'
+                          fontSize: '0.875rem',
+                          overflow: 'hidden'
                         }}>
-                          {resident.name.charAt(0)}
+                          {resident.avatar ? (
+                            <img
+                              src={
+                                resident.avatar.startsWith('http')
+                                  ? resident.avatar
+                                  : 'http://localhost:8000/' + resident.avatar.replace(/^\\+|^\/+/, '').replace(/\\/g, '/')
+                              }
+                              alt={resident.name}
+                              style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                            />
+                          ) : (
+                            resident.name.charAt(0)
+                          )}
                         </div>
                         <div>
                           <p style={{
@@ -512,7 +485,7 @@ export default function ResidentsPage() {
                         fontSize: '0.75rem',
                         fontWeight: 600
                       }}>
-                        {resident.room}
+                        {roomNumbers[resident.id] || 'Đang tải...'}
                       </span>
                     </td>
                     <td style={{padding: '1rem'}}>
@@ -525,57 +498,33 @@ export default function ResidentsPage() {
                       </span>
                     </td>
                     <td style={{padding: '1rem'}}>
-                      {resident.carePlanIds && resident.carePlanIds.length > 0 ? (
-                        resident.carePlanIds.map((planId: string, idx: number) => {
-                          const plan = carePlanOptions.find((p: any) => p._id === planId);
-                          if (!plan || !plan.planName) return null;
-                          return (
-                            <span key={planId + '-' + idx} style={{
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              color: '#3b82f6',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '9999px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              marginRight: '0.5rem',
-                              display: 'inline-block'
-                            }}>
-                              {plan.planName}
-                            </span>
-                          );
-                        })
-                      ) : (
-                        <span style={{
-                          background: 'rgba(107, 114, 128, 0.1)',
-                          color: '#6b7280',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
-                          Chưa đăng ký
-                        </span>
-                      )}
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#374151',
+                        fontWeight: 500
+                      }}>
+                        {resident.gender === 'male' ? 'Nam' : resident.gender === 'female' ? 'Nữ' : 'Khác'}
+                      </span>
                     </td>
-                                         <td style={{padding: '1rem'}}>
-                       <div>
-                         <p style={{
-                           fontSize: '0.875rem',
-                           fontWeight: 600,
-                           color: '#111827',
-                           margin: 0
-                         }}>
-                           {resident.emergencyContact}
-                         </p>
-                         <p style={{
-                           fontSize: '0.75rem',
-                           color: '#6b7280',
-                           margin: 0
-                         }}>
-                           {resident.contactPhone}
-                         </p>
-                       </div>
-                     </td>
+                    <td style={{padding: '1rem'}}>
+                      <div>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#111827',
+                          margin: 0
+                        }}>
+                          {resident.emergencyContact}
+                        </p>
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          margin: 0
+                        }}>
+                          {resident.contactPhone}
+                        </p>
+                      </div>
+                    </td>
                     <td style={{padding: '1rem'}}>
                       <div style={{
                         display: 'flex',

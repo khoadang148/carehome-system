@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -26,48 +26,80 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const hasRedirected = useRef(false);
+  const [sessionDebug, setSessionDebug] = useState({});
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/';
   const { login, user, loading } = useAuth();
 
-  // Redirect nếu đã đăng nhập
   useEffect(() => {
-    if (!loading && user) {
-      if (returnUrl && returnUrl !== '/login') {
-        router.replace(returnUrl);
-      } else if (user.role === 'family') {
-        router.replace('/family');
+    console.log('Login page useEffect triggered:', { user, loading, returnUrl, hasRedirected: hasRedirected.current });
+    if (!loading && user && !hasRedirected.current) {
+      console.log('User is logged in, redirecting...', { userRole: user.role, returnUrl });
+      hasRedirected.current = true; // Đánh dấu đã redirect để tránh vòng lặp
+      
+      // Sử dụng router.push thay vì window.location.href để tránh vòng lặp
+      const redirectTo = (url: string) => {
+        console.log('Redirecting to:', url);
+        router.push(url);
+      };
+
+      // Ưu tiên redirect dựa trên role trước, sau đó mới đến returnUrl
+      if (user.role === 'family') {
+        console.log('Redirecting to family page');
+        redirectTo('/family');
       } else if (user.role === 'admin') {
-        router.replace('/admin');
+        console.log('Redirecting to admin page');
+        redirectTo('/admin');
       } else if (user.role === 'staff') {
-        router.replace('/staff');
+        console.log('Redirecting to staff page');
+        redirectTo('/staff');
+      } else if (returnUrl && returnUrl !== '/login') {
+        console.log('Redirecting to returnUrl:', returnUrl);
+        redirectTo(returnUrl);
       } else {
-        router.replace('/');
+        console.log('Redirecting to home page');
+        redirectTo('/');
       }
     }
-  }, [user, loading, router, returnUrl]);
+  }, [user, loading, returnUrl]); // Bỏ hasRedirected khỏi dependencies
+
+  useEffect(() => {
+    setSessionDebug({
+      access_token: sessionStorage.getItem('access_token'),
+      user: sessionStorage.getItem('user'),
+      session_start: sessionStorage.getItem('session_start'),
+    });
+  }, [user, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Login form submitted with:', { email, password: '***' });
     setError('');
     setIsLoading(true);
 
     // Tạo timeout promise để tránh chờ quá lâu
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 5000); // 5 giây timeout
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 10000); // 10 giây timeout
     });
 
     try {
+      console.log('Login page: Calling login function...');
       // Race giữa login và timeout
       const success = await Promise.race([
         login(email, password),
         timeoutPromise
       ]);
       
+      console.log('Login page: Login result:', success);
+      
       if (!success) {
+        console.log('Login page: Login failed, setting error');
         setError('Thông tin đăng nhập không chính xác. Vui lòng thử lại.');
+      } else {
+        console.log('Login page: Login successful, waiting for redirect...');
       }
       // Nếu thành công, context sẽ tự redirect
     } catch (err: any) {
@@ -85,7 +117,7 @@ export default function LoginPage() {
           setError('Tài khoản không tồn tại.');
         } else if (data && (data.detail || data.message)) {
           const msg = data.detail || data.message;
-          if (typeof msg === 'string' && (msg.includes('/auth/refresh') || msg.includes('Khoa'))) {
+          if (typeof msg === 'string' && (msg.includes('/auth/refresh') || msg.includes('Cannot POST'))) {
             setError('Phiên đăng nhập đã hết hạn hoặc có lỗi xác thực. Vui lòng đăng nhập lại.');
           } else {
             setError(msg);
@@ -1051,7 +1083,8 @@ export default function LoginPage() {
       }}>
         <div style={{
           width: '100%',
-            maxWidth: '420px',
+            maxWidth: '520px',
+            maxHeight: '1100px',
           background: 'white',
             borderRadius: '20px',
             boxShadow: '0 25px 50px rgba(0, 0, 0, 0.15)',
@@ -1120,7 +1153,7 @@ export default function LoginPage() {
               margin: 0,
                   lineHeight: 1.5
             }}>
-                  Chọn loại tài khoản và đăng nhập để tiếp tục
+                  
             </p>
               </div>
           </div>

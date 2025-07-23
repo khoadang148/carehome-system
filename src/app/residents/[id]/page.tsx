@@ -19,8 +19,11 @@ import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { residentAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { vitalSignsAPI } from '@/lib/api';
+import { roomsAPI } from '@/lib/api';
+import { bedsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { careNotesAPI } from '@/lib/api';
+import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
@@ -37,6 +40,11 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
   const [vitalSigns, setVitalSigns] = useState<any>(null);
   const [vitalLoading, setVitalLoading] = useState(true);
   const [careNotes, setCareNotes] = useState<any[]>([]);
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
+  const [bedNumber, setBedNumber] = useState<string>('Chưa cập nhật');
+  const [bedLoading, setBedLoading] = useState(false);
   
   // Get residentId from params directly
   const residentId = params.id;
@@ -49,18 +57,63 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
         // Map API data về format UI nếu cần
         const mapped = {
           id: data._id,
-          name: data.fullName,
-          age: data.dateOfBirth ? (new Date().getFullYear() - new Date(data.dateOfBirth).getFullYear()) : '',
-          room: data.room || '',
-          careLevel: data.careLevel === 'basic' ? 'Cơ bản' : data.careLevel === 'intermediate' ? 'Nâng cao' : data.careLevel === 'advanced' ? 'Cao cấp' : '',
-          emergencyContact: data.emergencyContact?.fullName || '',
-          contactPhone: data.emergencyContact?.phoneNumber || '',
+          name: data.full_name,
+          age: data.date_of_birth ? (new Date().getFullYear() - new Date(data.date_of_birth).getFullYear()) : '',
+          gender: data.gender,
+          admissionDate: data.admission_date,
+          dischargeDate: data.discharge_date,
+          relationship: data.relationship,
+          medicalHistory: data.medical_history,
+          currentMedications: data.current_medications,
+          allergies: data.allergies,
+          emergencyContact: data.emergency_contact,
+          careLevel: data.care_level,
+          avatar: Array.isArray(data.avatar) ? data.avatar[0] : data.avatar || null,
+          status: data.status,
           ...data
         };
         setResident(mapped);
-        // Fetch care plans
-        const plans = await carePlansAPI.getByResidentId(residentId);
-        setCarePlans(Array.isArray(plans) ? plans : []);
+        // Lấy số phòng giống trang family
+        setRoomLoading(true);
+        try {
+          const assignments = await carePlansAPI.getByResidentId(residentId);
+          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
+          const roomId = assignment?.assigned_room_id;
+          if (roomId) {
+            const room = await roomsAPI.getById(roomId);
+            setRoomNumber(room?.room_number || 'Chưa cập nhật');
+          } else {
+            setRoomNumber('Chưa cập nhật');
+          }
+        } catch {
+          setRoomNumber('Chưa cập nhật');
+        }
+        setRoomLoading(false);
+        // Fetch care plan assignments (gói dịch vụ đang sử dụng)
+        const assignments = await carePlansAPI.getByResidentId(residentId);
+        setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
+        // Lấy số giường nếu có assigned_bed_id
+        setBedLoading(true);
+        let currentAssignment = null;
+        if (Array.isArray(assignments)) {
+          currentAssignment = assignments.find(a =>
+            (a.resident_id?._id || a.resident_id) === residentId
+          ) || assignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
+        }
+        const assignedBedId = currentAssignment?.assigned_bed_id;
+        if (assignedBedId) {
+          try {
+            const bed = await bedsAPI.getById(assignedBedId);
+            setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+          } catch {
+            setBedNumber('Chưa cập nhật');
+          }
+        } else {
+          setBedNumber('Chưa cập nhật');
+        }
+        setBedLoading(false);
+        // Fetch care plans (nếu cần cho mục đích khác)
+        setCarePlans([]); // Không dùng carePlans cũ nữa cho phần này
         // Fetch vital signs
         setVitalLoading(true);
         const vitalData = await vitalSignsAPI.getByResidentId(residentId);
@@ -328,7 +381,23 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                 }}>
                   <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
                   <span>Phòng:</span>
-                  <span>{resident.room}</span>
+                  <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
+                </span>
+                {/* Giường */}
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  background: '#f3f4f6',
+                  borderRadius: '0.5rem',
+                  padding: '0.25rem 0.75rem',
+                  fontWeight: 500
+                }}>
+                  <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                  <span>Giường:</span>
+                  <span>{bedLoading ? 'Đang tải...' : bedNumber}</span>
                 </span>
                 
                 {/* Trạng thái sức khỏe */}
@@ -460,7 +529,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                       Ngày sinh
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                      {resident.dateOfBirth ? new Date(resident.dateOfBirth).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                      {resident.date_of_birth ? formatDateDDMMYYYY(resident.date_of_birth) : 'Chưa cập nhật'}
                     </p>
                   </div>
                 <div>
@@ -476,7 +545,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     Ngày nhập viện
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                      {resident.admissionDate ? new Date(resident.admissionDate).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                      {resident.admission_date ? formatDateDDMMYYYY(resident.admission_date) : 'Chưa cập nhật'}
                     </p>
                 </div>
               </div>
@@ -515,9 +584,10 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     Gói dịch vụ đang sử dụng
                   </h3>
                 </div>
-                {carePlans.length > 0 ? (
+                {/* Render danh sách gói dịch vụ từ carePlanAssignments */}
+                {carePlanAssignments.length > 0 && carePlanAssignments[0].care_plan_ids && carePlanAssignments[0].care_plan_ids.length > 0 ? (
                   <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    {carePlans.map((plan, idx) => (
+                    {carePlanAssignments[0].care_plan_ids.map((plan: any, idx: number) => (
                       <div key={plan._id || idx} style={{
                         background: 'rgba(255,255,255,0.8)',
                         borderRadius: '0.5rem',
@@ -525,25 +595,10 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                         border: '1px solid #d1fae5',
                         marginBottom: '0.5rem'
                       }}>
-                        <div style={{ fontWeight: 600, fontSize: '1rem', color: '#059669' }}>{plan.planName || 'Gói dịch vụ'}</div>
+                        <div style={{ fontWeight: 600, fontSize: '1rem', color: '#059669' }}>{plan.plan_name || 'Gói dịch vụ'}</div>
                         <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
-                          Giá: {plan.monthlyPrice !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthlyPrice) : '---'}
+                          Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
                         </div>
-                        {plan.description && (
-                          <div style={{ fontSize: '0.95rem', color: '#64748b', marginBottom: '0.5rem' }}>
-                            {plan.description}
-                          </div>
-                        )}
-                        {Array.isArray(plan.servicesIncluded) && plan.servicesIncluded.length > 0 && (
-                          <div style={{ marginBottom: '0.5rem' }}>
-                            <div style={{ fontWeight: 500, color: '#06b6d4', fontSize: '0.95rem', marginBottom: 4 }}>Dịch vụ bao gồm:</div>
-                            <ul style={{ paddingLeft: 18, margin: 0, color: '#10b981', fontSize: '0.95rem' }}>
-                              {plan.servicesIncluded.map((feature: string, i: number) => (
-                                <li key={i} style={{ marginBottom: 3, color: '#374151' }}>✔ {feature}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -617,7 +672,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                   gap: '1rem'
                 }}>
-                  {resident.medicalHistory ? (
+                  {resident.medical_history ? (
                     <div style={{
                       padding: '0.75rem',
                       background: 'rgba(255, 255, 255, 0.8)',
@@ -625,7 +680,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                       border: '1px solid rgba(239, 68, 68, 0.1)'
                     }}>
                       <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                        {resident.medicalHistory}
+                        {resident.medical_history}
                       </p>
                     </div>
                   ) : (
@@ -657,8 +712,8 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                   gap: '1rem'
                 }}>
-                  {(resident.currentMedications || []).length > 0 ? (
-                    (resident.currentMedications || []).map((medication: string, index: number) => (
+                  {(resident.current_medications || []).length > 0 ? (
+                    (resident.current_medications || []).map((med: any, index: number) => (
                       <div key={index} style={{
                         padding: '0.75rem',
                         background: 'rgba(255, 255, 255, 0.8)',
@@ -666,7 +721,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                         border: '1px solid rgba(16, 185, 129, 0.1)'
                       }}>
                         <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                          {medication}
+                          {med.medication_name} - {med.dosage} - {med.frequency}
                         </p>
                       </div>
                     ))
@@ -769,7 +824,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                   </p>
                   <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
                     {resident.emergencyContact && typeof resident.emergencyContact === 'object'
-                      ? `${resident.emergencyContact.fullName || ''}${resident.emergencyContact.relationship ? ' (' + resident.emergencyContact.relationship + ')' : ''}`
+                      ? `${resident.emergencyContact.name || ''}${resident.emergencyContact.relationship ? ' (' + resident.emergencyContact.relationship + ')' : ''}`
                       : (resident.emergencyContact || 'Chưa cập nhật')}
                   </p>
                 </div>
@@ -778,7 +833,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     Số điện thoại liên hệ
                   </p>
                   <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
-                    {resident.contactPhone || 'Chưa cập nhật'}
+                    {resident.emergencyContact?.phone || 'Chưa cập nhật'}
                   </p>
                 </div>
               </div>

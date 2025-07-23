@@ -15,6 +15,8 @@ export default function ScheduleVisitPage() {
   const [visitDate, setVisitDate] = useState('');
   const [visitTime, setVisitTime] = useState('');
   const [visitPurpose, setVisitPurpose] = useState('');
+  const [customPurpose, setCustomPurpose] = useState('');
+  const [displayDate, setDisplayDate] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -25,7 +27,6 @@ export default function ScheduleVisitPage() {
   const [loadingResidents, setLoadingResidents] = useState(false);
   const [loadingVisits, setLoadingVisits] = useState(false);
 
-  // Hàm chuyển giờ bắt đầu thành chuỗi dạng "09:00 - 10:00"
   function getTimeRange(startTime: string) {
     const [hour, minute] = startTime.split(':').map(Number);
     const endHour = hour + 1;
@@ -128,6 +129,25 @@ export default function ScheduleVisitPage() {
     }
   }, [user]);
 
+  // Cập nhật displayDate khi visitDate thay đổi
+  useEffect(() => {
+    if (visitDate) {
+      try {
+        const date = new Date(visitDate);
+        if (!isNaN(date.getTime())) {
+          const day = date.getDate().toString().padStart(2, '0');
+          const month = (date.getMonth() + 1).toString().padStart(2, '0');
+          const year = date.getFullYear();
+          setDisplayDate(`${day}/${month}/${year}`);
+        }
+      } catch (error) {
+        setDisplayDate('');
+      }
+    } else {
+      setDisplayDate('');
+    }
+  }, [visitDate]);
+
   // Fetch visits (nếu API hỗ trợ lấy theo user, nên truyền userId)
   const fetchVisits = () => {
     setLoadingVisits(true);
@@ -169,6 +189,11 @@ export default function ScheduleVisitPage() {
       setShowErrorModal(true);
       return;
     }
+    if (visitPurpose === 'Khác' && !customPurpose.trim()) {
+      setError('Vui lòng nhập lý do thăm  khi chọn "Khác".');
+      setShowErrorModal(true);
+      return;
+    }
     if (!residents.length) {
       setError('Không có người thân nào để đặt lịch.');
       setShowErrorModal(true);
@@ -192,8 +217,19 @@ export default function ScheduleVisitPage() {
       }
       const visitDateTime = new Date(`${visitDate}T${visitTime}:00`);
       const now = new Date();
-      if (visitDateTime.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
+      const timeDiff = visitDateTime.getTime() - now.getTime();
+      const minTimeDiff = 24 * 60 * 60 * 1000; // 24 giờ
+      const maxTimeDiff = 30 * 24 * 60 * 60 * 1000; // 30 ngày
+      
+      if (timeDiff < minTimeDiff) {
         setError('Bạn chỉ được đặt lịch trước ít nhất 24 giờ so với thời điểm hiện tại.');
+        setShowErrorModal(true);
+        setLoading(false);
+        return;
+      }
+      
+      if (timeDiff > maxTimeDiff) {
+        setError('Bạn chỉ được đặt lịch trước tối đa 30 ngày so với thời điểm hiện tại.');
         setShowErrorModal(true);
         setLoading(false);
         return;
@@ -205,7 +241,7 @@ export default function ScheduleVisitPage() {
           resident_id: String(resident._id),
           visit_date: new Date(visitDate).toISOString(),
           visit_time: visitTime,
-          purpose: visitPurpose,
+          purpose: visitPurpose === 'Khác' ? customPurpose.trim() : visitPurpose,
           duration: 60,
           numberOfVisitors: 1
         };
@@ -537,12 +573,17 @@ export default function ScheduleVisitPage() {
                             fontWeight: status === 'today' ? 600 : 500
                           }}>
                             {item.date ? (() => {
-                              const date = new Date(item.date);
-                              const day = date.getDate().toString().padStart(2, '0');
-                              const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                              const year = date.getFullYear();
-                              return `${day}/${month}/${year}`;
-                            })() : ''}
+                              try {
+                                const date = new Date(item.date);
+                                if (isNaN(date.getTime())) return 'N/A';
+                                const day = date.getDate().toString().padStart(2, '0');
+                                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                                const year = date.getFullYear();
+                                return `${day}/${month}/${year}`;
+                              } catch (error) {
+                                return 'N/A';
+                              }
+                            })() : 'N/A'}
                           </td>
                           <td style={{
                             padding: '1rem',
@@ -622,15 +663,51 @@ export default function ScheduleVisitPage() {
                     Ngày thăm <span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>
                   </label>
                   <input
-                    type="date"
-                    value={visitDate}
-                    onChange={e => setVisitDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
+                    type="text"
+                    value={displayDate}
+                    onChange={e => {
+                      const value = e.target.value;
+                      
+                      // Chỉ cho phép số và dấu /
+                      const cleanValue = value.replace(/[^0-9/]/g, '');
+                      
+                      // Cập nhật hiển thị trực tiếp
+                      setDisplayDate(cleanValue);
+                      
+                      // Chỉ set visitDate khi đủ 3 phần và năm có 4 chữ số
+                      const parts = cleanValue.split('/');
+                      if (parts.length === 3 && parts[0] && parts[1] && parts[2] && parts[2].length === 4) {
+                        const day = parts[0].padStart(2, '0');
+                        const month = parts[1].padStart(2, '0');
+                        const year = parts[2];
+                        const isoDate = `${year}-${month}-${day}`;
+                        setVisitDate(isoDate);
+                      } else {
+                        setVisitDate('');
+                      }
+                    }}
+                    placeholder="dd/mm/yyyy"
                     style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '0.75rem', border: '1.5px solid #e2e8f0', fontSize: '0.98rem', transition: 'all 0.2s ease', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.07)' }}
                     onFocus={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.10)'; }}
-                    onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.07)'; }}
+                    onBlur={e => { 
+                      e.currentTarget.style.borderColor = '#e2e8f0'; 
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.07)';
+                      
+                      // Tự động format khi blur nếu chưa có dấu /
+                      const value = displayDate;
+                      if (value && !value.includes('/')) {
+                        let formattedValue = value;
+                        if (value.length >= 2) {
+                          formattedValue = value.slice(0, 2) + '/' + value.slice(2);
+                        }
+                        if (value.length >= 4) {
+                          formattedValue = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4);
+                        }
+                        setDisplayDate(formattedValue);
+                      }
+                    }}
                   />
-                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 4 }}>Chỉ được đặt lịch trước ít nhất <b>24 giờ</b>. Thời gian thăm: <b>9:00-11:00</b> và <b>14:00-17:00</b>.</div>
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 4 }}>Chỉ được đặt lịch trước ít nhất <b>24 giờ</b> và tối đa <b>30 ngày</b>. Thời gian thăm: <b>9:00-11:00</b> và <b>14:00-17:00</b>.</div>
                 </div>
                 <div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.98rem', fontWeight: 600, color: '#374151', marginBottom: '0.75rem' }}>
@@ -660,7 +737,12 @@ export default function ScheduleVisitPage() {
                   </label>
                   <select
                     value={visitPurpose}
-                    onChange={e => setVisitPurpose(e.target.value)}
+                    onChange={e => {
+                      setVisitPurpose(e.target.value);
+                      if (e.target.value !== 'Khác') {
+                        setCustomPurpose('');
+                      }
+                    }}
                     style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '0.75rem', border: '1.5px solid #e2e8f0', fontSize: '0.98rem', background: 'white', transition: 'all 0.2s ease', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.07)' }}
                     onFocus={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.10)'; }}
                     onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.07)'; }}
@@ -672,11 +754,44 @@ export default function ScheduleVisitPage() {
                     <option value="Tham gia hoạt động">Tham gia hoạt động</option>
                     <option value="Khác">Khác</option>
                   </select>
-                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 4 }}>Chọn đúng mục đích để nhân viên chuẩn bị tốt nhất cho chuyến thăm.</div>
+                  
+                  {visitPurpose === 'Khác' && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                        <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>•</span>
+                        Lý do khác <span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={customPurpose}
+                        onChange={e => setCustomPurpose(e.target.value)}
+                        placeholder="Nhập mục đích thăm.."
+                        style={{ 
+                          width: '100%', 
+                          padding: '0.875rem 1rem', 
+                          borderRadius: '0.75rem', 
+                          border: '1.5px solid #e2e8f0', 
+                          fontSize: '0.95rem', 
+                          transition: 'all 0.2s ease', 
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.07)',
+                          background: 'white'
+                        }}
+                        onFocus={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.10)'; }}
+                        onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.07)'; }}
+                      />
+                    </div>
+                  )}
+                  
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 4 }}>
+                    {visitPurpose === 'Khác' 
+                      ? 'Vui lòng mô tả chi tiết lý do thăm để nhân viên chuẩn bị phù hợp.'
+                      : 'Chọn đúng mục đích để nhân viên chuẩn bị tốt nhất cho chuyến thăm.'
+                    }
+                  </div>
                 </div>
               </div>
               <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1.5px solid #bbf7d0', borderRadius: '0.75rem', padding: '1.1rem 1.5rem', marginBottom: '2rem', color: '#059669', fontWeight: 500, fontSize: '0.98rem' }}>
-                <span style={{ fontWeight: 700, color: '#10b981', marginRight: 6 }}>Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ. Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
+                <span style={{ fontWeight: 700, color: '#10b981', marginRight: 6 }}>Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                 <button
@@ -689,7 +804,7 @@ export default function ScheduleVisitPage() {
                 </button>
                 <button
                   onClick={submitVisitSchedule}
-                  disabled={!visitDate || !visitTime || !visitPurpose || loading}
+                  disabled={!visitDate || !visitTime || !visitPurpose || (visitPurpose === 'Khác' && !customPurpose.trim()) || loading}
                   style={{ padding: '0.85rem 1.7rem', borderRadius: '0.75rem', border: 'none', background: loading ? 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s ease', boxShadow: loading ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.13)' }}
                   onMouseOver={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.18)'; } }}
                   onMouseOut={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.13)'; } }}

@@ -14,6 +14,7 @@ interface ClientLayoutProps {
 }
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
+  console.log('[ClientLayout] Mounted');
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
