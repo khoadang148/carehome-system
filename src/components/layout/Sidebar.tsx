@@ -61,11 +61,12 @@ const menuGroups: MenuGroup[] = [
     title: "Chương trình & Gia đình",
     items: [
       { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['admin'], color: '#f59e0b' },
+      { name: 'Hoạt động sinh hoạt', href: '/staff/activities', icon: CalendarIcon, roles: ['staff'], color: '#3b82f6' },
       { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['admin'], color: '#8b5cf6' },
       { name: 'Thông tin', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
       { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1' },
       { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1' },
-      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'family'], color: '#6366f1' },
+      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'family','admin'], color: '#6366f1' },
       
     ]
   },

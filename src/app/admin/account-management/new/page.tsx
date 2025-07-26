@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { residentAPI } from "@/lib/api";
+import { userAPI } from "@/lib/api";
 
 // Format ngày sinh dạng dd/mm/yyyy
 function formatDate(dateStr: string) {
@@ -91,15 +92,9 @@ export default function NewAccountPage() {
       data.append("status", "active");
       data.append("created_at", new Date().toISOString());
       data.append("updated_at", new Date().toISOString());
-      const res = await fetch("http://localhost:8000/users", {
-        method: "POST",
-        headers: {
-          'Authorization': typeof window !== 'undefined' ? `Bearer ${localStorage.getItem('access_token') || ''}` : ''
-        },
-        body: data,
-      });
+      const res = await userAPI.create(data);
       if (res.status === 201) {
-        const user = await res.json();
+        const user = res.data;
         // Nếu là gia đình, cập nhật resident
         if (formData.role === "family" && selectedResidentId) {
           await residentAPI.update(selectedResidentId, { family_member_id: user._id });
@@ -107,11 +102,11 @@ export default function NewAccountPage() {
         alert("Tạo tài khoản thành công!");
         router.push("/admin/account-management");
       } else {
-        const errData = await res.json().catch(() => ({}));
+        const errData = res.data;
         setError(errData.detail || errData.message || "Tạo tài khoản thất bại!");
       }
-    } catch {
-      setError("Tạo tài khoản thất bại!");
+    } catch (err: any) {
+      setError(err.message || "Tạo tài khoản thất bại!");
     } finally {
       setSaving(false);
     }

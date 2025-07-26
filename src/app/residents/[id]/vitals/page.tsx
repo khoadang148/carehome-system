@@ -15,7 +15,6 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';

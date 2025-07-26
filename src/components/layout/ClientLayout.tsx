@@ -18,6 +18,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  const isPaymentSpecialPage = ["/payment/cancel", "/payment/success"].includes(pathname);
   
   // Use session timeout hook
   const { showWarning, remainingTime, extendSession, handleLogout } = useSessionTimeout();
@@ -120,11 +121,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   }
   
   // For login page, or when user is not authenticated
-  if (isLoginPage || !user) {
+  if (isLoginPage || !user || isPaymentSpecialPage) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        background: isPaymentSpecialPage
+          ? undefined
+          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         {children}
       </div>

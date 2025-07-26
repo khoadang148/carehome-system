@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { 
   BuildingLibraryIcon,
   DocumentPlusIcon,
@@ -438,31 +437,8 @@ export default function ServicesPage() {
     try {
       // For family role, use RESIDENTS_DATA as the primary source
       if (user?.role === 'family') {
-        // Filter residents with care packages from RESIDENTS_DATA
-        const residentsWithPackages = RESIDENTS_DATA.filter((r: any) => r.carePackage);
-        let packages = residentsWithPackages.map((resident: any) => ({
-          ...resident.carePackage,
-          // Add resident info to package data
-          residentInfo: {
-            name: resident.name,
-            age: resident.age,
-            room: resident.room,
-            admissionDate: resident.admissionDate,
-            healthCondition: resident.healthCondition,
-            emergencyContact: resident.emergencyContact,
-            medicalHistory: resident.medicalHistory,
-            medications: resident.medications_detail || resident.medications,
-            allergyInfo: resident.allergyInfo,
-            specialNeeds: resident.specialNeeds
-          }
-        }));
-        
-        // Apply status filter if not 'all'
-        if (statusFilter !== 'all') {
-          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
-        }
-        
-        return packages;
+        // Không dùng RESIDENTS_DATA nữa, chỉ lấy từ API thật
+        return [];
       }
       
       // Fallback to localStorage for other roles
@@ -692,7 +668,9 @@ export default function ServicesPage() {
                 Xem danh sách đăng ký dịch vụ
               </button>
             )}
-            {/* Nút Điều Khoản & Quy Định */}
+
+
+            {/* Nút Điều Khản & Quy Định */}
             <button
               onClick={() => setShowBusinessRulesModal(true)}
               style={{
@@ -723,16 +701,62 @@ export default function ServicesPage() {
                 e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
               }}
             >
-              <svg
+              {/* <svg
                 style={{ width: '1.25rem', height: '1.25rem' }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              </svg> */}
               Điều Khoản & Quy Định
             </button>
+
+
+            
+            {/* Nút xem gói dịch vụ đã đăng ký cho family */}
+            {user?.role === 'family' && (
+              <button
+                onClick={() => setShowServiceModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '1rem 2rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '50px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                {/* <svg
+                  style={{ width: '1.25rem', height: '1.25rem' }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg> */}
+                Xem gói dịch vụ đã đăng ký
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1241,9 +1265,9 @@ export default function ServicesPage() {
               alignItems: 'center',
               gap: '8px'
             }}>
-              <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {/* <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              </svg> */}
               Thông tin bổ sung & Cam kết dịch vụ
             </h4>
             <div style={{
@@ -1311,9 +1335,9 @@ export default function ServicesPage() {
                 justifyContent: 'center',
                 boxShadow: '0 4px 15px rgba(14, 165, 233, 0.3)'
               }}>
-                <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                </svg> */}
               </div>
               <h4 style={{ 
                 color: '#0c4a6e', 
@@ -1371,9 +1395,9 @@ export default function ServicesPage() {
               >
                 <DocumentPlusIcon style={{ width: '18px', height: '18px' }} />
                 Xem Chi Tiết
-                <svg style={{ width: '14px', height: '14px', opacity: 0.8 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* <svg style={{ width: '14px', height: '14px', opacity: 0.8 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                </svg>
+                </svg> */}
               </button>
             </div>
           </div>
@@ -1395,14 +1419,14 @@ export default function ServicesPage() {
           <div style={{
             backgroundColor: 'white',
             borderRadius: '16px',
-            width: '99%',
-            maxWidth: '1150px',
-            maxHeight: '98vh',
+            width: '95%',
+            maxWidth: '1200px',
+            height: '80vh',
             boxShadow: '0 10px 32px rgba(0, 0, 0, 0.18)',
             border: '1.5px solid #e0e7ef',
             padding: 0,
             overflowY: 'auto',
-            marginLeft: '5rem',
+            marginLeft: '3rem',
           }}>
             {/* Header */}
             <div style={{
@@ -1429,9 +1453,9 @@ export default function ServicesPage() {
                   justifyContent: 'center',
                   boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
                 }}>
-                  <svg style={{ width: '26px', height: '26px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* <svg style={{ width: '26px', height: '26px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                  </svg> */}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e40af', margin: 0 }}>
@@ -1490,9 +1514,9 @@ export default function ServicesPage() {
                     color: '#475569',
                     marginBottom: '0.75rem',
                   }}>
-                    <svg style={{ width: '16px', height: '16px', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {/* <svg style={{ width: '16px', height: '16px', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-1H21m0 0l-3 3m3-3l-3-3" />
-                    </svg>
+                    </svg> */}
                     <span style={{ fontSize: '1rem' }}>Chọn người thân:</span>
                   </label>
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -1575,9 +1599,9 @@ export default function ServicesPage() {
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}>
-                          <svg style={{ width: '32px', height: '32px', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {/* <svg style={{ width: '32px', height: '32px', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
+                          </svg> */}
                         </div>
                             <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
                               Chưa có gói dịch vụ
@@ -1615,19 +1639,38 @@ export default function ServicesPage() {
               }
               // Show all care plans for this resident
                 return (
-                <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                <div
+                  style={{
+                    padding: '2rem',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                    gap: '2rem',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)',
+                    borderRadius: 20,
+                  }}
+                >
                   {plans.map((assignment: any, idx: number) => (
                     <div
                       key={assignment._id || idx}
                       style={{
-                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0eafc 100%)',
+                        background: 'white',
                         borderRadius: 20,
                         padding: 32,
-                        marginBottom: 36,
                         boxShadow: '0 8px 32px rgba(59,130,246,0.10)',
                         border: '1.5px solid #e0e7ef',
-                        maxWidth: 800,
-                        margin: '0 auto'
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 16,
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-6px) scale(1.03)';
+                        e.currentTarget.style.boxShadow = '0 16px 40px rgba(59,130,246,0.18)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.boxShadow = '0 8px 32px rgba(59,130,246,0.10)';
                       }}
                     >
                       {/* Header */}
@@ -1645,9 +1688,9 @@ export default function ServicesPage() {
                           marginRight: 20,
                           boxShadow: '0 2px 8px rgba(59,130,246,0.15)'
                         }}>
-                          <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {/* <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
+                          </svg> */}
                       </div>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '1.5rem', color: '#1e293b', marginBottom: 2 }}>
@@ -1662,7 +1705,7 @@ export default function ServicesPage() {
                       {/* Tổng quan */}
                       <div style={{
                           display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
                         gap: '1.5rem',
                         marginBottom: 24
                       }}>
@@ -1699,14 +1742,27 @@ export default function ServicesPage() {
                           {Array.isArray(assignment.care_plan_ids) && assignment.care_plan_ids.length > 0 ? (
                             assignment.care_plan_ids.map((plan: any, i: number) => (
                               <div key={plan._id || i} style={{
-                                background: 'white',
+                                background: 'linear-gradient(135deg, #e0e7ef 0%, #f1f5f9 100%)',
                                 borderRadius: 14,
                                 boxShadow: '0 2px 8px rgba(59,130,246,0.08)',
                                 padding: '1.1rem 1.5rem',
                                 minWidth: 220,
                                 marginBottom: 8,
-                                border: '1px solid #e0e7ef'
-                              }}>
+                                border: '1px solid #e0e7ef',
+                                fontWeight: 600,
+                                color: '#0c4a6e',
+                                fontSize: '1.1rem',
+                                transition: 'transform 0.2s, box-shadow 0.2s',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.transform = 'scale(1.04)';
+                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(59,130,246,0.13)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(59,130,246,0.08)';
+                              }}
+                              >
                                 <div style={{ fontWeight: 700, color: '#0c4a6e', fontSize: '1.1rem', marginBottom: 4 }}>{plan.plan_name}</div>
                                 <div style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '1rem', marginBottom: 2 }}>
                                   Giá: {typeof plan.monthly_price === 'number' ? formatCurrency(plan.monthly_price) : '---'}
@@ -1824,9 +1880,9 @@ export default function ServicesPage() {
             <div style={{ padding: '2rem 2.5rem', maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
               {pendingPackages.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280' }}>
-                  <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#d1d5db' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#d1d5db' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                  </svg> */}
                   <h4 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#374151' }}>
                     Không có gói dịch vụ nào chờ duyệt
                   </h4>
@@ -2207,6 +2263,7 @@ export default function ServicesPage() {
                       paddingBottom: '1rem',
                       borderBottom: '2px solid #f1f5f9'
                     }}>
+                      {/* XÓA ICON ĐỘNG */}
                       <div style={{
                         width: '3rem',
                         height: '3rem',
@@ -2220,7 +2277,7 @@ export default function ServicesPage() {
                         fontWeight: 700,
                         boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
                       }}>
-                        {index + 1}
+                        {/* Để trống hoặc thay bằng icon tĩnh nếu muốn */}
                       </div>
                       <div>
                         <h3 style={{
@@ -2239,9 +2296,9 @@ export default function ServicesPage() {
                           fontSize: '0.875rem',
                           color: '#dc2626'
                         }}>
-                          <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {/* <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9z" />
-                          </svg>
+                          </svg> */}
                           Quy định quan trọng
                         </div>
                       </div>
@@ -2311,9 +2368,9 @@ export default function ServicesPage() {
                   gap: '0.75rem',
                   marginBottom: '1rem'
                 }}>
-                  <svg style={{ width: '1.5rem', height: '1.5rem', color: '#dc2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* <svg style={{ width: '1.5rem', height: '1.5rem', color: '#dc2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9z" />
-                  </svg>
+                  </svg> */}
                   <h4 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#dc2626', margin: 0 }}>
                     Lưu ý quan trọng
                   </h4>
@@ -2426,6 +2483,8 @@ export default function ServicesPage() {
           </div>
         </div>
       )}
+
+      
     </div>
   );
 } 

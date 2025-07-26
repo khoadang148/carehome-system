@@ -186,35 +186,7 @@ export default function Header() {
 
             {/* Notifications */}
             <Menu as="div" className="relative">
-              <Menu.Button
-                style={{
-                  background: 'rgba(255,255,255,0.15)',
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  cursor: 'pointer',
-                  position: 'relative'
-                }}
-                title="Xem thông báo"
-              >
-                <BellIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
-                {unreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-0.25rem',
-                    right: '-0.25rem',
-                    background: '#ef4444',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    padding: '0.125rem 0.375rem',
-                    borderRadius: '9999px',
-                    border: '2px solid #667eea'
-                  }}>
-                    {unreadCount}
-                  </span>
-                )}
-              </Menu.Button>
+              
 
               <Transition
                 as={Fragment}

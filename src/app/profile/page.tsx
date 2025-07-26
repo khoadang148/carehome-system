@@ -31,8 +31,7 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (avatarPath.startsWith('data:')) return avatarPath;
   
   // Convert relative path to full URL
-  const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${cleanPath.replace(/^\//, '')}`;
+  return userAPI.getAvatarUrl(avatarPath);
 };
 
 // Family members data (matching family page)

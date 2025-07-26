@@ -295,30 +295,62 @@ export const userAPI = {
     }
   },
 
-  updateAvatar: async (id: string, avatarFile: File) => {
+  updateAvatar: async (id: string, avatarData: FormData) => {
     try {
-      const formData = new FormData();
-      formData.append('avatar', avatarFile);
-      
-      // Thử endpoint /auth/profile trước (cho family members)
-      try {
-        const response = await apiClient.put('/auth/profile', formData, {
-          headers: {
-            // KHÔNG set 'Content-Type' để browser tự động set boundary
-          },
-        });
-        return response.data;
-      } catch (profileError) {
-        // Nếu /auth/profile không được, thử /users/{id}/avatar (cho admin/staff)
-        const response = await apiClient.patch(`/users/${id}/avatar`, formData, {
-          headers: {
-            // KHÔNG set 'Content-Type' để browser tự động set boundary
-          },
-        });
-        return response.data;
-      }
+      // Ưu tiên endpoint /users/{id}/avatar
+      const response = await apiClient.patch(`/users/${id}/avatar`, avatarData, {
+        headers: {
+          // KHÔNG set 'Content-Type' để browser tự động set boundary
+        },
+      });
+      return response.data;
     } catch (error) {
       console.error('Error updating user avatar:', error);
+      throw error;
+    }
+  },
+  getAvatarUrl: (avatarPath: string) => {
+    if (!avatarPath) return '';
+    if (avatarPath.startsWith('http')) return avatarPath;
+    const cleanPath = avatarPath.replace(/^\\+|^\/+/g, '').replace(/\\/g, '/');
+    return `${API_BASE_URL}/${cleanPath}`;
+  },
+  activate: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/users/${id}/activate`);
+      return response.data;
+    } catch (error) {
+      console.error('Error activating user:', error);
+      throw error;
+    }
+  },
+  deactivate: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/users/${id}/deactivate`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      throw error;
+    }
+  },
+  create: async (userData: any) => {
+    try {
+      const response = await apiClient.post('/users', userData, {
+        headers: userData instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+      });
+      return response;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  },
+  // Thêm hàm resetPassword
+  resetPassword: async (id: string, newPassword: string) => {
+    try {
+      const response = await apiClient.patch(`/users/${id}/reset-password`, { newPassword });
+      return response.data;
+    } catch (error) {
+      console.error('Error resetting user password:', error);
       throw error;
     }
   },
@@ -418,6 +450,15 @@ export const residentAPI = {
       console.error(`Error fetching resident by family member ID ${familyMemberId}:`, error);
       throw error;
     }
+  },
+  getAvatarUrl: (id: string) => {
+    if (!id) return '';
+    return `${API_BASE_URL}/residents/${id}/avatar`;
+  },
+  fetchAvatar: async (id: string) => {
+    const response = await fetch(`${API_BASE_URL}/residents/${id}/avatar`);
+    if (!response.ok) throw new Error('Không lấy được avatar');
+    return await response.blob();
   },
 };
 
@@ -578,6 +619,25 @@ export const activitiesAPI = {
       throw error;
     }
   },
+
+  // AI Recommendation endpoint
+  getAIRecommendation: async (residentIds: string[], schedule_time?: string) => {
+    try {
+      const payload: any = {
+        resident_ids: residentIds
+      };
+      
+      if (schedule_time) {
+        payload.schedule_time = schedule_time;
+      }
+      
+      const response = await apiClient.post(`${endpoints.activities}/recommendation/ai`, payload);
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting AI recommendation for resident(s)`, error);
+      throw error;
+    }
+  },
 };
 
 // Activity Participations API
@@ -673,6 +733,35 @@ export const activityParticipationsAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching activity participations for resident ${residentId}:`, error);
+      throw error;
+    }
+  },
+
+  getByStaffId: async (staffId: string, params?: any) => {
+    try {
+      const response = await apiClient.get(endpoints.activityParticipations, { 
+        params: { 
+          staff_id: staffId,
+          ...params 
+        } 
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching activity participations for staff ${staffId}:`, error);
+      throw error;
+    }
+  },
+
+  getByActivityId: async (activityId: string, date?: string) => {
+    try {
+      const params: any = { activity_id: activityId };
+      if (date) {
+        params.date = date;
+      }
+      const response = await apiClient.get(`${endpoints.activityParticipations}/by-activity`, { params });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching activity participations for activity ${activityId}:`, error);
       throw error;
     }
   },
@@ -1026,7 +1115,6 @@ export const reportsAPI = {
   },
 };
 
-// Notifications API
 export const notificationsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1079,7 +1167,6 @@ export const notificationsAPI = {
   },
 };
 
-// Permissions API
 export const permissionsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1132,7 +1219,6 @@ export const permissionsAPI = {
   },
 };
 
-// Services API
 export const servicesAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1185,7 +1271,6 @@ export const servicesAPI = {
   },
 };
 
-// Inventory API
 export const inventoryAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1238,7 +1323,6 @@ export const inventoryAPI = {
   },
 };
 
-// Vital Signs API
 export const vitalSignsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1260,7 +1344,6 @@ export const vitalSignsAPI = {
     }
   },
 
-  // Thêm hàm lấy vital signs theo residentId
   getByResidentId: async (residentId: string) => {
     try {
       const response = await apiClient.get(`${endpoints.vitalSigns}/resident/${residentId}`);
@@ -1302,7 +1385,6 @@ export const vitalSignsAPI = {
   },
 };
 
-// Photos API
 export const photosAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1347,9 +1429,14 @@ export const photosAPI = {
       throw error;
     }
   },
+  getPhotoUrl: (file_path: string) => {
+    if (!file_path) return '';
+    const cleanPath = file_path.replace(/\\/g, '/').replace(/"/g, '');
+    return `${API_BASE_URL}/${cleanPath}`;
+  },
 };
 
-// Visits API
+
 export const visitsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1422,7 +1509,6 @@ export const visitsAPI = {
   },
 };
 
-// Care Plans API
 export const carePlansAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1442,7 +1528,7 @@ export const carePlansAPI = {
       throw error;
     }
   },
-  // New: Get care plans by residentId
+ 
   getByResidentId: async (residentId: string) => {
     try {
       const response = await apiClient.get(`/care-plan-assignments/by-resident/${residentId}`);
@@ -1463,7 +1549,99 @@ export const carePlansAPI = {
   },
 };
 
-// Bills API
+// Care Plan Assignments API
+export const carePlanAssignmentsAPI = {
+  getAll: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/care-plan-assignments', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching care plan assignments:', error);
+      throw error;
+    }
+  },
+
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/care-plan-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching care plan assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  getByResidentId: async (residentId: string) => {
+    try {
+      const response = await apiClient.get(`/care-plan-assignments/by-resident/${residentId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching care plan assignments by residentId ${residentId}:`, error);
+      throw error;
+    }
+  },
+
+  getByFamilyMemberId: async (familyMemberId: string) => {
+    try {
+      const response = await apiClient.get(`/care-plan-assignments/by-family-member/${familyMemberId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching care plan assignments by familyMemberId ${familyMemberId}:`, error);
+      throw error;
+    }
+  },
+
+  getByStatus: async (status: string) => {
+    try {
+      const response = await apiClient.get(`/care-plan-assignments/by-status/${status}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching care plan assignments by status ${status}:`, error);
+      throw error;
+    }
+  },
+
+  create: async (data: any) => {
+    try {
+      const response = await apiClient.post('/care-plan-assignments', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating care plan assignment:', error);
+      throw error;
+    }
+  },
+
+  update: async (id: string, data: any) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating care plan assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  updateStatus: async (id: string, status: string) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/${id}/status?status=${status}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating care plan assignment status with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  delete: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/care-plan-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting care plan assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+};
+
 export const billsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1512,7 +1690,6 @@ export const billsAPI = {
   },
 };
 
-// Beds API
 export const bedsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1546,7 +1723,6 @@ export const roomTypesAPI = {
   }
 };
 
-// Bed Assignments API
 export const bedAssignmentsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1568,7 +1744,6 @@ export const bedAssignmentsAPI = {
   },
 };
 
-// Payment API
 export const paymentAPI = {
   createPayment: async (billId: string) => {
     try {
@@ -1583,5 +1758,6 @@ export const paymentAPI = {
 };
 
 export { apiClient };
+export { API_BASE_URL };
 
 

@@ -72,17 +72,9 @@ export default function EditAccountPage() {
     const formData = new FormData();
     formData.append('avatar', file);
     try {
-      const res = await fetch(`http://localhost:8000/users/${id}/avatar`, {
-        method: 'PATCH',
-        headers: {
-          // KHÔNG set 'Content-Type' ở đây!
-          'Authorization': typeof window !== 'undefined' ? `Bearer ${localStorage.getItem('access_token') || ''}` : ''
-        },
-        body: formData
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFormData((prev: any) => ({ ...prev, avatar: data.avatar }));
+      const res = await userAPI.updateAvatar(id, formData);
+      if (res.success) {
+        setFormData((prev: any) => ({ ...prev, avatar: res.avatar }));
         alert('Cập nhật ảnh đại diện thành công!');
       } else {
         alert('Lỗi khi upload ảnh đại diện!');
@@ -99,19 +91,9 @@ export default function EditAccountPage() {
     setSaving(true);
     try {
       if (newStatus === 'active') {
-        await fetch(`http://localhost:8000/users/${id}/activate`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-          },
-        });
+        await userAPI.activate(id);
       } else if (newStatus === 'inactive') {
-        await fetch(`http://localhost:8000/users/${id}/deactivate`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-          },
-        });
+        await userAPI.deactivate(id);
       }
       setFormData((prev: any) => ({ ...prev, status: newStatus }));
     } catch {
@@ -168,7 +150,7 @@ export default function EditAccountPage() {
               {avatarPreview ? (
                 <img src={avatarPreview} alt="avatar preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : formData.avatar ? (
-                <img src={formData.avatar.startsWith('http') ? formData.avatar : `http://localhost:8000/${formData.avatar.replace(/^\\+|^\/+/, '').replace(/\\/g, '/')}`}
+                <img src={userAPI.getAvatarUrl(formData.avatar)}
                   alt="avatar"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
@@ -199,17 +181,10 @@ export default function EditAccountPage() {
                   const formDataUpload = new FormData();
                   formDataUpload.append('avatar', file);
                   try {
-                    const res = await fetch(`http://localhost:8000/users/${id}/avatar`, {
-                      method: 'PATCH',
-                      headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-                      },
-                      body: formDataUpload,
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      if (data.avatar) {
-                        setFormData((prev: any) => ({ ...prev, avatar: data.avatar }));
+                    const res = await userAPI.updateAvatar(id, formDataUpload);
+                    if (res.success) {
+                      if (res.avatar) {
+                        setFormData((prev: any) => ({ ...prev, avatar: res.avatar }));
                       } else {
                         alert('Upload ảnh thành công nhưng không nhận được URL!');
                       }

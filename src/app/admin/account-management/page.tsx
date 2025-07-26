@@ -99,6 +99,15 @@ export default function AccountManagementPage() {
   // Form data states
   const [formData, setFormData] = useState<any>({});
   
+  // State for reset password modal
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('');
+  const [resetPasswordError, setResetPasswordError] = useState('');
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  
   const router = useRouter();
   const { user, loading } = useAuth();
 
@@ -405,6 +414,13 @@ export default function AccountManagementPage() {
             >
               <PencilIcon style={{ width: 20, height: 20, color: '#6366f1' }} />
             </button>
+            <button title="Cấp lại mật khẩu" onClick={(e) => { e.stopPropagation(); handleResetPassword(user); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#e0e7ef'}
+              onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+            >
+              <KeyIcon style={{ width: 20, height: 20, color: '#059669' }} />
+            </button>
           </div>
         </div>
       </div>
@@ -502,10 +518,27 @@ export default function AccountManagementPage() {
             >
               <PencilIcon style={{ width: 20, height: 20, color: '#6366f1' }} />
             </button>
+            <button title="Cấp lại mật khẩu" onClick={(e) => { e.stopPropagation(); handleResetPassword(account); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#e0e7ef'}
+              onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+            >
+              <KeyIcon style={{ width: 20, height: 20, color: '#059669' }} />
+            </button>
           </div>
         </div>
       </div>
     );
+  };
+
+  // Thêm hàm mở modal reset mật khẩu
+  const handleResetPassword = (user: User) => {
+    setResetPasswordUser(user);
+    setResetPassword('');
+    setResetPasswordConfirm('');
+    setResetPasswordError('');
+    setResetPasswordSuccess('');
+    setShowResetPasswordModal(true);
   };
 
   return (
@@ -832,6 +865,71 @@ export default function AccountManagementPage() {
       {showEditModal && <EditAccountModal />}
       {showDetailModal && <DetailModal />}
       {showDeleteModal && <DeleteConfirmModal />}
+      {showResetPasswordModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ background: 'white', borderRadius: '1rem', padding: '2rem', minWidth: 350, maxWidth: 400 }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 16, color: '#059669' }}>
+              Cấp lại mật khẩu cho tài khoản
+            </h2>
+            <div style={{ marginBottom: 12, color: '#374151', fontWeight: 500 }}>
+              {resetPasswordUser?.full_name} ({resetPasswordUser?.username})
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontWeight: 600, color: '#374151', fontSize: '0.95rem' }}>Mật khẩu mới</label>
+              <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)}
+                style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }}
+                placeholder="Nhập mật khẩu mới" />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontWeight: 600, color: '#374151', fontSize: '0.95rem' }}>Nhập lại mật khẩu</label>
+              <input type="password" value={resetPasswordConfirm} onChange={e => setResetPasswordConfirm(e.target.value)}
+                style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }}
+                placeholder="Nhập lại mật khẩu mới" />
+            </div>
+            {resetPasswordError && <div style={{ color: '#dc2626', marginBottom: 8 }}>{resetPasswordError}</div>}
+            {resetPasswordSuccess && <div style={{ color: '#059669', marginBottom: 8 }}>{resetPasswordSuccess}</div>}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => setShowResetPasswordModal(false)}
+                style={{ padding: '8px 18px', borderRadius: 6, background: '#f3f4f6', color: '#374151', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  setResetPasswordError('');
+                  setResetPasswordSuccess('');
+                  if (!resetPassword || resetPassword.length < 6) {
+                    setResetPasswordError('Mật khẩu phải có ít nhất 6 ký tự.');
+                    return;
+                  }
+                  if (resetPassword !== resetPasswordConfirm) {
+                    setResetPasswordError('Mật khẩu nhập lại không khớp.');
+                    return;
+                  }
+                  setResetPasswordLoading(true);
+                  try {
+                    await userAPI.resetPassword(resetPasswordUser!._id, resetPassword);
+                    setResetPasswordSuccess('Cấp lại mật khẩu thành công!');
+                    setTimeout(() => {
+                      setShowResetPasswordModal(false);
+                    }, 1200);
+                  } catch (err) {
+                    setResetPasswordError('Có lỗi khi cấp lại mật khẩu.');
+                  } finally {
+                    setResetPasswordLoading(false);
+                  }
+                }}
+                style={{ padding: '8px 18px', borderRadius: 6, background: '#059669', color: 'white', border: 'none', fontWeight: 600, cursor: resetPasswordLoading ? 'not-allowed' : 'pointer', opacity: resetPasswordLoading ? 0.7 : 1 }}
+                disabled={resetPasswordLoading}
+              >
+                {resetPasswordLoading ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

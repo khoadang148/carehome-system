@@ -5,6 +5,7 @@ import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownT
 import { useAuth } from "@/lib/contexts/auth-context";
 import { staffAPI } from "@/lib/api";
 import { residentAPI } from "@/lib/api";
+import { userAPI, photosAPI } from "@/lib/api";
 
 export default function FamilyPhotosPage() {
   const router = useRouter();
@@ -86,38 +87,30 @@ export default function FamilyPhotosPage() {
     setLoading(true);
     setError(null);
     const familyId = user.id;
-    fetch(`http://localhost:8000/resident-photos?family_member_id=${familyId}`, {
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "accept": "*/*"
-      }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error("Lỗi khi lấy ảnh");
-        return res.json();
-      })
-      .then(data => {
-        console.log("API resident-photos data:", data);
-        console.log("Sample photo item:", data[0]);
+    photosAPI.getAll({ family_member_id: familyId })
+      .then(async data => {
         // Map lại dữ liệu cho đúng định dạng UI mong muốn
-        const mapped = Array.isArray(data) ? data.map(item => {
+        const mapped = await Promise.all(Array.isArray(data) ? data.map(async item => {
           let senderName = item.uploadedByName;
+          let senderPosition = '';
+          // Nếu uploaded_by là id user, fetch user info
+          if (!senderName && item.uploaded_by && typeof item.uploaded_by === 'string' && item.uploaded_by.length === 24) {
+            try {
+              const userInfo = await userAPI.getById(item.uploaded_by);
+              if (userInfo && userInfo.full_name) {
+                senderName = userInfo.full_name;
+                senderPosition = userInfo.position || '';
+              }
+            } catch (e) { /* Bỏ qua lỗi */ }
+          }
+          // Nếu không có, thử lấy từ staffList
           if (!senderName && item.uploadedBy && staffList.length > 0) {
             const staff = staffList.find(s => String(s._id) === String(item.uploadedBy));
             senderName = staff ? (staff.fullName || staff.name || staff.username || staff.email) : undefined;
+            senderPosition = staff ? (staff.position || '') : '';
           }
-          
           // Xử lý đường dẫn ảnh
-          let imageUrl = "";
-          if (item.file_path) {
-            // Chuyển đổi backslash thành forward slash và loại bỏ dấu ngoặc kép
-            const cleanPath = item.file_path.replace(/\\/g, '/').replace(/"/g, '');
-            imageUrl = `http://localhost:8000/${cleanPath}`;
-            console.log('Original file_path:', item.file_path);
-            console.log('Clean path:', cleanPath);
-            console.log('Final image URL:', imageUrl);
-          }
-          
+          let imageUrl = item.file_path ? photosAPI.getPhotoUrl(item.file_path) : "";
           return {
             ...item,
             id: item._id,
@@ -127,9 +120,10 @@ export default function FamilyPhotosPage() {
               ? new Date(item.takenDate).toISOString().split("T")[0]
               : (item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : ""),
             uploadedByName: senderName,
+            uploadedByPosition: senderPosition,
             residentId: item.resident_id,
           };
-        }) : [];
+        }) : []);
         setAllPhotos(mapped);
         setLoading(false);
       })
@@ -137,7 +131,7 @@ export default function FamilyPhotosPage() {
         setError(err.message || "Lỗi không xác định");
         setLoading(false);
       });
-  }, [user]);
+  }, [user, staffList]);
 
   // Fetch staff list
   useEffect(() => {
@@ -202,6 +196,7 @@ export default function FamilyPhotosPage() {
   // Download
   const downloadPhoto = async (url: string, name: string) => {
     try {
+      // Sử dụng fetch như cũ vì đây là download file, không phải API business logic
       const accessToken = sessionStorage.getItem("access_token");
       const response = await fetch(url, {
         headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
@@ -641,7 +636,9 @@ export default function FamilyPhotosPage() {
             <div style={{ background: "rgba(30,41,59,0.68)", borderRadius: 20, padding: "22px 36px", display: "inline-block", color: "#fff", minWidth: 260, fontWeight: 700, textShadow: "0 2px 8px rgba(30,41,59,0.5)", fontSize: '1.18rem' }}>
               <div style={{ fontSize: "1.32rem", fontWeight: 700, marginBottom: 10 }}>{filteredPhotos[lightboxIndex].caption}</div>
               <div style={{ fontSize: "1.09em", fontWeight: 500, opacity: 0.92, marginBottom: 6 }}>
-                Người gửi: {filteredPhotos[lightboxIndex].uploadedByName || filteredPhotos[lightboxIndex].uploadedBy || "Không rõ"}
+                Người gửi: {filteredPhotos[lightboxIndex].uploadedByPosition && filteredPhotos[lightboxIndex].uploadedByName
+                  ? `${filteredPhotos[lightboxIndex].uploadedByPosition} ${filteredPhotos[lightboxIndex].uploadedByName}`
+                  : (filteredPhotos[lightboxIndex].uploadedByName || filteredPhotos[lightboxIndex].uploadedBy || "Không rõ")}
               </div>
               <div style={{ fontSize: "1.09em", fontWeight: 500, opacity: 0.92 }}>
                 Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString("vi-VN")}

@@ -18,6 +18,7 @@ import {
 import { residentAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { Fragment } from 'react';
+import { userAPI } from "@/lib/api";
 
 // Sửa lại type ResidentFormData cho đồng bộ API mới
 type ResidentFormData = {
@@ -702,11 +703,7 @@ export default function EditResidentPage({ params }: { params: { id: string } })
                     </label>
                     {getValues('avatar') && (
                       <img
-                        src={
-                          getValues('avatar').startsWith('http')
-                            ? getValues('avatar')
-                            : 'http://localhost:8000' + (getValues('avatar').startsWith('/') ? getValues('avatar') : '/' + getValues('avatar'))
-                        }
+                        src={residentAPI.getAvatarUrl(params.id)}
                         alt="avatar"
                         style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, marginBottom: 8, border: '1px solid #e5e7eb' }}
                       />
@@ -721,20 +718,17 @@ export default function EditResidentPage({ params }: { params: { id: string } })
                         const formData = new FormData();
                         formData.append('avatar', file);
                         try {
-                          const res = await fetch(`http://localhost:8000/residents/${params.id}/avatar`, {
-                            method: 'PATCH',
-                            headers: {
-                              'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-                            },
-                            body: formData,
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            if (data.avatar) {
-                              reset({ ...getValues(), avatar: data.avatar });
-                            } else {
-                              alert('Upload ảnh thành công nhưng không nhận được URL!');
-                            }
+                          const blob = await residentAPI.fetchAvatar(params.id);
+                          if (blob) {
+                            const reader = new FileReader();
+                            reader.readAsDataURL(blob);
+                            reader.onloadend = () => {
+                              if (reader.result) {
+                                reset({ ...getValues(), avatar: reader.result as string });
+                              } else {
+                                alert('Upload ảnh thành công nhưng không nhận được URL!');
+                              }
+                            };
                           } else {
                             alert('Upload ảnh thất bại!');
                           }

@@ -22,12 +22,16 @@ import {
   BuildingLibraryIcon,
   DevicePhoneMobileIcon,
   ClockIcon,
-  PlusCircleIcon
+  PlusCircleIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
 import ReactDOM from 'react-dom';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { billsAPI, carePlansAPI, roomsAPI, paymentAPI } from '@/lib/api';
 import axios from 'axios';
+import Select from 'react-select';
+import { photosAPI } from "@/lib/api";
+import { userAPI } from "@/lib/api";
+import { residentAPI } from "@/lib/api";
 
 
 export default function FinancePage() {
@@ -56,6 +60,7 @@ export default function FinancePage() {
   const [filterStatus, setFilterStatus] = useState('Tất cả');
   const [selectedResident, setSelectedResident] = useState(0);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
   const [familyFinancialData, setFamilyFinancialData] = useState<any[]>([]); // <-- move this here, replace mock
@@ -69,17 +74,8 @@ export default function FinancePage() {
   useEffect(() => {
     const fetchResidentsAndBills = async (familyMemberId: string, accessToken: string) => {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/residents/family-member/${familyMemberId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              Accept: '*/*',
-            },
-          }
-        );
-        if (!res.ok) throw new Error('Failed to fetch residents');
-        const residents = await res.json();
+        // SỬA ĐOẠN NÀY: Lấy residents giống trang family
+        const residents = await residentAPI.getByFamilyMemberId(familyMemberId);
         if (!Array.isArray(residents)) {
           setFamilyFinancialData([]);
           return;
@@ -118,6 +114,8 @@ export default function FinancePage() {
           return {
             id: resident._id,
             residentName: resident.full_name || resident.fullName || resident.name,
+            avatar: userAPI.getAvatarUrl(resident.avatar),
+            relationship: resident.relationship || resident.emergency_contact?.relationship || resident.emergencyContact?.relationship || 'Chưa rõ', // Thêm relationship
             room: resident.room || '',
             residentDob: resident.dateOfBirth || resident.date_of_birth || '',
             birthYear: resident.birthYear || '',
@@ -210,80 +208,23 @@ export default function FinancePage() {
     setShowInvoiceModal(true);
   };
 
-  const handleViewServicePackage = () => {
-    setShowServiceModal(true);
+  // NEW: Handle PayOS payment redirect
+  const handlePayOnline = async (payment: any) => {
+    try {
+      // Hiển thị trạng thái loading nếu muốn
+      const data = await paymentAPI.createPayment(payment.id);
+      if (data && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert('Không lấy được link thanh toán online. Vui lòng thử lại.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Không thể tạo link thanh toán. Vui lòng thử lại.');
+    }
   };
 
   // Thay thế hàm getRegisteredServicePackage bằng logic đồng bộ với trang dịch vụ
-  const getAllRegisteredServicePackages = (statusFilter = 'all') => {
-    try {
-      if (user?.role === 'family') {
-        // Lấy từ RESIDENTS_DATA nếu là family
-        const residentsWithPackages = RESIDENTS_DATA.filter((r: any) => r.carePackage);
-        let packages = residentsWithPackages.map((resident: any) => ({
-          ...resident.carePackage,
-          residentInfo: {
-            name: resident.name,
-            age: resident.age,
-            room: resident.room,
-            admissionDate: resident.admissionDate || '',
-            healthCondition: resident.healthCondition || '',
-            emergencyContact: resident.emergencyContact || '',
-            medicalHistory: resident.medicalHistory || '',
-            medications: resident.medications_detail || resident.medications || '',
-            allergyInfo: resident.allergyInfo || '',
-            specialNeeds: resident.specialNeeds || '',
-            id: resident.id,
-          },
-        }));
-        if (statusFilter !== 'all') {
-          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
-        }
-        return packages;
-      }
-      // Còn lại lấy từ localStorage
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
-      if (savedResidents) {
-        const residents = JSON.parse(savedResidents);
-        const residentsWithPackages = residents.filter((r: any) => r.carePackage);
-        let packages = residentsWithPackages.map((resident: any) => ({
-          ...resident.carePackage,
-          residentInfo: {
-            name: resident.name,
-            age: resident.age,
-            room: resident.room,
-            admissionDate: resident.admissionDate || '',
-            healthCondition: resident.healthCondition || '',
-            emergencyContact: resident.emergencyContact || '',
-            medicalHistory: resident.medicalHistory || '',
-            medications: resident.medications || '',
-            allergyInfo: resident.allergyInfo || '',
-            specialNeeds: resident.specialNeeds || '',
-            id: resident.id,
-          },
-        }));
-        if (statusFilter !== 'all') {
-          packages = packages.filter((pkg: any) => pkg.status === statusFilter);
-        }
-        return packages;
-      }
-    } catch (error) {
-      console.error('Error getting registered service packages:', error);
-    }
-    return [];
-  };
-
-  const getRegisteredServicePackage = () => {
-    const allPackages = getAllRegisteredServicePackages();
-    // Nếu có selectedResident, ưu tiên lấy đúng người đang chọn
-    if (selectedResident) {
-      const found = allPackages.find(
-        (pkg: any) => pkg.residentInfo?.id?.toString() === selectedResident || pkg.residentInfo?.name === familyFinancialData[selectedResident]?.residentName
-      );
-      return found || (allPackages.length > 0 ? allPackages[0] : null);
-    }
-    return allPackages.length > 0 ? allPackages[0] : null;
-  };
+  // XÓA HÀM getAllRegisteredServicePackages và getRegisteredServicePackage vì không còn dùng RESIDENTS_DATA
 
   const getPaymentMethodName = (method: string) => {
     return 'Chuyển khoản ngân hàng';
@@ -352,7 +293,6 @@ export default function FinancePage() {
       timestamp: new Date().toISOString(),
       details: {
         amount: payment.amount,
-        method: paymentMethod,
         ipAddress: '192.168.1.1', // In real app, get from request
         userAgent: navigator.userAgent,
         ...details
@@ -549,54 +489,150 @@ export default function FinancePage() {
           
 
           {/* Family Member Selector */}
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.25rem',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <h3 style={{
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              color: '#374151',
-              marginBottom: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
+          {familyFinancialData.length > 1 && (
+            <div style={{
+              marginBottom: '2.5rem',
+              maxWidth: 5000,
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1.5rem',
+              padding: '2rem',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(10px)'
             }}>
-              <UserGroupIcon style={{width: '1.125rem', height: '1.125rem', color: '#8b5cf6'}} />
-              Chọn người thân để xem thông tin tài chính
-            </h3>
-            
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem'}}>
-              {familyFinancialData.map((resident, index) => (
-                <div
-                  key={resident.id}
-                  onClick={() => setSelectedResident(index)}
-                  style={{
-                    background: selectedResident === index ? '#eff6ff' : 'white',
-                    border: selectedResident === index ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    position: 'relative'
-                  }}
-                >
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                    <div>
-                      <h4 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: '0 0 0.5rem 0'}}>
-                        Người cao tuổi: {resident.residentName}
-                      </h4>
-                      
-                    </div>
-                  </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{
+                  width: '3rem',
+                  height: '3rem',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  borderRadius: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                }}>
+                  <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
                 </div>
-              ))}
+                <div>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    margin: 0,
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Chọn người thân để xem thông tin tài chính
+                  </h3>
+                  
+                </div>
+              </div>
+              
+              <Select
+                options={familyFinancialData.map((r, idx) => ({
+                  value: idx,
+                  label: r.residentName || 'Chưa rõ',
+                  avatar: userAPI.getAvatarUrl(r.avatar),
+                  roomNumber: r.room || 'Chưa cập nhật',
+                  relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+                }))}
+                value={(() => {
+                  const r = familyFinancialData[selectedResident];
+                  return r ? {
+                    value: selectedResident,
+                    label: r.residentName || 'Chưa rõ',
+                    avatar: userAPI.getAvatarUrl(r.avatar),
+                    roomNumber: r.room || 'Chưa cập nhật',
+                    relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+                  } : null;
+                })()}
+                onChange={opt => {
+                  if (typeof opt?.value === 'number') setSelectedResident(opt.value);
+                }}
+                formatOptionLabel={formatOptionLabel}
+                isSearchable
+                styles={{
+                  control: (base, state) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    minHeight: 70,
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    boxShadow: state.isFocused 
+                      ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)' 
+                      : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                    borderColor: state.isFocused ? '#8b5cf6' : '#e5e7eb',
+                    borderWidth: state.isFocused ? '2px' : '1px',
+                    paddingLeft: '1rem',
+                    paddingRight: '1rem',
+                    transition: 'all 0.2s ease',
+                    background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)'
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    background: state.isSelected 
+                      ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' 
+                      : state.isFocused 
+                      ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' 
+                      : '#fff',
+                    color: state.isSelected ? '#7c3aed' : '#111827',
+                    cursor: 'pointer',
+                    paddingTop: '1rem',
+                    paddingBottom: '1rem',
+                    paddingLeft: '1.5rem',
+                    paddingRight: '1.5rem',
+                    fontSize: '1.125rem',
+                    fontWeight: state.isSelected ? 700 : 600,
+                    borderBottom: '1px solid #f1f5f9',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateX(4px)'
+                    }
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    overflow: 'hidden'
+                  }),
+                  menuList: (base) => ({
+                    ...base,
+                    padding: '0.5rem'
+                  }),
+                  singleValue: (base) => ({
+                    ...base,
+                    color: '#7c3aed',
+                    fontWeight: 700
+                  }),
+                  placeholder: (base) => ({
+                    ...base,
+                    color: '#9ca3af',
+                    fontWeight: 500
+                  }),
+                  dropdownIndicator: (base) => ({
+                    ...base,
+                    color: '#8b5cf6',
+                    '&:hover': {
+                      color: '#7c3aed'
+                    }
+                  }),
+                  indicatorSeparator: (base) => ({
+                    ...base,
+                    backgroundColor: '#e5e7eb'
+                  })
+                }}
+                placeholder='Chọn người thân...'
+              />
             </div>
-          </div>
+          )}
 
 
 
@@ -936,7 +972,7 @@ export default function FinancePage() {
                                   return (
                                     <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
                                       <button
-                                        onClick={() => router.push(`/finance/${payment.id}/payment`)}
+                                        onClick={() => handlePayOnline(payment)}
                                         style={{
                                           marginTop: '0.25rem',
                                           display: 'inline-flex',
@@ -1157,54 +1193,156 @@ export default function FinancePage() {
         
 
         {/* Family Member Selector */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1rem',
-          padding: '1.25rem',
-          marginBottom: '1.5rem',
-          boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.3)'
-        }}>
-          <h3 style={{
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            color: '#374151',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
+        {familyFinancialData.length > 1 && (
+          <div style={{
+            marginBottom: '2.5rem',
+            maxWidth: 5000,
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)'
           }}>
-            <UserGroupIcon style={{width: '1.125rem', height: '1.125rem', color: '#8b5cf6'}} />
-            Chọn người thân để xem thông tin tài chính
-          </h3>
-          
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem'}}>
-            {familyFinancialData.map((resident, index) => (
-              <div
-                key={resident.id}
-                onClick={() => setSelectedResident(index)}
-                style={{
-                  background: selectedResident === index ? '#eff6ff' : 'white',
-                  border: selectedResident === index ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                  borderRadius: '12px',
-                  padding: '1.5rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  position: 'relative'
-                }}
-              >
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                  <div>
-                    <h4 style={{fontSize: '1.125rem', fontWeight: 600, color: '#111827', margin: '0 0 0.5rem 0'}}>
-                      Người cao tuổi: {resident.residentName}
-                    </h4>
-                    
-                  </div>
-                </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+              }}>
+                <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
               </div>
-            ))}
+              <div>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Chọn người thân để xem thông tin tài chính
+                </h3>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Chọn từ danh sách người thân của bạn
+                </p>
+              </div>
+            </div>
+            <Select
+              options={familyFinancialData.map((r, idx) => ({
+                value: idx,
+                label: r.residentName || 'Chưa rõ',
+                avatar: userAPI.getAvatarUrl(r.avatar),
+                roomNumber: r.room || 'Chưa cập nhật',
+                relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+              }))}
+              value={(() => {
+                const r = familyFinancialData[selectedResident];
+                return r ? {
+                  value: selectedResident,
+                  label: r.residentName || 'Chưa rõ',
+                  avatar: userAPI.getAvatarUrl(r.avatar),
+                  roomNumber: r.room || 'Chưa cập nhật',
+                  relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+                } : null;
+              })()}
+              onChange={opt => {
+                if (typeof opt?.value === 'number') setSelectedResident(opt.value);
+              }}
+              formatOptionLabel={formatOptionLabel}
+              isSearchable
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  borderRadius: '1rem',
+                  minHeight: 70,
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  boxShadow: state.isFocused 
+                    ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)' 
+                    : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                  borderColor: state.isFocused ? '#8b5cf6' : '#e5e7eb',
+                  borderWidth: state.isFocused ? '2px' : '1px',
+                  paddingLeft: '1rem',
+                  paddingRight: '1rem',
+                  transition: 'all 0.2s ease',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)'
+                }),
+                option: (base, state) => ({
+                  ...base,
+                  background: state.isSelected 
+                    ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' 
+                    : state.isFocused 
+                    ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' 
+                    : '#fff',
+                  color: state.isSelected ? '#7c3aed' : '#111827',
+                  cursor: 'pointer',
+                  paddingTop: '1rem',
+                  paddingBottom: '1rem',
+                  paddingLeft: '1.5rem',
+                  paddingRight: '1.5rem',
+                  fontSize: '1.125rem',
+                  fontWeight: state.isSelected ? 700 : 600,
+                  borderBottom: '1px solid #f1f5f9',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateX(4px)'
+                  }
+                }),
+                menu: (base) => ({
+                  ...base,
+                  borderRadius: '1rem',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  overflow: 'hidden'
+                }),
+                menuList: (base) => ({
+                  ...base,
+                  padding: '0.5rem'
+                }),
+                singleValue: (base) => ({
+                  ...base,
+                  color: '#7c3aed',
+                  fontWeight: 700
+                }),
+                placeholder: (base) => ({
+                  ...base,
+                  color: '#9ca3af',
+                  fontWeight: 500
+                }),
+                dropdownIndicator: (base) => ({
+                  ...base,
+                  color: '#8b5cf6',
+                  '&:hover': {
+                    color: '#7c3aed'
+                  }
+                }),
+                indicatorSeparator: (base) => ({
+                  ...base,
+                  backgroundColor: '#e5e7eb'
+                })
+              }}
+              placeholder='Chọn người thân...'
+            />
           </div>
-        </div>
+        )}
 
 
 
@@ -1544,7 +1682,7 @@ export default function FinancePage() {
                                 return (
                                   <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
                                     <button
-                                      onClick={() => router.push(`/finance/${payment.id}/payment`)}
+                                      onClick={() => handlePayOnline(payment)}
                                       style={{
                                         marginTop: '0.25rem',
                                         display: 'inline-flex',
@@ -2155,3 +2293,25 @@ const formatDob = (dob: string) => {
   const year = d.getFullYear();
   return `${day}-${month}-${year}`;
 };
+
+interface ResidentOption {
+  value: number;
+  label: string;
+  avatar: string;
+  roomNumber: string;
+  relationship: string;
+}
+
+const formatOptionLabel = (option: ResidentOption) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+    <img
+      src={option.avatar}
+      alt={option.label}
+      style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', background: '#f3f4f6' }}
+    />
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 20 }}>{option.label}</div>
+      {/* Bỏ dòng số phòng */}
+    </div>
+  </div>
+);

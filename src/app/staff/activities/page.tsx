@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   MagnifyingGlassIcon, 
   FunnelIcon, 
-  PlusCircleIcon, 
-  PencilIcon, 
-  UserGroupIcon, 
+  EyeIcon, 
   CalendarIcon,
-  EyeIcon,
   SparklesIcon,
   CalendarDaysIcon,
   ChevronLeftIcon,
@@ -17,14 +15,14 @@ import {
   ClockIcon,
   MapPinIcon,
   ListBulletIcon,
-  ArrowLeftIcon,
-  UserIcon
+  UserIcon,
+  CheckCircleIcon,
+  XMarkIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useResidents } from '@/lib/contexts/residents-context';
-import { activitiesAPI } from '@/lib/api';
-import { activityParticipationsAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI } from '@/lib/api';
 import ResidentEvaluationModal from '@/components/ResidentEvaluationModal';
 import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
@@ -98,7 +96,7 @@ const getCategoryLabel = (activityType: string) => {
 const categories = ['Tất cả', 'Thể chất', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục', 'Y tế', 'Tâm lý', 'Giải trí'];
 const locations = ['Tất cả', 'Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật'];
 
-export default function ActivitiesPage() {
+export default function StaffActivitiesPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { residents } = useResidents();
@@ -112,15 +110,58 @@ export default function ActivitiesPage() {
   const [error, setError] = useState<string | null>(null);
   const [activityParticipantCounts, setActivityParticipantCounts] = useState<{[id: string]: number}>({});
   
-  // Fetch activities from API
+  // Check access permissions
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    if (!user.role || user.role !== 'staff') {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
+  
+  // Fetch activities from API - same logic as main activities page
   useEffect(() => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await activitiesAPI.getAll();
-        const mappedActivities = data.map(mapActivityFromAPI).filter(Boolean); // Filter out null values
-        setActivities(mappedActivities);
+        
+        // Get all activity participations where this staff is assigned
+        if (!user?.id) {
+          setError('Không tìm thấy thông tin người dùng');
+          return;
+        }
+        
+        const participations = await activityParticipationsAPI.getByStaffId(user.id);
+        
+        // Extract unique activity IDs from participations
+        const activityIds = [...new Set(participations.map((p: any) => p.activity_id?._id || p.activity_id))];
+        
+        // Fetch activity details for each unique activity
+        const activityPromises = activityIds.map(async (activityId: any) => {
+          try {
+            const activityData = await activitiesAPI.getById(activityId);
+            return mapActivityFromAPI(activityData);
+          } catch (error) {
+            console.error(`Error fetching activity ${activityId}:`, error);
+            return null;
+          }
+        });
+        
+        const activityResults = await Promise.all(activityPromises);
+        const validActivities = activityResults.filter(Boolean);
+        
+        // Sort activities by date (newest first)
+        validActivities.sort((a, b) => {
+          if (!a || !b) return 0;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        
+        setActivities(validActivities);
       } catch (err: any) {
         console.error('Error fetching activities:', err);
         setError('Không thể tải danh sách hoạt động. Vui lòng thử lại sau.');
@@ -129,24 +170,12 @@ export default function ActivitiesPage() {
       }
     };
 
-    fetchActivities();
-  }, []);
-  
-  // Check access permissions
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
+    if (user?.id) {
+      fetchActivities();
     }
-    
-    if (!user.role || !['admin', 'staff'].includes(user.role)) {
-      router.push('/');
-      return;
-    }
-  }, [user, router]);
+  }, [user?.id]);
   
   const [searchTerm, setSearchTerm] = useState('');
-  // State for selected date filter (as Date object)
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [filterLocation, setFilterLocation] = useState('Tất cả');
   const [filterCategory, setFilterCategory] = useState('Tất cả');
@@ -251,41 +280,27 @@ export default function ActivitiesPage() {
       default: return '#6b7280';
     }
   };
-  
-  // Handler functions for button actions
+
   const handleViewActivity = (activityId: string) => {
-    router.push(`/activities/${activityId}`);
+    router.push(`/staff/activities/${activityId}`);
   };
 
-  const handleEditActivity = (activityId: string) => {
-    router.push(`/activities/${activityId}/edit`);
-  };
-
-  const handleCreateActivity = () => {
-    router.push('/activities/new');
-  };
-
-  // Handler for opening evaluation modal
   const handleOpenEvaluation = async (activity: any) => {
     try {
       const participations = await activityParticipationsAPI.getAll({
         activity_id: activity.id,
         date: activity.date
       });
-      // Lọc đúng ngày (so sánh yyyy-MM-dd)
+      
       const filteredParticipations = participations.filter((p: any) => {
         if (!p.date) return false;
         const participationDate = new Date(p.date).toLocaleDateString('en-CA');
         return participationDate === activity.date;
       });
-      // Nếu chỉ muốn người đã có đánh giá/tham gia:
-      // const filteredParticipations = participations.filter((p: any) => {
-      //   if (!p.date) return false;
-      //   const participationDate = new Date(p.date).toISOString().slice(0, 10);
-      //   return participationDate === activity.date && p.attendance_status === 'attended';
-      // });
+      
       const residentIds = filteredParticipations.map((p: any) => p.resident_id?._id || p.resident_id);
       const filteredResidents = residents.filter((r: any) => residentIds.includes(r.id));
+      
       setSelectedActivity(activity);
       setEvaluationResidents(filteredResidents);
       setEvaluationModalOpen(true);
@@ -329,7 +344,6 @@ export default function ActivitiesPage() {
     if (activities.length > 0) fetchCounts();
   }, [activities]);
 
-  // Loading state
   if (loading) {
     return (
       <div style={{
@@ -337,44 +351,28 @@ export default function ActivitiesPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         <div style={{
-          textAlign: 'center',
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '3rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem'
         }}>
           <div style={{
             width: '3rem',
             height: '3rem',
-            border: '3px solid #e5e7eb',
-            borderTopColor: '#f59e0b',
+            border: '3px solid rgba(255,255,255,0.3)',
+            borderTop: '3px solid white',
             borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1rem'
+            animation: 'spin 1s linear infinite'
           }} />
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: 600,
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Đang tải danh sách hoạt động...
-          </h3>
-          <p style={{
-            fontSize: '0.875rem',
-            color: '#6b7280'
-          }}>
-            Vui lòng chờ trong giây lát
-          </p>
+          <p style={{ color: 'white', fontWeight: 600 }}>Đang tải danh sách hoạt động...</p>
         </div>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div style={{
@@ -382,59 +380,28 @@ export default function ActivitiesPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         <div style={{
-          textAlign: 'center',
           background: 'white',
+          padding: '2rem',
           borderRadius: '1rem',
-          padding: '3rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+          textAlign: 'center',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
         }}>
-          <div style={{
-            width: '3rem',
-            height: '3rem',
-            background: '#fee2e2',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1rem'
-          }}>
-            <SparklesIcon style={{ width: '1.5rem', height: '1.5rem', color: '#ef4444' }} />
-          </div>
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: 600,
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Có lỗi xảy ra
-          </h3>
-          <p style={{
-            fontSize: '0.875rem',
-            color: '#6b7280',
-            marginBottom: '1rem'
-          }}>
-            {error}
-          </p>
+          <p style={{ color: '#ef4444', marginBottom: '1rem' }}>{error}</p>
           <button
             onClick={() => window.location.reload()}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              background: '#3b82f6',
               color: 'white',
+              border: 'none',
               padding: '0.75rem 1.5rem',
               borderRadius: '0.5rem',
-              border: 'none',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontWeight: 600
             }}
           >
-            <SparklesIcon style={{ width: '1rem', height: '1rem' }} />
             Thử lại
           </button>
         </div>
@@ -455,10 +422,8 @@ export default function ActivitiesPage() {
         position: 'relative',
         zIndex: 1
       }}>
-
-        
-        {/* Header */}
-        <div style={{
+          {/* Header */}
+          <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
           padding: '2rem',
@@ -575,40 +540,10 @@ export default function ActivitiesPage() {
             Lịch hoạt động
                 </button>
               </div>
-
-              <button
-                onClick={handleCreateActivity}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-                  gap: '0.5rem',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  border: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
-                }}
-              >
-                <PlusCircleIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-            Thêm hoạt động
-              </button>
             </div>
+          </div>
         </div>
-      </div>
-      
+
         {/* Filters */}
         <div style={{
           background: 'white',
@@ -662,7 +597,7 @@ export default function ActivitiesPage() {
                 />
               </div>
             </div>
-          
+
             <div>
                 <label style={{
                 display: 'block',
@@ -695,35 +630,6 @@ export default function ActivitiesPage() {
 />
               {/* Optionally, show a warning if the date is invalid */}
             </div>
-              
-            <div>
-                <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-                }}>
-                  Địa điểm
-                </label>
-                <select
-                value={filterLocation}
-                onChange={(e) => setFilterLocation(e.target.value)}
-                  style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
-              >
-                {locations.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
-            </div>
 
             <div>
                 <label style={{
@@ -753,7 +659,38 @@ export default function ActivitiesPage() {
                 ))}
               </select>
             </div>
+
+            <div>
+                <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '0.5rem'
+                }}>
+                  Địa điểm
+                </label>
+                <select
+                value={filterLocation}
+                onChange={(e) => setFilterLocation(e.target.value)}
+                  style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {locations.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          
         </div>
 
         {/* Calendar View Week Navigation */}
@@ -916,8 +853,8 @@ export default function ActivitiesPage() {
             </div>
           </div>
         )}
-        
-        {/* Activities List */}
+
+        {/* Activities Grid */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: viewMode === 'calendar' ? 
@@ -937,7 +874,7 @@ export default function ActivitiesPage() {
             .map((activity, index) => {
               const statusColor = getStatusColor(activity.status);
               const categoryColor = getCategoryColor(activity.activity_type);
-
+              
               return (
                 <div
                   key={activity.id || `activity-${index}`}
@@ -1125,113 +1062,90 @@ export default function ActivitiesPage() {
                       <EyeIcon style={{ width: '1rem', height: '1rem' }} />
                       Xem chi tiết
                     </button>
-                    {['admin', 'staff'].includes(user?.role || '') && (
-                      <button
-                        onClick={() => handleEditActivity(activity.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '0.5rem',
-                          border: 'none',
-                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                          color: 'white',
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <PencilIcon style={{ width: '1rem', height: '1rem' }} />
-                        Chỉnh sửa
-                      </button>
-                    )}
-                    
                   </div>
-                </div>
+                  </div>
+               
               );
             })}
         </div>
-        
-        {(viewMode === 'calendar' ? weekActivities : filteredActivities).length === 0 && (
-            <div style={{
+
+        {/* Empty State */}
+        {filteredActivities.length === 0 && !loading && (
+          <div style={{
+            textAlign: 'center',
+            padding: '4rem 2rem',
             background: 'white',
-              borderRadius: '1rem',
-              padding: '3rem',
-              textAlign: 'center',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            borderRadius: '1rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            border: '1px solid #e5e7eb'
           }}>
             <SparklesIcon style={{
               width: '4rem',
               height: '4rem',
-              color: '#d1d5db',
-              margin: '0 auto 1rem'
+              color: '#9ca3af',
+              margin: '0 auto 1rem auto'
             }} />
-                  <h3 style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 600,
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: 600,
               color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-              {viewMode === 'calendar' 
-                ? 'Không có hoạt động nào trong tuần này'
-                : 'Không tìm thấy hoạt động nào'
-              }
-                  </h3>
-                  <p style={{
-                    fontSize: '0.875rem',
-              color: '#6b7280',
-              marginBottom: '1rem'
+              margin: '0 0 0.5rem 0'
             }}>
-              {viewMode === 'calendar' 
-                ? 'Thử chuyển sang tuần khác hoặc tạo hoạt động mới'
-                : 'Thử thay đổi bộ lọc hoặc tạo hoạt động mới'
-              }
+              Không có hoạt động nào
+            </h3>
+            <p style={{
+              fontSize: '1rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              {searchTerm || filterCategory !== 'Tất cả' || filterLocation !== 'Tất cả' || selectedDate
+                ? 'Không tìm thấy hoạt động nào phù hợp với bộ lọc hiện tại.'
+                : 'Bạn chưa được phân công phụ trách hoạt động nào.'}
             </p>
-            <button
-              onClick={handleCreateActivity}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                color: 'white',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer'
-              }}
-            >
-              <PlusCircleIcon style={{ width: '1rem', height: '1rem' }} />
-              {viewMode === 'calendar' 
-                ? 'Tạo hoạt động cho tuần này'
-                : 'Tạo hoạt động đầu tiên'
-              }
-            </button>
           </div>
         )}
       </div>
-      {/* Resident Evaluation Modal */}
+
+      {/* Evaluation Modal */}
       {evaluationModalOpen && selectedActivity && (
         <ResidentEvaluationModal
           open={evaluationModalOpen}
-          onClose={() => setEvaluationModalOpen(false)}
+          onClose={() => {
+            setEvaluationModalOpen(false);
+            setSelectedActivity(null);
+            setEvaluationResidents([]);
+            // Refresh participant counts after closing
+            const fetchCounts = async () => {
+              const counts: {[id: string]: number} = {};
+              await Promise.all(activities.map(async (activity) => {
+                if (!activity.id || !activity.date) return;
+                try {
+                  const participations = await activityParticipationsAPI.getAll({
+                    activity_id: activity.id
+                  });
+                  
+                  // Lọc participations cho hoạt động này và đúng ngày
+                  const joined = participations.filter((p: any) => {
+                    const participationActivityId = p.activity_id?._id || p.activity_id;
+                    const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
+                    return participationActivityId === activity.id && participationDate === activity.date;
+                  });
+                  
+                  counts[activity.id] = joined.length;
+                } catch (error) {
+                  console.error(`Error fetching participations for activity ${activity.id}:`, error);
+                  counts[activity.id] = 0;
+                }
+              }));
+              setActivityParticipantCounts(counts);
+            };
+            fetchCounts();
+          }}
           activity={selectedActivity}
           residents={evaluationResidents}
           user={user}
         />
       )}
-
-      <style jsx>{`
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
     </div>
   );
-}
+} 

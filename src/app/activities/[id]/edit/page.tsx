@@ -29,58 +29,6 @@ type ActivityFormData = {
 const categories = ['Thể chất', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục', 'Y tế', 'Tâm lý', 'Giải trí'];
 const baseLocations = ['Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật'];
 
-// Mock activities data
-const activitiesData = [
-  { 
-    id: 1, 
-    name: 'Tập thể dục buổi sáng', 
-    description: 'Các bài tập kéo giãn và vận động nhẹ nhàng để cải thiện khả năng vận động. Hoạt động này được thiết kế đặc biệt cho người cao tuổi nhằm duy trì sức khỏe thể chất và tinh thần.',
-    category: 'Thể chất', 
-    location: 'Phòng sinh hoạt chung',
-    scheduledTime: '08:00', 
-    duration: 45,
-    capacity: 20,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
-      'Võ Thị K', 'Phan Văn L', 'Đỗ Thị M', 'Tạ Văn N', 'Hồ Thị O',
-      'Lưu Văn P', 'Mai Thị Q', 'Cao Văn R'
-    ],
-    facilitator: 'David Wilson',
-    facilitatorId: 5,
-    date: '2024-01-15',
-    notes: 'Cần chuẩn bị thảm tập yoga và nhạc nhẹ nhàng. Kiểm tra sức khỏe của các người cao tuổi trước khi tham gia.',
-    materials: ['Thảm tập yoga', 'Loa phát nhạc', 'Nước uống', 'Khăn nhỏ'],
-    benefits: ['Cải thiện khả năng vận động', 'Tăng cường sức khỏe tim mạch', 'Giảm căng thẳng', 'Cải thiện tâm trạng'],
-    level: 'Dễ',
-    recurring: 'Hàng ngày',
-    status: 'Đã lên lịch'
-  },
-  { 
-    id: 2, 
-    name: 'Mỹ thuật & Thủ công', 
-    description: 'Hoạt động vẽ tranh và làm đồ thủ công sáng tạo nhằm kích thích khả năng nghệ thuật và sáng tạo của người cao tuổi.',
-    category: 'Sáng tạo', 
-    location: 'Phòng hoạt động',
-    scheduledTime: '10:30', 
-    duration: 60,
-    capacity: 15,
-    participants: [
-      'Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Hoàng Văn D', 'Phạm Thị E',
-      'Vũ Văn F', 'Đặng Thị G', 'Bùi Văn H', 'Lý Thị I', 'Ngô Văn J',
-      'Võ Thị K', 'Phan Văn L'
-    ],
-    facilitator: 'Emily Parker',
-    facilitatorId: 2,
-    date: '2024-01-15',
-    notes: 'Hoạt động phù hợp với tất cả mức độ. Khuyến khích sự sáng tạo và không có áp lực về kết quả.',
-    materials: ['Giấy vẽ', 'Màu nước', 'Cọ vẽ', 'Kéo', 'Keo dán', 'Vải nỉ'],
-    benefits: ['Kích thích sáng tạo', 'Cải thiện khéo léo tay', 'Thư giãn tinh thần', 'Tăng cường tự tin'],
-    level: 'Trung bình',
-    recurring: 'Hàng tuần',
-    status: 'Đang diễn ra'
-  }
-];
 
 // Map giá trị activity_type từ API về đúng option
 function mapActivityType(type: string): string {
@@ -144,9 +92,9 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const onSubmit = async (data: ActivityFormData) => {
     setIsSubmitting(true);
     try {
-      // Chuẩn hóa dữ liệu gửi lên backend
+      // Chuẩn hóa dữ liệu gửi lên backend - gửi local time string
       const schedule_time = data.date && data.scheduledTime
-        ? new Date(`${data.date}T${data.scheduledTime}:00.000Z`).toISOString()
+        ? `${data.date}T${data.scheduledTime}:00`
         : '';
       const payload = {
         activity_name: data.name,

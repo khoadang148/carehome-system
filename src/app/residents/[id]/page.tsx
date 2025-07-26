@@ -15,7 +15,6 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { residentAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { vitalSignsAPI } from '@/lib/api';

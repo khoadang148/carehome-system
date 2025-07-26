@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import Link from 'next/link';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, apiClient, roomTypesAPI } from '@/lib/api';
 import Select from 'react-select';
@@ -850,28 +849,15 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
         {step === 6 && (
           <div>
             <label style={{ fontWeight: 600 }}>Ngày bắt đầu dịch vụ:</label>
-            <input
-              type='text'
-              value={startDate ? (() => {
-                const [y, m, d] = startDate.split('-');
-                return d && m && y ? `${d}/${m}/${y}` : '';
-              })() : ''}
-              onChange={e => {
-                // Accept dd/mm/yyyy and convert to yyyy-mm-dd
-                const val = e.target.value;
-                const match = val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                if (match) {
-                  const [, dd, mm, yyyy] = match;
-                  setStartDate(`${yyyy}-${mm}-${dd}`);
-                } else if (val === '') {
-                  setStartDate('');
-                }
-              }}
-              placeholder="dd/mm/yyyy"
-              style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16 }}
+            <DatePicker
+              selected={startDate ? new Date(startDate) : null}
+              onChange={date => setStartDate(date ? date.toISOString().slice(0, 10) : '')}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="dd/mm/yyyy"
+              minDate={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)}
+              maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)}
+              className="your-custom-class"
               required
-              pattern="\\d{2}/\\d{2}/\\d{4}"
-              inputMode="numeric"
             />
             <label style={{ fontWeight: 600 }}>Phân loại phòng theo giới tính:</label>
             <input

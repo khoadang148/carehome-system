@@ -17,26 +17,27 @@ import {
   PlusIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-import { aiRecommendationEngine, convertToAIProfile, AIRecommendation } from '@/lib/ai-recommendations';
+import { parseAIRecommendation, ParsedAIRecommendation, AIRecommendationResponse } from '@/lib/ai-recommendations';
 import { activitiesAPI } from '@/lib/api';
 import NotificationModal from '@/components/NotificationModal';
 import { residentAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 
 export default function AIRecommendationsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [selectedResident, setSelectedResident] = useState<string | null>(null);
-  const [timeOfDay, setTimeOfDay] = useState<string>('morning');
-  const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
-  const [groupRecommendations, setGroupRecommendations] = useState<AIRecommendation[]>([]);
-  const [selectedResidents, setSelectedResidents] = useState<number[]>([]);
+  const [selectedResident, setSelectedResident] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string>('09:00');
+  const [recommendations, setRecommendations] = useState<ParsedAIRecommendation[]>([]);
+  const [aiResponse, setAiResponse] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'individual' | 'group'>('individual');
-  const [residents, setResidents] = useState<any[]>([]);
   const [createLoading, setCreateLoading] = useState(false);
   const [notification, setNotification] = useState<{ open: boolean; type: 'success' | 'error'; message: string }>({ open: false, type: 'success', message: '' });
   const [searchText, setSearchText] = useState('');
+  const [residents, setResidents] = useState<any[]>([]);
 
   // Check access permissions
   useEffect(() => {
@@ -51,112 +52,104 @@ export default function AIRecommendationsPage() {
     }
   }, [user, router]);
 
-  // Thay đổi useEffect lấy residents từ API thật
   useEffect(() => {
-    const fetchResidents = async () => {
-      try {
-        const apiData = await residentAPI.getAll();
-        // Map lại dữ liệu giống trang residents
-        const mapped = await Promise.all(apiData.map(async (r: any) => {
-          let room = '';
-          try {
-            const assignments = await carePlansAPI.getByResidentId(r._id);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-            if (assignment?.assigned_room_id) {
-              const roomData = await roomsAPI.getById(assignment.assigned_room_id);
-              room = roomData?.room_number || '';
-            }
-          } catch {}
-          return {
-            id: r._id,
-            name: r.full_name || '',
-            room,
-          };
-        }));
-        setResidents(mapped);
-      } catch (err) {
-        setResidents([]);
-      }
-    };
     fetchResidents();
   }, []);
 
-  useEffect(() => {
-    // Load resident profiles into AI engine
-    residents.forEach((resident: any) => {
-      const aiProfile = convertToAIProfile({
-        ...resident,
-        conditions: resident.conditions || ['diabetes', 'arthritis'],
-        mobilityLevel: resident.mobilityLevel || 'medium',
-        cognitiveLevel: resident.cognitiveLevel || 'normal',
-        socialPreferences: resident.socialPreferences || 'mixed',
-        activityPreferences: resident.activityPreferences || ['Thể chất', 'Sáng tạo'],
-        participationHistory: resident.participationHistory || [
-          {
-            activityId: 1,
-            activityName: 'Tập thể dục buổi sáng',
-            date: '2024-01-10',
-            participationLevel: 'full',
-            enjoymentRating: 4,
-            behaviorNotes: 'Tích cực tham gia',
-            healthImpact: 'positive'
-          }
-        ],
-        medicalRestrictions: resident.medicalRestrictions || [],
-        personalInterests: resident.personalInterests || ['âm nhạc', 'vẽ tranh'],
-        physicalLimitations: resident.physicalLimitations || [],
-        emotionalState: resident.emotionalState || 'calm',
-        sleepPattern: resident.sleepPattern || 'good',
-        nutritionLevel: resident.nutritionLevel || 'good'
-      });
-      aiRecommendationEngine.loadResidentProfile(aiProfile);
-    });
-  }, [residents]);
+    const fetchResidents = async () => {
+      try {
+      const response = await residentAPI.getAll();
+      setResidents(response);
+    } catch (error) {
+      console.error('Error fetching residents:', error);
+      setNotification({ open: true, type: 'error', message: 'Không thể tải danh sách người cao tuổi.' });
+      }
+    };
 
   const generateIndividualRecommendations = async () => {
     if (!selectedResident) return;
     
     setLoading(true);
     try {
-      // Simulate AI processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Tạo datetime string từ ngày và giờ được chọn (không dùng toISOString)
+      let scheduleDateTime = '';
+      if (selectedDate && selectedTime) {
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        scheduleDateTime = `${year}-${month}-${day}T${selectedTime}`;
+      }
       
-      const recs = aiRecommendationEngine.generateRecommendations(selectedResident, timeOfDay);
-      setRecommendations(recs);
+      // Gọi API mới với residentIds và schedule_time
+      const response: AIRecommendationResponse = await activitiesAPI.getAIRecommendation(
+        [selectedResident],
+        scheduleDateTime
+      );
+      
+      // Xử lý response theo cấu trúc thực tế từ API
+      if (!response || !Array.isArray(response) || response.length === 0) {
+        setNotification({ open: true, type: 'error', message: 'Phản hồi AI không hợp lệ.' });
+        setRecommendations([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Lấy feedback từ phần tử đầu tiên trong mảng
+      const firstRecommendation = response[0];
+      if (!firstRecommendation || !firstRecommendation.feedback || typeof firstRecommendation.feedback !== 'string') {
+        setNotification({ open: true, type: 'error', message: 'Phản hồi AI không hợp lệ.' });
+        setRecommendations([]);
+        setLoading(false);
+        return;
+      }
+      
+      setAiResponse(firstRecommendation.feedback);
+      const parsedRecs = parseAIRecommendation(firstRecommendation.feedback);
+      
+      // Validate parsed recommendations
+      console.log('Raw AI feedback:', firstRecommendation.feedback);
+      console.log('Parsed recommendations:', parsedRecs);
+      if (parsedRecs.length > 0) {
+        const rec = parsedRecs[0];
+        console.log('First recommendation validation:', {
+          activityName: rec.activityName,
+          duration: rec.duration,
+          difficulty: rec.difficulty,
+          confidenceLevel: rec.confidenceLevel,
+          hasDescription: !!rec.detailedDescription,
+          objectivesCount: rec.objectives?.length || 0,
+          benefitsCount: rec.benefits?.length || 0
+        });
+      
+        // Validate critical fields
+        if (!rec.activityName || rec.activityName === 'Hoạt Động Thư Giãn Được Đề Xuất') {
+          console.warn('Warning: Activity name might not be parsed correctly');
+        }
+        if (!rec.duration || rec.duration === '30-45 phút') {
+          console.warn('Warning: Duration might not be parsed correctly');
+        }
+        if (!rec.difficulty || rec.difficulty === 'Trung bình') {
+          console.warn('Warning: Difficulty might not be parsed correctly');
+        }
+      }
+      
+      setRecommendations(parsedRecs);
     } catch (error) {
       console.error('Error generating recommendations:', error);
-      alert('Có lỗi xảy ra khi tạo gợi ý. Vui lòng thử lại.');
+      setNotification({ open: true, type: 'error', message: 'Có lỗi xảy ra khi tạo gợi ý. Vui lòng thử lại.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const generateGroupRecommendations = async () => {
-    if (selectedResidents.length < 2) {
-      alert('Vui lòng chọn ít nhất 2 người cao tuổi để tạo gợi ý nhóm');
-      return;
+  // Khi nhận về schedule_time từ BE, parse lại đúng local
+  const handleScheduleTimeFromAPI = (schedule_time: string) => {
+    if (schedule_time) {
+      const [datePart, timePart] = schedule_time.split('T');
+      const [year, month, day] = datePart.split('-');
+      setSelectedDate(new Date(Number(year), Number(month) - 1, Number(day)));
+      setSelectedTime(timePart);
     }
-    
-    setLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const groupRecs = aiRecommendationEngine.generateGroupRecommendations(selectedResidents, timeOfDay);
-      setGroupRecommendations(groupRecs);
-    } catch (error) {
-      console.error('Error generating group recommendations:', error);
-      alert('Có lỗi xảy ra khi tạo gợi ý nhóm. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResidentToggle = (residentId: number) => {
-    setSelectedResidents(prev => 
-      prev.includes(residentId) 
-        ? prev.filter(id => id !== residentId)
-        : [...prev, residentId]
-    );
   };
 
   const getPriorityColor = (priority: string) => {
@@ -168,55 +161,148 @@ export default function AIRecommendationsPage() {
     }
   };
 
-  const getSelectedResidentNames = () => {
-    return selectedResidents.map(id => {
-      const resident = residents.find(r => r.id === id);
-      return resident?.name || '';
-    }).join(', ');
-  };
-
-  // Helper to get ISO string for schedule_time (use today and optimalTime if possible)
-  const getScheduleTime = (optimalTime: string) => {
-    // Try to parse time from optimalTime string (e.g., '8:00-11:00')
-    const today = new Date();
-    let hour = 8, minute = 0;
-    if (optimalTime && /\d{1,2}:\d{2}/.test(optimalTime)) {
-      const match = optimalTime.match(/(\d{1,2}):(\d{2})/);
-      if (match) {
-        hour = parseInt(match[1], 10);
-        minute = parseInt(match[2], 10);
-      }
-    } else if (optimalTime && optimalTime.includes('sáng')) {
-      hour = 8;
-    } else if (optimalTime && optimalTime.includes('chiều')) {
-      hour = 14;
-    } else if (optimalTime && optimalTime.includes('tối')) {
-      hour = 19;
-    }
-    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute, 0);
-    return date.toISOString();
-  };
-
-  const handleCreateActivity = async (recommendation: AIRecommendation) => {
+  const handleCreateActivity = async (recommendation: ParsedAIRecommendation) => {
     setCreateLoading(true);
     try {
+      // Parse duration from string to number
+      const durationMatch = recommendation.duration.match(/(\d+)/);
+      const duration = durationMatch ? parseInt(durationMatch[1], 10) : 45;
+      // Create a comprehensive description from AI recommendation data
+      let description = '';
+      
+      // Tạo mô tả ngắn gọn và chuyên nghiệp
+      const descriptionParts = [];
+      
+      // Thêm mô tả chi tiết nếu có
+      if (recommendation.detailedDescription && recommendation.detailedDescription.length > 20) {
+        descriptionParts.push(recommendation.detailedDescription);
+      }
+      
+      // Thêm mục tiêu nếu có
+      if (recommendation.objectives && recommendation.objectives.length > 0) {
+        const objectives = recommendation.objectives.slice(0, 2).join(', '); // Chỉ lấy 2 mục tiêu đầu
+        descriptionParts.push(`Mục tiêu: ${objectives}`);
+      }
+      
+      // Thêm lợi ích nếu có
+      if (recommendation.benefits && recommendation.benefits.length > 0) {
+        const benefits = recommendation.benefits.slice(0, 2).join(', '); // Chỉ lấy 2 lợi ích đầu
+        descriptionParts.push(`Lợi ích: ${benefits}`);
+      }
+      
+      // Thêm lưu ý quan trọng nếu có
+      if (recommendation.precautions && recommendation.precautions.length > 0) {
+        const precautions = recommendation.precautions.slice(0, 1).join(', '); // Chỉ lấy 1 lưu ý đầu
+        descriptionParts.push(`Lưu ý: ${precautions}`);
+      }
+      
+      // Ghép các phần lại thành mô tả hoàn chỉnh
+      description = descriptionParts.join('. ');
+      
+      // Nếu không có mô tả chi tiết, tạo mô tả mặc định ngắn gọn
+      if (!description || description.length < 30) {
+        description = `Hoạt động ${recommendation.activityName} được thiết kế phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần.`;
+      }
+      
+      // Giới hạn độ dài mô tả để tránh quá dài
+      if (description.length > 300) {
+        description = description.substring(0, 297) + '...';
+      }
+      const getActivityType = (activityName: string): string => {
+        const name = activityName.toLowerCase();
+        if (name.includes('đi bộ') || name.includes('tập thể dục') || name.includes('thể dục')) {
+          return 'Thể dục';
+        } else if (name.includes('vườn') || name.includes('cây cảnh') || name.includes('chăm sóc')) {
+          return 'Làm vườn';
+        } else if (name.includes('âm nhạc') || name.includes('hát') || name.includes('nhạc')) {
+          return 'Âm nhạc';
+        } else if (name.includes('yoga') || name.includes('dưỡng sinh') || name.includes('thiền')) {
+          return 'Dưỡng sinh';
+        } else if (name.includes('thư giãn') || name.includes('nghỉ ngơi')) {
+          return 'Thư giãn';
+        } else {
+          return 'Hoạt động chung';
+        }
+      };
+      const getLocation = (activityType: string, activityName: string): string => {
+        const name = activityName.toLowerCase();
+        if (activityType === 'Thể dục' || name.includes('đi bộ')) {
+          return 'Sân vườn';
+        } else if (activityType === 'Làm vườn') {
+          return 'Vườn cây';
+        } else if (activityType === 'Âm nhạc') {
+          return 'Phòng sinh hoạt';
+        } else if (activityType === 'Dưỡng sinh') {
+          return 'Phòng tập';
+        } else {
+          return 'Khu vực chung';
+        }
+      };
+      const activityType = getActivityType(recommendation.activityName);
+      // Gửi schedule_time đúng local, không dùng toISOString
+      let scheduleDateTime = '';
+      if (selectedDate && selectedTime) {
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        scheduleDateTime = `${year}-${month}-${day}T${selectedTime}`;
+      }
+
+      // Validate thời gian
+      if (scheduleDateTime) {
+        const selectedDateTime = new Date(scheduleDateTime);
+        const now = new Date();
+        
+        // Kiểm tra không được tạo trong quá khứ
+        if (selectedDateTime <= now) {
+          throw new Error('Thời gian bắt đầu không thể là thời gian trong quá khứ. Vui lòng chọn thời gian trong tương lai.');
+        }
+        
+        // Kiểm tra phải tạo trước ít nhất 2 tiếng
+        const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+        if (selectedDateTime < twoHoursFromNow) {
+          throw new Error('Hoạt động phải được tạo trước ít nhất 2 tiếng so với thời gian bắt đầu để đảm bảo chuẩn bị đầy đủ.');
+        }
+        
+        // Kiểm tra không được tạo trước quá 1 tuần
+        const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        if (selectedDateTime > oneWeekFromNow) {
+          throw new Error('Hoạt động chỉ có thể được tạo trước tối đa 1 tuần so với thời gian bắt đầu.');
+        }
+      }
+
       const activityData = {
         activity_name: recommendation.activityName,
-        description: recommendation.reasons?.join('\n') || '',
-        duration: recommendation.suggestedDuration || 45,
-        schedule_time: getScheduleTime(recommendation.optimalTime),
-        location: '', // No location in AIRecommendation, leave blank or set default
-        capacity: recommendation.recommendedParticipants?.length || 20,
-        // Optionally add more fields if your API supports (category, etc.)
+        description: description || recommendation.description || 'Hoạt động được đề xuất bởi AI',
+        duration: duration,
+        schedule_time: scheduleDateTime,
+        location: getLocation(activityType, recommendation.activityName),
+        capacity: 20,
+        activity_type: activityType,
       };
-      await activitiesAPI.create(activityData);
-      setNotification({ open: true, type: 'success', message: 'Tạo hoạt động thành công!' });
+      // Validate required fields
+      if (!activityData.activity_name || !activityData.description || !activityData.activity_type) {
+        throw new Error('Thiếu thông tin bắt buộc để tạo hoạt động. Vui lòng kiểm tra lại dữ liệu AI recommendation.');
+      }
+      const response = await activitiesAPI.create(activityData);
+      setNotification({ open: true, type: 'success', message: 'Hoạt động đã được tạo thành công từ gợi ý AI! Bạn sẽ được chuyển đến trang danh sách hoạt động.' });
       setTimeout(() => {
         setNotification({ open: false, type: 'success', message: '' });
         router.push('/activities');
       }, 1500);
     } catch (error: any) {
-      setNotification({ open: true, type: 'error', message: error?.message || 'Không thể tạo hoạt động' });
+      let errorMessage = 'Đã xảy ra lỗi khi tạo hoạt động từ gợi ý AI. Vui lòng thử lại sau.';
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      if (error?.response?.data) {
+        console.error('Backend error details:', error.response.data);
+      }
+      setNotification({ open: true, type: 'error', message: errorMessage });
     } finally {
       setCreateLoading(false);
     }
@@ -307,7 +393,7 @@ export default function AIRecommendationsPage() {
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Input Section */}
         <div style={{
           background: 'white',
           borderRadius: '1rem',
@@ -316,50 +402,6 @@ export default function AIRecommendationsPage() {
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
-          <div style={{
-            display: 'flex',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            <button
-              onClick={() => setActiveTab('individual')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                background: activeTab === 'individual' 
-                  ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
-                  : '#f3f4f6',
-                color: activeTab === 'individual' ? 'white' : '#6b7280',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Gợi ý theo cá nhân
-            </button>
-            <button
-              onClick={() => setActiveTab('group')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                background: activeTab === 'group' 
-                  ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
-                  : '#f3f4f6',
-                color: activeTab === 'group' ? 'white' : '#6b7280',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Gợi ý theo nhóm
-            </button>
-          </div>
-
-          {/* Individual Tab */}
-          {activeTab === 'individual' && (
-            <div>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -390,7 +432,7 @@ export default function AIRecommendationsPage() {
                   >
                     <option value="">Chọn người cao tuổi...</option>
                     {residents.map(resident => (
-                      <option key={resident.id} value={resident.id}>
+                      <option key={resident._id || resident.id} value={resident.id}>
                         {resident.name}{resident.room ? ` - Phòng ${resident.room}` : ''}
                       </option>
                     ))}
@@ -405,11 +447,20 @@ export default function AIRecommendationsPage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Thời gian trong ngày
+                Ngày (tùy chọn)
                   </label>
-                  <select
-                    value={timeOfDay}
-                    onChange={(e) => setTimeOfDay(e.target.value)}
+              <DatePicker
+                selected={selectedDate}
+                onChange={(date) => {
+                  setSelectedDate(date as Date);
+                    }}
+                dateFormat="dd/MM/yyyy"
+                className="datepicker-input"
+                placeholderText="dd/mm/yyyy"
+                wrapperClassName="w-full"
+                customInput={
+                  <input
+                    type="text"
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -418,135 +469,19 @@ export default function AIRecommendationsPage() {
                       fontSize: '0.875rem',
                       background: 'white'
                     }}
-                  >
-                    <option value="morning">Buổi sáng (8:00-11:00)</option>
-                    <option value="afternoon">Buổi chiều (14:00-17:00)</option>
-                    <option value="evening">Buổi tối (19:00-21:00)</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={generateIndividualRecommendations}
-                disabled={!selectedResident || loading}
-                style={{
-                  padding: '0.875rem 2rem',
-                  borderRadius: '0.75rem',
-                  border: 'none',
-                  background: selectedResident && !loading 
-                    ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
-                    : '#9ca3af',
-                  color: 'white',
-                  fontWeight: 600,
-                  cursor: selectedResident && !loading ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {loading ? (
-                  <>
-                    <div style={{
-                      width: '1rem',
-                      height: '1rem',
-                      border: '2px solid transparent',
-                      borderTop: '2px solid white',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    Đang phân tích...
-                  </>
-                ) : (
-                  <>
-                    <SparklesIcon style={{ width: '1rem', height: '1rem' }} />
-                    Tạo hoạt động
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Group Tab */}
-          {activeTab === 'group' && (
-            <div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  Chọn người cao tuổi (tối thiểu 2 người)
-                </label>
-                {/* Ô tìm kiếm */}
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm người cao tuổi..."
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  style={{
-                    width: '100%',
-                    marginBottom: '0.5rem',
-                    padding: '0.5rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.95em'
-                  }}
-                />
-                {/* List dọc thay cho grid */}
-                <div style={{
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  background: '#f9fafb'
-                }}>
-                  {residents
-                    .filter(resident =>
-                      resident.name.toLowerCase().includes(searchText.toLowerCase()) ||
-                      (resident.room || '').toLowerCase().includes(searchText.toLowerCase())
-                    )
-                    .map(resident => (
-                    <label
-                      key={resident.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '1rem',
-                        padding: '0.75rem 1rem',
-                        borderBottom: '1px solid #e5e7eb',
-                        cursor: 'pointer',
-                        background: selectedResidents.includes(resident.id) ? '#e0e7ff' : 'transparent',
-                        transition: 'background 0.2s'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedResidents.includes(resident.id)}
-                        onChange={() => handleResidentToggle(resident.id)}
-                        style={{ margin: 0 }}
-                      />
-                      <span style={{ fontWeight: 500 }}>{resident.name}</span>
-                      <span style={{ color: '#6b7280', fontSize: '0.85em' }}>
-                        {resident.room ? `Phòng ${resident.room}` : ''}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {selectedResidents.length > 0 && (
+                  />
+                }
+                  />
                   <p style={{
-                    fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                     color: '#6b7280',
-                    marginTop: '0.5rem'
+                    marginTop: '0.25rem'
                   }}>
-                    Đã chọn: {getSelectedResidentNames()}
+                Nếu chọn, sẽ ưu tiên ngày này thay vì ngày hiện tại
                   </p>
-                )}
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
+            <div>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
@@ -554,39 +489,46 @@ export default function AIRecommendationsPage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Thời gian trong ngày
+                Giờ (tùy chọn)
                 </label>
-                <select
-                  value={timeOfDay}
-                  onChange={(e) => setTimeOfDay(e.target.value)}
+                <input
+                type="time"
+                value={selectedTime}
+                  onChange={(e) => {
+                  setSelectedTime(e.target.value);
+                  }}
                   style={{
-                    width: '300px',
+                  width: '100%',
                     padding: '0.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid #d1d5db',
                     fontSize: '0.875rem',
                     background: 'white'
                   }}
-                >
-                  <option value="morning">Buổi sáng (8:00-11:00)</option>
-                  <option value="afternoon">Buổi chiều (14:00-17:00)</option>
-                  <option value="evening">Buổi tối (19:00-21:00)</option>
-                </select>
+                />
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  marginTop: '0.25rem'
+                }}>
+                Nếu chọn, sẽ ưu tiên giờ này thay vì giờ AI đề xuất
+                </p>
+            </div>
               </div>
 
               <button
-                onClick={generateGroupRecommendations}
-                disabled={selectedResidents.length < 2 || loading}
+            onClick={generateIndividualRecommendations}
+            disabled={!selectedResident || loading}
                 style={{
                   padding: '0.875rem 2rem',
                   borderRadius: '0.75rem',
                   border: 'none',
-                  background: selectedResidents.length >= 2 && !loading 
+              background: selectedResident && !loading 
                     ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
                     : '#9ca3af',
                   color: 'white',
                   fontWeight: 600,
-                  cursor: selectedResidents.length >= 2 && !loading ? 'pointer' : 'not-allowed',
+              cursor: selectedResident && !loading ? 'pointer' : 'not-allowed',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
@@ -603,21 +545,19 @@ export default function AIRecommendationsPage() {
                       borderRadius: '50%',
                       animation: 'spin 1s linear infinite'
                     }} />
-                    Đang phân tích nhóm...
+                Đang phân tích...
                   </>
                 ) : (
                   <>
                     <SparklesIcon style={{ width: '1rem', height: '1rem' }} />
-                    Tạo gợi ý nhóm AI
+                Tạo gợi ý AI
                   </>
                 )}
               </button>
-            </div>
-          )}
         </div>
 
         {/* Recommendations Results */}
-        {(recommendations.length > 0 || groupRecommendations.length > 0) && (
+        {recommendations.length > 0 && (
           <div style={{
             background: 'white',
             borderRadius: '1rem',
@@ -646,181 +586,404 @@ export default function AIRecommendationsPage() {
               gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
               gap: '1.5rem'
             }}>
-              {(activeTab === 'individual' ? recommendations : groupRecommendations).map((rec, index) => {
+              {recommendations.map((rec, index) => {
                 const priorityColor = getPriorityColor(rec.priority);
+                
+                // Validate and sanitize data before rendering to ensure correct field mapping
+                // This prevents display issues where wrong information shows in wrong fields
+                const safeRec: ParsedAIRecommendation = {
+                  activityName: rec.activityName || 'Hoạt động được đề xuất',
+                  duration: rec.duration || '30-45 phút',
+                  difficulty: rec.difficulty || 'Trung bình',
+                  confidenceLevel: rec.confidenceLevel || 70,
+                  priority: rec.priority || 'medium',
+                  description: rec.description || rec.detailedDescription || 'Mô tả chi tiết về hoạt động này.',
+                  detailedDescription: rec.detailedDescription || 'Mô tả chi tiết về hoạt động này.',
+                  objectives: rec.objectives || [],
+                  benefits: rec.benefits || [],
+                  precautions: rec.precautions || [],
+                  timeOfDay: rec.timeOfDay || ''
+                };
                 
                 return (
                   <div
                     key={index}
                     style={{
-                      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                      borderRadius: '1rem',
+                      background: 'white',
+                      borderRadius: '0.75rem',
                       padding: '1.5rem',
-                      border: `2px solid ${priorityColor.border}`,
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      transition: 'all 0.2s ease'
+                      border: '1px solid #e5e7eb',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
-                    {/* Header */}
+                    {/* Activity Name Section */}
+                    <div style={{
+                      padding: '1.5rem 0',
+                      borderBottom: '1px solid #f3f4f6',
+                      marginBottom: '1.5rem'
+                    }}>
                     <div style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
+                        alignItems: 'center',
+                        gap: '0.75rem',
                       marginBottom: '1rem'
                     }}>
-                      <div>
+                        <div style={{
+                          width: '2rem',
+                          height: '2rem',
+                          background: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <SparklesIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
                         <h3 style={{
-                          fontSize: '1.125rem',
+                            fontSize: '1.25rem',
                           fontWeight: 600,
                           margin: 0,
-                          marginBottom: '0.25rem'
+                            color: '#1e293b',
+                            lineHeight: '1.3'
                         }}>
-                          {rec.activityName}
+                            {safeRec.activityName}
                         </h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <span style={{
                             padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
+                          borderRadius: '0.375rem',
                             background: priorityColor.bg,
                             color: priorityColor.text,
                             fontSize: '0.75rem',
-                            fontWeight: 600
+                          fontWeight: 500
                           }}>
-                            {rec.priority === 'high' ? 'Ưu tiên cao' : 
-                             rec.priority === 'medium' ? 'Ưu tiên trung bình' : 'Ưu tiên thấp'}
+                          {safeRec.priority === 'high' ? 'Ưu tiên cao' : 
+                           safeRec.priority === 'medium' ? 'Ưu tiên trung bình' : 'Ưu tiên thấp'}
                           </span>
-                        </div>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}>
-                        <StarIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
-                        <span style={{ 
-                          fontSize: '1rem', 
-                          fontWeight: 600, 
-                          color: '#f59e0b' 
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          fontSize: '0.75rem',
+                          fontWeight: 500
                         }}>
-                          {rec.recommendationScore}/100
+                          {safeRec.difficulty}
+                        </span>
+                        <span style={{ 
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}>
+                          {safeRec.confidenceLevel}/100
                         </span>
                       </div>
                     </div>
 
-                    {/* Metrics */}
+                    {/* Activity Overview */}
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(2, 1fr)',
-                      gap: '1rem',
-                      marginBottom: '1rem'
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      marginBottom: '1.5rem',
+                      border: '1px solid #e2e8f0'
                     }}>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem'
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem'
                       }}>
-                        <ClockIcon style={{ width: '1rem', height: '1rem', color: '#6b7280' }} />
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          {rec.optimalTime}
-                        </span>
+                        <div style={{
+                          width: '1.5rem',
+                          height: '1.5rem',
+                          background: '#3b82f6',
+                          borderRadius: '0.375rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <SparklesIcon style={{ width: '0.875rem', height: '0.875rem', color: 'white' }} />
                       </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#6b7280' }} />
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          {rec.suggestedDuration} phút
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Participants */}
-                    {rec.recommendedParticipants.length > 1 && (
-                      <div style={{ marginBottom: '1rem' }}>
                         <h4 style={{
                           fontSize: '0.875rem',
                           fontWeight: 600,
-                          color: '#374151',
-                          marginBottom: '0.5rem'
+                          color: '#1e293b',
+                          margin: 0
                         }}>
-                          người cao tuổi tham gia:
+                          Tổng quan hoạt động
                         </h4>
+                      </div>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                        gap: '0.75rem'
+                      }}>
                         <div style={{
+                          background: 'white',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                      <div style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            color: '#64748b',
+                            marginBottom: '0.25rem'
+                          }}>
+                            Thời lượng
+                          </div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            color: '#334155'
+                          }}>
+                            {safeRec.duration}
+                        </div>
+                      </div>
+                      <div style={{
+                          background: 'white',
+                        borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            color: '#64748b',
+                            marginBottom: '0.25rem'
+                          }}>
+                            Độ khó
+                        </div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            color: '#334155'
+                          }}>
+                            {safeRec.difficulty}
+                          </div>
+                        </div>
+                        {safeRec.timeOfDay && (
+                          <div style={{
+                            background: 'white',
+                            borderRadius: '0.5rem',
+                            padding: '0.75rem',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            color: '#64748b',
+                            marginBottom: '0.25rem'
+                          }}>
+                              Thời điểm
+                          </div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            color: '#334155'
+                          }}>
+                              {safeRec.timeOfDay}
+                          </div>
+                        </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Time of Day */}
+                    {safeRec.timeOfDay && (
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#64748b',
+                          marginBottom: '0.5rem',
                           display: 'flex',
-                          flexWrap: 'wrap',
+                          alignItems: 'center',
                           gap: '0.5rem'
                         }}>
-                          {rec.recommendedParticipants.map(participantId => {
-                            const participant = residents.find(r => r.id === participantId);
-                            return (
-                              <span
-                                key={participantId}
-                                style={{
-                                  padding: '0.25rem 0.5rem',
-                                  background: '#e0e7ff',
-                                  color: '#3730a3',
-                                  borderRadius: '0.375rem',
-                                  fontSize: '0.75rem'
-                                }}
-                              >
-                                {participant?.name || `người cao tuổi ${participantId}`}
-                              </span>
-                            );
-                          })}
+                          <ClockIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                          Thời điểm thực hiện
+                        </h4>
+                        <div style={{
+                          background: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            color: '#334155',
+                            margin: 0,
+                            lineHeight: '1.5'
+                          }}>
+                            {safeRec.timeOfDay}
+                          </p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#64748b',
+                            margin: '0.25rem 0 0 0',
+                            fontStyle: 'italic'
+                          }}>
+                           Trợ lý thông minh đã phân tích và đề xuất thời gian phù hợp
+                          </p>
                         </div>
                       </div>
                     )}
 
-                    {/* Reasons */}
-                    <div style={{ marginBottom: '1rem' }}>
+                    {/* Objectives */}
+                    {safeRec.objectives && safeRec.objectives.length > 0 && (
+                      <div style={{ marginBottom: '1.5rem' }}>
                       <h4 style={{
                         fontSize: '0.875rem',
                         fontWeight: 600,
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Lý do gợi ý:
+                          color: '#64748b',
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <LightBulbIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                          Mục tiêu hoạt động
                       </h4>
+                        <div style={{
+                          background: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                        }}>
                       <ul style={{
                         margin: 0,
                         paddingLeft: '1rem',
                         fontSize: '0.875rem',
-                        color: '#6b7280'
-                      }}>
-                        {rec.reasons.map((reason, idx) => (
-                          <li key={idx} style={{ marginBottom: '0.25rem' }}>
-                            {reason}
+                            color: '#334155'
+                          }}>
+                            {safeRec.objectives.map((objective, idx) => (
+                              <li key={idx} style={{ 
+                                marginBottom: '0.25rem',
+                                lineHeight: '1.5'
+                              }}>
+                                {objective}
                           </li>
                         ))}
                       </ul>
                     </div>
+                      </div>
+                    )}
+
+                    {/* Detailed Description */}
+                    {safeRec.detailedDescription && (
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#64748b',
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <EyeIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                          Mô tả hoạt động
+                        </h4>
+                        <div style={{
+                          background: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            color: '#334155',
+                            margin: 0,
+                            lineHeight: '1.5'
+                          }}>
+                            {(() => {
+                              // Tạo mô tả ngắn gọn và chuyên nghiệp từ detailedDescription
+                              let cleanDescription = safeRec.detailedDescription;
+                              
+                              // Loại bỏ các phần thông tin đã có ở các trường khác
+                              cleanDescription = cleanDescription.replace(/\*\*Tên hoạt động:\*\*.*?(?=\*\*|$)/gi, '');
+                              cleanDescription = cleanDescription.replace(/\*\*Thời gian:\*\*.*?(?=\*\*|$)/gi, '');
+                              cleanDescription = cleanDescription.replace(/\*\*Thời lượng:\*\*.*?(?=\*\*|$)/gi, '');
+                              cleanDescription = cleanDescription.replace(/\*\*Độ khó:\*\*.*?(?=\*\*|$)/gi, '');
+                              
+                              // Loại bỏ các từ khóa không cần thiết
+                              cleanDescription = cleanDescription.replace(/Tuyệt vời,?/gi, '');
+                              cleanDescription = cleanDescription.replace(/dựa trên thông tin bạn cung cấp/gi, '');
+                              cleanDescription = cleanDescription.replace(/tôi sẽ (tạo|đề xuất)/gi, '');
+                              cleanDescription = cleanDescription.replace(/như sau:/gi, '');
+                              
+                              // Loại bỏ thông tin lặp lại về thời gian
+                              cleanDescription = cleanDescription.replace(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}.*?\d{1,2}\/\d{1,2}\/\d{4}.*?\(\d+ phút\)/gi, '');
+                              
+                              // Làm sạch và format lại
+                              cleanDescription = cleanDescription.replace(/\*\*/g, '').trim();
+                              cleanDescription = cleanDescription.replace(/\s+/g, ' ');
+                              cleanDescription = cleanDescription.replace(/^[,\s]+/, '');
+                              cleanDescription = cleanDescription.replace(/[,\s]+$/, '');
+                              
+                              // Nếu mô tả quá ngắn hoặc không có ý nghĩa, tạo mô tả mặc định
+                              if (!cleanDescription || cleanDescription.length < 20) {
+                                return `Hoạt động ${safeRec.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần một cách an toàn và hiệu quả.`;
+                              }
+                              
+                              // Giới hạn độ dài
+                              if (cleanDescription.length > 200) {
+                                cleanDescription = cleanDescription.substring(0, 197) + '...';
+                              }
+                              
+                              return cleanDescription;
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Benefits */}
-                    <div style={{ marginBottom: '1rem' }}>
+                    {safeRec.benefits && safeRec.benefits.length > 0 && (
+                      <div style={{ marginBottom: '1.5rem' }}>
                       <h4 style={{
                         fontSize: '0.875rem',
                         fontWeight: 600,
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Lợi ích:
+                          color: '#64748b',
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <StarIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                          Lợi ích mang lại
                       </h4>
+                        <div style={{
+                          background: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                        }}>
                       <div style={{
                         display: 'flex',
                         flexWrap: 'wrap',
                         gap: '0.5rem'
                       }}>
-                        {rec.benefits.slice(0, 3).map((benefit, idx) => (
+                            {safeRec.benefits.slice(0, 4).map((benefit, idx) => (
                           <span
                             key={idx}
                             style={{
-                              padding: '0.25rem 0.5rem',
-                              background: '#dcfce7',
-                              color: '#166534',
+                                  padding: '0.375rem 0.75rem',
+                                  background: '#f1f5f9',
+                                  color: '#475569',
                               borderRadius: '0.375rem',
-                              fontSize: '0.75rem'
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  border: '1px solid #cbd5e1'
                             }}
                           >
                             {benefit}
@@ -828,130 +991,117 @@ export default function AIRecommendationsPage() {
                         ))}
                       </div>
                     </div>
+                      </div>
+                    )}
 
                     {/* Precautions */}
-                    {rec.precautions.length > 0 && (
-                      <div style={{ marginBottom: '1rem' }}>
+                    {safeRec.precautions && safeRec.precautions.length > 0 && (
+                      <div style={{ marginBottom: '1.5rem' }}>
                         <h4 style={{
                           fontSize: '0.875rem',
                           fontWeight: 600,
-                          color: '#ef4444',
+                          color: '#64748b',
                           marginBottom: '0.5rem',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.25rem'
+                          gap: '0.5rem'
                         }}>
-                          <ExclamationTriangleIcon style={{ width: '0.875rem', height: '0.875rem' }} />
-                          Lưu ý:
+                          <ExclamationTriangleIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                          Lưu ý quan trọng
                         </h4>
+                        <div style={{
+                          background: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0'
+                        }}>
                         <ul style={{
                           margin: 0,
                           paddingLeft: '1rem',
                           fontSize: '0.875rem',
-                          color: '#ef4444'
+                            color: '#334155'
                         }}>
-                          {rec.precautions.map((precaution, idx) => (
-                            <li key={idx} style={{ marginBottom: '0.25rem' }}>
+                          {safeRec.precautions.map((precaution, idx) => (
+                              <li key={idx} style={{ 
+                                marginBottom: '0.25rem',
+                                lineHeight: '1.5'
+                              }}>
                               {precaution}
                             </li>
                           ))}
                         </ul>
                       </div>
-                    )}
-
-                    {/* Adaptations */}
-                    {rec.adaptations.length > 0 && (
-                      <div style={{ marginBottom: '1rem' }}>
-                        <h4 style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#374151',
-                          marginBottom: '0.5rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem'
-                        }}>
-                          <AdjustmentsHorizontalIcon style={{ width: '0.875rem', height: '0.875rem' }} />
-                          Điều chỉnh:
-                        </h4>
-                        <ul style={{
-                          margin: 0,
-                          paddingLeft: '1rem',
-                          fontSize: '0.875rem',
-                          color: '#6b7280'
-                        }}>
-                          {rec.adaptations.map((adaptation, idx) => (
-                            <li key={idx} style={{ marginBottom: '0.25rem' }}>
-                              {adaptation}
-                            </li>
-                          ))}
-                        </ul>
                       </div>
                     )}
+
+
 
                     {/* Confidence Level */}
                     <div style={{
                       marginBottom: '1rem',
                       padding: '0.75rem',
-                      background: '#f3f4f6',
-                      borderRadius: '0.5rem'
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e2e8f0'
                     }}>
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        marginBottom: '0.25rem'
+                        marginBottom: '0.5rem'
                       }}>
                         <span style={{
                           fontSize: '0.875rem',
                           fontWeight: 600,
-                          color: '#374151'
+                          color: '#64748b',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
                         }}>
-                          Độ tin cậy AI:
+                          <ChartBarIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                          Độ tin cậy vào trợ lý thông minh
                         </span>
                         <span style={{
                           fontSize: '0.875rem',
                           fontWeight: 600,
-                          color: '#6b7280'
+                          color: '#334155'
                         }}>
-                          {rec.confidenceLevel}%
+                          {safeRec.confidenceLevel}%
                         </span>
                       </div>
                       <div style={{
                         width: '100%',
                         height: '6px',
-                        background: '#e5e7eb',
+                        background: '#e2e8f0',
                         borderRadius: '3px',
                         overflow: 'hidden'
                       }}>
                         <div style={{
-                          width: `${rec.confidenceLevel}%`,
+                          width: `${safeRec.confidenceLevel}%`,
                           height: '100%',
-                          background: rec.confidenceLevel > 80 
-                            ? 'linear-gradient(90deg, #22c55e, #16a34a)'
-                            : rec.confidenceLevel > 60
-                            ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                            : 'linear-gradient(90deg, #ef4444, #dc2626)',
-                          transition: 'width 0.3s ease'
+                          background: '#64748b',
+                          transition: 'width 0.3s ease',
+                          borderRadius: '3px'
                         }} />
                       </div>
                     </div>
 
                     {/* Actions */}
                     <div style={{
-                      display: 'flex',
-                      gap: '0.5rem'
+                      marginTop: '1.5rem',
+                      paddingTop: '1.5rem',
+                      borderTop: '1px solid #e5e7eb'
                     }}>
-                      {user?.role === 'admin' || (user?.role === 'staff' && rec.recommendationScore > 60) ? (
+                      {user?.role === 'admin' || (user?.role === 'staff' && safeRec.confidenceLevel > 60) ? (
                         <button
-                          onClick={() => handleCreateActivity(rec)}
+                          onClick={() => handleCreateActivity(safeRec)}
                           disabled={createLoading}
                           style={{
-                            flex: 1,
-                            padding: '0.75rem',
+                            width: '100%',
+                            padding: '0.875rem 1rem',
                             borderRadius: '0.5rem',
                             border: 'none',
-                            background: createLoading ? '#9ca3af' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            background: createLoading ? '#9ca3af' : '#10b981',
                             color: 'white',
                             fontWeight: 600,
                             cursor: createLoading ? 'not-allowed' : 'pointer',
@@ -962,21 +1112,16 @@ export default function AIRecommendationsPage() {
                             fontSize: '0.875rem',
                             transition: 'all 0.2s ease'
                           }}
-                          onMouseOver={(e) => {
-                            if (!createLoading) {
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                              e.currentTarget.style.boxShadow = '0 4px 8px rgba(22, 163, 74, 0.3)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (!createLoading) {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = 'none';
-                            }
-                          }}
                         >
                           {createLoading ? (
-                            <div style={{ width: '1rem', height: '1rem', border: '2px solid transparent', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                            <div style={{ 
+                              width: '1rem', 
+                              height: '1rem', 
+                              border: '2px solid transparent', 
+                              borderTop: '2px solid white', 
+                              borderRadius: '50%', 
+                              animation: 'spin 1s linear infinite' 
+                            }} />
                           ) : (
                             <PlusIcon style={{ width: '1rem', height: '1rem' }} />
                           )}
@@ -984,16 +1129,22 @@ export default function AIRecommendationsPage() {
                         </button>
                       ) : (
                         <div style={{
-                          flex: 1,
-                          padding: '0.75rem',
+                          width: '100%',
+                          padding: '0.875rem 1rem',
                           borderRadius: '0.5rem',
                           border: '1px solid #d1d5db',
                           background: '#f9fafb',
                           color: '#6b7280',
                           fontSize: '0.875rem',
-                          textAlign: 'center'
+                          textAlign: 'center',
+                          fontWeight: 500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem'
                         }}>
-                          {user?.role === 'staff' ? 'Cần điểm AI ≥ 60 để tạo' : 'Không có quyền'}
+                          <ExclamationTriangleIcon style={{ width: '1rem', height: '1rem' }} />
+                          {user?.role === 'staff' ? 'Cần độ tin cậy AI ≥ 60 để tạo' : 'Không có quyền'}
                         </div>
                       )}
                     </div>
@@ -1004,8 +1155,50 @@ export default function AIRecommendationsPage() {
           </div>
         )}
 
+        {/* Raw AI Response for debugging */}
+        {aiResponse && (
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            marginTop: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <ChartBarIcon style={{ width: '1.5rem', height: '1.5rem', color: '#8b5cf6' }} />
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                margin: 0
+              }}>
+                Phản hồi trợ lý thông minh
+              </h3>
+            </div>
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              border: '1px solid #e2e8f0',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap',
+              fontSize: '0.875rem',
+              lineHeight: '1.6',
+              color: '#374151'
+            }}>
+              {aiResponse}
+            </div>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!loading && recommendations.length === 0 && groupRecommendations.length === 0 && (
+        {!loading && recommendations.length === 0 && (
           <div style={{
             background: 'white',
             borderRadius: '1rem',

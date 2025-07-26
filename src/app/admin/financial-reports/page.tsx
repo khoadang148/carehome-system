@@ -114,23 +114,31 @@ export default function FinancialReportsPage() {
     }
   };
 
-  // Xử lý hủy hóa đơn
+  // Xử lý xóa hóa đơn
   const handleDeleteBill = async () => {
     if (!deleteBill) return;
-    if (!deleteReason.trim()) {
-      setDeleteError('Vui lòng nhập lý do hủy.');
+    
+    // Kiểm tra trạng thái hóa đơn
+    if (deleteBill.status === 'completed' || deleteBill.status === 'paid') {
+      setDeleteError('Không thể xóa hóa đơn đã thanh toán.');
       return;
     }
+    
+    if (deleteBill.status === 'cancelled') {
+      setDeleteError('Không thể xóa hóa đơn đã hủy.');
+      return;
+    }
+    
     setSaving(true);
     try {
-      // Có thể chỉ cập nhật trạng thái thành cancelled thay vì xóa cứng
-      await billsAPI.update(deleteBill._id, { status: 'cancelled', notes: (deleteBill.notes || '') + `\n[Lý do hủy]: ${deleteReason}` });
+      // Xóa cứng hóa đơn chưa thanh toán
+      await billsAPI.delete(deleteBill._id);
       setDeleteBill(null);
       setDeleteReason('');
       setDeleteError('');
       fetchBills();
     } catch (err) {
-      setDeleteError('Có lỗi khi hủy hóa đơn.');
+      setDeleteError('Có lỗi khi xóa hóa đơn.');
     } finally {
       setSaving(false);
     }
@@ -242,22 +250,37 @@ export default function FinancialReportsPage() {
                       </span>
                     </td>
                    <td className="px-6 py-4 whitespace-nowrap flex gap-2">
-                     <button
-                       className="p-2 rounded-full hover:bg-blue-100 transition"
-                       title="Chỉnh sửa"
-                       onClick={() => { setEditBill(record); setEditReason(''); setEditError(''); }}
-                       disabled={record.status === 'cancelled'}
-                     >
-                       <PencilIcon className="w-5 h-5 text-blue-600" />
-                     </button>
-                     <button
-                       className="p-2 rounded-full hover:bg-red-100 transition"
-                       title="Hủy hóa đơn"
-                       onClick={() => { setDeleteBill(record); setDeleteReason(''); setDeleteError(''); }}
-                       disabled={record.status === 'cancelled'}
-                     >
-                       <TrashIcon className="w-5 h-5 text-red-600" />
-                     </button>
+                     {/* Chỉ hiển thị nút chỉnh sửa và xóa cho hóa đơn chưa thanh toán và chưa hủy */}
+                     {(record.status === 'pending' || record.status === 'unpaid') && (
+                       <>
+                         <button
+                           className="p-2 rounded-full hover:bg-blue-100 transition"
+                           title="Chỉnh sửa"
+                           onClick={() => { setEditBill(record); setEditReason(''); setEditError(''); }}
+                         >
+                           <PencilIcon className="w-5 h-5 text-blue-600" />
+                         </button>
+                         <button
+                           className="p-2 rounded-full hover:bg-red-100 transition"
+                           title="Xóa hóa đơn"
+                           onClick={() => { setDeleteBill(record); setDeleteReason(''); setDeleteError(''); }}
+                         >
+                           <TrashIcon className="w-5 h-5 text-red-600" />
+                         </button>
+                       </>
+                     )}
+                     {/* Hiển thị thông báo cho hóa đơn đã thanh toán */}
+                     {(record.status === 'completed' || record.status === 'paid') && (
+                       <span className="text-sm text-gray-500 italic">
+                         Đã thanh toán
+                       </span>
+                     )}
+                     {/* Hiển thị thông báo cho hóa đơn đã hủy */}
+                     {record.status === 'cancelled' && (
+                       <span className="text-sm text-gray-500 italic">
+                         Đã hủy
+                       </span>
+                     )}
                    </td>
                   </tr>
                 ))}
@@ -292,7 +315,7 @@ export default function FinancialReportsPage() {
                  </div>
                  <div>
                    <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                   <select className="w-full border rounded px-3 py-2 bg-gray-100 cursor-not-allowed" value={editBill.status} disabled readOnly>
+                   <select className="w-full border rounded px-3 py-2 bg-gray-100 cursor-not-allowed" value={editBill.status} disabled>
                      <option value="pending">Chưa thanh toán</option>
                      <option value="completed">Đã thanh toán</option>
                      <option value="cancelled">Đã hủy</option>
@@ -313,25 +336,26 @@ export default function FinancialReportsPage() {
          </div>
        </Dialog>
 
-       {/* Modal hủy hóa đơn */}
+       {/* Modal xóa hóa đơn */}
        <Dialog open={!!deleteBill} onClose={() => setDeleteBill(null)} className="fixed z-50 inset-0 overflow-y-auto">
          <div className="flex items-center justify-center min-h-screen px-4">
            <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
            <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-auto p-6 z-10">
-             <Dialog.Title className="text-lg font-bold mb-4 text-red-600">Hủy hóa đơn</Dialog.Title>
+             <Dialog.Title className="text-lg font-bold mb-4 text-red-600">Xóa hóa đơn</Dialog.Title>
              {deleteBill && (
-               <form onSubmit={e => { e.preventDefault(); handleDeleteBill(); }} className="space-y-4">
-                 <div className="text-gray-700 mb-2">Bạn có chắc chắn muốn hủy hóa đơn <b>{deleteBill.title}</b>?</div>
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Lý do hủy <span className="text-red-500">*</span></label>
-                   <textarea className="w-full border rounded px-3 py-2" value={deleteReason} onChange={e => setDeleteReason(e.target.value)} required />
+               <div className="space-y-4">
+                 <div className="text-gray-700 mb-2">Bạn có chắc chắn muốn xóa hóa đơn <b>{deleteBill.title}</b>?</div>
+                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                   <div className="text-yellow-800 text-sm">
+                     <strong>Lưu ý:</strong> Hành động này sẽ xóa vĩnh viễn hóa đơn khỏi hệ thống và không thể hoàn tác.
+                   </div>
                  </div>
                  {deleteError && <div className="text-red-600 text-sm">{deleteError}</div>}
                  <div className="flex gap-2 justify-end mt-4">
                    <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setDeleteBill(null)}>Hủy</button>
-                   <button type="submit" className="px-4 py-2 rounded bg-red-600 text-white font-semibold" disabled={saving}>Xác nhận hủy</button>
+                   <button type="button" className="px-4 py-2 rounded bg-red-600 text-white font-semibold" disabled={saving} onClick={handleDeleteBill}>Xác nhận xóa</button>
                  </div>
-               </form>
+               </div>
              )}
            </div>
          </div>

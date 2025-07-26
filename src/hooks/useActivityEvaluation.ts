@@ -123,8 +123,13 @@ export function useActivityEvaluation({
         } else {
           const resident = residents.find(r => r.id === residentId);
           if (resident) {
+            // Sử dụng staff_id hiện tại của hoạt động hoặc user hiện tại
+            const currentStaffId = participations.length > 0 ? 
+              (participations[0].staff_id?._id || participations[0].staff_id) : 
+              user?.id || "664f1b2c2f8b2c0012a4e750";
+            
             await activityParticipationsAPI.create({
-              staff_id: user?.id || "664f1b2c2f8b2c0012a4e750",
+              staff_id: currentStaffId,
               activity_id: activity.id,
               resident_id: resident.id,
               date: activity.date + "T00:00:00Z",
@@ -137,10 +142,32 @@ export function useActivityEvaluation({
         }
       }
       // Refresh participations
-      const participationsData = await activityParticipationsAPI.getAll({
-        activity_id: activity.id
-      });
+      const participationsData = await activityParticipationsAPI.getByActivityId(
+        activity.id, 
+        activity.date
+      );
       setParticipations(participationsData);
+      
+            // Cập nhật evaluations state với dữ liệu mới
+      const updatedEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+      participationsData.forEach((participation: any) => {
+        // Xử lý resident_id có thể là object hoặc string
+        const residentId = participation.resident_id?._id || participation.resident_id;
+        const participated = participation.attendance_status === 'attended';
+        const reason = participation.performance_notes || '';
+
+        if (residentId) {
+          console.log('Processing participation for residentId:', residentId, 'name:', participation.resident_id?.full_name);
+          updatedEvaluations[residentId] = {
+            participated,
+            reason
+          };
+        }
+      });
+      setEvaluations(updatedEvaluations);
+      console.log('Updated evaluations from new endpoint:', updatedEvaluations);
+      console.log('Evaluations keys:', Object.keys(updatedEvaluations));
+      
       return true;
     } catch (error) {
       throw error;

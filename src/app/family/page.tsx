@@ -36,47 +36,6 @@ import { userAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
-// Add CSS animations
-const styles = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  @keyframes slideUp {
-    from { 
-      opacity: 0; 
-      transform: translateY(20px); 
-    }
-    to { 
-      opacity: 1; 
-      transform: translateY(0); 
-    }
-  }
-  
-  @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translateX(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-  
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`;
-
 // Thêm hàm tính tuổi ở đầu file (sau import)
 const getAge = (dob: string) => {
   if (!dob) return '';
@@ -113,7 +72,7 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
   
   // Convert relative path to full URL
   const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${cleanPath.replace(/^\//, '')}`;
+  return userAPI.getAvatarUrl(cleanPath);
 };
 
 export default function FamilyPortalPage() {
@@ -162,16 +121,6 @@ export default function FamilyPortalPage() {
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [lightboxPhoto, setLightboxPhoto] = useState<any>(null);
 
-  // Activity history states
-  const [selectedActivityDate, setSelectedActivityDate] = useState('2024-05-10');
-  const [showActivityHistory, setShowActivityHistory] = useState(false);
-
-  // Thêm state cho activity participations
-  const [activities, setActivities] = useState<any[]>([]);
-  const [activityHistory, setActivityHistory] = useState<any[]>([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(false);
-  const [activitiesError, setActivitiesError] = useState('');
-
   // Thêm state cho vital signs
   const [vitalSigns, setVitalSigns] = useState<any>(null);
   const [vitalLoading, setVitalLoading] = useState(false);
@@ -195,6 +144,30 @@ export default function FamilyPortalPage() {
 
   // Thêm state để lưu staffName tạm thời khi fetch từ API
   const [fetchedStaffNames, setFetchedStaffNames] = useState<{[id: string]: string}>({});
+
+  // --- HOẠT ĐỘNG SINH HOẠT STATE ---
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activitiesError, setActivitiesError] = useState('');
+  const [showActivityHistory, setShowActivityHistory] = useState(false);
+  const [selectedActivityDate, setSelectedActivityDate] = useState('');
+  const [activityHistoryDates, setActivityHistoryDates] = useState<string[]>([]);
+
+  // --- PHÂN TRANG GHI CHÚ CHĂM SÓC ---
+  const [careNotesPage, setCareNotesPage] = useState(1);
+  const notesPerPage = 5;
+  const totalNotes = careNotes.length;
+  const totalPages = Math.ceil(totalNotes / notesPerPage);
+  const paginatedNotes = careNotes.slice((careNotesPage-1)*notesPerPage, careNotesPage*notesPerPage);
+  useEffect(()=>{ setCareNotesPage(1); }, [careNotes]); // Reset về trang 1 khi đổi resident
+
+  // --- PHÂN TRANG CHỈ SỐ SỨC KHỎE ---
+  const [vitalPage, setVitalPage] = useState(1);
+  const vitalPerPage = 5;
+  const totalVital = vitalSignsHistory.length;
+  const totalVitalPages = Math.ceil(totalVital / vitalPerPage);
+  const paginatedVital = vitalSignsHistory.slice((vitalPage-1)*vitalPerPage, vitalPage*vitalPerPage);
+  useEffect(()=>{ setVitalPage(1); }, [vitalSignsHistory]); // Reset về trang 1 khi đổi resident
 
   // Sửa useEffect fetch resident
   useEffect(() => {
@@ -487,93 +460,6 @@ export default function FamilyPortalPage() {
     }
   }, [selectedResidentId]);
 
-  // Fetch activity participations khi đổi resident
-  useEffect(() => {
-    if (selectedResidentId) {
-      setActivitiesLoading(true);
-      setActivitiesError('');
-      
-      console.log('Fetching activity participations for resident:', selectedResidentId);
-      
-      activityParticipationsAPI.getByResidentId(selectedResidentId)
-        .then((data) => {
-          console.log('Activity participations response:', data);
-          const participations = Array.isArray(data) ? data : [];
-          
-          // Sử dụng toLocaleDateString để tránh lệch múi giờ
-          const today = new Date();
-          const todayStr = today.toLocaleDateString('en-CA'); // "YYYY-MM-DD"
-          
-          // Filter for today's activities
-          const todayParticipations = participations.filter(p => {
-            const participationDate = new Date(p.date).toLocaleDateString('en-CA');
-            return participationDate === todayStr;
-          });
-          // Gom theo activity_id + ngày, ưu tiên bản ghi 'Không tham gia'
-          const todayActivitiesMap: { [key: string]: any } = {};
-          todayParticipations.forEach(p => {
-            const key = (p.activity_id?._id || p.activity_id) + '_' + new Date(p.date).toLocaleDateString('en-CA');
-            // Nếu chưa có hoặc bản ghi hiện tại là 'Không tham gia', thì ghi đè
-            if (!todayActivitiesMap[key] || p.attendance_status !== 'attended') {
-              todayActivitiesMap[key] = p;
-            }
-          });
-          const todayActivities = Object.values(todayActivitiesMap).map((p: any) => ({
-            id: p._id,
-            name: p.activity_id?.activity_name || 'Hoạt động không xác định',
-            time: new Date(p.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-            participated: p.attendance_status === 'attended',
-            notes: p.performance_notes || '',
-            staff: p.staff_id?.full_name || 'Không xác định',
-            absenceReason: p.attendance_status !== 'attended' ? (p.performance_notes || '') : ''
-          }));
-          
-          // Group historical activities by date
-          const groupedByDate: { [key: string]: any[] } = {};
-          participations.forEach(p => {
-            const date = new Date(p.date).toLocaleDateString('en-CA');
-            if (!groupedByDate[date]) {
-              groupedByDate[date] = [];
-            }
-            groupedByDate[date].push({
-              id: p._id,
-              name: p.activity_id?.activity_name || 'Hoạt động không xác định',
-              time: new Date(p.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-              participated: p.attendance_status === 'attended',
-              reason: p.attendance_status !== 'attended' ? 'Không tham gia' : undefined,
-              notes: p.performance_notes || '',
-              staff: p.staff_id?.full_name || 'Không xác định'
-            });
-          });
-          
-          // Convert to activity history format
-          const historyArray = Object.keys(groupedByDate)
-            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-            .map(date => ({
-              date,
-              activities: groupedByDate[date]
-            }));
-          
-          console.log('Activity history:', historyArray);
-          
-          setActivities(todayActivities);
-          setActivityHistory(historyArray);
-          
-          // Set default selected date for history to the latest available date
-          if (historyArray.length > 0) {
-            setSelectedActivityDate(historyArray[0].date);
-          }
-        })
-        .catch((error) => {
-          console.error('Error fetching activity participations:', error);
-          setActivitiesError(`Không lấy được dữ liệu hoạt động: ${error.message || 'Lỗi không xác định'}`);
-          setActivities([]);
-          setActivityHistory([]);
-        })
-        .finally(() => setActivitiesLoading(false));
-    }
-  }, [selectedResidentId]);
-
   // Lấy số phòng khi đổi resident
   useEffect(() => {
     if (!selectedResidentId) {
@@ -599,6 +485,68 @@ export default function FamilyPortalPage() {
       .catch(() => setRoomNumber('Chưa cập nhật'))
       .finally(() => setRoomLoading(false));
   }, [selectedResidentId]);
+
+  // Fetch activities when resident or mode changes
+  useEffect(() => {
+    if (!selectedResidentId) return;
+    setActivitiesLoading(true);
+    setActivitiesError('');
+    activityParticipationsAPI.getByResidentId(selectedResidentId)
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : [];
+        // Group by date (YYYY-MM-DD)
+        const grouped: Record<string, any[]> = {};
+        arr.forEach((item) => {
+          const date = item.date?.slice(0, 10);
+          if (!date) return;
+          if (!grouped[date]) grouped[date] = [];
+          grouped[date].push(item);
+        });
+        // Get all available dates (desc)
+        const allDates = Object.keys(grouped).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        setActivityHistoryDates(allDates);
+        // Default: today or most recent
+        let today = new Date().toISOString().slice(0, 10);
+        if (!showActivityHistory) {
+          setSelectedActivityDate(today);
+          setActivities(grouped[today] || []);
+        } else {
+          // If viewing history, keep selected date or pick most recent
+          const date = selectedActivityDate && grouped[selectedActivityDate] ? selectedActivityDate : allDates[0] || '';
+          setSelectedActivityDate(date);
+          setActivities(grouped[date] || []);
+        }
+      })
+      .catch((err) => {
+        setActivitiesError('Không lấy được dữ liệu hoạt động.');
+        setActivities([]);
+        setActivityHistoryDates([]);
+      })
+      .finally(() => setActivitiesLoading(false));
+  // eslint-disable-next-line
+}, [selectedResidentId, showActivityHistory]);
+
+// When selectedActivityDate changes in history mode, update activities
+useEffect(() => {
+  if (!showActivityHistory || !selectedActivityDate || !selectedResidentId) return;
+  setActivitiesLoading(true);
+  setActivitiesError('');
+  activityParticipationsAPI.getByResidentId(selectedResidentId)
+    .then((data) => {
+      const arr = Array.isArray(data) ? data : [];
+      const grouped: Record<string, any[]> = {};
+      arr.forEach((item) => {
+        const date = item.date?.slice(0, 10);
+        if (!date) return;
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(item);
+      });
+      setActivities(grouped[selectedActivityDate] || []);
+    })
+    .catch(() => setActivities([]))
+    .finally(() => setActivitiesLoading(false));
+// eslint-disable-next-line
+}, [selectedActivityDate]);
 
   // Bảo vệ route chỉ cho family
   useEffect(() => {
@@ -631,9 +579,6 @@ export default function FamilyPortalPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Inject CSS animations */}
-      <style dangerouslySetInnerHTML={{ __html: styles }} />
-      
       {/* Professional Notification Banner */}
       {notifications.length > 0 && (
         <div style={{
@@ -897,10 +842,10 @@ export default function FamilyPortalPage() {
         {residents.length > 1 && (
           <div style={{ 
             marginBottom: '2.5rem', 
-            maxWidth: 500,
+            maxWidth: 5000,
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2rem',
+            borderRadius: '1rem',
+            padding: '1.5rem',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             backdropFilter: 'blur(10px)'
@@ -935,14 +880,7 @@ export default function FamilyPortalPage() {
                 }}>
                   Chọn người thân để xem thông tin
                 </h3>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#64748b',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: 500
-                }}>
-                  Chọn từ danh sách người thân của bạn
-                </p>
+                
               </div>
             </div>
             
@@ -1044,267 +982,140 @@ export default function FamilyPortalPage() {
         )}
         {/* Resident Overview */}
         <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '0.75rem',
-          boxShadow: '0 2px 8px -2px #000000',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          padding: '1rem',
-          marginBottom: '1rem'
+          background: '#fff',
+          borderRadius: 20,
+          border: '1.5px solid #e5e7eb',
+          boxShadow: '0 4px 24px rgba(30,41,59,0.08)',
+          padding: '2.5rem 3rem',
+          maxWidth: 1500,
+          margin: '2rem auto',
         }}>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '3rem', alignItems: 'flex-start'}}>
-            <div style={{display: 'flex', flexWrap: 'wrap', gap: '3.5rem', alignItems: 'center', width: '100%'}}>
-              <div>
-                <img 
-                  src={getAvatarUrl(selectedResident?.avatar || selectedResident?.avatarUrl)}
-                  alt={selectedResident?.fullName || 'avatar'} 
-                  style={{
-                    height: '10rem', 
-                    width: '10rem', 
-                    borderRadius: '1.5rem', 
-                    objectFit: 'cover', 
-                    border: '4px solid white', 
-                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-                    marginLeft: '2rem'
-                  }}
-                />
-              </div>
-              <div style={{flex: 1, marginTop: '1.5rem'}}>
-                
-                <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Họ và Tên: </span>{selectedResident?.full_name || selectedResident?.fullName || 'Chưa cập nhật'}
-                </div>
-                <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Ngày sinh: </span>
-                  {selectedResident?.date_of_birth || selectedResident?.dateOfBirth
-                    ? `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}`
-                    : 'Chưa cập nhật'}
-                </div>
-                <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Giới tính: </span>{selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa cập nhật')}
-                </div>
-                <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Phòng: </span>{roomLoading ? 'Đang tải...' : roomNumber}
-                </div>
-                
-                <div style={{marginBottom: '0.5rem'}}>
-                  <span style={{fontWeight: 800, color: '#374151'}}>Mối quan hệ với người cao tuổi: </span>{selectedResident?.relationship || selectedResident?.emergency_contact?.relationship || selectedResident?.emergencyContact?.relationship || 'Chưa cập nhật'}
-                </div>
-                <div style={{marginBottom: '1.5rem'}}>
-                  <span style={{display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600, background: selectedResident?.status === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: selectedResident?.status === 'Ổn định' ? '#166534' : '#92400e', border: selectedResident?.status === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24'}}>
-                    <div style={{width: '0.5rem', height: '0.5rem', background: selectedResident?.status === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
-                    Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
-                  </span>
-                </div>
-                
-                {/* Quick Action Buttons */}
-                <div style={{
-                  display: 'flex', 
-                  gap: '1rem', 
-                  flexWrap: 'wrap',
-                  marginBottom: '1rem'
-                }}>
-                  <button
-                    onClick={() => router.push('/family/photos')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.75rem 1.25rem',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                      minWidth: '140px',
-                      justifyContent: 'center'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
-                    }}
-                  >
-                    <PhotoIcon style={{width: '1.125rem', height: '1.125rem'}} />
-                    Xem ảnh
-                  </button>
-                  
-                  <button
-                    onClick={() => router.push('/family/schedule-visit')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.75rem 1.25rem',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                      minWidth: '140px',
-                      justifyContent: 'center'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                    }}
-                  >
-                    <CalendarDaysIcon style={{width: '1.125rem', height: '1.125rem'}} />
-                    Đặt lịch thăm
-                  </button>
-                </div>
-                
-                <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
-                 
-                </div>
-              </div>
-              
-              <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '1rem',
-                padding: '0.125rem',
-                flexShrink: 0,
-                maxWidth: '300px',
-                width: '100%',
-                marginRight: '4rem'
-              }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.95) 100%)',
-                  borderRadius: '0.875rem',
-                  padding: '1.25rem',
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '0.75rem',
-                    gap: '0.5rem'
-                  }}>
-                    <div style={{
-                      width: '1.5rem',
-                      height: '1.5rem',
-                      background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-                      borderRadius: '0.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <svg style={{width: '0.875rem', height: '0.875rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                      </svg>
-                    </div>
-                    <h3 style={{
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#1f2937', 
-                      margin: 0
-                    }}>
-                      Chỉ số sức khỏe của {selectedResident?.full_name}
-                    </h3>
+          {/* Avatar, tên, badge ở trên cùng, căn giữa */}
+          <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32}}>
+            <img src={getAvatarUrl(selectedResident?.avatar)} alt="avatar"
+              style={{width: 120, height: 120, borderRadius: '50%', border: '4px solid #6366f1', boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)', objectFit: 'cover', marginBottom: 12}} />
+            <div style={{fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 2, letterSpacing: 0.2, textTransform: 'uppercase'}}>Người cao tuổi:</div>
+            <h1 style={{fontWeight: 800, fontSize: 28, color: '#1e293b', margin: 0, lineHeight: 1.2, textAlign: 'center'}}>{selectedResident?.full_name}</h1>
+            <div style={{
+              fontSize: 14, fontWeight: 600, marginTop: 8,
+              background: selectedResident?.status === 'active' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)',
+              color: 'white', borderRadius: 20, padding: '6px 16px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center'
+            }}>{selectedResident?.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}</div>
+            <div style={{fontSize: 13, color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8}}>
+              <CalendarDaysIcon style={{width: 16, height: 16}} />
+              Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa cập nhật'}
+            </div>
+          </div>
+          {/* Grid 2 cột: Thông tin cá nhân + Liên hệ khẩn cấp | Chỉ số sức khỏe */}
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start'}}>
+            {/* Cột trái: Thông tin cá nhân + Liên hệ khẩn cấp */}
+            <div style={{display: 'flex', flexDirection: 'column', gap: 32}}>
+              {/* Card Thông tin cá nhân */}
+              <div style={{background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)', border: '1px solid #e2e8f0', borderRadius: 16, padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
+                <div style={{fontWeight: 700, color: '#1e293b', fontSize: 18, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottom: '2px solid #6366f1'}}>
+                  <div style={{background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: '50%', padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                    <UsersIcon style={{width: 18, height: 18, color: 'white'}} />
                   </div>
-                  
-                  <p style={{
-                    fontSize: '0.75rem', 
-                    color: '#6b7280', 
-                    margin: '0 0 1rem 0'
-                  }}>
-                    <span style={{fontWeight: 600}}>Lần cập nhật gần nhất:</span> {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYY(vitalSigns.date_time) : 'Không có dữ liệu'}
-                  </p>
-                  
-                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.8rem'}}>
-                    <div style={{
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem',
-                      border: '1px solid rgba(239, 68, 68, 0.2)'
-                    }}>
-                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Huyết áp (mmHg)</div>
-                      <div style={{fontWeight: 700, color: '#ef4444', fontSize: '0.8rem'}}>
-                        {vitalLoading ? 'Đang tải...' : vitalSigns?.blood_pressure ?? 'Không có dữ liệu'}
-                      </div>
-                    </div>
-                    
-                    <div style={{
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem',
-                      border: '1px solid rgba(16, 185, 129, 0.2)'
-                    }}>
-                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Nhịp tim (bpm)</div>
-                      <div style={{fontWeight: 700, color: '#10b981', fontSize: '0.8rem'}}>
-                        {vitalLoading ? 'Đang tải...' : vitalSigns?.heart_rate ?? 'Không có dữ liệu'}
-                      </div>
-                    </div>
-                    
-                    <div style={{
-                      background: 'rgba(245, 158, 11, 0.1)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem',
-                      border: '1px solid rgba(245, 158, 11, 0.2)'
-                    }}>
-                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Nhiệt độ cơ thể</div>
-                      <div style={{fontWeight: 700, color: '#f59e0b', fontSize: '0.8rem'}}>
-                        {vitalLoading ? 'Đang tải...' : vitalSigns?.temperature ?? 'Không có dữ liệu'}°C
-                      </div>
-                    </div>
-                    
-                    <div style={{
-                      background: 'rgba(99, 102, 241, 0.1)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem',
-                      border: '1px solid rgba(99, 102, 241, 0.2)'
-                    }}>
-                      <div style={{color: '#6b7280', fontSize: '0.7rem', marginBottom: '0.25rem', fontWeight: 600}}>Cân nặng hiện tại</div>
-                      <div style={{fontWeight: 700, color: '#6366f1', fontSize: '0.8rem'}}>
-                        {vitalLoading ? 'Đang tải...' : vitalSigns?.weight ?? 'Không có dữ liệu'} kg
-                      </div>
-                    </div>
+                  Thông tin cá nhân
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr', gap: 14, fontSize: 15}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                    <span style={{color: '#64748b', fontWeight: 600}}>Họ và tên người cao tuổi:</span>
+                    <span style={{color: '#1e293b', fontWeight: 600, textAlign: 'center'}}>{selectedResident?.full_name}</span>
                   </div>
-                  
-                  <div style={{
-                    marginTop: '0.75rem',
-                    padding: '0.5rem',
-                    background: 'rgba(16, 185, 129, 0.1)',
-                    borderRadius: '0.5rem',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <div style={{
-                      width: '0.375rem',
-                      height: '0.375rem',
-                      background: '#10b981',
-                      borderRadius: '50%'
-                    }} />
-                    <span style={{fontSize: '0.7rem', color: '#059669', fontWeight: 600}}>
-                      Tình trạng: Tất cả chỉ số đều bình thường
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                    <span style={{color: '#64748b', fontWeight: 600}}>Ngày sinh:</span>
+                    <span style={{color: '#1e293b', fontWeight: 600}}>
+                      {selectedResident?.date_of_birth || selectedResident?.dateOfBirth ? 
+                        `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}` : 
+                        'Chưa cập nhật'
+                      }
                     </span>
                   </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                    <span style={{color: '#64748b', fontWeight: 600}}>Giới tính:</span>
+                    <span style={{color: '#1e293b', fontWeight: 600}}>
+                      {selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa cập nhật')}
+                    </span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                    <span style={{color: '#64748b', fontWeight: 600}}>Phòng:</span>
+                    <span style={{color: '#1e293b', fontWeight: 600}}>
+                      {roomLoading ? 'Đang tải...' : roomNumber}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Card Liên hệ khẩn cấp */}
+              <div style={{background: 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)', border: '1px solid #fecaca', borderRadius: 16, padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
+                <div style={{fontWeight: 700, color: '#1e293b', fontSize: 18, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottom: '2px solid #ef4444'}}>
+                  <div style={{background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderRadius: '50%', padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                    <PhoneIcon style={{width: 18, height: 18, color: 'white'}} />
+                  </div>
+                  Liên hệ khẩn cấp
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr', gap: 14, fontSize: 15}}>
+                  {selectedResident?.emergency_contact?.name ? (
+                    <>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                        <span style={{color: '#64748b', fontWeight: 600}}>Tên người liên hệ:</span>
+                        <span style={{color: '#1e293b', fontWeight: 600}}>{selectedResident.emergency_contact.name}</span>
+                      </div>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                        <span style={{color: '#64748b', fontWeight: 600}}>Quan hệ với người cao tuổi:</span>
+                        <span style={{color: '#1e293b', fontWeight: 600}}>{selectedResident.emergency_contact.relationship}</span>
+                      </div>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
+                        <span style={{color: '#64748b', fontWeight: 600}}>Số điện thoại liên hệ:</span>
+                        <span style={{color: '#1e293b', fontWeight: 600}}>{selectedResident.emergency_contact.phone}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{textAlign: 'center', color: '#64748b', fontStyle: 'italic', padding: '16px 0'}}>
+                      Chưa cập nhật thông tin liên hệ khẩn cấp
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* Cột phải: Chỉ số sức khỏe */}
+            <div style={{display: 'flex', flexDirection: 'column', gap: 32, justifyContent: 'flex-start'}}>
+              <div style={{background: '#fff', border: '1.5px solid #e0e7ef', borderRadius: 18, padding: '2.5rem 2rem 2rem 2rem', boxShadow: '0 2px 8px #e0e7ef'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16}}>
+                  <svg width="22" height="22" fill="#ef3b7d" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                  <span style={{fontWeight: 700, fontSize: 19, color: '#1e293b', textAlign: 'center'}}>Chỉ số sức khỏe của {selectedResident?.full_name}</span>
+                </div>
+                <div style={{fontSize: 15, color: '#64748b', marginBottom: 22, textAlign: 'center'}}>
+                  Lần cập nhật gần nhất: {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYY(vitalSigns.date_time) : 'Không có dữ liệu'}
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.2rem', fontSize: 16, marginBottom: 22}}>
+                  <div style={{background: '#fef2f2', borderRadius: 12, padding: '1.2rem', border: '1px solid #fecaca'}}>
+                    <div style={{color: '#b91c1c', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Huyết áp (mmHg)</div>
+                    <div style={{fontWeight: 700, color: '#dc2626', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.blood_pressure ?? '--'}</div>
+                  </div>
+                  <div style={{background: '#f0fdf4', borderRadius: 12, padding: '1.2rem', border: '1px solid #bbf7d0'}}>
+                    <div style={{color: '#047857', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Nhịp tim (bpm)</div>
+                    <div style={{fontWeight: 700, color: '#10b981', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.heart_rate ?? '--'}</div>
+                  </div>
+                  <div style={{background: '#fefce8', borderRadius: 12, padding: '1.2rem', border: '1px solid #fde68a'}}>
+                    <div style={{color: '#b45309', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Nhiệt độ cơ thể</div>
+                    <div style={{fontWeight: 700, color: '#f59e42', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.temperature ?? '--'}°C</div>
+                  </div>
+                  <div style={{background: '#f3f4f6', borderRadius: 12, padding: '1.2rem', border: '1px solid #e0e7ef'}}>
+                    <div style={{color: '#6366f1', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Cân nặng hiện tại</div>
+                    <div style={{fontWeight: 700, color: '#6366f1', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.weight ?? '--'} kg</div>
+                  </div>
+                </div>
+                <div style={{marginTop: 8, padding: '0.9rem 1.1rem', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', color: '#059669', fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center'}}>
+                  <span style={{width: 13, height: 13, background: '#10b981', borderRadius: '50%', display: 'inline-block'}}></span>
+                  Tình trạng: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
+
         {/* Tabbed Information */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -1348,242 +1159,87 @@ export default function FamilyPortalPage() {
               </Tab>
             </Tab.List>
 
-            
             <Tab.Panels>
               <Tab.Panel style={{padding: '2rem'}}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1.5rem',
-                  flexWrap: 'wrap',
-                  gap: '1rem'
-                }}>
-                  <h3 style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 600,
-                    color: '#111827',
-                    margin: 0
-                  }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.5rem',flexWrap:'wrap',gap:'1rem'}}>
+                  <h3 style={{fontSize:'1.125rem',fontWeight:600,color:'#111827',margin:0}}>
                     {showActivityHistory ? 'Lịch sử hoạt động' : 'Hoạt động hôm nay'}
                   </h3>
-                  
-                  <div style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    alignItems: 'center',
-                    flexWrap: 'wrap'
-                  }}>
+                  <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap'}}>
                     {showActivityHistory && (
                       <DatePicker
-                        selected={new Date(selectedActivityDate)}
+                        selected={selectedActivityDate ? new Date(selectedActivityDate) : null}
                         onChange={date => {
                           if (!date) return;
-                          // Chỉ cho phép chọn ngày có trong activityHistory
-                          const iso = date.toISOString().slice(0, 10);
-                          if (activityHistory.some((day: { date: string }) => day.date === iso)) {
-                            setSelectedActivityDate(iso);
-                          }
+                          const iso = date.toISOString().slice(0,10);
+                          if (activityHistoryDates.includes(iso)) setSelectedActivityDate(iso);
                         }}
-                        includeDates={activityHistory.map((day: { date: string }) => new Date(day.date))}
+                        includeDates={activityHistoryDates.map(d=>new Date(d))}
+                        openToDate={selectedActivityDate ? new Date(selectedActivityDate) : undefined}
                         dateFormat="EEEE, d 'tháng' M, yyyy"
                         locale={vi}
                         popperPlacement="bottom"
                         showPopperArrow={false}
                         customInput={
-                          <button
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.75rem',
-                              border: '2px solid #3b82f6',
-                              background: 'white',
-                              fontSize: '1rem',
-                              fontWeight: 600,
-                              color: '#374151',
-                              cursor: 'pointer',
-                              minWidth: '220px',
-                              textAlign: 'left',
-                              boxShadow: '0 2px 8px rgba(59,130,246,0.07)'
-                            }}
-                          >
+                          <button style={{padding:'0.5rem 1rem',borderRadius:'0.75rem',border:'2px solid #3b82f6',background:'white',fontSize:'1rem',fontWeight:600,color:'#374151',cursor:'pointer',minWidth:'220px',textAlign:'left',boxShadow:'0 2px 8px rgba(59,130,246,0.07)'}}>
                             {formatDateDDMMYYYY(selectedActivityDate)}
                           </button>
                         }
                       />
                     )}
                     <button
-                      onClick={() => setShowActivityHistory(!showActivityHistory)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #8b5cf6',
-                        background: showActivityHistory ? 'white' : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                        color: showActivityHistory ? '#8b5cf6' : 'white',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}
-                      onMouseOver={(e) => {
-                        if (showActivityHistory) {
-                          e.currentTarget.style.background = '#f3f4f6';
-                        } else {
-                          e.currentTarget.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (showActivityHistory) {
-                          e.currentTarget.style.background = 'white';
-                        } else {
-                          e.currentTarget.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';
-                        }
-                      }}
+                      onClick={()=>setShowActivityHistory(v=>!v)}
+                      style={{padding:'0.5rem 1rem',borderRadius:'0.5rem',border:'1px solid #8b5cf6',background:showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',color:showActivityHistory?'#8b5cf6':'white',fontSize:'0.875rem',fontWeight:600,cursor:'pointer',transition:'all 0.2s ease',display:'flex',alignItems:'center',gap:'0.5rem'}}
+                      onMouseOver={e=>{e.currentTarget.style.background=showActivityHistory?'#f3f4f6':'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';}}
+                      onMouseOut={e=>{e.currentTarget.style.background=showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';}}
                     >
-                      <CalendarDaysIcon style={{width: '1rem', height: '1rem'}} />
-                      {showActivityHistory ? 'Xem hôm nay' : 'Xem lịch sử hoạt động'}
+                      <CalendarDaysIcon style={{width:'1rem',height:'1rem'}}/>
+                      {showActivityHistory?'Xem hôm nay':'Xem lịch sử hoạt động'}
                     </button>
                   </div>
                 </div>
-
-                {showActivityHistory ? (
-                  <div>
-                    <div style={{
-                      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      marginBottom: '1.5rem',
-                      border: '1px solid #bae6fd'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <InformationCircleIcon style={{width: '1.25rem', height: '1.25rem', color: '#0369a1'}} />
-                        <span style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#0369a1'
-                        }}>
-                          Lịch sử hoạt động - {formatDateDDMMYYYY(selectedActivityDate)}
-                        </span>
-                      </div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#0c4a6e',
-                        margin: 0
-                      }}>
-                        Xem lại các hoạt động đã tham gia trong ngày được chọn. 
-                      </p>
-                    </div>
-
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                      {activitiesLoading ? (
-                        <div>Đang tải dữ liệu hoạt động...</div>
-                      ) : activitiesError ? (
-                        <div style={{color: 'red'}}>{activitiesError}</div>
-                      ) : Array.isArray(activities) && activities.length > 0 ? (
-                        activities.map((activity: any) => (
-                          <div
-                            key={activity.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              padding: '1rem',
-                              borderRadius: '0.75rem',
-                              background: activity.participated 
-                                ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
-                                : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                              border: '1px solid',
-                              borderColor: activity.participated ? '#86efac' : '#d1d5db'
-                            }}
-                          >
-                            <div style={{marginRight: '1rem'}}>
-                              {activity.participated ? (
-                                <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
-                              ) : (
-                                <ClockIcon style={{width: '1.5rem', height: '1.5rem', color: '#6b7280'}} />
-                              )}
+                <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
+                  {activitiesLoading ? (
+                    <div>Đang tải dữ liệu hoạt động...</div>
+                  ) : activitiesError ? (
+                    <div style={{color:'red'}}>{activitiesError}</div>
+                  ) : Array.isArray(activities) && activities.length > 0 ? (
+                    activities.map((activity:any) => {
+                      const attended = activity.attendance_status === 'attended';
+                      const absent = activity.attendance_status === 'absent';
+                      const pending = activity.attendance_status === 'pending';
+                      const time = activity.activity_id?.schedule_time ? new Date(activity.activity_id.schedule_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+                      const endTime = activity.activity_id?.end_time ? new Date(activity.activity_id.end_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+                      return (
+                        <div key={activity._id} style={{display:'flex',alignItems:'center',padding:'1rem',borderRadius:'0.75rem',background:attended?'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)':absent?'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)':'#fff',border:'1px solid',borderColor:attended?'#86efac':absent?'#d1d5db':'#e5e7eb'}}>
+                          <div style={{marginRight:'1rem'}}>
+                            {attended ? (
+                              <CheckCircleIcon style={{width:'1.5rem',height:'1.5rem',color:'#16a34a'}}/>
+                            ) : absent ? (
+                              <XCircleIcon style={{width:'1.5rem',height:'1.5rem',color:'#ef4444'}}/>
+                            ) : (
+                              <ClockIcon style={{width:'1.5rem',height:'1.5rem',color:'#6b7280'}}/>
+                            )}
+                          </div>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:'0.95rem',fontWeight:600,color:'#111827',marginBottom:'0.25rem'}}>
+                              <span style={{fontWeight:600,color:'#374151'}}>Hoạt động: </span>{activity.activity_id?.activity_name || '---'}
                             </div>
-                            <div style={{flex: 1}}>
-                              <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                                <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
-                              </div>
-                              <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem'}}>
-                                <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
-                              </div>
-                              <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
-                                <span style={{fontWeight: 600}}>Trạng thái: </span>
-                                {activity.participated
-                                  ? 'Đã tham gia'
-                                  : activity.absenceReason
-                                    ? <>Không tham gia{activity.absenceReason && <> - Lý do: <span style={{color: '#ef4444'}}>{activity.absenceReason}</span></>}</>
-                                    : 'Chưa tham gia'}
-                              </span>
+                            <div style={{fontSize:'0.8rem',color:'#6b7280',marginBottom:'0.25rem'}}>
+                              <span style={{fontWeight:600}}>Thời gian: </span>{time}{endTime?` - ${endTime}`:''}
                             </div>
+                            <span style={{fontSize:'0.8rem',fontWeight:500,color:attended?'#166534':absent?'#ef4444':'#6b7280'}}>
+                              <span style={{fontWeight:600}}>Trạng thái: </span>
+                              {attended ? 'Đã tham gia' : absent ? <>Không tham gia{activity.performance_notes && <> - Lý do: <span style={{color:'#ef4444'}}>{activity.performance_notes}</span></>}</> : 'Chưa tham gia'}
+                            </span>
                           </div>
-                        ))
-                      ) : (
-                        <div>Không có dữ liệu hoạt động</div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                    {activitiesLoading ? (
-                      <div>Đang tải dữ liệu hoạt động...</div>
-                    ) : activitiesError ? (
-                      <div style={{color: 'red'}}>{activitiesError}</div>
-                    ) : Array.isArray(activities) && activities.length > 0 ? (
-                      activities.map((activity: any) => (
-                      <div
-                        key={activity.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '1rem',
-                          borderRadius: '0.75rem',
-                          background: activity.participated 
-                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
-                            : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                          border: '1px solid',
-                          borderColor: activity.participated ? '#86efac' : '#d1d5db'
-                        }}
-                      >
-                        <div style={{marginRight: '1rem'}}>
-                          {activity.participated ? (
-                            <CheckCircleIcon style={{width: '1.5rem', height: '1.5rem', color: '#16a34a'}} />
-                          ) : (
-                            <ClockIcon style={{width: '1.5rem', height: '1.5rem', color: '#6b7280'}} />
-                          )}
                         </div>
-                        <div style={{flex: 1}}>
-                          <div style={{fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem'}}>
-                            <span style={{fontWeight: 600, color: '#374151'}}>Hoạt động: </span>{activity.name}
-                          </div>
-                          <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem'}}>
-                            <span style={{fontWeight: 600}}>Thời gian: </span>{activity.time}{activity.endTime ? ` - ${activity.endTime}` : ''}
-                          </div>
-                          <span style={{fontSize: '0.75rem', fontWeight: 500, color: activity.participated ? '#166534' : '#6b7280'}}>
-                            <span style={{fontWeight: 600}}>Trạng thái: </span>
-                            {activity.participated
-                              ? 'Đã tham gia'
-                              : activity.absenceReason
-                                ? <>Không tham gia{activity.absenceReason && <> - Lý do: <span style={{color: '#ef4444'}}>{activity.absenceReason}</span></>}</>
-                                : 'Chưa tham gia'}
-                          </span>
-                        </div>
-                      </div>
-                      ))
-                    ) : (
-                      <div>Không có dữ liệu hoạt động</div>
-                    )}
-                  </div>
-                )}
+                      );
+                    })
+                  ) : (
+                    <div>Không có dữ liệu hoạt động</div>
+                  )}
+                </div>
               </Tab.Panel>
               
               <Tab.Panel style={{padding: '2rem'}}>
@@ -1609,8 +1265,8 @@ export default function FamilyPortalPage() {
                         <tr><td colSpan={3}>Đang tải ghi chú chăm sóc...</td></tr>
                       ) : careNotesError ? (
                         <tr><td colSpan={3} style={{color: 'red'}}>{careNotesError}</td></tr>
-                      ) : Array.isArray(careNotes) && careNotes.length > 0 ? (
-                        careNotes.map((note: any) => {
+                      ) : Array.isArray(paginatedNotes) && paginatedNotes.length > 0 ? (
+                        paginatedNotes.map((note: any) => {
                           return (
                             <tr key={note._id} style={{borderTop: '1px solid #e5e7eb'}}>
                               <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}>
@@ -1626,17 +1282,19 @@ export default function FamilyPortalPage() {
                                   (() => {
                                     let conductedBy = note.conducted_by;
                                     if (typeof conductedBy === 'object' && conductedBy !== null) {
-                                      conductedBy = conductedBy.full_name || conductedBy.fullName || conductedBy.name || conductedBy.username || conductedBy.email || '';
+                                      const name = conductedBy.full_name || conductedBy.fullName || conductedBy.name || conductedBy.username || conductedBy.email || '';
+                                      const pos = conductedBy.position;
+                                      return pos ? `${pos}: ${name}` : name;
                                     }
-                                    
                                     // Nếu conductedBy là tên (có dấu tiếng Việt), hiển thị trực tiếp
                                     if (conductedBy && /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/.test(conductedBy)) {
                                       return conductedBy;
                                     }
-                                    
                                     const staff = staffList.find((s: any) => String(s._id) === String(conductedBy));
                                     if (staff) {
-                                      return staff.fullName || staff.full_name || staff.name || staff.username || staff.email;
+                                      const name = staff.fullName || staff.full_name || staff.name || staff.username || staff.email;
+                                      const pos = staff.position;
+                                      return pos ? `${pos}: ${name}` : name;
                                     }
                                     if (conductedBy && fetchedStaffNames[conductedBy]) {
                                       return fetchedStaffNames[conductedBy];
@@ -1647,7 +1305,7 @@ export default function FamilyPortalPage() {
                                         .then(data => {
                                           setFetchedStaffNames(prev => ({
                                             ...prev,
-                                            [conductedBy]: (data.full_name || data.fullName || data.name || data.username || data.email || conductedBy) + (data.position ? ` (${data.position})` : '')
+                                            [conductedBy]: (data.position ? `${data.position}: ` : '') + (data.full_name || data.fullName || data.name || data.username || data.email || conductedBy)
                                           }));
                                         })
                                         .catch(() => {
@@ -1669,6 +1327,17 @@ export default function FamilyPortalPage() {
                         <tr><td colSpan={3}>Không có ghi chú chăm sóc</td></tr>
                       )}
                     </tbody>
+                    {totalPages > 1 && (
+                      <tfoot>
+                        <tr>
+                          <td colSpan={3} style={{textAlign:'center',padding:'1rem 0'}}>
+                            <button onClick={()=>setCareNotesPage(p=>Math.max(1,p-1))} disabled={careNotesPage===1} style={{marginRight:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:careNotesPage===1?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:careNotesPage===1?'not-allowed':'pointer'}}>← Trang trước</button>
+                            <span style={{fontWeight:600,color:'#7c3aed'}}>Trang {careNotesPage}/{totalPages}</span>
+                            <button onClick={()=>setCareNotesPage(p=>Math.min(totalPages,p+1))} disabled={careNotesPage===totalPages} style={{marginLeft:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:careNotesPage===totalPages?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:careNotesPage===totalPages?'not-allowed':'pointer'}}>Trang sau →</button>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </Tab.Panel>
@@ -1713,8 +1382,8 @@ export default function FamilyPortalPage() {
                     <tbody>
                       {vitalHistoryLoading ? (
                         <tr><td colSpan={7} style={{padding: '1.5rem', textAlign: 'center', color: '#8b5cf6'}}>Đang tải dữ liệu...</td></tr>
-                      ) : vitalSignsHistory.length > 0 ? (
-                        vitalSignsHistory.map((vital: any, index: number) => (
+                      ) : paginatedVital.length > 0 ? (
+                        paginatedVital.map((vital: any, index: number) => (
                           <tr key={vital._id}
                             style={{
                               background: index % 2 === 0 ? '#fff' : '#f8fafc',
@@ -1751,6 +1420,17 @@ export default function FamilyPortalPage() {
                     </tbody>
                   </table>
                 </div>
+                {totalVitalPages > 1 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={7} style={{textAlign:'center',padding:'1rem 0'}}>
+                        <button onClick={()=>setVitalPage(p=>Math.max(1,p-1))} disabled={vitalPage===1} style={{marginRight:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:vitalPage===1?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:vitalPage===1?'not-allowed':'pointer'}}>← Trang trước</button>
+                        <span style={{fontWeight:600,color:'#7c3aed'}}>Trang {vitalPage}/{totalVitalPages}</span>
+                        <button onClick={()=>setVitalPage(p=>Math.min(totalVitalPages,p+1))} disabled={vitalPage===totalVitalPages} style={{marginLeft:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:vitalPage===totalVitalPages?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:vitalPage===totalVitalPages?'not-allowed':'pointer'}}>Trang sau →</button>
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </Tab.Panel>
             </Tab.Panels>
           </Tab.Group>

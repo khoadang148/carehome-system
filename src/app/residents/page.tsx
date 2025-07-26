@@ -14,11 +14,11 @@ import {
   PhotoIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-import { RESIDENTS_DATA } from '@/lib/data/residents-data';
 import { residentAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { userAPI } from "@/lib/api";
 
 
 export default function ResidentsPage() {
@@ -445,11 +445,7 @@ export default function ResidentsPage() {
                         }}>
                           {resident.avatar ? (
                             <img
-                              src={
-                                resident.avatar.startsWith('http')
-                                  ? resident.avatar
-                                  : 'http://localhost:8000/' + resident.avatar.replace(/^\\+|^\/+/, '').replace(/\\/g, '/')
-                              }
+                              src={userAPI.getAvatarUrl(resident.avatar)}
                               alt={resident.name}
                               style={{width: '100%', height: '100%', objectFit: 'cover'}}
                             />

@@ -249,10 +249,8 @@ export default function PhotoGalleryPage() {
     if (!photo || !photo.file_path) return '/window.svg';
     // Nếu là URL tuyệt đối thì trả về luôn
     if (photo.file_path.startsWith('http')) return photo.file_path;
-    // Chuẩn hóa dấu gạch chéo
-    const cleanPath = photo.file_path.replace(/\\/g, '/').replace(/"/g, '/');
-    // Nếu backend chạy local, sửa lại host cho đúng
-    return `http://localhost:8000/${cleanPath.replace(/^\//, '')}`;
+    // Sử dụng:
+    return photosAPI.getPhotoUrl(photo.file_path);
   };
 
   // Hàm lấy tên resident từ resident_id

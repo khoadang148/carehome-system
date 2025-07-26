@@ -62,25 +62,50 @@ export default function NewActivityPage() {
     setSuccess('');
     // Validate
     if (!form.activity_name.trim() || !form.description.trim() || !form.duration || !form.date || !form.time || !form.location.trim() || !form.capacity || !form.activity_type) {
-      setError('Vui lòng nhập đầy đủ thông tin.');
+      setError('Vui lòng điền đầy đủ tất cả các trường bắt buộc (*) để tiếp tục.');
       return;
     }
     if (isNaN(Number(form.duration)) || Number(form.duration) <= 0) {
-      setError('Thời lượng phải là số lớn hơn 0.');
+      setError('Thời lượng hoạt động phải là số nguyên dương (ví dụ: 30, 45, 60 phút).');
       return;
     }
     if (isNaN(Number(form.capacity)) || Number(form.capacity) <= 0) {
-      setError('Sức chứa phải là số lớn hơn 0.');
+      setError('Sức chứa phải là số nguyên dương (ví dụ: 10, 20, 50 người).');
       return;
     }
-    // Tạo schedule_time ISO
+
+    // Validate thời gian
     const time24 = to24Hour(form.time);
-    const schedule_time = form.date && form.time ? new Date(`${form.date}T${time24}:00.000Z`).toISOString() : '';
+    const scheduleDateTime = form.date && form.time ? `${form.date}T${time24}:00` : '';
+    // Tạo Date object từ local time string, không thêm Z để tránh chuyển đổi UTC
+    const selectedDateTime = new Date(scheduleDateTime);
+    const now = new Date();
+    
+    // Kiểm tra không được tạo trong quá khứ
+    if (selectedDateTime <= now) {
+      setError('Thời gian bắt đầu không thể là thời gian trong quá khứ. Vui lòng chọn thời gian trong tương lai.');
+      return;
+    }
+    
+    // Kiểm tra phải tạo trước ít nhất 2 tiếng
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    if (selectedDateTime < twoHoursFromNow) {
+      setError('Hoạt động phải được tạo trước ít nhất 2 tiếng so với thời gian bắt đầu để đảm bảo chuẩn bị đầy đủ.');
+      return;
+    }
+    
+    // Kiểm tra không được tạo trước quá 1 tuần
+    const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (selectedDateTime > oneWeekFromNow) {
+      setError('Hoạt động chỉ có thể được tạo trước tối đa 1 tuần so với thời gian bắt đầu.');
+      return;
+    }
+
     const payload = {
       activity_name: form.activity_name,
       description: form.description,
       duration: Number(form.duration),
-      schedule_time,
+      schedule_time: scheduleDateTime,
       location: form.location,
       capacity: Number(form.capacity),
       activity_type: form.activity_type // Thêm trường này vào payload
@@ -89,10 +114,18 @@ export default function NewActivityPage() {
     setLoading(true);
     try {
       await activitiesAPI.create(payload);
-      setSuccess('Tạo hoạt động thành công!');
+      setSuccess('Hoạt động đã được tạo thành công! Bạn sẽ được chuyển đến trang danh sách hoạt động.');
       setTimeout(() => router.push('/activities'), 1200);
     } catch (err: any) {
-      setError(err?.message || 'Không thể tạo hoạt động.');
+      let errorMessage = 'Đã xảy ra lỗi khi tạo hoạt động. Vui lòng thử lại sau.';
+      if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
