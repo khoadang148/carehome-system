@@ -11,6 +11,7 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+  timeout: 15000, // Tăng timeout lên 15 giây cho tất cả requests
 });
 
 // Utility function to handle API errors
@@ -44,20 +45,12 @@ apiClient.interceptors.request.use(
     // Lấy token từ localStorage
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     
-    // Log để debug
-    console.log('Current token:', token);
-    
     if (token) {
       // Đảm bảo headers object tồn tại
       config.headers = config.headers || {};
       
       // Thêm token vào header
       config.headers['Authorization'] = `Bearer ${token}`;
-      
-      // Log để debug
-      console.log('Request headers:', config.headers);
-    } else {
-      console.warn('No token found in localStorage');
     }
     
     return config;
@@ -71,35 +64,6 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
-    // Log để debug
-    console.log('Response error:', error.response?.status);
-    console.log('Original request:', originalRequest);
-
-    // Tắt hoàn toàn logic refresh token để tránh vòng lặp login
-    // if (error.response?.status === 401 && !originalRequest._retry) {
-    //   originalRequest._retry = true;
-    //   console.log('Attempting token refresh...');
-    //   try {
-    //     const response = await apiClient.post('/auth/refresh');
-    //     const { access_token } = response.data;
-    //     console.log('Got new token:', access_token);
-    //     if (typeof window !== 'undefined') {
-    //       localStorage.setItem('access_token', access_token);
-    //     }
-    //     originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-    //     return apiClient(originalRequest);
-    //   } catch (refreshError) {
-    //     console.error('Token refresh failed:', refreshError);
-    //     if (typeof window !== 'undefined') {
-    //       localStorage.removeItem('access_token');
-    //     }
-    //     window.location.href = '/login';
-    //     return Promise.reject(refreshError);
-    //   }
-    // }
-
     // Nếu gặp 401 thì chỉ logout, không thử refresh
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
@@ -168,7 +132,6 @@ const endpoints = {
   roomTypes: '/room-types',
 };
 
-// Auth API
 export const authAPI = {
   login: async (email: string, password: string) => {
     try {
@@ -297,10 +260,16 @@ export const userAPI = {
 
   updateAvatar: async (id: string, avatarData: FormData) => {
     try {
+      // Debug: Log FormData content
+      console.log('API - FormData entries:');
+      for (let [key, value] of avatarData.entries()) {
+        console.log(key, value);
+      }
+      
       // Ưu tiên endpoint /users/{id}/avatar
       const response = await apiClient.patch(`/users/${id}/avatar`, avatarData, {
         headers: {
-          // KHÔNG set 'Content-Type' để browser tự động set boundary
+          'Content-Type': 'multipart/form-data',
         },
       });
       return response.data;
@@ -538,6 +507,91 @@ export const staffAPI = {
   },
 };
 
+// Staff Assignments API
+export const staffAssignmentsAPI = {
+  getAll: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/staff-assignments', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching staff assignments:', error);
+      throw error;
+    }
+  },
+
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/staff-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching staff assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  create: async (assignment: any) => {
+    try {
+      const response = await apiClient.post('/staff-assignments', assignment);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating staff assignment:', error);
+      throw error;
+    }
+  },
+
+  update: async (id: string, assignment: any) => {
+    try {
+      const response = await apiClient.patch(`/staff-assignments/${id}`, assignment);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating staff assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  delete: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/staff-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting staff assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+
+
+  getByStaff: async (staffId: string) => {
+    try {
+      const response = await apiClient.get(`/staff-assignments/by-staff/${staffId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching staff assignments for staff ${staffId}:`, error);
+      throw error;
+    }
+  },
+
+  getByResident: async (residentId: string) => {
+    try {
+      const response = await apiClient.get(`/staff-assignments/by-resident/${residentId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching staff assignments for resident ${residentId}:`, error);
+      throw error;
+    }
+  },
+
+  getMyAssignments: async () => {
+    try {
+      const response = await apiClient.get('/staff-assignments/my-assignments');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching my staff assignments:', error);
+      throw error;
+    }
+  },
+};
+
 // Activities API
 export const activitiesAPI = {
   getAll: async (params?: any) => {
@@ -552,6 +606,9 @@ export const activitiesAPI = {
 
   getById: async (id: string) => {
     try {
+      if (!id || id === 'null' || id === 'undefined') {
+        throw new Error(`Invalid activity ID: ${id}`);
+      }
       const response = await apiClient.get(`${endpoints.activities}/${id}`);
       return response.data;
     } catch (error) {
@@ -631,7 +688,10 @@ export const activitiesAPI = {
         payload.schedule_time = schedule_time;
       }
       
-      const response = await apiClient.post(`${endpoints.activities}/recommendation/ai`, payload);
+      // Tăng timeout cho AI recommendation API vì có thể cần nhiều thời gian xử lý
+      const response = await apiClient.post(`${endpoints.activities}/recommendation/ai`, payload, {
+        timeout: 30000 // 30 giây cho AI processing
+      });
       return response.data;
     } catch (error) {
       console.error(`Error getting AI recommendation for resident(s)`, error);
@@ -974,7 +1034,8 @@ export const roomsAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching rooms:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
     }
   },
 
@@ -984,7 +1045,8 @@ export const roomsAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching room with ID ${id}:`, error);
-      throw error;
+      // Trả về null thay vì throw error
+      return null;
     }
   },
 
@@ -1547,6 +1609,33 @@ export const carePlansAPI = {
       throw error;
     }
   },
+  create: async (data: any) => {
+    try {
+      const response = await apiClient.post('/care-plans', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating care plan:', error);
+      throw error;
+    }
+  },
+  update: async (id: string, data: any) => {
+    try {
+      const response = await apiClient.patch(`/care-plans/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating care plan with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  delete: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/care-plans/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting care plan with ID ${id}:`, error);
+      throw error;
+    }
+  },
 };
 
 // Care Plan Assignments API
@@ -1697,7 +1786,8 @@ export const bedsAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching beds:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error
+      return [];
     }
   },
   getById: async (id: string) => {
@@ -1706,7 +1796,8 @@ export const bedsAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching bed with ID ${id}:`, error);
-      throw error;
+      // Trả về null thay vì throw error
+      return null;
     }
   },
 };
@@ -1718,7 +1809,8 @@ export const roomTypesAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching room types:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error
+      return [];
     }
   }
 };

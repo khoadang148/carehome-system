@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, startTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { LOGIN_REDIRECT_DELAY } from '@/lib/constants/app';
 import { 
   LockClosedIcon, 
   EnvelopeIcon, 
@@ -24,47 +25,213 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
   const hasRedirected = useRef(false);
   const [sessionDebug, setSessionDebug] = useState({});
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [messageDisplayed, setMessageDisplayed] = useState(false);
+  const [randomValues, setRandomValues] = useState<{
+    quantumParticles: Array<{
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+      color: string;
+      duration: number;
+      delay: number;
+      blur: number;
+      shadow: number;
+    }>;
+    bubbles: Array<{
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+      duration: number;
+      delay: number;
+    }>;
+  }>({
+    quantumParticles: [],
+    bubbles: []
+  });
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/';
   const { login, user, loading } = useAuth();
 
+  // Preload các trang đích để tăng tốc độ chuyển trang
   useEffect(() => {
-    console.log('Login page useEffect triggered:', { user, loading, returnUrl, hasRedirected: hasRedirected.current });
+    // Preload tất cả các trang có thể ngay lập tức
+    router.prefetch('/family');
+    router.prefetch('/admin');
+    router.prefetch('/staff');
+    if (returnUrl && returnUrl !== '/login') {
+      router.prefetch(returnUrl);
+    }
+  }, [router, returnUrl]);
+
+  // Immediate redirect nếu user đã đăng nhập
+  useEffect(() => {
     if (!loading && user && !hasRedirected.current) {
-      console.log('User is logged in, redirecting...', { userRole: user.role, returnUrl });
+      hasRedirected.current = true;
+      
+      const redirectTo = (url: string) => {
+        startTransition(() => {
+          router.push(url);
+        });
+      };
+
+      if (user.role === 'family') {
+        redirectTo('/family');
+      } else if (user.role === 'admin') {
+        redirectTo('/admin');
+      } else if (user.role === 'staff') {
+        redirectTo('/staff');
+      } else if (returnUrl && returnUrl !== '/login') {
+        redirectTo(returnUrl);
+      } else {
+        redirectTo('/');
+      }
+    }
+  }, [user, loading, returnUrl]);
+
+  // Preload thêm khi user bắt đầu nhập thông tin để tăng tốc độ
+  useEffect(() => {
+    if (email.length > 0 || password.length > 0) {
+      // Khi user bắt đầu nhập, preload lại các trang để đảm bảo
+      router.prefetch('/family');
+      router.prefetch('/admin');
+      router.prefetch('/staff');
+      if (returnUrl && returnUrl !== '/login') {
+        router.prefetch(returnUrl);
+      }
+    }
+  }, [email, password, router, returnUrl]);
+
+  // Khôi phục lỗi và thông báo thành công từ localStorage nếu có
+  useEffect(() => {
+    const savedError = localStorage.getItem('login_error');
+    const savedSuccess = localStorage.getItem('login_success');
+    const savedAttempts = localStorage.getItem('login_attempts');
+    
+    // Reset redirect flag khi component mount
+    setShouldRedirect(false);
+    
+    // Chỉ khôi phục thông báo nếu user chưa đăng nhập và chưa hiển thị thông báo
+    if (!user && !loading && !messageDisplayed) {
+      if (savedError) {
+        setError(savedError);
+        setMessageDisplayed(true);
+        // Không xóa ngay lập tức, để thông báo hiển thị lâu hơn
+      }
+      if (savedSuccess) {
+        setSuccess(savedSuccess);
+        setMessageDisplayed(true);
+        // Không xóa ngay lập tức, để thông báo hiển thị lâu hơn
+      }
+      if (savedAttempts) {
+        setLoginAttempts(parseInt(savedAttempts));
+      }
+    } else if (user) {
+      // Nếu user đã đăng nhập, chỉ xóa thông báo lỗi, giữ thông báo thành công
+      localStorage.removeItem('login_error');
+      setError('');
+      setLoginAttempts(0);
+      // Không xóa thông báo thành công để user có thể thấy
+    }
+  }, [user, loading]);
+
+  // Tạo random values cho animations ở client side để tránh hydration mismatch
+  useEffect(() => {
+    const colors = ['#ff0844', '#00c9ff', '#8338ec', '#06ffa5', '#ff6b35'];
+    
+    const quantumParticles = Array.from({ length: 20 }, () => ({
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      width: 8 + Math.random() * 16,
+      height: 8 + Math.random() * 16,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      duration: 10 + Math.random() * 15,
+      delay: Math.random() * 10,
+      blur: Math.random() * 2,
+      shadow: 10 + Math.random() * 20
+    }));
+    
+    const bubbles = Array.from({ length: 12 }, () => ({
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      width: 20 + Math.random() * 40,
+      height: 20 + Math.random() * 40,
+      duration: 8 + Math.random() * 8,
+      delay: Math.random() * 8
+    }));
+    
+    setRandomValues({ quantumParticles, bubbles });
+  }, []);
+
+  // Wrapper function để lưu lỗi vào localStorage
+  const setErrorWithStorage = (errorMessage: string) => {
+    setError(errorMessage);
+    setMessageDisplayed(true);
+    // Không xóa thông báo thành công ngay lập tức
+    if (errorMessage) {
+      localStorage.setItem('login_error', errorMessage);
+      // Tăng số lần thử đăng nhập sai
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      localStorage.setItem('login_attempts', newAttempts.toString());
+    } else {
+      localStorage.removeItem('login_error');
+      // Reset số lần thử khi đăng nhập thành công
+      setLoginAttempts(0);
+      localStorage.removeItem('login_attempts');
+    }
+  };
+
+  // Wrapper function để hiển thị thông báo thành công
+  const setSuccessWithStorage = (successMessage: string) => {
+    setSuccess(successMessage);
+    setMessageDisplayed(true);
+    // Không xóa lỗi ngay lập tức khi có thông báo thành công
+    if (successMessage) {
+      localStorage.setItem('login_success', successMessage);
+    } else {
+      localStorage.removeItem('login_success');
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && user && !hasRedirected.current && shouldRedirect) {
       hasRedirected.current = true; // Đánh dấu đã redirect để tránh vòng lặp
       
-      // Sử dụng router.push thay vì window.location.href để tránh vòng lặp
+      // Chuyển trang ngay lập tức không cần delay
       const redirectTo = (url: string) => {
-        console.log('Redirecting to:', url);
-        router.push(url);
+        // Preload trang đích để tăng tốc độ
+        router.prefetch(url);
+        // Sử dụng startTransition để tối ưu hóa việc chuyển trang
+        startTransition(() => {
+          router.push(url);
+        });
       };
 
       // Ưu tiên redirect dựa trên role trước, sau đó mới đến returnUrl
       if (user.role === 'family') {
-        console.log('Redirecting to family page');
         redirectTo('/family');
       } else if (user.role === 'admin') {
-        console.log('Redirecting to admin page');
         redirectTo('/admin');
       } else if (user.role === 'staff') {
-        console.log('Redirecting to staff page');
         redirectTo('/staff');
       } else if (returnUrl && returnUrl !== '/login') {
-        console.log('Redirecting to returnUrl:', returnUrl);
         redirectTo(returnUrl);
       } else {
-        console.log('Redirecting to home page');
         redirectTo('/');
       }
     }
-  }, [user, loading, returnUrl]); // Bỏ hasRedirected khỏi dependencies
+  }, [user, loading, returnUrl, shouldRedirect]);
 
   useEffect(() => {
     setSessionDebug({
@@ -74,67 +241,113 @@ export default function LoginPage() {
     });
   }, [user, loading]);
 
+  // Xóa thông báo khi user logout
+  useEffect(() => {
+    if (!user && !loading) {
+      // Chỉ xóa thông báo thành công khi user đã logout thực sự
+      // Không xóa khi component mount lần đầu
+      const hasLoggedOut = localStorage.getItem('has_logged_out');
+      if (hasLoggedOut) {
+        localStorage.removeItem('login_success');
+        setSuccess('');
+        setMessageDisplayed(false);
+        localStorage.removeItem('has_logged_out');
+      }
+    }
+  }, [user, loading]);
+
+  // Đảm bảo thông báo không bị mất khi component re-render
+  useEffect(() => {
+    if (messageDisplayed && !error && !success) {
+      // Nếu thông báo đã hiển thị nhưng bị mất, khôi phục lại
+      const savedError = localStorage.getItem('login_error');
+      const savedSuccess = localStorage.getItem('login_success');
+      
+      if (savedError) {
+        setError(savedError);
+      }
+      if (savedSuccess) {
+        setSuccess(savedSuccess);
+      }
+    }
+  }, [messageDisplayed, error, success]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login form submitted with:', { email, password: '***' });
-    setError('');
+    
+    // Validation cơ bản
+    if (!email.trim() || !password.trim()) {
+      setErrorWithStorage('Vui lòng nhập đầy đủ email và mật khẩu');
+      return;
+    }
+    
+    // Không xóa thông báo lỗi khi bắt đầu submit
     setIsLoading(true);
 
     // Tạo timeout promise để tránh chờ quá lâu
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 10000); // 10 giây timeout
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 5000);
     });
 
     try {
-      console.log('Login page: Calling login function...');
       // Race giữa login và timeout
       const success = await Promise.race([
         login(email, password),
         timeoutPromise
       ]);
       
-      console.log('Login page: Login result:', success);
-      
-      if (!success) {
-        console.log('Login page: Login failed, setting error');
-        setError('Thông tin đăng nhập không chính xác. Vui lòng thử lại.');
+      if (success) {
+        // Xóa thông báo lỗi khi thành công
+        setError('');
+        localStorage.removeItem('login_error');
+        
+        // Hiển thị thông báo thành công ngắn gọn
+        setSuccessWithStorage('Đăng nhập thành công');
+        
+        // Chuyển trang ngay lập tức không cần delay
+        setShouldRedirect(true);
+        
+        // Tự động xóa thông báo thành công sau 3 giây
+        setTimeout(() => {
+          setSuccessWithStorage('');
+        }, 3000);
       } else {
-        console.log('Login page: Login successful, waiting for redirect...');
+        // Nếu không thành công, không reset form để user có thể thử lại
+        // Giữ nguyên email và password
       }
-      // Nếu thành công, context sẽ tự redirect
     } catch (err: any) {
-      // Xử lý lỗi chi tiết từ API
-      if (err.response) {
-        const status = err.response.status;
-        const data = err.response.data;
-        if (status === 401) {
-          setError('Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.');
-        } else if (status === 403) {
-          setError('Tài khoản của bạn không có quyền truy cập.');
-        } else if (status === 423) {
-          setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.');
-        } else if (status === 404) {
-          setError('Tài khoản không tồn tại.');
-        } else if (data && (data.detail || data.message)) {
-          const msg = data.detail || data.message;
-          if (typeof msg === 'string' && (msg.includes('/auth/refresh') || msg.includes('Cannot POST'))) {
-            setError('Phiên đăng nhập đã hết hạn hoặc có lỗi xác thực. Vui lòng đăng nhập lại.');
-          } else {
-            setError(msg);
-          }
-        } else {
-          setError('Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
-        }
-      } else if (err.message && err.message.includes('hết thời gian chờ')) {
-        setError('Kết nối chậm. Vui lòng kiểm tra mạng và thử lại.');
-      } else if (err.message && err.message.includes('Không thể kết nối')) {
-        setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
-      } else {
-        setError(err.message || 'Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
-      }
-    } finally {
+      // Xử lý lỗi và đảm bảo loading state được reset
       setIsLoading(false);
+      setShouldRedirect(false); // Không cho phép redirect khi có lỗi
+      
+      // Xóa thông báo thành công khi có lỗi
+      setSuccess('');
+      localStorage.removeItem('login_success');
+      
+      if (err.response?.status === 401) {
+        setErrorWithStorage('Email hoặc mật khẩu không đúng');
+      } else if (err.response?.status === 403) {
+        setErrorWithStorage('Tài khoản không có quyền truy cập');
+      } else if (err.response?.status === 423) {
+        setErrorWithStorage('Tài khoản đã bị khóa');
+      } else if (err.response?.status === 404) {
+        setErrorWithStorage('Tài khoản không tồn tại');
+      } else if (err.message?.includes('timeout')) {
+        setErrorWithStorage('Kết nối chậm, vui lòng thử lại');
+      } else {
+        setErrorWithStorage('Email hoặc mật khẩu không đúng');
+      }
+      
+      // Đảm bảo thông báo lỗi hiển thị ít nhất 5 giây
+      setTimeout(() => {
+        setErrorWithStorage('');
+      }, 5000);
+      
+      return; // Thoát sớm để tránh finally block
     }
+    
+    // Reset loading state
+    setIsLoading(false);
   };
 
   return (
@@ -184,6 +397,7 @@ export default function LoginPage() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+
       `}</style>
       {/* Subtle Animated Grid */}
       <div style={{
@@ -340,7 +554,6 @@ export default function LoginPage() {
         backdropFilter: 'blur(15px)'
       }} />
       
-      {/* Quantum DNA Helix */}
       <div style={{
         position: 'absolute',
         bottom: '12%',
@@ -369,7 +582,6 @@ export default function LoginPage() {
         backdropFilter: 'blur(10px)'
       }} />
       
-      {/* Advanced Floating Tech Elements */}
       <div style={{
         position: 'absolute',
         top: '35%',
@@ -408,29 +620,27 @@ export default function LoginPage() {
         }} />
       </div>
       
-      {/* Quantum Energy Particles */}
-      {[...Array(20)].map((_, i) => (
+      {randomValues.quantumParticles.length > 0 && randomValues.quantumParticles.map((particle, i) => (
         <div key={`quantum-${i}`} style={{
           position: 'absolute',
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-          width: `${8 + Math.random() * 16}px`,
-          height: `${8 + Math.random() * 16}px`,
+          left: `${particle.left}%`,
+          top: `${particle.top}%`,
+          width: `${particle.width}px`,
+          height: `${particle.height}px`,
           background: `
             radial-gradient(circle, 
-              ${['#ff0844', '#00c9ff', '#8338ec', '#06ffa5', '#ff6b35'][Math.floor(Math.random() * 5)]}, 
+              ${particle.color}, 
               transparent 70%)
           `,
           borderRadius: '50%',
-          animation: `quantumEnergyFlow ${10 + Math.random() * 15}s linear infinite`,
-          animationDelay: `${Math.random() * 10}s`,
-          filter: `blur(${Math.random() * 2}px)`,
+          animation: `quantumEnergyFlow ${particle.duration}s linear infinite`,
+          animationDelay: `${particle.delay}s`,
+          filter: `blur(${particle.blur}px)`,
           pointerEvents: 'none',
-          boxShadow: `0 0 ${10 + Math.random() * 20}px currentColor`
+          boxShadow: `0 0 ${particle.shadow}px currentColor`
         }} />
       ))}
       
-      {/* Dynamic Mega Background Effects */}
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -448,19 +658,17 @@ export default function LoginPage() {
         animation: 'megaBackgroundShift 12s ease-in-out infinite alternate'
       }} />
       
-      {/* Pulsing Neon Layers */}
       <div style={{
         position: 'absolute',
         inset: 0,
         background: `
-          conic-gradient(from 0deg at 25% 25%, rgba(255, 8, 68, 0.4), rgba(255, 107, 53, 0.4), rgba(0, 201, 255, 0.4), rgba(255, 8, 68, 0.4)),
-          conic-gradient(from 180deg at 75% 75%, rgba(131, 56, 236, 0.4), rgba(6, 255, 165, 0.4), rgba(233, 69, 96, 0.4), rgba(131, 56, 236, 0.4))
+          conic-gradient(from 0deg at 25% 25%, rgba(255, 8, 68, 0.4) 0deg, rgba(255, 107, 53, 0.4) 90deg, rgba(0, 201, 255, 0.4) 180deg, rgba(255, 8, 68, 0.4) 360deg),
+          conic-gradient(from 180deg at 75% 75%, rgba(131, 56, 236, 0.4) 0deg, rgba(6, 255, 165, 0.4) 90deg, rgba(233, 69, 96, 0.4) 180deg, rgba(131, 56, 236, 0.4) 360deg)
         `,
         pointerEvents: 'none',
         animation: 'neonPulse 6s ease-in-out infinite alternate, rotate 20s linear infinite'
       }} />
       
-      {/* Intense Energy Waves */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -487,24 +695,23 @@ export default function LoginPage() {
       }} />
       
       {/* Magical Floating Bubbles */}
-      {[...Array(12)].map((_, i) => (
+      {randomValues.bubbles.length > 0 && randomValues.bubbles.map((bubble, i) => (
         <div key={i} style={{
           position: 'absolute',
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-          width: `${20 + Math.random() * 40}px`,
-          height: `${20 + Math.random() * 40}px`,
+          left: `${bubble.left}%`,
+          top: `${bubble.top}%`,
+          width: `${bubble.width}px`,
+          height: `${bubble.height}px`,
           background: `radial-gradient(circle, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1))`,
           borderRadius: '50%',
-          animation: `megaBubbleFloat ${8 + Math.random() * 8}s ease-in-out infinite`,
-          animationDelay: `${Math.random() * 8}s`,
+          animation: `megaBubbleFloat ${bubble.duration}s ease-in-out infinite`,
+          animationDelay: `${bubble.delay}s`,
           backdropFilter: 'blur(4px)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           pointerEvents: 'none'
         }} />
       ))}
         
-      {/* Mega Floating Elements with Intense Effects */}
           <div style={{
         position: 'absolute',
         top: '10%',
@@ -602,7 +809,6 @@ export default function LoginPage() {
         }} />
       </div>
       
-      {/* Additional Mega Floating Elements */}
       <div style={{
         position: 'absolute',
         top: '35%',
@@ -667,7 +873,6 @@ export default function LoginPage() {
         }} />
       </div>
       
-      {/* Additional Magical Particles */}
       <div style={{
         position: 'absolute',
         top: '20%',
@@ -866,7 +1071,7 @@ export default function LoginPage() {
               <span style={{ color: '#059669', fontWeight: 600 }}>Chuyên nghiệp • An toàn • Tận tâm</span>
             </p>
             
-                        {/* Beautiful Illustration */}
+                      
           <div
             style={{
               margin: '2rem 0',
@@ -1145,7 +1350,7 @@ export default function LoginPage() {
               color: '#1e293b',
                   margin: '0 0 0.5rem 0'
             }}>
-              Đăng nhập hệ thống
+              Đăng nhập
             </h2>
             <p style={{
               fontSize: '0.875rem',
@@ -1160,26 +1365,67 @@ export default function LoginPage() {
           
           {/* Form */}
             <div style={{ padding: '2.5rem' }}>
-            {error && (
+            {loginAttempts >= 3 && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.75rem',
-                  padding: '1rem 1.25rem',
-                  background: 'linear-gradient(135deg, #fef2f2 0%, #fde6e6 100%)',
+                padding: '0.75rem 1rem',
+                background: '#fef3c7',
+                color: '#92400e',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.8rem',
+                border: '1px solid #fbbf24',
+                fontWeight: 500
+              }}>
+                <ExclamationTriangleIcon style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                <span>Quá nhiều lần đăng nhập sai. Vui lòng kiểm tra lại thông tin.</span>
+              </div>
+            )}
+            
+            {success && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '1rem 1.25rem',
+                background: '#f0fdf4',
+                color: '#166534',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                fontSize: '0.875rem',
+                border: '1px solid #bbf7d0',
+                fontWeight: 500
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                </svg>
+                <span style={{ fontWeight: 500 }}>{success}</span>
+              </div>
+            )}
+            
+                        {error && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '1rem 1.25rem',
+                background: '#fef2f2',
                 color: '#dc2626',
-                  borderRadius: '12px',
+                borderRadius: '8px',
                 marginBottom: '1.5rem',
                 fontSize: '0.875rem',
                 border: '1px solid #fecaca',
                 fontWeight: 500
               }}>
-                  <ExclamationTriangleIcon style={{ width: '20px', height: '20px', flexShrink: 0 }} />
-                <p style={{margin: 0}}>{error}</p>
+                <ExclamationTriangleIcon style={{ width: '20px', height: '20px', flexShrink: 0 }} />
+                <span style={{ fontWeight: 500 }}>{error}</span>
               </div>
             )}
             
-            <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+            <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}} noValidate>
               {/* Email Input */}
               <div>
                 <label 
@@ -1211,7 +1457,10 @@ export default function LoginPage() {
                     type="email"
                     placeholder={"example@email.com"}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      // Không xóa thông báo khi user nhập lại
+                    }}
                     style={{
                       width: '100%',
                         padding: '0.875rem 1rem 0.875rem 2.75rem',
@@ -1266,7 +1515,10 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Nhập mật khẩu của bạn"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      // Không xóa thông báo khi user nhập lại
+                    }}
                     style={{
                       width: '100%',
                         padding: '0.875rem 2.75rem 0.875rem 2.75rem',
@@ -1358,34 +1610,39 @@ export default function LoginPage() {
                 disabled={isLoading}
                 style={{
                   width: '100%',
-                    padding: '1rem',
-                    fontSize: '0.9rem',
+                  padding: '1rem',
+                  fontSize: '0.9rem',
                   fontWeight: 600,
                   color: 'white',
                   background: isLoading 
-                      ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    borderRadius: '12px',
+                    ? '#6b7280'
+                    : error 
+                    ? '#ef4444'
+                    : success
+                    ? '#22c55e'
+                    : '#10b981',
+                  borderRadius: '12px',
                   border: 'none',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                    marginTop: '0.5rem',
-                    boxShadow: isLoading ? 'none' : '0 8px 20px rgba(16, 185, 129, 0.3)',
-                    position: 'relative',
-                    overflow: 'hidden'
+                  transition: 'all 0.2s ease',
+                  marginTop: '0.5rem',
+                  boxShadow: isLoading 
+                    ? 'none' 
+                    : '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transform: 'scale(1)'
                 }}
                 onMouseOver={(e) => {
                   if (!isLoading) {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.4)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.2)';
                   }
                 }}
                 onMouseOut={(e) => {
                   if (!isLoading) {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
                   }
                 }}
               >
@@ -1402,10 +1659,10 @@ export default function LoginPage() {
                     Đang xác thực...
                   </div>
                 ) : (
-                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}>
-                      <LockClosedIcon style={{ width: '18px', height: '18px' }} />
-                      Đăng nhập
-                    </div>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}>
+                    <LockClosedIcon style={{ width: '18px', height: '18px' }} />
+                    Đăng nhập
+                  </div>
                 )}
               </button>
             </form>

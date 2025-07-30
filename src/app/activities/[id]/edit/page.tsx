@@ -9,7 +9,9 @@ import {
   InformationCircleIcon, 
   CalendarIcon, 
   UserGroupIcon,
-  PencilSquareIcon
+  PencilSquareIcon,
+  CheckCircleIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { activitiesAPI } from '@/lib/api';
 import { format, parseISO } from 'date-fns';
@@ -48,6 +50,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [participants, setParticipants] = useState<string[]>([]);
   const [selectedResident, setSelectedResident] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Get activityId from params directly
   const activityId = params.id;
@@ -106,7 +110,17 @@ export default function EditActivityPage({ params }: { params: { id: string } })
         capacity: Number(data.capacity)
       };
       await activitiesAPI.update(activityId, payload);
+      
+      // Hiển thị modal thành công
+      setSuccessMessage(`Hoạt động "${data.name}" đã được cập nhật thành công!`);
+      setShowSuccessModal(true);
+      
+      // Tự động chuyển hướng sau 3 giây
+      setTimeout(() => {
+        setShowSuccessModal(false);
         router.push('/activities');
+      }, 3000);
+      
     } catch (error) {
       console.error('Error updating activity:', error);
       alert('Có lỗi xảy ra khi cập nhật hoạt động. Vui lòng thử lại.');
@@ -548,6 +562,195 @@ export default function EditActivityPage({ params }: { params: { id: string } })
           </form>
         </div>
       </div>
+      
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
+            maxWidth: '500px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            animation: 'modalSlideIn 0.3s ease-out'
+          }}>
+            {/* Success Icon */}
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)',
+              animation: 'successIconBounce 0.6s ease-out'
+            }}>
+              <CheckCircleIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+            </div>
+            
+            {/* Success Title */}
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: '#065f46',
+              margin: '0 0 1rem 0',
+              letterSpacing: '-0.025em'
+            }}>
+              Cập nhật thành công!
+            </h2>
+            
+            {/* Success Message */}
+            <p style={{
+              fontSize: '1rem',
+              color: '#4b5563',
+              margin: '0 0 2rem 0',
+              lineHeight: 1.6
+            }}>
+              {successMessage}
+            </p>
+            
+            {/* Progress Bar */}
+            <div style={{
+              width: '100%',
+              height: '0.25rem',
+              background: '#e5e7eb',
+              borderRadius: '9999px',
+              overflow: 'hidden',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{
+                height: '100%',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                borderRadius: '9999px',
+                animation: 'progressBar 3s linear forwards'
+              }} />
+            </div>
+            
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  router.push('/activities');
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: 'white',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                }}
+              >
+                <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                Xem danh sách
+              </button>
+              
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  background: 'white',
+                  border: '1px solid #d1d5db',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#9ca3af';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+              >
+                <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes modalSlideIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9) translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        
+        @keyframes successIconBounce {
+          0% {
+            transform: scale(0);
+          }
+          50% {
+            transform: scale(1.2);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+        
+        @keyframes progressBar {
+          from {
+            width: 0%;
+          }
+          to {
+            width: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 } 

@@ -1,41 +1,103 @@
 import React from 'react';
+import { 
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+  InformationCircleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 
 interface NotificationModalProps {
   open: boolean;
-  type: 'success' | 'error';
+  title: string;
   message: string;
+  type?: 'success' | 'error' | 'warning' | 'info';
   onClose: () => void;
+  showCloseButton?: boolean;
 }
 
-export default function NotificationModal({ open, type, message, onClose }: NotificationModalProps) {
+export default function NotificationModal({
+  open,
+  title,
+  message,
+  type = 'info',
+  onClose,
+  showCloseButton = true
+}: NotificationModalProps) {
   if (!open) return null;
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return <CheckCircleIcon className="w-6 h-6 text-green-600" />;
+      case 'error':
+        return <XCircleIcon className="w-6 h-6 text-red-600" />;
+      case 'warning':
+        return <ExclamationTriangleIcon className="w-6 h-6 text-yellow-600" />;
+      default:
+        return <InformationCircleIcon className="w-6 h-6 text-blue-600" />;
+    }
+  };
+
+  const getBackgroundColor = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-50 border-green-200';
+      case 'error':
+        return 'bg-red-50 border-red-200';
+      case 'warning':
+        return 'bg-yellow-50 border-yellow-200';
+      default:
+        return 'bg-blue-50 border-blue-200';
+    }
+  };
+
+  const getButtonColor = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-600 hover:bg-green-700 text-white';
+      case 'error':
+        return 'bg-red-600 hover:bg-red-700 text-white';
+      case 'warning':
+        return 'bg-yellow-600 hover:bg-yellow-700 text-white';
+      default:
+        return 'bg-blue-600 hover:bg-blue-700 text-white';
+    }
+  };
+
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-      background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-    }}>
-      <div style={{
-        background: 'white', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center'
-      }}>
-        {type === 'success' ? (
-          <svg width={48} height={48} fill="none"><circle cx={24} cy={24} r={24} fill="#22c55e"/><path d="M16 24l6 6 10-10" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
-        ) : (
-          <svg width={48} height={48} fill="none"><circle cx={24} cy={24} r={24} fill="#ef4444"/><path d="M16 16l16 16M32 16L16 32" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
-        )}
-        <div style={{ fontWeight: 600, fontSize: 18, margin: '16px 0 8px', color: type === 'success' ? '#22c55e' : '#ef4444' }}>
-          {type === 'success' ? 'Thành công' : 'Lỗi'}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+      <div className={`bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 border ${getBackgroundColor()}`}>
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {getIcon()}
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          </div>
+          {showCloseButton && (
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
-        <div style={{ color: '#374151', marginBottom: 24, textAlign: 'center' }}>{message}</div>
-        <button
-          onClick={onClose}
-          style={{
-            background: type === 'success' ? '#22c55e' : '#ef4444',
-            color: 'white', border: 'none', borderRadius: 8, padding: '8px 24px', fontWeight: 500, cursor: 'pointer'
-          }}
-        >
-          Đóng
-        </button>
+
+        {/* Content */}
+        <div className="mb-6">
+          <p className="text-gray-600 leading-relaxed whitespace-pre-line">{message}</p>
+        </div>
+
+        {/* Action */}
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${getButtonColor()}`}
+          >
+            Đóng
+          </button>
+        </div>
       </div>
     </div>
   );

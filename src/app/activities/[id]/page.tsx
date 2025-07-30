@@ -6,8 +6,10 @@ import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { useResidents } from '@/lib/contexts/residents-context';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { activitiesAPI, activityParticipationsAPI, userAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
+import ConfirmModal from '@/components/ConfirmModal';
+import NotificationModal from '@/components/NotificationModal';
 
 export default function ActivityDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -21,9 +23,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   const [searchTerm, setSearchTerm] = useState('');
   const [evaluations, setEvaluations] = useState<{[key: string]: {participated: boolean, reason?: string}}>({});
   const [saving, setSaving] = useState(false);
-  const [addResidentModalOpen, setAddResidentModalOpen] = useState(false);
-  const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
-  const [addingResident, setAddingResident] = useState(false);
+
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Staff assignment states
@@ -33,6 +33,23 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   const [assigningStaff, setAssigningStaff] = useState(false);
   const [currentAssignedStaff, setCurrentAssignedStaff] = useState<any>(null);
   const [assignedStaffList, setAssignedStaffList] = useState<any[]>([]);
+  
+  // Confirm modal states
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'danger' as 'danger' | 'warning' | 'info'
+  });
+  
+  // Notification modal state
+  const [notificationModal, setNotificationModal] = useState({
+    open: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
   
   // Check access permissions
   useEffect(() => {
@@ -224,7 +241,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
     };
     
     fetchParticipations();
-  }, [activity?.id, staffList, refreshTrigger]);
+  }, [activity?.id, refreshTrigger]);
 
   // Debug: Log when evaluations change
   useEffect(() => {
@@ -262,14 +279,24 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
         return null;
       }
 
+      // Chuyển đổi thời gian từ UTC về múi giờ Việt Nam (+7)
+      const convertToVietnamTime = (utcTime: Date) => {
+        const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000)); // +7 giờ
+        return vietnamTime.toLocaleTimeString('vi-VN', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        });
+      };
+
       return {
         id: apiActivity._id,
         name: apiActivity.activity_name,
         description: apiActivity.description,
         category: getCategoryLabel(apiActivity.activity_type),
-        scheduledTime: scheduleTime.toISOString().slice(11, 16), // Get HH:mm from UTC
-        startTime: scheduleTime.toISOString().slice(11, 16), // Get HH:mm from UTC
-        endTime: endTime.toISOString().slice(11, 16), // Calculate end time in UTC
+        scheduledTime: convertToVietnamTime(scheduleTime), // Convert to Vietnam time
+        startTime: convertToVietnamTime(scheduleTime), // Convert to Vietnam time
+        endTime: convertToVietnamTime(endTime), // Convert to Vietnam time
         duration: apiActivity.duration,
         date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
         location: apiActivity.location,
@@ -383,7 +410,12 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
     });
     
     if (invalidEvaluations.length > 0) {
-      alert(`Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`);
+      setNotificationModal({
+        open: true,
+        title: 'Thiếu thông tin',
+        message: `Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`,
+        type: 'warning'
+      });
       return;
     }
     
@@ -515,7 +547,12 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       }
       
       setEvaluationMode(false);
-      alert('Đánh giá đã được lưu thành công!');
+      setNotificationModal({
+        open: true,
+        title: 'Thành công',
+        message: 'Đánh giá đã được lưu thành công!',
+        type: 'success'
+      });
     } catch (error: any) {
       console.error('Error saving evaluations:', error);
       let errorMessage = 'Có lỗi xảy ra khi lưu đánh giá. Vui lòng thử lại.';
@@ -526,7 +563,12 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
         errorMessage = `Lỗi: ${error.message}`;
       }
       
-      alert(errorMessage);
+      setNotificationModal({
+        open: true,
+        title: 'Lỗi',
+        message: errorMessage,
+        type: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -675,124 +717,9 @@ const activityResidents: ActivityResident[] = Object.values(
   const participationCount = activityResidents.length;
   console.log('Participation count:', participationCount);
   
-  const residentsNotJoined = residents.filter((r: any) => !joinedResidentIds.includes(r.id));
 
-  // Thêm cư dân vào hoạt động
-  const handleAddResident = async () => {
-    if (!selectedResidentId || !activity?.id || !activity.date) return;
-    
-    // Kiểm tra sức chứa trước khi thêm
-    const currentParticipantCount = participations.filter((p: any) => {
-      const participationActivityId = p.activity_id?._id || p.activity_id;
-      const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
-      return participationActivityId === activity.id && participationDate === activity.date;
-    }).length;
-    
-    if (currentParticipantCount >= activity.capacity) {
-      alert(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`);
-      return;
-    }
-    
-    // Kiểm tra xem cư dân đã được thêm vào hoạt động này chưa
-    const isAlreadyParticipating = participations.some((p: any) => {
-      const participationActivityId = p.activity_id?._id || p.activity_id;
-      const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
-      const participationResidentId = p.resident_id?._id || p.resident_id;
-      return participationActivityId === activity.id && 
-             participationDate === activity.date && 
-             participationResidentId === selectedResidentId;
-    });
-    
-    if (isAlreadyParticipating) {
-      alert('Cư dân này đã được thêm vào hoạt động này rồi.');
-      return;
-    }
-    
-    setAddingResident(true);
-    try {
-      // Sử dụng staff_id đầu tiên trong danh sách hoặc user hiện tại nếu chưa có
-      const currentStaffId = assignedStaffList.length > 0 ? assignedStaffList[0].id : (user?.id || "664f1b2c2f8b2c0012a4e750");
-      
-      await activityParticipationsAPI.create({
-        staff_id: currentStaffId,
-        activity_id: activity.id,
-        resident_id: selectedResidentId,
-        date: activity.date + 'T00:00:00Z',
-        attendance_status: 'attended',
-        performance_notes: ''
-      });
-      setAddResidentModalOpen(false);
-      setSelectedResidentId(null);
-      // Reload participations
-      const participationsData = await activityParticipationsAPI.getByActivityId(
-        activity.id, 
-        activity.date
-      );
-      setParticipations(participationsData);
-      
-      // Cập nhật thông tin nhân viên hướng dẫn sau khi thêm cư dân
-      // Kiểm tra cả activity_id và activity_id._id vì có thể có cấu trúc nested
-      const currentActivityParticipations = participationsData.filter((p: any) => {
-        const participationActivityId = p.activity_id?._id || p.activity_id;
-        return participationActivityId === activity.id;
-      });
-      
-      // Lấy danh sách tất cả nhân viên được phân công cho hoạt động này
-      const staffIds = new Set();
-      const assignedStaffs: any[] = [];
-      
-      currentActivityParticipations.forEach((participation: any) => {
-        if (participation.staff_id) {
-          let staffId = participation.staff_id;
-          let staffName = 'Nhân viên chưa xác định';
-          let staffRole = 'Nhân viên';
-          
-          if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
-            staffId = participation.staff_id._id;
-            staffName = participation.staff_id.full_name || staffName;
-            staffRole = participation.staff_id.role || staffRole;
-          } else {
-            const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
-            if (foundStaff) {
-              staffName = foundStaff.name;
-              staffRole = foundStaff.role;
-            }
-          }
-          
-          if (!staffIds.has(staffId)) {
-            staffIds.add(staffId);
-            assignedStaffs.push({
-              id: staffId,
-              name: staffName,
-              role: staffRole
-            });
-          }
-        }
-      });
-      
-      setAssignedStaffList(assignedStaffs);
-      
-      // Giữ lại currentAssignedStaff cho backward compatibility (lấy nhân viên đầu tiên)
-      if (assignedStaffs.length > 0) {
-        setCurrentAssignedStaff(assignedStaffs[0]);
-      } else {
-        setCurrentAssignedStaff(null);
-      }
-    } catch (err: any) {
-      console.error('Error adding resident:', err);
-      let errorMessage = 'Không thể thêm cư dân vào hoạt động. Vui lòng thử lại.';
-      
-      if (err.response?.data?.message) {
-        errorMessage = `Lỗi: ${err.response.data.message}`;
-      } else if (err.message) {
-        errorMessage = `Lỗi: ${err.message}`;
-      }
-      
-      alert(errorMessage);
-    } finally {
-      setAddingResident(false);
-    }
-  };
+
+
 
   // Xóa nhân viên được phân công
   const handleRemoveStaff = async (staffId: string) => {
@@ -800,12 +727,28 @@ const activityResidents: ActivityResident[] = Object.values(
     
     // Kiểm tra quyền - chỉ admin mới có thể xóa staff
     if (user?.role !== 'admin') {
-      alert('Bạn không có quyền xóa nhân viên khỏi hoạt động.');
+      setNotificationModal({
+        open: true,
+        title: 'Không có quyền',
+        message: 'Bạn không có quyền xóa nhân viên khỏi hoạt động.',
+        type: 'error'
+      });
       return;
     }
     
-    const confirmed = window.confirm('Bạn có chắc chắn muốn xóa nhân viên này khỏi hoạt động?');
-    if (!confirmed) return;
+    // Hiển thị modal xác nhận
+    setConfirmModal({
+      open: true,
+      title: 'Xác nhận xóa',
+      message: 'Bạn có chắc chắn muốn xóa nhân viên này khỏi hoạt động?',
+      onConfirm: () => performRemoveStaff(staffId),
+      type: 'danger'
+    });
+  };
+
+  // Thực hiện xóa nhân viên sau khi xác nhận
+  const performRemoveStaff = async (staffId: string) => {
+    setConfirmModal(prev => ({ ...prev, open: false }));
     
     try {
       // Tìm tất cả participations của nhân viên này trong hoạt động hiện tại
@@ -816,7 +759,12 @@ const activityResidents: ActivityResident[] = Object.values(
       });
       
       if (currentActivityParticipations.length === 0) {
-        alert('Không tìm thấy nhân viên này trong hoạt động.');
+        setNotificationModal({
+          open: true,
+          title: 'Không tìm thấy',
+          message: 'Không tìm thấy nhân viên này trong hoạt động.',
+          type: 'error'
+        });
         return;
       }
       
@@ -874,7 +822,12 @@ const activityResidents: ActivityResident[] = Object.values(
         setCurrentAssignedStaff(null);
       }
       
-      alert('Đã xóa nhân viên khỏi hoạt động thành công!');
+      setNotificationModal({
+        open: true,
+        title: 'Thành công',
+        message: 'Đã xóa nhân viên khỏi hoạt động thành công!',
+        type: 'success'
+      });
     } catch (error: any) {
       console.error('Error removing staff:', error);
       let errorMessage = 'Không thể xóa nhân viên khỏi hoạt động. Vui lòng thử lại.';
@@ -885,7 +838,12 @@ const activityResidents: ActivityResident[] = Object.values(
         errorMessage = `Lỗi: ${error.message}`;
       }
       
-      alert(errorMessage);
+      setNotificationModal({
+        open: true,
+        title: 'Lỗi',
+        message: errorMessage,
+        type: 'error'
+      });
     }
   };
 
@@ -895,35 +853,82 @@ const activityResidents: ActivityResident[] = Object.values(
     
     // Kiểm tra quyền - chỉ admin mới có thể phân công staff
     if (user?.role !== 'admin') {
-      alert('Bạn không có quyền phân công nhân viên cho hoạt động.');
+      setNotificationModal({
+        open: true,
+        title: 'Không có quyền',
+        message: 'Bạn không có quyền phân công nhân viên cho hoạt động.',
+        type: 'error'
+      });
       return;
     }
     setAssigningStaff(true);
     try {
-      // Cập nhật tất cả participations cho hoạt động hiện tại với nhân viên mới
-      // Kiểm tra cả activity_id và activity_id._id vì có thể có cấu trúc nested
+      // Lấy danh sách cư dân được phân công cho staff này
+      const staffAssignments = await staffAssignmentsAPI.getByStaff(selectedStaffId);
+      const assignedResidentIds = staffAssignments.map((assignment: any) => assignment.resident_id._id || assignment.resident_id);
+      
+      console.log('Staff assignments:', staffAssignments);
+      console.log('Assigned resident IDs:', assignedResidentIds);
+      
+      // Lấy danh sách cư dân đã tham gia hoạt động này
       const currentActivityParticipations = participations.filter(p => {
         const participationActivityId = p.activity_id?._id || p.activity_id;
         return participationActivityId === activity.id;
       });
       
-      console.log('Current activity participations:', currentActivityParticipations);
-      console.log('Total participations:', participations);
-      console.log('Activity ID:', activity.id);
+      const currentParticipantIds = currentActivityParticipations.map(p => 
+        p.resident_id?._id || p.resident_id
+      );
       
-      if (currentActivityParticipations.length > 0) {
-        for (const participation of currentActivityParticipations) {
+      console.log('Current participant IDs:', currentParticipantIds);
+      
+      // Tìm cư dân chưa tham gia hoạt động
+      const newResidentIds = assignedResidentIds.filter((residentId: string) => 
+        !currentParticipantIds.includes(residentId)
+      );
+      
+      console.log('New resident IDs to add:', newResidentIds);
+      
+      // Kiểm tra sức chứa
+      const currentParticipantCount = currentParticipantIds.length;
+      const totalAfterAdding = currentParticipantCount + newResidentIds.length;
+      
+      if (totalAfterAdding > activity.capacity) {
+        const canAddCount = activity.capacity - currentParticipantCount;
+        setNotificationModal({
+          open: true,
+          title: 'Cảnh báo',
+          message: `Hoạt động chỉ còn ${canAddCount} chỗ trống, nhưng staff này quản lý ${assignedResidentIds.length} cư dân. Chỉ có thể thêm ${canAddCount} cư dân đầu tiên.`,
+          type: 'warning'
+        });
+        
+        // Chỉ thêm số lượng có thể
+        newResidentIds.splice(canAddCount);
+      }
+      
+      // Thêm cư dân mới vào hoạt động
+      let addedCount = 0;
+      for (const residentId of newResidentIds) {
+        try {
+          await activityParticipationsAPI.create({
+            staff_id: selectedStaffId,
+            activity_id: activity.id,
+            resident_id: residentId,
+            date: activity.date + 'T00:00:00Z',
+            attendance_status: 'attended',
+            performance_notes: 'Tham gia tích cực, tinh thần tốt'
+          });
+          addedCount++;
+        } catch (error) {
+          console.error(`Error adding resident ${residentId}:`, error);
+        }
+      }
+      
+      // Cập nhật tất cả participations hiện có với staff mới
+      for (const participation of currentActivityParticipations) {
         await activityParticipationsAPI.update(participation._id, {
           staff_id: selectedStaffId
         });
-        }
-      } else {
-        // Nếu chưa có participations, thông báo cho user thêm cư dân trước
-        alert('Vui lòng thêm cư dân vào hoạt động trước khi phân công nhân viên hướng dẫn.');
-        setAssignStaffModalOpen(false);
-        setSelectedStaffId('');
-        setAssigningStaff(false);
-        return;
       }
       
       // Update current assigned staff
@@ -937,9 +942,60 @@ const activityResidents: ActivityResident[] = Object.values(
       );
       setParticipations(participationsData);
       
+      // Cập nhật danh sách staff được phân công
+      const staffIds = new Set();
+      const assignedStaffs: any[] = [];
+      
+      participationsData.forEach((participation: any) => {
+        if (participation.staff_id) {
+          let staffId = participation.staff_id;
+          let staffName = 'Nhân viên chưa xác định';
+          let staffRole = 'Nhân viên';
+          
+          if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
+            staffId = participation.staff_id._id;
+            staffName = participation.staff_id.full_name || staffName;
+            staffRole = participation.staff_id.role || staffRole;
+          } else {
+            const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
+            if (foundStaff) {
+              staffName = foundStaff.name;
+              staffRole = foundStaff.role;
+            }
+          }
+          
+          if (!staffIds.has(staffId)) {
+            staffIds.add(staffId);
+            assignedStaffs.push({
+              id: staffId,
+              name: staffName,
+              role: staffRole
+            });
+          }
+        }
+      });
+      
+      setAssignedStaffList(assignedStaffs);
+      
       setAssignStaffModalOpen(false);
       setSelectedStaffId('');
-      alert('Phân công nhân viên hướng dẫn thành công!');
+      
+      // Thông báo kết quả
+      if (addedCount > 0) {
+        setNotificationModal({
+          open: true,
+          title: 'Thành công',
+          message: `Phân công nhân viên hướng dẫn thành công! Đã tự động thêm ${addedCount} cư dân vào hoạt động.`,
+          type: 'success'
+        });
+      } else {
+        setNotificationModal({
+          open: true,
+          title: 'Thành công',
+          message: 'Phân công nhân viên hướng dẫn thành công!',
+          type: 'success'
+        });
+      }
     } catch (error: any) {
       console.error('Error assigning staff:', error);
       let errorMessage = 'Không thể phân công nhân viên hướng dẫn. Vui lòng thử lại.';
@@ -950,7 +1006,12 @@ const activityResidents: ActivityResident[] = Object.values(
         errorMessage = `Lỗi: ${error.message}`;
       }
       
-      alert(errorMessage);
+      setNotificationModal({
+        open: true,
+        title: 'Lỗi',
+        message: errorMessage,
+        type: 'error'
+      });
     } finally {
       setAssigningStaff(false);
     }
@@ -1579,30 +1640,7 @@ const activityResidents: ActivityResident[] = Object.values(
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                    <button
-                      onClick={() => {
-                        if (participationCount >= activity.capacity) {
-                          alert(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`);
-                          return;
-                        }
-                        setAddResidentModalOpen(true);
-                      }}
-                      disabled={participationCount >= activity.capacity}
-                      style={{
-                        background: participationCount >= activity.capacity ? '#9ca3af' : '#10b981', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: 6, 
-                        padding: '0.5rem 1rem', 
-                        fontWeight: 600, 
-                        cursor: participationCount >= activity.capacity ? 'not-allowed' : 'pointer',
-                        opacity: participationCount >= activity.capacity ? 0.6 : 1
-                      }}
-                    >
-                      {participationCount >= activity.capacity ? 'Đã đạt sức chứa tối đa' : '+ Thêm người tham gia'}
-                    </button>
-                  </div>
+
 
 
                   {/* Staff Assignment Section */}
@@ -2094,41 +2132,7 @@ const activityResidents: ActivityResident[] = Object.values(
         </div>
       </div>
 
-      {/* Modal chọn cư dân */}
-      <Dialog open={addResidentModalOpen} onClose={() => setAddResidentModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
-        <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
-          <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
-            <Dialog.Title className="text-lg font-bold mb-4">Chọn cư dân để thêm vào hoạt động</Dialog.Title>
-            <select
-              value={selectedResidentId || ''}
-              onChange={e => setSelectedResidentId(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-4"
-            >
-              <option value="">-- Chọn cư dân --</option>
-              {residentsNotJoined.map((r: any) => (
-                <option key={r.id} value={r.id}>{r.name} (Phòng: {r.room || 'N/A'})</option>
-              ))}
-            </select>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setAddResidentModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 font-semibold"
-                disabled={addingResident}
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleAddResident}
-                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 font-semibold"
-                disabled={addingResident || !selectedResidentId}
-              >
-                {addingResident ? 'Đang thêm...' : 'Thêm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Dialog>
+
 
       {/* Modal phân công nhân viên hướng dẫn */}
       <Dialog open={assignStaffModalOpen} onClose={() => setAssignStaffModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
@@ -2173,6 +2177,25 @@ const activityResidents: ActivityResident[] = Object.values(
           }
         }
       `}</style>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+        type={confirmModal.type}
+      />
+
+      {/* Notification Modal */}
+      <NotificationModal
+        open={notificationModal.open}
+        title={notificationModal.title}
+        message={notificationModal.message}
+        type={notificationModal.type}
+        onClose={() => setNotificationModal(prev => ({ ...prev, open: false }))}
+      />
     </div>
   );
 } 

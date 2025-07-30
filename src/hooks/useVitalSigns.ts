@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { residentAPI, vitalSignsAPI, staffAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, vitalSignsAPI, staffAPI, carePlansAPI, roomsAPI, staffAssignmentsAPI } from '@/lib/api';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   transformApiVitalSignsData, 
   transformFormDataToApi,
@@ -44,6 +45,7 @@ export interface UseVitalSignsReturn {
 }
 
 export function useVitalSigns(): UseVitalSignsReturn {
+  const { user } = useAuth();
   const [vitalSigns, setVitalSigns] = useState<VitalSigns[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
   const [staffMap, setStaffMap] = useState<{ [id: string]: string }>({});
@@ -52,7 +54,30 @@ export function useVitalSigns(): UseVitalSignsReturn {
   // Load residents data
   const loadResidents = useCallback(async () => {
     try {
-      const resList = await residentAPI.getAll();
+      let resList = await residentAPI.getAll();
+      
+      // If user is staff, filter residents by staff assignment
+      if (user?.role === 'staff' && user?.id) {
+        try {
+          const staffAssignments = await staffAssignmentsAPI.getByStaff(user.id);
+          const assignedResidentIds = staffAssignments.map((assignment: any) => 
+            assignment.resident_id._id || assignment.resident_id
+          );
+          
+          // Filter residents to only show assigned ones
+          resList = resList.filter((resident: any) => 
+            assignedResidentIds.includes(resident._id || resident.id)
+          );
+          
+          console.log('Staff assignments:', staffAssignments);
+          console.log('Assigned resident IDs:', assignedResidentIds);
+          console.log('Filtered residents for staff:', resList.length);
+        } catch (assignmentError) {
+          console.error('Error fetching staff assignments:', assignmentError);
+          // If error fetching assignments, show no residents for staff
+          resList = [];
+        }
+      }
       
       // Get room information for each resident
       const mappedResidents: Resident[] = await Promise.all(resList.map(async (r: any) => {
@@ -96,7 +121,7 @@ export function useVitalSigns(): UseVitalSignsReturn {
       setResidents([]);
       return [];
     }
-  }, []);
+  }, [user]);
 
   // Load staff data
   const loadStaff = useCallback(async () => {
@@ -159,7 +184,7 @@ export function useVitalSigns(): UseVitalSignsReturn {
       const response = await vitalSignsAPI.create(apiData);
       await loadVitalSigns();
       return response;
-    } catch (error) {
+    } catch (error: any) {
       // More specific error messages
       if (error.response?.status === 400) {
         throw new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các thông tin đã nhập.');
@@ -228,9 +253,11 @@ export function useVitalSigns(): UseVitalSignsReturn {
 
   // Initialize data on mount
   useEffect(() => {
-    loadVitalSigns();
-    loadStaff();
-  }, [loadVitalSigns, loadStaff]);
+    if (user) {
+      loadVitalSigns();
+      loadStaff();
+    }
+  }, [loadVitalSigns, loadStaff, user]);
 
   return {
     vitalSigns,

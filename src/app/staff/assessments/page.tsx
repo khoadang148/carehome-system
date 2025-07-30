@@ -3,10 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { residentAPI } from '@/lib/api';
-import { careNotesAPI } from '@/lib/api';
-import { carePlansAPI, roomsAPI } from '@/lib/api';
-import { userAPI } from '@/lib/api';
+import { staffAssignmentsAPI, careNotesAPI, carePlansAPI, roomsAPI, userAPI } from '@/lib/api';
 import { 
   HeartIcon, 
   MagnifyingGlassIcon,
@@ -26,6 +23,7 @@ interface Resident {
   lastNote?: string;
   notesCount?: number;
   date_of_birth?: string;
+  avatar?: string;
 }
 
 export default function CareNotesPage() {
@@ -67,29 +65,42 @@ export default function CareNotesPage() {
 
   const loadResidents = async () => {
     try {
-      const data = await residentAPI.getAll();
-      const residentsWithNotes = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
-        let age = resident.age;
-        if ((!age || age === '') && resident.date_of_birth) {
+      // Lấy danh sách assignments của staff đang đăng nhập
+      const assignmentsData = await staffAssignmentsAPI.getMyAssignments();
+      const assignments = Array.isArray(assignmentsData) ? assignmentsData : [];
+      
+      const residentsWithNotes = await Promise.all(assignments.map(async (assignment: any) => {
+        const resident = assignment.resident_id;
+        
+        let age = '';
+        if (resident.date_of_birth) {
           const dob = new Date(resident.date_of_birth);
           const now = new Date();
-          age = now.getFullYear() - dob.getFullYear();
+          age = (now.getFullYear() - dob.getFullYear()).toString();
           const m = now.getMonth() - dob.getMonth();
           if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
-            age--;
+            age = (parseInt(age) - 1).toString();
           }
         }
-        // Lấy số phòng giống family
+        
+        // Lấy số phòng từ assignment data
         let room_number = '';
-        try {
-          const assignments = await carePlansAPI.getByResidentId(resident._id || resident.id);
-          const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-          const roomId = assignment?.assigned_room_id;
-          if (roomId) {
-            const room = await roomsAPI.getById(roomId);
+        if (resident.room_number) {
+          room_number = resident.room_number;
+        } else {
+          // Fallback: lấy từ care plan assignments
+          try {
+            const carePlanAssignments = await carePlansAPI.getByResidentId(resident._id);
+            const carePlanAssignment = Array.isArray(carePlanAssignments) ? 
+              carePlanAssignments.find((a: any) => a.assigned_room_id) : null;
+            
+            if (carePlanAssignment?.assigned_room_id) {
+              const room = await roomsAPI.getById(carePlanAssignment.assigned_room_id);
             room_number = room?.room_number || '';
           }
         } catch {}
+        }
+        
         return {
           id: resident._id || resident.id,
           full_name: resident.full_name || resident.name || resident.fullName || '',
@@ -97,9 +108,12 @@ export default function CareNotesPage() {
           age: age || '',
           careLevel: resident.care_level || resident.careLevel || '',
           date_of_birth: resident.date_of_birth || resident.dateOfBirth || '',
+          avatar: resident.avatar || '',
         };
       }));
+      
       setResidents(residentsWithNotes);
+      
       // Load care notes cho từng resident song song
       const notesMap: Record<string, any[]> = {};
       await Promise.all(residentsWithNotes.map(async (resident) => {
@@ -246,16 +260,44 @@ export default function CareNotesPage() {
                 gap: '0.5rem',
                 marginBottom: '1rem'
               }}>
+                {/* Avatar */}
                 <div style={{
                   width: '2.2rem',
                   height: '2.2rem',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  borderRadius: '0.6rem',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  background: '#f3f4f6',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  border: '2px solid #e5e7eb',
+                  flexShrink: 0
                 }}>
-                  <UserIcon style={{ width: '1.1rem', height: '1.1rem', color: 'white' }} />
+                  <img
+                    src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : ''}
+                    alt={`Avatar của ${resident.full_name}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const nextElement = target.nextElementSibling as HTMLElement;
+                      if (nextElement) {
+                        nextElement.style.display = 'flex';
+                      }
+                    }}
+                  />
+                  <UserIcon 
+                    style={{
+                      width: '1.1rem',
+                      height: '1.1rem',
+                      color: '#9ca3af',
+                      display: 'none'
+                    }}
+                  />
                 </div>
                 <div style={{ fontSize: '0.97rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span><span style={{ color: '#2563eb', fontWeight: 500 }}>Họ và tên:</span> <span style={{ fontWeight: 600 }}>{resident.full_name}</span></span>
@@ -450,10 +492,18 @@ export default function CareNotesPage() {
                         <span style={{ fontWeight: 600 }}>Khuyến nghị: </span>{note.recommendations || '---'}
                       </div>
                       <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600 }}>Nhân viên: </span>{
-                          (() => {
-                            const staffId = note.conducted_by;
-                            if (!staffId) return '---';
+                        <span style={{ fontWeight: 600 }}>Nhân viên: </span>
+                        {(() => {
+                          const staffId = note.conducted_by;
+                          if (!staffId) return '---';
+                          
+                          // Check if conducted_by is an object with full_name
+                          if (typeof staffId === 'object' && staffId.full_name) {
+                            return staffId.full_name;
+                          }
+                          
+                          // If it's a string ID, use the staffNames mapping
+                          if (typeof staffId === 'string') {
                             if (staffNames[staffId]) return staffNames[staffId];
                             userAPI.getById(staffId)
                               .then(data => {
@@ -463,8 +513,10 @@ export default function CareNotesPage() {
                                 setStaffNames(prev => ({ ...prev, [staffId]: staffId }));
                               });
                             return 'Đang tải...';
-                          })()
-                        }
+                          }
+                          
+                          return '---';
+                        })()}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                         <button
@@ -578,15 +630,26 @@ export default function CareNotesPage() {
                   value={(() => {
                     const staffId = editNote.conducted_by;
                     if (!staffId) return '---';
-                    if (staffNames[staffId]) return staffNames[staffId];
-                    userAPI.getById(staffId)
-                      .then(data => {
-                        setStaffNames(prev => ({ ...prev, [staffId]: data.full_name || data.username || data.email || staffId }));
-                      })
-                      .catch(() => {
-                        setStaffNames(prev => ({ ...prev, [staffId]: staffId }));
-                      });
-                    return 'Đang tải...';
+                    
+                    // Check if conducted_by is an object with full_name
+                    if (typeof staffId === 'object' && staffId.full_name) {
+                      return staffId.full_name;
+                    }
+                    
+                    // If it's a string ID, use the staffNames mapping
+                    if (typeof staffId === 'string') {
+                      if (staffNames[staffId]) return staffNames[staffId];
+                      userAPI.getById(staffId)
+                        .then(data => {
+                          setStaffNames(prev => ({ ...prev, [staffId]: data.full_name || data.username || data.email || staffId }));
+                        })
+                        .catch(() => {
+                          setStaffNames(prev => ({ ...prev, [staffId]: staffId }));
+                        });
+                      return 'Đang tải...';
+                    }
+                    
+                    return '---';
                   })()}
                   disabled
                   style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 15, background: '#f3f4f6' }}

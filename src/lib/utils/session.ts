@@ -14,6 +14,12 @@ export function clearSessionData() {
   // Clear localStorage (in case there's any old data)
   localStorage.removeItem('access_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('session_start');
+  
+  // Clear login-related data
+  localStorage.removeItem('login_success');
+  localStorage.removeItem('login_error');
+  localStorage.removeItem('login_attempts');
   
   // Clear cookies
   document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -23,9 +29,10 @@ export function clearSessionData() {
  * Check if session is valid
  */
 export function isSessionValid(): boolean {
-  const token = sessionStorage.getItem('access_token');
-  const user = sessionStorage.getItem('user');
-  const sessionStart = sessionStorage.getItem('session_start');
+  // Ưu tiên localStorage trước, sau đó mới đến sessionStorage
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+  const user = localStorage.getItem('user') || sessionStorage.getItem('user');
+  const sessionStart = localStorage.getItem('session_start') || sessionStorage.getItem('session_start');
   
   if (!token || !user || !sessionStart) {
     return false;
@@ -42,7 +49,8 @@ export function isSessionValid(): boolean {
  * Get remaining session time in milliseconds
  */
 export function getRemainingSessionTime(): number {
-  const sessionStart = sessionStorage.getItem('session_start');
+  // Kiểm tra cả localStorage và sessionStorage để nhất quán
+  const sessionStart = localStorage.getItem('session_start') || sessionStorage.getItem('session_start');
   if (!sessionStart) {
     return 0;
   }
@@ -58,17 +66,25 @@ export function getRemainingSessionTime(): number {
  * Extend session by updating session start time
  */
 export function extendSession() {
-  sessionStorage.setItem('session_start', Date.now().toString());
+  const currentTime = Date.now().toString();
+  // Cập nhật cả localStorage và sessionStorage
+  localStorage.setItem('session_start', currentTime);
+  sessionStorage.setItem('session_start', currentTime);
 }
 
 /**
  * Initialize session with token and user data
  */
 export function initializeSession(token: string, userData: any) {
+  const currentTime = Date.now().toString();
+  
+  // Lưu vào localStorage để truy cập nhanh hơn
+  localStorage.setItem('access_token', token);
+  localStorage.setItem('user', JSON.stringify(userData));
+  localStorage.setItem('session_start', currentTime);
+  
+  // Lưu vào sessionStorage để backup
   sessionStorage.setItem('access_token', token);
   sessionStorage.setItem('user', JSON.stringify(userData));
-  sessionStorage.setItem('session_start', Date.now().toString());
-  
-  // Set cookie with expiration matching session timeout (2 hours)
-  document.cookie = `access_token=${token}; path=/; max-age=7200; SameSite=Strict`;
+  sessionStorage.setItem('session_start', currentTime);
 } 

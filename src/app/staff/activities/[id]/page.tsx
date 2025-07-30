@@ -189,14 +189,24 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
         return null;
       }
 
+      // Chuyển đổi thời gian từ UTC về múi giờ Việt Nam (+7)
+      const convertToVietnamTime = (utcTime: Date) => {
+        const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000)); // +7 giờ
+        return vietnamTime.toLocaleTimeString('vi-VN', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        });
+      };
+
       return {
         id: apiActivity._id,
         name: apiActivity.activity_name,
         description: apiActivity.description,
         category: getCategoryLabel(apiActivity.activity_type),
-        scheduledTime: scheduleTime.toISOString().slice(11, 16), // Get HH:mm from UTC
-        startTime: scheduleTime.toISOString().slice(11, 16), // Get HH:mm from UTC
-        endTime: endTime.toISOString().slice(11, 16), // Calculate end time in UTC
+        scheduledTime: convertToVietnamTime(scheduleTime), // Convert to Vietnam time
+        startTime: convertToVietnamTime(scheduleTime), // Convert to Vietnam time
+        endTime: convertToVietnamTime(endTime), // Convert to Vietnam time
         duration: apiActivity.duration,
         date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
         location: apiActivity.location,

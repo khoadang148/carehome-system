@@ -15,7 +15,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI } from '@/lib/api';
+import { residentAPI, userAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { vitalSignsAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
@@ -336,87 +336,154 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
               <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
           </Link>
             <div style={{ flex: 1 }}>
-              <h1 style={{
-                fontSize: '1.875rem',
-                fontWeight: 700,
-                margin: 0,
-                color: '#1e293b'
-              }}>
-                {resident.name}
-              </h1>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1rem',
-                marginTop: '0.5rem'
+                gap: '1.5rem',
+                marginBottom: '1rem'
               }}>
-                {/* Tuổi */}
-                <span style={{
-                  display: 'inline-flex',
+                {/* Avatar */}
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: '3px solid #e5e7eb',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  background: '#f3f4f6',
-                  borderRadius: '0.5rem',
-                  padding: '0.25rem 0.75rem',
-                  fontWeight: 500
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '2rem',
+                  fontWeight: 'bold',
+                  flexShrink: 0
                 }}>
-                  <UserIcon style={{ width: '1rem', height: '1rem' }} />
-                  <span>Tuổi:</span>
-                  <span>{resident.age}</span>
-                </span>
-                {/* Phòng */}
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  background: '#f3f4f6',
-                  borderRadius: '0.5rem',
-                  padding: '0.25rem 0.75rem',
-                  fontWeight: 500
-                }}>
-                  <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
-                  <span>Phòng:</span>
-                  <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
-                </span>
-                {/* Giường */}
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  background: '#f3f4f6',
-                  borderRadius: '0.5rem',
-                  padding: '0.25rem 0.75rem',
-                  fontWeight: 500
-                }}>
-                  <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
-                  <span>Giường:</span>
-                  <span>{bedLoading ? 'Đang tải...' : bedNumber}</span>
-                </span>
+                  {resident.avatar ? (
+                    <img
+                      src={userAPI.getAvatarUrl(resident.avatar)}
+                      alt={`Avatar của ${resident.name}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          parent.textContent = resident.name ? resident.name.charAt(0).toUpperCase() : 'U';
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src="/default-avatar.svg"
+                      alt="Default avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          parent.textContent = resident.name ? resident.name.charAt(0).toUpperCase() : 'U';
+                        }
+                      }}
+                    />
+                  )}
+                </div>
                 
-                {/* Trạng thái sức khỏe */}
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  color: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '#166534' : '#92400e',
-                  border: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24',
-                  marginLeft: '0.5rem'
-                }}>
-                  <div style={{width: '0.5rem', height: '0.5rem', background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
-                  Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
-                </span>
+                {/* Thông tin cơ bản */}
+                <div style={{ flex: 1 }}>
+                                     <div style={{ marginBottom: '0.5rem' }}>
+                     <span style={{
+                       fontSize: '0.875rem',
+                       fontWeight: 500,
+                       color: '#64748b',
+                       display: 'block',
+                       marginBottom: '0.25rem'
+                     }}>
+                       Tên người cao tuổi:
+                     </span>
+                     <h1 style={{
+                       fontSize: '1.875rem',
+                       fontWeight: 700,
+                       margin: 0,
+                       color: '#1e293b'
+                     }}>
+                       {resident.name}
+                     </h1>
+                   </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginTop: '0.5rem',
+                    flexWrap: 'wrap'
+                  }}>
+                    {/* Tuổi */}
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontSize: '1rem',
+                      color: '#64748b',
+                      background: '#f3f4f6',
+                      borderRadius: '0.5rem',
+                      padding: '0.25rem 0.75rem',
+                      fontWeight: 500
+                    }}>
+                      <UserIcon style={{ width: '1rem', height: '1rem' }} />
+                      <span>Tuổi:</span>
+                      <span>{resident.age}</span>
+                    </span>
+                    {/* Phòng */}
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontSize: '1rem',
+                      color: '#64748b',
+                      background: '#f3f4f6',
+                      borderRadius: '0.5rem',
+                      padding: '0.25rem 0.75rem',
+                      fontWeight: 500
+                    }}>
+                      <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                      <span>Phòng:</span>
+                      <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
+                    </span>
+                    {/* Giường */}
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontSize: '1rem',
+                      color: '#64748b',
+                      background: '#f3f4f6',
+                      borderRadius: '0.5rem',
+                      padding: '0.25rem 0.75rem',
+                      fontWeight: 500
+                    }}>
+                      <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                      <span>Giường:</span>
+                      <span>{bedLoading ? 'Đang tải...' : bedNumber}</span>
+                    </span>
+                    
+                    {/* Trạng thái sức khỏe */}
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                      color: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '#166534' : '#92400e',
+                      border: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24',
+                      marginLeft: '0.5rem'
+                    }}>
+                      <div style={{width: '0.5rem', height: '0.5rem', background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
+                      Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
+                    </span>
+                  </div>
+                </div>
               </div>
-        </div>
+            </div>
         <button
           onClick={handleEditClick}
           style={{

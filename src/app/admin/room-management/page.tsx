@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from 'next/navigation';
 import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI } from "@/lib/api";
-import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 interface Room {
   _id: string;
@@ -41,6 +42,7 @@ interface RoomType {
 }
 
 export default function RoomManagementPage() {
+  const router = useRouter();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
   const [bedAssignments, setBedAssignments] = useState<BedAssignment[]>([]);
@@ -104,7 +106,7 @@ export default function RoomManagementPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Header Section */}
+      {/* Back Button */}
       <div style={{
         maxWidth: '1400px',
         margin: '0 auto',
@@ -112,6 +114,38 @@ export default function RoomManagementPage() {
         position: 'relative',
         zIndex: 1
       }}>
+        <button
+          onClick={() => router.push('/admin')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f9fafb';
+            e.currentTarget.style.borderColor = '#9ca3af';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'white';
+            e.currentTarget.style.borderColor = '#d1d5db';
+          }}
+        >
+          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          Quay lại
+        </button>
+
+        {/* Header Section */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -213,8 +247,8 @@ export default function RoomManagementPage() {
             <table style={{width: '100%', borderCollapse: 'collapse'}}>
               <thead>
                 <tr style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                  borderBottom: '1px solid #e5e7eb'
+                  background: '#3b82f6',
+                  borderBottom: '1px solid #2563eb'
                 }}>
                   <th style={thStyle}>Số phòng</th>
                   <th style={thStyle}>Loại phòng</th>
@@ -491,7 +525,7 @@ export default function RoomManagementPage() {
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden' }}>
           <thead>
-            <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e5e7eb' }}>
+            <tr style={{ background: '#3b82f6', borderBottom: '1px solid #2563eb' }}>
               <th style={thStyle}>Số giường</th>
               <th style={thStyle}>Loại giường</th>
               <th style={thStyle}>Trạng thái</th>
@@ -550,16 +584,16 @@ const thStyle = {
   textAlign: "center" as const,
   fontWeight: 700,
   fontSize: 16,
-  color: '#22223b',
-  background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-  borderBottom: '2px solid #a5b4fc',
+  color: '#ffffff',
+  background: '#3b82f6',
+  borderBottom: '1px solid #2563eb',
 };
 const tdStyle = {
   padding: "1rem",
   fontSize: 15,
-  color: '#22223b',
+  color: '#1f2937',
   textAlign: 'center' as const,
   fontWeight: 500,
-  background: '#fff',
+  background: '#ffffff',
   borderBottom: '1px solid #e5e7eb',
 };

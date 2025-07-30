@@ -245,20 +245,30 @@ export default function StaffVitalSignsPage() {
               </div>
               <button
                 onClick={() => setShowAddForm(true)}
+                disabled={user?.role === 'staff' && residents.length === 0}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.75rem 1.5rem',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: user?.role === 'staff' && residents.length === 0 
+                    ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
+                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '0.75rem',
                   fontSize: '0.875rem',
                   fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                  cursor: user?.role === 'staff' && residents.length === 0 ? 'not-allowed' : 'pointer',
+                  boxShadow: user?.role === 'staff' && residents.length === 0 
+                    ? '0 4px 12px rgba(156, 163, 175, 0.3)'
+                    : '0 4px 12px rgba(239, 68, 68, 0.3)',
+                  opacity: user?.role === 'staff' && residents.length === 0 ? 0.6 : 1
                 }}
+                title={user?.role === 'staff' && residents.length === 0 
+                  ? 'Bạn chưa được phân công quản lý cư dân nào' 
+                  : 'Thêm chỉ số sức khỏe mới'
+                }
               >
                 <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
                 Thêm chỉ số
@@ -298,13 +308,26 @@ export default function StaffVitalSignsPage() {
                     outline: 'none'
                   }}
                 >
-                  <option value="">Tất cả người cao tuổi</option>
+                  <option value="">Tất cả người cao tuổi được phân công</option>
                   {residents.map(resident => (
                     <option key={resident.id} value={resident.id}>
                       {resident.name} - Phòng {resident.room}
                     </option>
                   ))}
                 </select>
+                {residents.length === 0 && user?.role === 'staff' && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    background: '#fef3c7',
+                    border: '1px solid #f59e0b',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#92400e'
+                  }}>
+                    ⚠️ Bạn chưa được phân công quản lý cư dân nào. Vui lòng liên hệ admin để được phân công.
+                  </div>
+                )}
               </div>
 
               {/* Date Filter */}
@@ -332,14 +355,7 @@ export default function StaffVitalSignsPage() {
                     }
                   }}
                   dateFormat="dd/MM/yyyy"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
+                  className="w-full px-3 py-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
 
@@ -376,10 +392,16 @@ export default function StaffVitalSignsPage() {
               }}>
                 <HeartIcon style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem', opacity: 0.5 }} />
                 <p style={{ fontSize: '1.125rem', fontWeight: 500, margin: '0 0 0.5rem 0' }}>
-                  Chưa có chỉ số sức khỏe nào
+                  {residents.length === 0 && user?.role === 'staff' 
+                    ? 'Bạn chưa được phân công quản lý cư dân nào'
+                    : 'Chưa có chỉ số sức khỏe nào'
+                  }
                 </p>
                 <p style={{ margin: 0 }}>
-                  Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe
+                  {residents.length === 0 && user?.role === 'staff'
+                    ? 'Vui lòng liên hệ admin để được phân công quản lý cư dân'
+                    : 'Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe'
+                  }
                 </p>
               </div>
             ) : (
@@ -450,7 +472,7 @@ export default function StaffVitalSignsPage() {
                             {format(parseISO(vs.date), 'dd/MM/yyyy')}
                           </div>
                           <div style={{ color: '#6b7280' }}>
-                            {vs.date_time ? vs.date_time.slice(11, 16) : vs.time || ''}
+                            {vs.time || ''}
                           </div>
                         </td>
                         <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
@@ -486,8 +508,6 @@ export default function StaffVitalSignsPage() {
         isOpen={showAddForm}
         onClose={() => setShowAddForm(false)}
         onSubmit={handleAddVitalSigns}
-        residents={residents}
-        validateForm={validateForm}
       />
 
       {/* Notification Center Button */}

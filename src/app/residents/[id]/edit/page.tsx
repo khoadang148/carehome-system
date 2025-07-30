@@ -15,7 +15,7 @@ import {
   SparklesIcon,
   ShieldCheckIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI } from '@/lib/api';
+import { residentAPI, apiClient } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { Fragment } from 'react';
 import { userAPI } from "@/lib/api";
@@ -570,8 +570,19 @@ export default function EditResidentPage({ params }: { params: { id: string } })
                 fontSize: '1.875rem',
                 fontWeight: 700,
                 margin: 0,
-                color: '#1e293b'
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.025em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
               }}>
+                <UserIcon style={{
+                  width: '2rem',
+                  height: '2rem',
+                  color: '#667eea'
+                }} />
                 Chỉnh sửa thông tin người cao tuổi
               </h1>
               <p style={{
@@ -701,46 +712,116 @@ export default function EditResidentPage({ params }: { params: { id: string } })
                     <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
                       Ảnh đại diện
                     </label>
-                    {getValues('avatar') && (
-                      <img
-                        src={residentAPI.getAvatarUrl(params.id)}
-                        alt="avatar"
-                        style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, marginBottom: 8, border: '1px solid #e5e7eb' }}
-                      />
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setAvatarUploading(true);
-                        const formData = new FormData();
-                        formData.append('avatar', file);
-                        try {
-                          const blob = await residentAPI.fetchAvatar(params.id);
-                          if (blob) {
-                            const reader = new FileReader();
-                            reader.readAsDataURL(blob);
-                            reader.onloadend = () => {
-                              if (reader.result) {
-                                reset({ ...getValues(), avatar: reader.result as string });
-                              } else {
-                                alert('Upload ảnh thành công nhưng không nhận được URL!');
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        border: '1px solid #e5e7eb',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: '1.5rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {residentData?.avatar ? (
+                          <img
+                            src={userAPI.getAvatarUrl(residentData.avatar)}
+                            alt="avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                parent.textContent = getValues('full_name') ? getValues('full_name').charAt(0).toUpperCase() : 'U';
                               }
-                            };
-                          } else {
-                            alert('Upload ảnh thất bại!');
-                          }
-                        } catch {
-                          alert('Upload ảnh thất bại!');
-                        } finally {
-                          setAvatarUploading(false);
-                        }
-                      }}
-                      style={{ display: 'block', marginBottom: 8 }}
-                    />
-                    {avatarUploading && <span style={{ color: '#3b82f6', fontSize: 12 }}>Đang tải ảnh lên...</span>}
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src="/default-avatar.svg"
+                            alt="Default avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                parent.textContent = getValues('full_name') ? getValues('full_name').charAt(0).toUpperCase() : 'U';
+                              }
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            
+                            // Kiểm tra kích thước file (max 5MB)
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert('File quá lớn. Vui lòng chọn file nhỏ hơn 5MB.');
+                              return;
+                            }
+                            
+                            setAvatarUploading(true);
+                            const formData = new FormData();
+                            formData.append('avatar', file);
+                            
+                            try {
+                              // Sử dụng endpoint avatar của resident
+                              const response = await apiClient.patch(`/residents/${params.id}/avatar`, formData, {
+                                headers: {
+                                  'Content-Type': 'multipart/form-data',
+                                },
+                              });
+                              console.log('Upload response:', response);
+                              
+                              // Sau khi upload thành công, cập nhật form với tên file
+                              reset({ ...getValues(), avatar: file.name });
+                              alert('Upload ảnh thành công!');
+                              
+                              // Refresh lại dữ liệu resident để cập nhật avatar
+                              const updatedData = await residentAPI.getById(params.id);
+                              setResidentData(updatedData);
+                              
+                            } catch (error: any) {
+                              console.error('Upload error:', error);
+                              if (error.response?.status === 400) {
+                                alert('File không hợp lệ. Vui lòng chọn file ảnh khác.');
+                              } else {
+                                alert('Upload ảnh thất bại! Vui lòng thử lại.');
+                              }
+                            } finally {
+                              setAvatarUploading(false);
+                            }
+                          }}
+                          style={{ 
+                            display: 'block', 
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                        {avatarUploading && (
+                          <span style={{ color: '#3b82f6', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                            Đang tải ảnh lên...
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

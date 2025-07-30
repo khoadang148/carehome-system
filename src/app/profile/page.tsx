@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { residentAPI, userAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 
 // Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
@@ -75,6 +76,10 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
   const [roomLoading, setRoomLoading] = useState(false);
+  
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Static profile data
   // const profileData = { ... } // Xoá hoặc comment dòng này
@@ -99,14 +104,14 @@ export default function ProfilePage() {
     // File validation
   const validateFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 5 * 1024 * 1024; // 5MB (giảm xuống để phù hợp với backend)
 
     if (!allowedTypes.includes(file.type)) {
       return 'Chỉ hỗ trợ file ảnh định dạng JPG, PNG, WEBP';
     }
 
     if (file.size > maxSize) {
-      return 'Kích thước file không được vượt quá 10MB';
+      return 'Kích thước file không được vượt quá 5MB';
     }
 
     return null;
@@ -169,40 +174,71 @@ export default function ProfilePage() {
     }
   };
 
-  // Simulate upload with progress
-  const simulateUpload = async () => {
+  // Upload avatar function
+  const uploadAvatar = async () => {
     setIsUploading(true);
     setUploadProgress(0);
 
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 150));
+    // Simulate progress
+    for (let i = 0; i <= 90; i += 10) {
+      await new Promise(resolve => setTimeout(resolve, 100));
       setUploadProgress(i);
     }
-
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 500));
     
     if (selectedFile && user?.id) {
       try {
-        // Gọi API upload avatar với file gốc
-        const response = await userAPI.updateAvatar(user.id, selectedFile);
+        // Tạo FormData để gửi file
+        const formData = new FormData();
+        formData.append('avatar', selectedFile, selectedFile.name);
+        
+        // Debug: Kiểm tra FormData
+        console.log('Selected file:', selectedFile);
+        console.log('File name:', selectedFile.name);
+        console.log('File type:', selectedFile.type);
+        console.log('File size:', selectedFile.size);
+        console.log('FormData entries:');
+        for (let [key, value] of formData.entries()) {
+          console.log(key, value);
+        }
+        
+        // Gọi API upload avatar với FormData
+        const response = await userAPI.updateAvatar(user.id, formData);
         console.log('Avatar upload response:', response);
         
         // Cập nhật avatar image với đường dẫn mới từ response
         if (response.avatar) {
           setAvatarImage(response.avatar);
         }
-      } catch (err) {
-        console.error('Avatar upload error:', err);
-        const errorMessage = (err as Error)?.message || 'Lỗi khi cập nhật ảnh đại diện.';
         
-        // Kiểm tra nếu là lỗi 403 (Forbidden) - có thể family members không có quyền
-        if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-          setUploadError('Tài khoản của bạn không có quyền thay đổi ảnh đại diện. Vui lòng liên hệ quản trị viên.');
-        } else {
-          setUploadError(errorMessage);
+        // Cập nhật userData nếu có
+        if (userData) {
+          setUserData((prev: any) => ({ ...prev, avatar: response.avatar }));
         }
         
+        // Hoàn thành progress
+        setUploadProgress(100);
+        
+        // Hiển thị thông báo thành công
+        setSuccessMessage('✅ Cập nhật ảnh đại diện thành công!');
+        setShowSuccessModal(true);
+      } catch (err: any) {
+        console.error('Avatar upload error:', err);
+        let errorMessage = 'Lỗi khi cập nhật ảnh đại diện.';
+        
+        // Xử lý các loại lỗi cụ thể
+        if (err.response?.status === 403) {
+          errorMessage = 'Tài khoản của bạn không có quyền thay đổi ảnh đại diện. Vui lòng liên hệ quản trị viên.';
+        } else if (err.response?.status === 400) {
+          errorMessage = 'File không hợp lệ. Vui lòng chọn file ảnh khác.';
+        } else if (err.response?.status === 413) {
+          errorMessage = 'File quá lớn. Vui lòng chọn file nhỏ hơn.';
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+        
+        setUploadError(errorMessage);
         setIsUploading(false);
         return;
       }
@@ -652,29 +688,7 @@ export default function ProfilePage() {
                   </div>
               </div>
 
-              <div>
-                <label style={{
-                    fontSize: '0.75rem',
-                  fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginBottom: '0.25rem',
-                    display: 'block'
-                }}>
-                  Địa chỉ
-                </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#111827'
-                    }}>
-                      <MapPinIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                    {userData?.address}
-                  </div>
-              </div>
+
 
              
               </div>
@@ -801,6 +815,8 @@ export default function ProfilePage() {
                 ) : (
                   // Chỉ hiển thị thông tin công việc cho role khác family
                   <>
+                    
+
                     <div>
                       <label style={{
                         fontSize: '0.75rem',
@@ -811,7 +827,7 @@ export default function ProfilePage() {
                         marginBottom: '0.25rem',
                         display: 'block'
                       }}>
-                        Phòng ban
+                        Chức vụ
                       </label>
                       <div style={{
                         display: 'flex',
@@ -820,8 +836,33 @@ export default function ProfilePage() {
                         fontSize: '0.875rem',
                         color: '#111827'
                       }}>
-                        <BriefcaseIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                        {userData?.department}
+                        <UserIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                        {userData?.position || 'Chưa cập nhật'}
+                      </div>
+                    </div>
+
+
+                    <div>
+                      <label style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: '0.25rem',
+                        display: 'block'
+                      }}>
+                        Ngày bắt đầu làm việc
+                      </label>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        color: '#111827'
+                      }}>
+                        <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                        {userData?.join_date ? new Date(userData.join_date).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
                       </div>
                     </div>
 
@@ -835,7 +876,7 @@ export default function ProfilePage() {
                         marginBottom: '0.25rem',
                         display: 'block'
                       }}>
-                        Ngày bắt đầu
+                        Trạng thái
                       </label>
                       <div style={{
                         display: 'flex',
@@ -844,10 +885,17 @@ export default function ProfilePage() {
                         fontSize: '0.875rem',
                         color: '#111827'
                       }}>
-                        <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                        {userData?.startDate ? new Date(userData.startDate).toLocaleDateString('vi-VN') : ''}
+                        <div style={{
+                          width: '0.5rem',
+                          height: '0.5rem',
+                          borderRadius: '50%',
+                          backgroundColor: userData?.status === 'active' ? '#10b981' : '#ef4444'
+                        }} />
+                        {userData?.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ việc'}
                       </div>
                     </div>
+
+                   
                   </>
                 )}
               </div>
@@ -947,7 +995,7 @@ export default function ProfilePage() {
                     color: '#6b7280',
                     margin: 0
                   }}>
-                    Hỗ trợ JPG, PNG, WEBP (tối đa 10MB)
+                    Hỗ trợ JPG, PNG, WEBP (tối đa 5MB)
                   </p>
                   
                   <input
@@ -1099,7 +1147,7 @@ export default function ProfilePage() {
                   Hủy
                 </button>
                 <button
-                  onClick={simulateUpload}
+                  onClick={uploadAvatar}
                   disabled={!selectedFile || isUploading}
                   style={{
                     padding: '0.75rem 1.5rem',
@@ -1138,6 +1186,23 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Success Modal */}
+        <ConfirmModal
+          isOpen={showSuccessModal}
+          title="Thành công"
+          message={successMessage}
+          type="success"
+          confirmText="Đóng"
+          onConfirm={() => {
+            setShowSuccessModal(false);
+            setSuccessMessage('');
+          }}
+          onCancel={() => {
+            setShowSuccessModal(false);
+            setSuccessMessage('');
+          }}
+        />
       </div>
     </div>
   );

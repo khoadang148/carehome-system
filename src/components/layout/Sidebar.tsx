@@ -45,8 +45,9 @@ const menuGroups: MenuGroup[] = [
     title: "Quản lý chính",
     items: [
       { name: 'Màn hình chính', href: '/', icon: HomeIcon, roles: ['admin','staff'], color: '#667eea' },
-      { name: 'Người cao tuổi', href: '/residents', icon: UserIcon, roles: ['admin', 'staff'], color: '#10b981' },
+      { name: 'Người cao tuổi', href: '/residents', icon: UserIcon, roles: ['admin'], color: '#10b981' },
       { name: 'Nhân viên', href: '/admin/staff-management', icon: UsersIcon, roles: ['admin'], color: '#6366f1' },
+      { name: 'Quản lý người cao tuổi', href: '/staff/residents', icon: UserGroupIcon, roles: ['staff'], color: '#6366f1' },
     ]
   },
   {
@@ -74,7 +75,7 @@ const menuGroups: MenuGroup[] = [
     title: "Dữ liệu & Báo cáo",
     items: [
       { name: 'Hóa đơn', href: '/finance', icon: BanknotesIcon, roles: ['family'], color: '#16a34a' },
-      { name: 'Tài chính', href: '/admin/financial-reports', icon: BanknotesIcon, roles: ['admin', 'staff'], color: '#16a34a' }
+      { name: 'Hóa đơn', href: '/admin/financial-reports', icon: BanknotesIcon, roles: ['admin'], color: '#16a34a' }
 
     ]
   },

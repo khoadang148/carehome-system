@@ -24,7 +24,7 @@ import {
 } from '@heroicons/react/24/solid';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isTomorrow, isAfter, isBefore, startOfDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { visitsAPI } from '@/lib/api';
 
@@ -52,7 +52,7 @@ export default function StaffVisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [timeStatusFilter, setTimeStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -76,39 +76,51 @@ export default function StaffVisitsPage() {
     }
   };
 
-  // Get status configuration
-  const getStatusConfig = (status: string) => {
+  // Get time-based status for a visit
+  const getTimeBasedStatus = (visit: Visit) => {
+    const visitDate = new Date(visit.visit_date);
+    const today = startOfDay(new Date());
+    const visitDay = startOfDay(visitDate);
+
+    if (isBefore(visitDay, today)) {
+      return 'past';
+    } else if (isToday(visitDate)) {
+      return 'today';
+    } else if (isAfter(visitDay, today)) {
+      return 'upcoming';
+    }
+    
+    return 'today'; // fallback
+  };
+
+  // Get status configuration based on time
+  const getStatusConfig = (visit: Visit) => {
+    const timeStatus = getTimeBasedStatus(visit);
+    
     const configs = {
-      completed: {
-        label: 'Hoàn thành',
-        color: '#10b981',
-        bg: '#ecfdf5',
-        border: '#86efac',
+      past: {
+        label: 'Trạng thái: Đã qua',
+        color: '#6b7280',
+        bg: '#f3f4f6',
+        border: '#d1d5db',
         icon: CheckCircleIcon
       },
-      scheduled: {
-        label: 'Đã lên lịch',
-        color: '#3b82f6',
-        bg: '#eff6ff',
-        border: '#93c5fd',
-        icon: CalendarDaysIcon
-      },
-      pending: {
-        label: 'Chờ duyệt',
+      today: {
+        label: 'Trạng thái: Hôm nay',
         color: '#f59e0b',
         bg: '#fffbeb',
         border: '#fde68a',
-        icon: ClockIcon
+        icon: CalendarDaysIcon
       },
-      cancelled: {
-        label: 'Đã hủy',
-        color: '#ef4444',
-        bg: '#fef2f2',
-        border: '#fca5a5',
-        icon: XCircleIcon
+      upcoming: {
+        label: 'Trạng thái: Sắp tới',
+        color: '#3b82f6',
+        bg: '#eff6ff',
+        border: '#93c5fd',
+        icon: ClockIcon
       }
     };
-    return configs[status] || configs.pending;
+    return configs[timeStatus] || configs.upcoming;
   };
 
   // Filter and sort visits (newest first)
@@ -119,18 +131,24 @@ export default function StaffVisitsPage() {
         visit.purpose.toLowerCase().includes(searchTerm.toLowerCase()) ||
         visit.residents_name.some(name => name.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      const matchesStatus = statusFilter === 'all' || visit.status === statusFilter;
+      const matchesTimeStatus = timeStatusFilter === 'all' || getTimeBasedStatus(visit) === timeStatusFilter;
       
       const matchesDate = !dateFilter || 
         new Date(visit.visit_date).toDateString() === dateFilter.toDateString();
       
-      return matchesSearch && matchesStatus && matchesDate;
+      return matchesSearch && matchesTimeStatus && matchesDate;
     })
     .sort((a, b) => {
-      // Sort by created_at first (newest first), then by visit_date (newest first)
-      const dateA = new Date(a.created_at || a.visit_date);
-      const dateB = new Date(b.created_at || b.visit_date);
+      // Sort by visit_date first (newest first), then by created_at
+      const dateA = new Date(a.visit_date);
+      const dateB = new Date(b.visit_date);
+      if (dateA.getTime() !== dateB.getTime()) {
       return dateB.getTime() - dateA.getTime();
+      }
+      // If same date, sort by created_at
+      const createdA = new Date(a.created_at || a.visit_date);
+      const createdB = new Date(b.created_at || b.visit_date);
+      return createdB.getTime() - createdA.getTime();
     });
 
   // Modal management
@@ -331,8 +349,103 @@ export default function StaffVisitsPage() {
                 </div>
               </div>
 
+              {/* Time Status Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Trạng thái thời gian
+                </label>
+                <select
+                  value={timeStatusFilter}
+                  onChange={(e) => setTimeStatusFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    background: 'white'
+                  }}
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="past">Đã qua</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="upcoming">Sắp tới</option>
+                </select>
+              </div>
 
-             
+              {/* Date Filter */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Lọc theo ngày
+                </label>
+                <DatePicker
+                  selected={dateFilter}
+                  onChange={(date) => setDateFilter(date)}
+                  placeholderText="Chọn ngày..."
+                  dateFormat="dd/MM/yyyy"
+                  locale={vi}
+                  isClearable
+                  customInput={
+                    <input
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        outline: 'none'
+                      }}
+                    />
+                  }
+                />
+              </div>
+
+              {/* Clear Filters */}
+              <div style={{ display: 'flex', alignItems: 'end' }}>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setTimeStatusFilter('all');
+                    setDateFilter(null);
+                  }}
+                  title="Xóa tất cả bộ lọc"
+                  style={{
+                    padding: '0.75rem',
+                    background: 'white',
+                    color: '#6b7280',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.color = '#374151';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'white';
+                    e.currentTarget.style.color = '#6b7280';
+                  }}
+                >
+                  <FunnelIcon style={{ width: '1rem', height: '1rem' }} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -352,10 +465,13 @@ export default function StaffVisitsPage() {
               alignItems: 'center'
             }}>
               <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 600,
-                color: '#1f2937',
-                margin: 0
+                fontSize: '1.5rem',
+                fontWeight: 700,
+                color: '#4f46e5',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}>
                 Danh sách lịch thăm
               </h2>
@@ -370,17 +486,17 @@ export default function StaffVisitsPage() {
               }}>
                 <CalendarDaysIcon style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem', opacity: 0.5 }} />
                 <p style={{ fontSize: '1.125rem', fontWeight: 500, margin: '0 0 0.5rem 0' }}>
-                  {searchTerm || statusFilter !== 'all' || dateFilter ? 'Không tìm thấy lịch thăm nào' : 'Chưa có lịch thăm nào'}
+                  {searchTerm || timeStatusFilter !== 'all' || dateFilter ? 'Không tìm thấy lịch thăm nào' : 'Chưa có lịch thăm nào'}
                 </p>
                 <p style={{ margin: 0 }}>
-                  {searchTerm || statusFilter !== 'all' || dateFilter ? 'Thử thay đổi bộ lọc để xem thêm kết quả' : 'Các lịch hẹn thăm viếng sẽ được hiển thị tại đây'}
+                  {searchTerm || timeStatusFilter !== 'all' || dateFilter ? 'Thử thay đổi bộ lọc để xem thêm kết quả' : 'Các lịch hẹn thăm viếng sẽ được hiển thị tại đây'}
                 </p>
               </div>
             ) : (
               <div style={{ padding: '1rem' }}>
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   {filteredVisits.map((visit) => {
-                    const statusConfig = getStatusConfig(visit.status);
+                    const statusConfig = getStatusConfig(visit);
                     const StatusIcon = statusConfig.icon;
                     
                     return (
@@ -677,14 +793,14 @@ export default function StaffVisitsPage() {
                     borderRadius: '9999px',
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    background: getStatusConfig(selectedVisit.status).bg,
-                    color: getStatusConfig(selectedVisit.status).color,
-                    border: `1px solid ${getStatusConfig(selectedVisit.status).border}`
+                    background: getStatusConfig(selectedVisit).bg,
+                    color: getStatusConfig(selectedVisit).color,
+                    border: `1px solid ${getStatusConfig(selectedVisit).border}`
                   }}>
-                    {React.createElement(getStatusConfig(selectedVisit.status).icon, { 
+                    {React.createElement(getStatusConfig(selectedVisit).icon, { 
                       style: { width: '1rem', height: '1rem' } 
                     })}
-                    {getStatusConfig(selectedVisit.status).label}
+                    {getStatusConfig(selectedVisit).label}
                   </div>
                 </div>
 

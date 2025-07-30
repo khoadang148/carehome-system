@@ -20,7 +20,8 @@ import {
 import { parseAIRecommendation, ParsedAIRecommendation, AIRecommendationResponse } from '@/lib/ai-recommendations';
 import { activitiesAPI } from '@/lib/api';
 import NotificationModal from '@/components/NotificationModal';
-import { residentAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, carePlansAPI, roomsAPI, staffAssignmentsAPI } from '@/lib/api';
+import { activityParticipationsAPI } from '@/lib/api';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -38,6 +39,9 @@ export default function AIRecommendationsPage() {
   const [notification, setNotification] = useState<{ open: boolean; type: 'success' | 'error'; message: string }>({ open: false, type: 'success', message: '' });
   const [searchText, setSearchText] = useState('');
   const [residents, setResidents] = useState<any[]>([]);
+  const [residentsLoading, setResidentsLoading] = useState(false);
+  const [residentsError, setResidentsError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Check access permissions
   useEffect(() => {
@@ -58,11 +62,29 @@ export default function AIRecommendationsPage() {
 
     const fetchResidents = async () => {
       try {
-      const response = await residentAPI.getAll();
-      setResidents(response);
+      const apiData = await residentAPI.getAll();
+      // Map lại dữ liệu giống trang residents
+      const mapped = await Promise.all(apiData.map(async (r: any) => {
+        let room = '';
+        try {
+          const assignments = await carePlansAPI.getByResidentId(r._id);
+          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
+          if (assignment?.assigned_room_id) {
+            const roomData = await roomsAPI.getById(assignment.assigned_room_id);
+            room = roomData?.room_number || '';
+          }
+        } catch {}
+        return {
+          id: r._id,
+          name: r.full_name || '',
+          room,
+        };
+      }));
+      setResidents(mapped);
     } catch (error) {
       console.error('Error fetching residents:', error);
       setNotification({ open: true, type: 'error', message: 'Không thể tải danh sách người cao tuổi.' });
+      setResidents([]);
       }
     };
 
@@ -88,7 +110,7 @@ export default function AIRecommendationsPage() {
       
       // Xử lý response theo cấu trúc thực tế từ API
       if (!response || !Array.isArray(response) || response.length === 0) {
-        setNotification({ open: true, type: 'error', message: 'Phản hồi AI không hợp lệ.' });
+        setNotification({ open: true, type: 'error', message: 'Phản hồi trợ lý thông minh không hợp lệ.' });
         setRecommendations([]);
         setLoading(false);
         return;
@@ -97,7 +119,7 @@ export default function AIRecommendationsPage() {
       // Lấy feedback từ phần tử đầu tiên trong mảng
       const firstRecommendation = response[0];
       if (!firstRecommendation || !firstRecommendation.feedback || typeof firstRecommendation.feedback !== 'string') {
-        setNotification({ open: true, type: 'error', message: 'Phản hồi AI không hợp lệ.' });
+        setNotification({ open: true, type: 'error', message: 'Phản hồi trợ lý thông minh không hợp lệ.' });
         setRecommendations([]);
         setLoading(false);
         return;
@@ -107,7 +129,7 @@ export default function AIRecommendationsPage() {
       const parsedRecs = parseAIRecommendation(firstRecommendation.feedback);
       
       // Validate parsed recommendations
-      console.log('Raw AI feedback:', firstRecommendation.feedback);
+      console.log('Raw trợ lý thông minh feedback:', firstRecommendation.feedback);
       console.log('Parsed recommendations:', parsedRecs);
       if (parsedRecs.length > 0) {
         const rec = parsedRecs[0];
@@ -134,9 +156,33 @@ export default function AIRecommendationsPage() {
       }
       
       setRecommendations(parsedRecs);
-    } catch (error) {
+      setRetryCount(0); // Reset retry count khi thành công
+    } catch (error: any) {
       console.error('Error generating recommendations:', error);
-      setNotification({ open: true, type: 'error', message: 'Có lỗi xảy ra khi tạo gợi ý. Vui lòng thử lại.' });
+      
+      let errorMessage = 'Có lỗi xảy ra khi tạo gợi ý. Vui lòng thử lại.';
+      
+      // Xử lý các loại lỗi cụ thể
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        const newRetryCount = retryCount + 1;
+        setRetryCount(newRetryCount);
+        
+        if (newRetryCount >= 3) {
+          errorMessage = 'Đã thử 3 lần nhưng vẫn bị timeout. Vui lòng thử lại sau 1-2 phút hoặc liên hệ admin.';
+        } else {
+          errorMessage = `Yêu cầu bị timeout (lần thử ${newRetryCount}/3). Hệ thống trợ lý thông minh đang xử lý, vui lòng thử lại sau vài giây.`;
+        }
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'API không tìm thấy. Vui lòng kiểm tra lại cấu hình.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
+      setNotification({ open: true, type: 'error', message: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -167,7 +213,7 @@ export default function AIRecommendationsPage() {
       // Parse duration from string to number
       const durationMatch = recommendation.duration.match(/(\d+)/);
       const duration = durationMatch ? parseInt(durationMatch[1], 10) : 45;
-      // Create a comprehensive description from AI recommendation data
+      // Create a comprehensive description from trợ lý thông minh recommendation data
       let description = '';
       
       // Tạo mô tả ngắn gọn và chuyên nghiệp
@@ -273,7 +319,7 @@ export default function AIRecommendationsPage() {
 
       const activityData = {
         activity_name: recommendation.activityName,
-        description: description || recommendation.description || 'Hoạt động được đề xuất bởi AI',
+        description: description || recommendation.description || 'Hoạt động được đề xuất bởi trợ lý thông minh',
         duration: duration,
         schedule_time: scheduleDateTime,
         location: getLocation(activityType, recommendation.activityName),
@@ -282,16 +328,77 @@ export default function AIRecommendationsPage() {
       };
       // Validate required fields
       if (!activityData.activity_name || !activityData.description || !activityData.activity_type) {
-        throw new Error('Thiếu thông tin bắt buộc để tạo hoạt động. Vui lòng kiểm tra lại dữ liệu AI recommendation.');
+        throw new Error('Thiếu thông tin bắt buộc để tạo hoạt động. Vui lòng kiểm tra lại dữ liệu trợ lý thông minh recommendation.');
       }
       const response = await activitiesAPI.create(activityData);
-      setNotification({ open: true, type: 'success', message: 'Hoạt động đã được tạo thành công từ gợi ý AI! Bạn sẽ được chuyển đến trang danh sách hoạt động.' });
+      
+      // Tự động thêm resident đã chọn vào hoạt động vừa tạo
+      if (response && response._id && selectedResident) {
+        try {
+          // Tìm resident để lấy thông tin đầy đủ
+          const selectedResidentData = residents.find(r => r.id === selectedResident);
+          if (selectedResidentData) {
+            // Tìm staff được phân công quản lý resident này
+            let assignedStaffId = user?.id || "664f1b2c2f8b2c0012a4e750"; // Mặc định là user hiện tại
+            
+            try {
+              const staffAssignments = await staffAssignmentsAPI.getByResident(selectedResidentData.id);
+              if (staffAssignments && staffAssignments.length > 0) {
+                // Lấy staff đầu tiên được phân công cho resident này
+                const assignment = staffAssignments[0];
+                assignedStaffId = assignment.staff_id._id || assignment.staff_id;
+                console.log('Found assigned staff for resident:', assignedStaffId);
+              } else {
+                console.log('No staff assignment found for resident, using current user');
+              }
+            } catch (assignmentError) {
+              console.error('Error fetching staff assignment:', assignmentError);
+              // Nếu không tìm thấy assignment, vẫn sử dụng user hiện tại
+            }
+            
+            await activityParticipationsAPI.create({
+              staff_id: assignedStaffId,
+              activity_id: response._id,
+              resident_id: selectedResidentData.id, // Sử dụng ID thực tế của resident
+              date: scheduleDateTime ? scheduleDateTime.split('T')[0] + "T00:00:00Z" : new Date().toISOString().split('T')[0] + "T00:00:00Z",
+              performance_notes: 'Tự động thêm từ gợi ý trợ lý thông minh',
+              attendance_status: 'attended'
+            });
+            
+            setNotification({ 
+              open: true, 
+              type: 'success', 
+              message: 'Hoạt động đã được tạo thành công và tự động thêm người cao tuổi vào hoạt động với staff được phân công! Bạn sẽ được chuyển đến trang danh sách hoạt động.' 
+            });
+          } else {
+            setNotification({ 
+              open: true, 
+              type: 'success', 
+              message: 'Hoạt động đã được tạo thành công! Tuy nhiên không tìm thấy thông tin người cao tuổi để thêm vào hoạt động.' 
+            });
+          }
+        } catch (participationError) {
+          console.error('Error adding resident to activity:', participationError);
+          setNotification({ 
+            open: true, 
+            type: 'success', 
+            message: 'Hoạt động đã được tạo thành công! Tuy nhiên có lỗi khi thêm người cao tuổi vào hoạt động. Bạn có thể thêm thủ công sau.' 
+          });
+        }
+      } else {
+        setNotification({ 
+          open: true, 
+          type: 'success', 
+          message: 'Hoạt động đã được tạo thành công từ gợi ý trợ lý thông minh! Bạn sẽ được chuyển đến trang danh sách hoạt động.' 
+        });
+      }
+      
       setTimeout(() => {
         setNotification({ open: false, type: 'success', message: '' });
         router.push('/activities');
       }, 1500);
     } catch (error: any) {
-      let errorMessage = 'Đã xảy ra lỗi khi tạo hoạt động từ gợi ý AI. Vui lòng thử lại sau.';
+      let errorMessage = 'Đã xảy ra lỗi khi tạo hoạt động từ gợi ý trợ lý thông minh. Vui lòng thử lại sau.';
       if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error?.response?.data?.detail) {
@@ -421,22 +528,59 @@ export default function AIRecommendationsPage() {
                   <select
                     value={selectedResident || ''}
                     onChange={(e) => setSelectedResident(e.target.value)}
+                    disabled={residentsLoading}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
                       borderRadius: '0.5rem',
                       border: '1px solid #d1d5db',
                       fontSize: '0.875rem',
-                      background: 'white'
+                      background: residentsLoading ? '#f9fafb' : 'white',
+                      cursor: residentsLoading ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    <option value="">Chọn người cao tuổi...</option>
-                    {residents.map(resident => (
-                      <option key={resident._id || resident.id} value={resident.id}>
-                        {resident.name}{resident.room ? ` - Phòng ${resident.room}` : ''}
+                    <option value="">
+                      {residentsLoading ? 'Đang tải danh sách...' : 'Chọn người cao tuổi...'}
+                    </option>
+                    {!residentsLoading && residents.length === 0 && (
+                      <option value="" disabled>Không có người cao tuổi nào</option>
+                    )}
+                    {!residentsLoading && residents.map(resident => (
+                      <option key={resident.id} value={resident.id}>
+                        {resident.name}{resident.room && resident.room !== 'Chưa phân phòng' ? ` - Phòng ${resident.room}` : ''}
                       </option>
                     ))}
                   </select>
+                  {residentsError && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: '#dc2626',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}>
+                      <ExclamationTriangleIcon style={{ width: '0.75rem', height: '0.75rem' }} />
+                      {residentsError}
+                      <button
+                        onClick={fetchResidents}
+                        disabled={residentsLoading}
+                        style={{
+                          marginLeft: '0.5rem',
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.75rem',
+                          background: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.25rem',
+                          cursor: residentsLoading ? 'not-allowed' : 'pointer',
+                          opacity: residentsLoading ? 0.6 : 1
+                        }}
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -472,13 +616,7 @@ export default function AIRecommendationsPage() {
                   />
                 }
                   />
-                  <p style={{
-                    fontSize: '0.75rem',
-                    color: '#6b7280',
-                    marginTop: '0.25rem'
-                  }}>
-                Nếu chọn, sẽ ưu tiên ngày này thay vì ngày hiện tại
-                  </p>
+                  
               </div>
 
             <div>
@@ -506,13 +644,7 @@ export default function AIRecommendationsPage() {
                     background: 'white'
                   }}
                 />
-                <p style={{
-                  fontSize: '0.75rem',
-                  color: '#6b7280',
-                  marginTop: '0.25rem'
-                }}>
-                Nếu chọn, sẽ ưu tiên giờ này thay vì giờ AI đề xuất
-                </p>
+               
             </div>
               </div>
 
@@ -545,12 +677,12 @@ export default function AIRecommendationsPage() {
                       borderRadius: '50%',
                       animation: 'spin 1s linear infinite'
                     }} />
-                Đang phân tích...
+                Đang phân tích trợ lý thông minh (có thể mất 10-30 giây)...
                   </>
                 ) : (
                   <>
                     <SparklesIcon style={{ width: '1rem', height: '1rem' }} />
-                Tạo gợi ý AI
+                Tạo gợi ý trợ lý thông minh
                   </>
                 )}
               </button>
@@ -577,7 +709,7 @@ export default function AIRecommendationsPage() {
                 fontWeight: 600,
                 margin: 0
               }}>
-                Kết quả gợi ý AI
+                Kết quả gợi ý trợ lý thông minh
               </h2>
             </div>
 
@@ -641,6 +773,14 @@ export default function AIRecommendationsPage() {
                           <SparklesIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
                         </div>
                         <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          color: '#64748b',
+                          marginBottom: '0.25rem'
+                        }}>
+                          Tên hoạt động
+                        </div>
                         <h3 style={{
                             fontSize: '1.25rem',
                           fontWeight: 600,
@@ -661,8 +801,8 @@ export default function AIRecommendationsPage() {
                             fontSize: '0.75rem',
                           fontWeight: 500
                           }}>
-                          {safeRec.priority === 'high' ? 'Ưu tiên cao' : 
-                           safeRec.priority === 'medium' ? 'Ưu tiên trung bình' : 'Ưu tiên thấp'}
+                        Mức ưu tiên: {safeRec.priority === 'high' ? 'Cao' : 
+                         safeRec.priority === 'medium' ? 'Trung bình' : 'Thấp'}
                           </span>
                         <span style={{
                           padding: '0.25rem 0.75rem',
@@ -672,7 +812,7 @@ export default function AIRecommendationsPage() {
                           fontSize: '0.75rem',
                           fontWeight: 500
                         }}>
-                          {safeRec.difficulty}
+                          Độ khó: {safeRec.difficulty}
                         </span>
                         <span style={{ 
                           padding: '0.25rem 0.75rem',
@@ -682,7 +822,7 @@ export default function AIRecommendationsPage() {
                           fontSize: '0.75rem',
                           fontWeight: 500
                         }}>
-                          {safeRec.confidenceLevel}/100
+                          Độ tin cậy: {safeRec.confidenceLevel}/100
                         </span>
                       </div>
                     </div>
@@ -783,7 +923,7 @@ export default function AIRecommendationsPage() {
                             color: '#64748b',
                             marginBottom: '0.25rem'
                           }}>
-                              Thời điểm
+                              Thời điểm thực hiện
                           </div>
                           <div style={{
                             fontSize: '0.875rem',
@@ -797,46 +937,7 @@ export default function AIRecommendationsPage() {
                       </div>
                     </div>
 
-                    {/* Time of Day */}
-                    {safeRec.timeOfDay && (
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <h4 style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#64748b',
-                          marginBottom: '0.5rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}>
-                          <ClockIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
-                          Thời điểm thực hiện
-                        </h4>
-                        <div style={{
-                          background: '#f8fafc',
-                          borderRadius: '0.5rem',
-                          padding: '0.75rem',
-                          border: '1px solid #e2e8f0'
-                        }}>
-                          <p style={{
-                            fontSize: '0.875rem',
-                            color: '#334155',
-                            margin: 0,
-                            lineHeight: '1.5'
-                          }}>
-                            {safeRec.timeOfDay}
-                          </p>
-                          <p style={{
-                            fontSize: '0.75rem',
-                            color: '#64748b',
-                            margin: '0.25rem 0 0 0',
-                            fontStyle: 'italic'
-                          }}>
-                           Trợ lý thông minh đã phân tích và đề xuất thời gian phù hợp
-                          </p>
-                        </div>
-                      </div>
-                    )}
+
 
                     {/* Objectives */}
                     {safeRec.objectives && safeRec.objectives.length > 0 && (
@@ -1059,7 +1160,7 @@ export default function AIRecommendationsPage() {
                           gap: '0.25rem'
                         }}>
                           <ChartBarIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
-                          Độ tin cậy vào trợ lý thông minh
+                          Độ tin cậy của trợ lý thông minh
                         </span>
                         <span style={{
                           fontSize: '0.875rem',
@@ -1144,7 +1245,7 @@ export default function AIRecommendationsPage() {
                           gap: '0.5rem'
                         }}>
                           <ExclamationTriangleIcon style={{ width: '1rem', height: '1rem' }} />
-                          {user?.role === 'staff' ? 'Cần độ tin cậy AI ≥ 60 để tạo' : 'Không có quyền'}
+                          {user?.role === 'staff' ? 'Cần độ tin cậy trợ lý thông minh ≥ 60 để tạo' : 'Không có quyền'}
                         </div>
                       )}
                     </div>
@@ -1169,7 +1270,7 @@ export default function AIRecommendationsPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '1rem',
-              marginBottom: '1rem'
+              marginBottom: '1.5rem'
             }}>
               <ChartBarIcon style={{ width: '1.5rem', height: '1.5rem', color: '#8b5cf6' }} />
               <h3 style={{
@@ -1181,18 +1282,71 @@ export default function AIRecommendationsPage() {
               </h3>
             </div>
             <div style={{
-              background: '#f8fafc',
-              borderRadius: '0.5rem',
-              padding: '1rem',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderRadius: '0.75rem',
+              padding: '1.5rem',
               border: '1px solid #e2e8f0',
-              maxHeight: '400px',
+              maxHeight: '500px',
               overflowY: 'auto',
-              whiteSpace: 'pre-wrap',
               fontSize: '0.875rem',
-              lineHeight: '1.6',
+              lineHeight: '1.7',
               color: '#374151'
             }}>
-              {aiResponse}
+              {(() => {
+                // Format trợ lý thông minh response để hiển thị đẹp hơn
+                let formattedResponse = aiResponse;
+                
+                // Thay thế các từ khóa bằng styling - thứ tự quan trọng để tránh conflict
+                formattedResponse = formattedResponse
+                  // Format tiêu đề chính trước
+                  .replace(/\*\*(.*?):\*\*/g, '<strong style="color: #1e40af; font-size: 1rem; font-weight: 600; display: block; margin: 1rem 0 0.5rem 0; padding: 0.5rem 0; border-bottom: 2px solid #dbeafe;">$1:</strong>')
+                  
+                  // Format các tiêu đề phụ
+                  .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #374151; font-weight: 600; display: inline-block; margin: 0.5rem 0 0.25rem 0;">$1:</strong>')
+                  
+                  // Format danh sách bullet points
+                  .replace(/^[-•]\s*(.*)/g, '<li style="margin: 0.25rem 0; padding-left: 0.5rem; position: relative;"><span style="position: absolute; left: 0; color: #8b5cf6;">•</span><span style="margin-left: 1rem;">$1</span></li>')
+                  
+                  // Wrap danh sách trong ul
+                  .replace(/(<li.*?<\/li>)/g, '<ul style="margin: 0.5rem 0; padding-left: 0; list-style: none;">$1</ul>')
+                  
+                  // Format thời gian và ngày - chỉ trong context phù hợp
+                  .replace(/(\d{2}:\d{2})(?=\s*,?\s*ngày|\s*-\s*|\s*$)/g, '<span style="background: #dbeafe; color: #1e40af; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600; font-size: 0.8rem;">$1</span>')
+                  .replace(/(\d{2}\/\d{2}\/\d{4})/g, '<span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600; font-size: 0.8rem;">$1</span>')
+                  
+                  // Format tên người - chỉ khi đứng sau "cụ", "bà", "ông"
+                  .replace(/(cụ|bà|ông)\s+([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]+)/g, '<span style="color: #dc2626; font-weight: 600;">$1 $2</span>')
+                  
+                  // Format các bệnh lý - chỉ trong context y tế
+                  .replace(/(bệnh lý|tiểu đường|bệnh thận|huyết áp|tim mạch)(?=\s*\)|\s*,|\s*\.|\s*$)/g, '<span style="background: #fee2e2; color: #dc2626; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 500;">$1</span>')
+                  
+                  // Format các lợi ích - chỉ trong context tích cực
+                  .replace(/(Tăng cường|Cải thiện|Thúc đẩy|Duy trì)(?=\s+[a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])/g, '<span style="color: #059669; font-weight: 600;">$1</span>')
+                  
+                  // Format từ "phù hợp" - chỉ khi nói về tính phù hợp
+                  .replace(/(phù hợp)(?=\s+với|\s+cho|\s*\)|\s*,|\s*\.|\s*$)/g, '<span style="color: #059669; font-weight: 600;">$1</span>')
+                  
+                  // Format "Tuyệt vời!" - chỉ khi đứng đầu câu
+                  .replace(/^(Tuyệt vời!)/g, '<span style="color: #059669; font-weight: 600;">$1</span>')
+                  
+                  // Thêm spacing cho các đoạn
+                  .replace(/\n\n/g, '</p><p style="margin: 0.75rem 0;">')
+                  .replace(/\n/g, '<br>');
+                
+                // Wrap trong paragraph nếu chưa có
+                if (!formattedResponse.startsWith('<')) {
+                  formattedResponse = `<p style="margin: 0;">${formattedResponse}</p>`;
+                }
+                
+                return (
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: formattedResponse }}
+                    style={{
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                  />
+                );
+              })()}
             </div>
           </div>
         )}
@@ -1229,7 +1383,7 @@ export default function AIRecommendationsPage() {
                   color: '#9ca3af',
                   margin: 0
                 }}>
-                  Chọn người cao tuổi và nhấn "Tạo gợi ý AI" để nhận được các hoạt động phù hợp
+                  Chọn người cao tuổi và nhấn "Tạo gợi ý trợ lý thông minh" để nhận được các hoạt động phù hợp
                 </p>
               </div>
             </div>

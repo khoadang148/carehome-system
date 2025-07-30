@@ -238,34 +238,36 @@ export default function ResidentsPage() {
             </div>
             
             <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
-              <Link 
-                href="/residents/add" 
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
-                }}
-              >
-                <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Thêm Người cao tuổi mới
-              </Link>
+              {user?.role === 'admin' && (
+                <Link 
+                  href="/residents/add" 
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.75rem',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+                  }}
+                >
+                  <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
+                  Thêm Người cao tuổi mới
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -448,9 +450,27 @@ export default function ResidentsPage() {
                               src={userAPI.getAvatarUrl(resident.avatar)}
                               alt={resident.name}
                               style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  parent.textContent = resident.name.charAt(0).toUpperCase();
+                                }
+                              }}
                             />
                           ) : (
-                            resident.name.charAt(0)
+                            <img
+                              src="/default-avatar.svg"
+                              alt="Default avatar"
+                              style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  parent.textContent = resident.name.charAt(0).toUpperCase();
+                                }
+                              }}
+                            />
                           )}
                         </div>
                         <div>
@@ -573,29 +593,31 @@ export default function ResidentsPage() {
                         >
                           <PencilIcon style={{width: '1rem', height: '1rem'}} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteClick(resident.id)}
-                          title="Xóa người cao tuổi khỏi hệ thống"
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '0.375rem',
-                            border: 'none',
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#ef4444';
-                            e.currentTarget.style.color = 'white';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                            e.currentTarget.style.color = '#ef4444';
-                          }}
-                        >
-                          <TrashIcon style={{width: '1rem', height: '1rem'}} />
-                        </button>
+                        {user?.role === 'admin' && (
+                          <button
+                            onClick={() => handleDeleteClick(resident.id)}
+                            title="Xóa người cao tuổi khỏi hệ thống"
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.375rem',
+                              border: 'none',
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#ef4444';
+                              e.currentTarget.style.color = 'white';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                              e.currentTarget.style.color = '#ef4444';
+                            }}
+                          >
+                            <TrashIcon style={{width: '1rem', height: '1rem'}} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -41,7 +41,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  console.log("[AuthProvider] Mounted");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -50,15 +49,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkUserSession = () => {
       // Kiểm tra session validity
-      if (!isSessionValid()) {
+      const isValid = isSessionValid();
+      
+      if (!isValid) {
         clearSessionData();
         setUser(null);
         setLoading(false);
         return;
       }
 
-      // Lấy user data từ sessionStorage
-      const storedUser = sessionStorage.getItem('user');
+      // Lấy user data từ localStorage hoặc sessionStorage
+      const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      
       if (storedUser) {
         try {
           const userData = JSON.parse(storedUser);
@@ -72,19 +74,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     };
-    checkUserSession();
+    
+    // Delay check to ensure DOM is ready
+    const timer = setTimeout(checkUserSession, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   // Login function: only allow family role
   const login = async (email: string, password: string) => {
     try {
-      console.log('Auth context: Starting login process...');
       const response = await authAPI.login(email, password);
-      console.log('Auth context: API login response:', response);
       if (response.access_token) {
         const userProfile = response.user;
         const userRole = userProfile.role;
-        console.log('Auth context: User role:', userRole);
+        
         // Cho phép family, staff, admin
         if (userRole === 'family' || userRole === 'staff' || userRole === 'admin') {
           const userObj = {
@@ -94,15 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
-          console.log('Auth context: Creating user object:', userObj);
-          
           // Initialize session with new data
           initializeSession(response.access_token, userObj);
-          console.log('Auth context: Session initialized');
           
           // Set user state ngay lập tức
           setUser(userObj);
-          console.log('Auth context: User state set, returning true');
           
           // Không redirect ở đây, để login page xử lý
           return true;
@@ -110,10 +109,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
         }
       }
-      console.log('Auth context: No access token, returning false');
       return false;
     } catch (error) {
-      console.error('Auth context: Login error:', error);
+      // Đảm bảo không set user state khi có lỗi
+      setUser(null);
       throw error;
     }
   };
@@ -122,6 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     clearSessionData();
     setUser(null);
+    // Đánh dấu user đã logout thực sự
+    localStorage.setItem('has_logged_out', 'true');
+    // Xóa thông báo đăng nhập thành công khi logout
+    localStorage.removeItem('login_success');
+    localStorage.removeItem('login_error');
+    localStorage.removeItem('login_attempts');
     router.push('/login');
   };
 

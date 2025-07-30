@@ -5,7 +5,13 @@ import {
   HeartIcon as HeartIconSolid,
   XMarkIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  UserIcon,
+  FireIcon,
+  CloudIcon,
+  ScaleIcon,
+  BeakerIcon,
+  HandRaisedIcon
 } from '@heroicons/react/24/solid';
 
 import { useVitalSigns } from '@/hooks/useVitalSigns';
@@ -140,8 +146,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
       });
     }
   };
-
-
 
   // Update transformToApiFormat to use bloodPressure directly and handle optional fields
   const transformToApiFormat = (data: VitalSigns) => {
@@ -389,142 +393,244 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
   if (!isOpen) return null;
 
   return (
-    <div className="vital-signs-modal" style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0, 0, 0, 0.75)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '1rem',
-      overflow: 'auto'
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '1rem',
-        width: '100%',
-        maxWidth: '800px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+    <>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes slideIn {
+            from {
+              opacity: 0;
+              transform: translateY(-20px) scale(0.95);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+          @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
+          }
+          .vital-signs-modal {
+            animation: fadeIn 0.3s ease-out;
+          }
+          .modal-content {
+            animation: slideIn 0.3s ease-out;
+          }
+          .success-banner {
+            animation: pulse 2s ease-in-out infinite;
+          }
+          .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+          }
+          .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .card-hover {
+            transition: all 0.3s ease;
+          }
+          .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+          }
+        `
+      }} />
+      
+      <div className="vital-signs-modal" style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '1rem',
+        overflow: 'auto'
       }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '2rem 2rem 1rem 2rem',
-          borderBottom: '1px solid #e5e7eb'
+        <div className="modal-content" style={{
+          background: 'white',
+          borderRadius: '1.5rem',
+          width: '100%',
+          maxWidth: '900px',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Header with gradient */}
+          <div style={{
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            borderRadius: '1.5rem 1.5rem 0 0',
+            padding: '2rem',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Background pattern */}
             <div style={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              borderRadius: '0.75rem',
-              padding: '0.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <HeartIconSolid style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-            </div>
-            <h2 style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: '#1f2937',
-              margin: 0
-            }}>
-              Thêm Chỉ Số Sức Khỏe
-            </h2>
-          </div>
-          <button
-            title="Đóng"
-            onClick={onClose}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              background: '#f3f4f6',
-              color: '#6b7280',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
-          {/* Success Message */}
-          {submitSuccess && (
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="2"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+              opacity: 0.3
+            }} />
+            
             <div style={{
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem',
-              background: '#ecfdf5',
-              border: '1px solid #86efac',
-              borderRadius: '0.5rem',
-              marginBottom: '1.5rem',
-              fontWeight: 600,
-              fontSize: '1rem',
-              color: '#065f46',
-              justifyContent: 'center'
+              position: 'relative',
+              zIndex: 1
             }}>
-              <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#10b981' }} />
-              Đã lưu chỉ số sức khỏe thành công!
-            </div>
-          )}
-          {/* Error Message */}
-          {validationErrors.general && !submitSuccess && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem',
-              background: '#fef2f2',
-              border: '1px solid #fca5a5',
-              borderRadius: '0.5rem',
-              marginBottom: '1.5rem'
-            }}>
-              <ExclamationTriangleIcon style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} />
-              <div>
-                <p style={{ fontSize: '0.875rem', fontWeight: 500, color: '#991b1b', margin: 0 }}>
-                  Có lỗi xảy ra
-                </p>
-                <p style={{ fontSize: '0.75rem', color: '#dc2626', margin: 0 }}>
-                  {validationErrors.general}
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '1rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <HeartIconSolid style={{ width: '2rem', height: '2rem', color: 'white' }} />
+                </div>
+                <div>
+                  <h2 style={{
+                    fontSize: '1.75rem',
+                    fontWeight: 700,
+                    color: 'white',
+                    margin: '0 0 0.25rem 0',
+                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    Thêm Chỉ Số Sức Khỏe
+                  </h2>
+                  <p style={{
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    margin: 0,
+                    fontSize: '0.875rem'
+                  }}>
+                    Ghi nhận thông số sinh lý quan trọng
+                  </p>
+                </div>
               </div>
+              <button
+                title="Đóng"
+                onClick={onClose}
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '0.75rem',
+                  border: 'none',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <XMarkIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+              </button>
             </div>
-          )}
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            {/* Resident Selection */}
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+            {/* Success Message */}
+            {submitSuccess && (
+              <div className="success-banner" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '1.25rem',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: '1px solid #34d399',
+                borderRadius: '1rem',
+                marginBottom: '2rem',
+                fontWeight: 600,
+                fontSize: '1rem',
+                color: 'white',
+                justifyContent: 'center',
+                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
               }}>
+                <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+                Đã lưu chỉ số sức khỏe thành công!
+              </div>
+            )}
+            
+            {/* Error Message */}
+            {validationErrors.general && !submitSuccess && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '1.25rem',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                border: '1px solid #f87171',
+                borderRadius: '1rem',
+                marginBottom: '2rem',
+                boxShadow: '0 10px 25px rgba(239, 68, 68, 0.3)'
+              }}>
+                <ExclamationTriangleIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                <div>
+                  <p style={{ fontSize: '1rem', fontWeight: 600, color: 'white', margin: '0 0 0.25rem 0' }}>
+                    Có lỗi xảy ra
+                  </p>
+                  <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>
+                    {validationErrors.general}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Resident Selection - Full Width */}
+            <div style={{ marginBottom: '2rem' }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '1rem',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '0.75rem'
+              }}>
+                <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} />
                 Người cao tuổi <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <select
                 value={formData.residentId || ''}
                 onChange={(e) => handleInputChange('residentId', e.target.value)}
+                className="input-focus"
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${validationErrors.residentId ? '#ef4444' : '#d1d5db'}`,
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
+                  padding: '1rem',
+                  border: `2px solid ${validationErrors.residentId ? '#ef4444' : '#e5e7eb'}`,
+                  borderRadius: '0.75rem',
+                  fontSize: '1rem',
                   outline: 'none',
-                  background: 'white'
+                  background: 'white',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
                 }}
               >
                 <option value="">Chọn người cao tuổi...</option>
@@ -535,311 +641,408 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 ))}
               </select>
               {validationErrors.residentId && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p style={{ color: '#ef4444', fontSize: '0.875rem', marginTop: '0.5rem', fontWeight: 500 }}>
                   {validationErrors.residentId}
                 </p>
               )}
             </div>
 
-            {/* Blood Pressure (single input) */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+            {/* Vital Signs Grid */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+              gap: '1.5rem', 
+              marginBottom: '2rem' 
+            }}>
+              {/* Blood Pressure */}
+              <div className="card-hover" style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
-                Huyết áp (mmHg) <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.bloodPressure || ''}
-                onChange={(e) => handleInputChange('bloodPressure', e.target.value)}
-                placeholder="120/80"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${validationErrors.bloodPressure ? '#ef4444' : '#d1d5db'}`,
-                  borderRadius: '0.5rem',
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                   fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-              />
-              {validationErrors.bloodPressure && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  {validationErrors.bloodPressure}
-                </p>
-              )}
-            </div>
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <HeartIconSolid style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />
+                  Huyết áp (mmHg) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.bloodPressure || ''}
+                  onChange={(e) => handleInputChange('bloodPressure', e.target.value)}
+                  placeholder="120/80"
+                  className="input-focus"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: `2px solid ${validationErrors.bloodPressure ? '#ef4444' : '#d1d5db'}`,
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+                {validationErrors.bloodPressure && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem', fontWeight: 500 }}>
+                    {validationErrors.bloodPressure}
+                  </p>
+                )}
+              </div>
 
-            {/* Heart Rate */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+              {/* Heart Rate */}
+              <div className="card-hover" style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
-                Nhịp tim (bpm) <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="number"
-                value={formData.heartRate || ''}
-                onChange={(e) => handleInputChange('heartRate', Number(e.target.value))}
-                placeholder="72"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${validationErrors.heartRate ? '#ef4444' : '#d1d5db'}`,
-                  borderRadius: '0.5rem',
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                   fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-              />
-              {validationErrors.heartRate && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  {validationErrors.heartRate}
-                </p>
-              )}
-            </div>
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <HeartIconSolid style={{ width: '1rem', height: '1rem', color: '#dc2626' }} />
+                  Nhịp tim (bpm) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.heartRate || ''}
+                  onChange={(e) => handleInputChange('heartRate', Number(e.target.value))}
+                  placeholder="72"
+                  className="input-focus"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: `2px solid ${validationErrors.heartRate ? '#ef4444' : '#fca5a5'}`,
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+                {validationErrors.heartRate && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem', fontWeight: 500 }}>
+                    {validationErrors.heartRate}
+                  </p>
+                )}
+              </div>
 
-            {/* Temperature */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+              {/* Temperature */}
+              <div className="card-hover" style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
-                Nhiệt độ (°C) <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={formData.temperature || ''}
-                onChange={(e) => handleInputChange('temperature', Number(e.target.value))}
-                placeholder="36.5"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${validationErrors.temperature ? '#ef4444' : '#d1d5db'}`,
-                  borderRadius: '0.5rem',
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                   fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-              />
-              {validationErrors.temperature && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  {validationErrors.temperature}
-                </p>
-              )}
-            </div>
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <FireIcon style={{ width: '1rem', height: '1rem', color: '#ea580c' }} />
+                  Nhiệt độ (°C) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.temperature || ''}
+                  onChange={(e) => handleInputChange('temperature', Number(e.target.value))}
+                  placeholder="36.5"
+                  className="input-focus"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: `2px solid ${validationErrors.temperature ? '#ef4444' : '#fbbf24'}`,
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+                {validationErrors.temperature && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem', fontWeight: 500 }}>
+                    {validationErrors.temperature}
+                  </p>
+                )}
+              </div>
 
-            {/* Oxygen Level */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+              {/* Oxygen Level */}
+              <div className="card-hover" style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
-                Nồng độ oxy (%) <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="number"
-                value={formData.oxygenSaturation || ''}
-                onChange={(e) => handleInputChange('oxygenSaturation', Number(e.target.value))}
-                placeholder="98"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${validationErrors.oxygenSaturation ? '#ef4444' : '#d1d5db'}`,
-                  borderRadius: '0.5rem',
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                   fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-              />
-              {validationErrors.oxygenSaturation && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  {validationErrors.oxygenSaturation}
-                </p>
-              )}
-            </div>
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <CloudIcon style={{ width: '1rem', height: '1rem', color: '#2563eb' }} />
+                  Nồng độ oxy (%) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.oxygenSaturation || ''}
+                  onChange={(e) => handleInputChange('oxygenSaturation', Number(e.target.value))}
+                  placeholder="98"
+                  className="input-focus"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: `2px solid ${validationErrors.oxygenSaturation ? '#ef4444' : '#60a5fa'}`,
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+                {validationErrors.oxygenSaturation && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem', fontWeight: 500 }}>
+                    {validationErrors.oxygenSaturation}
+                  </p>
+                )}
+              </div>
 
-            {/* Respiratory Rate */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+              {/* Respiratory Rate */}
+              <div className="card-hover" style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
-                Nhịp thở (lần/phút)
-              </label>
-              <input
-                type="number"
-                value={formData.respiratoryRate || ''}
-                onChange={(e) => handleInputChange('respiratoryRate', Number(e.target.value))}
-                placeholder="16"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                   fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-              />
-              {validationErrors.respiratoryRate && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  {validationErrors.respiratoryRate}
-                </p>
-              )}
-            </div>
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <HandRaisedIcon style={{ width: '1rem', height: '1rem', color: '#16a34a' }} />
+                  Nhịp thở (lần/phút)
+                </label>
+                <input
+                  type="number"
+                  value={formData.respiratoryRate || ''}
+                  onChange={(e) => handleInputChange('respiratoryRate', Number(e.target.value))}
+                  placeholder="16"
+                  className="input-focus"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: '2px solid #a7f3d0',
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+                {validationErrors.respiratoryRate && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem', fontWeight: 500 }}>
+                    {validationErrors.respiratoryRate}
+                  </p>
+                )}
+              </div>
 
-            {/* Weight */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+              {/* Weight */}
+              <div className="card-hover" style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
-                Cân nặng (kg)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={formData.weight || ''}
-                onChange={(e) => handleInputChange('weight', Number(e.target.value))}
-                placeholder="65.0"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${validationErrors.weight ? '#ef4444' : '#d1d5db'}`,
-                  borderRadius: '0.5rem',
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                   fontSize: '0.875rem',
-                  outline: 'none'
-                }}
-              />
-              {validationErrors.weight && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  {validationErrors.weight}
-                </p>
-              )}
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <ScaleIcon style={{ width: '1rem', height: '1rem', color: '#9333ea' }} />
+                  Cân nặng (kg)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.weight || ''}
+                  onChange={(e) => handleInputChange('weight', Number(e.target.value))}
+                  placeholder="65.0"
+                  className="input-focus"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: `2px solid ${validationErrors.weight ? '#ef4444' : '#d8b4fe'}`,
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+                {validationErrors.weight && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem', fontWeight: 500 }}>
+                    {validationErrors.weight}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Notes */}
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ marginBottom: '2rem' }}>
               <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '1rem',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '0.75rem'
               }}>
+                <BeakerIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
                 Ghi chú
               </label>
               <textarea
                 value={formData.notes || ''}
                 onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Ghi chú thêm về tình trạng sức khỏe..."
-                rows={3}
+                placeholder="Ghi chú thêm về tình trạng sức khỏe, triệu chứng, hoặc các thông tin quan trọng khác..."
+                rows={4}
+                className="input-focus"
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
+                  padding: '1rem',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '0.75rem',
+                  fontSize: '1rem',
                   outline: 'none',
-                  resize: 'vertical'
+                  resize: 'vertical',
+                  background: 'white',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'inherit'
                 }}
               />
             </div>
-          </div>
 
-          {/* General Error Display */}
-          {validationErrors.general && (
+            {/* Action Buttons */}
             <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem 1rem',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '0.5rem',
-              color: '#dc2626',
-              fontSize: '0.875rem'
-            }}>
-              {validationErrors.general}
-            </div>
-          )}
-
-          {/* Success Message Display */}
-          {submitSuccess && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem 1rem',
-              background: '#d1fae5',
-              border: '1px solid #a7f3d0',
-              borderRadius: '0.5rem',
-              color: '#065f46',
-              fontSize: '0.875rem',
               display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid #e5e7eb'
             }}>
-              <CheckCircleIcon style={{ width: '1.25rem', height: '1.25rem', color: '#065f46' }} />
-              Dữ liệu đã được lưu thành công!
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  padding: '0.875rem 2rem',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '0.75rem',
+                  background: 'white',
+                  color: '#374151',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#9ca3af';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                style={{
+                  padding: '0.875rem 2rem',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  background: isSubmitting 
+                    ? '#9ca3af' 
+                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isSubmitting 
+                    ? 'none' 
+                    : '0 4px 12px rgba(239, 68, 68, 0.3)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSubmitting) {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.4)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSubmitting) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                  }
+                }}
+              >
+                {isSubmitting ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '1rem',
+                      height: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Đang thêm...
+                  </div>
+                ) : (
+                  'Thêm chỉ số'
+                )}
+              </button>
             </div>
-          )}
-
-          {/* Action Buttons */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '1rem',
-            marginTop: '2rem'
-          }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                background: 'white',
-                color: '#374151',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: 'none',
-                borderRadius: '0.5rem',
-                background: isSubmitting ? '#9ca3af' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {isSubmitting ? 'Đang thêm...' : 'Thêm chỉ số'}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 } 

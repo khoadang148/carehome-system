@@ -9,9 +9,28 @@ import {
   CalendarDaysIcon,
   XMarkIcon,
   CheckCircleIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  PlusIcon,
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
-import { carePlansAPI, residentAPI } from '@/lib/api';
+import { carePlansAPI, residentAPI, userAPI } from '@/lib/api';
+import ConfirmModal from '@/components/shared/ConfirmModal';
+
+// Helper function to get full avatar URL (đồng bộ với family page)
+const getAvatarUrl = (avatarPath: string | null | undefined) => {
+  if (!avatarPath) return '/default-avatar.svg';
+  
+  // If it's already a full URL, return as is
+  if (avatarPath.startsWith('http')) return avatarPath;
+  
+  // If it's a base64 data URL, return as is
+  if (avatarPath.startsWith('data:')) return avatarPath;
+  
+  // Convert relative path to full URL
+  const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
+  return userAPI.getAvatarUrl(cleanPath);
+};
 
 // Business rules data
 const termsData = [
@@ -228,6 +247,22 @@ export default function ServicesPage() {
   // Thêm state lưu chi tiết plan cho từng assignment
   const [assignmentPlanDetails, setAssignmentPlanDetails] = useState<{ [assignmentId: string]: any }>({});
 
+  // Modal states
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [packageToDelete, setPackageToDelete] = useState<any>(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'confirm' as 'confirm' | 'success' | 'error',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
+
   // Debug: Log relatives khi thay đổi
   useEffect(() => {
     if (relatives.length > 0) {
@@ -416,12 +451,21 @@ export default function ServicesPage() {
     );
     
     if (alreadyRegistered) {
-      const confirmContinue = window.confirm(
-        `Bạn đã đăng ký gói "${packageToSelect.planName}" trước đó và đang chờ duyệt hoặc đang sử dụng. Bạn có chắc muốn tiếp tục đăng ký gói này không?`
-      );
-      if (!confirmContinue) {
-        return;
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: 'Xác nhận đăng ký',
+        message: `Bạn đã đăng ký gói "${packageToSelect.planName}" trước đó và đang chờ duyệt hoặc đang sử dụng. Bạn có chắc muốn tiếp tục đăng ký gói này không?`,
+        type: 'confirm',
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          setSelectedPackage(packageId);
+          router.push(`/services/purchase/${packageId}`);
+        },
+        onCancel: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      });
+      return;
     }
     
     setSelectedPackage(packageId);
@@ -601,6 +645,12 @@ export default function ServicesPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* Hero Section */}
       <div style={{ 
         background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%)',
@@ -633,6 +683,43 @@ export default function ServicesPage() {
 
           {/* Action Buttons */}
           <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {/* Nút thêm gói dịch vụ mới cho admin */}
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => router.push('/services/create')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '1rem 2rem',
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  color: 'white',
+                  border: '2px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '50px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(34, 197, 94, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                Thêm gói dịch vụ mới
+              </button>
+            )}
+
             {/* Nút xem danh sách đăng ký dịch vụ cho staff/admin */}
             {(user?.role === 'staff' || user?.role === 'admin') && (
               <button
@@ -763,156 +850,516 @@ export default function ServicesPage() {
 
       {/* Packages Section */}
       <div style={{ 
-        maxWidth: '1200px', 
+        maxWidth: '1400px', 
         margin: '0 auto', 
-        padding: '3rem 1rem',
+        padding: '4rem 2rem',
         transform: 'translateY(-2rem)'
       }}>
+        {/* Informational message for Family users */}
+        {user?.role === 'family' && (
+          <div style={{
+            background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+            border: '1px solid #0ea5e9',
+            borderRadius: '12px',
+            padding: '1rem 1.5rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginBottom: '0.5rem'
+            }}>
+              <svg style={{ width: '1.25rem', height: '1.25rem', color: '#0ea5e9' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span style={{ fontWeight: 600, color: '#0c4a6e' }}>Thông báo</span>
+            </div>
+            <p style={{ 
+              color: '#0c4a6e', 
+              margin: 0, 
+              fontSize: '0.95rem',
+              lineHeight: 1.5
+            }}>
+              Bạn có thể xem thông tin các gói dịch vụ hiện có. Để đăng ký gói dịch vụ mới, vui lòng liên hệ nhân viên chăm sóc hoặc sử dụng nút "Xem gói dịch vụ đã đăng ký" để kiểm tra tình trạng hiện tại.
+            </p>
+          </div>
+        )}
+        
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
-          gap: '2rem',
-          alignItems: 'stretch'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', 
+          gap: '2.5rem',
+          alignItems: 'stretch',
+          maxWidth: '1400px',
+          margin: '0 auto'
         }}>
           {loadingCarePlans ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#374151', fontSize: '1.2rem', padding: '2rem' }}>
-              Đang tải danh sách gói dịch vụ...
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{
+                  width: '3rem',
+                  height: '3rem',
+                  border: '3px solid #e2e8f0',
+                  borderTop: '3px solid #667eea',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <div style={{
+                  fontSize: '1.1rem',
+                  color: '#64748b',
+                  fontWeight: 500
+                }}>
+                  Đang tải danh sách gói dịch vụ...
+                </div>
+              </div>
             </div>
-          ) : carePlansError ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#dc2626', fontSize: '1.1rem', padding: '2rem' }}>
-              {carePlansError}
-            </div>
-          ) : carePlans.length === 0 ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#374151', fontSize: '1.1rem', padding: '2rem' }}>
-              Không có gói dịch vụ nào.
-            </div>
+                      ) : carePlansError ? (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem' }}>
+                <div style={{
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '16px',
+                  padding: '2rem'
+                }}>
+                  <div style={{
+                    width: '3rem',
+                    height: '3rem',
+                    background: '#ef4444',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div style={{
+                    fontSize: '1.1rem',
+                    color: '#dc2626',
+                    fontWeight: 600
+                  }}>
+                    {carePlansError}
+                  </div>
+                </div>
+              </div>
+            ) : carePlans.length === 0 ? (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem' }}>
+                <div style={{
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  background: 'rgba(102, 126, 234, 0.1)',
+                  border: '1px solid rgba(102, 126, 234, 0.2)',
+                  borderRadius: '16px',
+                  padding: '2rem'
+                }}>
+                  <div style={{
+                    width: '3rem',
+                    height: '3rem',
+                    background: '#667eea',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <div style={{
+                    fontSize: '1.1rem',
+                    color: '#374151',
+                    fontWeight: 600
+                  }}>
+                    Không có gói dịch vụ nào.
+                  </div>
+                  <div style={{
+                    fontSize: '0.9rem',
+                    color: '#64748b'
+                  }}>
+                    Vui lòng liên hệ quản trị viên để thêm gói dịch vụ.
+                  </div>
+                </div>
+              </div>
           ) : carePlans.map((pkg: any, index: number) => (
             <div
               key={pkg._id}
               style={{
                 background: 'white',
-                borderRadius: '20px',
-                boxShadow: '0 4px 16px rgba(56,189,248,0.08)',
-                border: '2px solid #5eead4',
-                padding: '1.5rem 1.2rem',
-                maxWidth: 340,
+                borderRadius: '1rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                border: pkg.category === 'main'
+                  ? '2px solid #dc2626'
+                  : '1px solid #e5e7eb',
+                padding: '1.5rem',
+                maxWidth: 380,
                 margin: '0 auto',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                fontFamily: "'Inter', 'Montserrat', Arial, sans-serif",
-                marginBottom: '1.2rem',
-                transition: 'box-shadow 0.2s, border 0.2s',
+                alignItems: 'stretch',
+                fontFamily: "'Inter', sans-serif",
+                marginBottom: '1.5rem',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: user?.role === 'family' ? 'default' : 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                if (user?.role !== 'family') {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                e.currentTarget.style.borderColor = pkg.category === 'main' ? '#b91c1c' : '#d1d5db';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (user?.role !== 'family') {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                e.currentTarget.style.borderColor = pkg.category === 'main' ? '#dc2626' : '#e5e7eb';
+                }
+              }}
+              onClick={() => {
+                if (user?.role !== 'family') {
+                  handlePackageSelect(pkg._id);
+                }
               }}
             >
-              <h2 style={{
-                fontFamily: "'Montserrat', 'Inter', Arial, sans-serif",
-                fontSize: '1.35rem',
-                fontWeight: 700,
-                color: '#22223b',
-                textAlign: 'center',
-                letterSpacing: '-0.5px',
-                lineHeight: 1.18,
-                textShadow: '0 2px 8px #e0e7ef',
-                margin: 0,
-                marginBottom: '0.7rem'
-              }}>
-                {pkg.plan_name}
-              </h2>
+              {/* Top accent line */}
               <div style={{
-                fontFamily: "'Montserrat', 'Inter', Arial, sans-serif",
-                fontSize: '1.5rem',
-                fontWeight: 800,
-                background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                marginBottom: '0.5rem',
-                textAlign: 'center',
-                letterSpacing: '-1px',
-                lineHeight: 1.1
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: pkg.category === 'main' 
+                  ? '#dc2626'
+                  : '#3b82f6',
+                borderRadius: '1rem 1rem 0 0'
+              }} />
+              
+              {/* Header */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                marginBottom: '1rem',
+                paddingTop: '0.25rem'
               }}>
-                {new Intl.NumberFormat('vi-VN').format(pkg.monthly_price)} <span style={{fontSize: '1rem'}}>đ</span>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: pkg.category === 'main'
+                    ? '#dc2626'
+                    : '#3b82f6',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg style={{width: '1.25rem', height: '1.25rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div style={{flex: 1}}>
+                  <h2 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0,
+                    lineHeight: 1.3
+                  }}>
+                    {pkg.plan_name}
+                  </h2>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    fontWeight: 500,
+                    marginTop: '0.125rem'
+                  }}>
+                    Gói dịch vụ
+                  </div>
+                </div>
               </div>
+
+              {/* Price section */}
               <div style={{
-                fontFamily: "'Inter', Arial, sans-serif",
-                fontSize: '0.98rem',
-                color: '#64748b',
-                marginBottom: '1.1rem',
-                textAlign: 'center',
-                minHeight: 32,
+                background: pkg.category === 'main'
+                  ? '#fef2f2'
+                  : '#f8fafc',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                marginBottom: '1rem',
+                border: pkg.category === 'main'
+                  ? '1px solid #fecaca'
+                  : '1px solid #e2e8f0',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: 600,
+                  marginBottom: '0.5rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Giá hàng tháng
+                </div>
+                <div style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  color: pkg.category === 'main' ? '#dc2626' : '#1f2937',
+                  lineHeight: 1
+                }}>
+                  {new Intl.NumberFormat('vi-VN').format(pkg.monthly_price)}
+                  <span style={{fontSize: '0.875rem', fontWeight: 600}}> đ</span>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div style={{
+                fontSize: '0.875rem',
+                color: '#4b5563',
                 lineHeight: 1.5,
-                fontWeight: 400,
-                padding: 0
+                marginBottom: '1rem'
               }}>
                 {pkg.description}
               </div>
-              <div style={{ width: '100%', marginBottom: '0.7rem' }}>
+
+              {/* Features list */}
+              <div style={{flex: 1}}>
                 <div style={{
-                  fontFamily: "'Montserrat', 'Inter', Arial, sans-serif",
-                  fontWeight: 700,
-                  color: '#06b6d4',
-                  marginBottom: '0.5rem',
-                  fontSize: '1rem',
-                  letterSpacing: '-0.5px',
-                  textAlign: 'left',
+                  fontWeight: 600,
+                  color: '#111827',
+                  marginBottom: '0.75rem',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                 }}>
-                  Dịch vụ bao gồm:
+                  <svg style={{width: '1rem', height: '1rem', color: '#10b981'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Dịch vụ bao gồm
                 </div>
-                <ul style={{
-                  fontFamily: "'Inter', Arial, sans-serif",
-                  padding: 0,
-                  margin: 0,
-                  listStyle: 'none',
-                  color: '#10b981',
-                  fontSize: '0.98rem',
-                  textAlign: 'left',
+                <div style={{
+                  display: 'grid',
+                  gap: '0.5rem'
                 }}>
                   {pkg.services_included?.map((feature: string, i: number) => (
-                    <li key={i} style={{
-                      marginBottom: 7,
+                    <div key={i} style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.5rem',
+                      padding: '0.5rem',
+                      background: '#f9fafb',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #f3f4f6'
+                    }}>
+                      <div style={{
+                        width: '1rem',
+                        height: '1rem',
+                        background: '#10b981',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: '0.125rem'
+                      }}>
+                        <svg style={{width: '0.5rem', height: '0.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <span style={{
+                        color: '#374151',
+                        fontWeight: 500,
+                        fontSize: '0.875rem',
+                        lineHeight: 1.4
+                      }}>
+                        {feature}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action button */}
+              <div style={{marginTop: '1rem'}}>
+                {user?.role === 'staff' ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/services/purchase/${pkg._id}`);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#2563eb';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#3b82f6';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    Đăng ký cho cư dân
+                  </button>
+                ) : user?.role === 'family' ? (
+                  <div style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                    background: '#f3f4f6',
+                    color: '#6b7280',
+                    border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                    textAlign: 'center'
+                  }}>
+                    Chỉ xem thông tin
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Admin action buttons */}
+              {user?.role === 'admin' && (
+                <div style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  marginTop: '0.75rem'
+                }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/services/edit/${pkg._id}`);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
                       display: 'flex',
                       alignItems: 'center',
-                      fontWeight: 500
-                    }}>
-                      <span style={{
-                        marginRight: 7,
-                        fontSize: 16,
-                        color: '#22c55e',
-                        flexShrink: 0
-                      }}>✔</span>
-                      <span style={{color: '#334155'}}>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {/* Nút đăng ký cho staff */}
-              {user?.role === 'staff' && (
-                <button
-                  onClick={() => {
-                    router.push(`/services/purchase/${pkg._id}`);
-                  }}
-                  style={{
-                    marginTop: 12,
-                    padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(16,185,129,0.15)',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)';
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)';
-                  }}
-                >
-                  Đăng ký cho cư dân
-                </button>
+                      justifyContent: 'center',
+                      gap: '0.25rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#2563eb';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#3b82f6';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <PencilIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+                    Sửa
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setPackageToDelete(pkg);
+                      setShowDeleteConfirmModal(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.25rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#dc2626';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#ef4444';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <TrashIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+                    Xóa
+                  </button>
+                </div>
+              )}
+
+              {/* Main package badge */}
+              {pkg.category === 'main' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-0.5rem',
+                  right: '-0.5rem',
+                  background: '#dc2626',
+                  color: 'white',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '9999px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  zIndex: 10,
+                  border: '2px solid white'
+                }}>
+                  Gói chính
+                </div>
+              )}
+              
+              {/* Popular badge */}
+              {pkg.category !== 'main' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-0.5rem',
+                  right: '-0.5rem',
+                  background: '#f59e0b',
+                  color: 'white',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '9999px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  zIndex: 10,
+                  border: '2px solid white'
+                }}>
+                  Gói bổ sung
+                </div>
               )}
             </div>
           ))}
@@ -1535,7 +1982,10 @@ export default function ServicesPage() {
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           transform: selectedRelativeIndex === index ? 'scale(1.02)' : 'scale(1)',
-                          boxShadow: selectedRelativeIndex === index ? '0 4px 12px rgba(59, 130, 246, 0.2)' : '0 2px 4px rgba(0,0,0,0.1)'
+                          boxShadow: selectedRelativeIndex === index ? '0 4px 12px rgba(59, 130, 246, 0.2)' : '0 2px 4px rgba(0,0,0,0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
                         }}
                         onMouseEnter={(e) => {
                           if (selectedRelativeIndex !== index) {
@@ -1550,7 +2000,51 @@ export default function ServicesPage() {
                           }
                         }}
                       >
-                        {relative.name || relative.full_name || `Người thân ${index + 1}`}
+                        {/* Avatar cho người thân */}
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          flexShrink: 0,
+                          border: '2px solid #e0e7ef',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          {relative.avatar ? (
+                            <img
+                              src={getAvatarUrl(relative.avatar)}
+                              alt={`Avatar của ${relative.name || relative.full_name}`}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                              onError={(e) => {
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = 'none';
+                                const nextElement = target.nextElementSibling as HTMLElement;
+                                if (nextElement) {
+                                  nextElement.style.display = 'flex';
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <div style={{
+                            display: relative.avatar ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                            color: 'white',
+                            fontSize: '0.875rem',
+                            fontWeight: 600
+                          }}>
+                            {(relative.name || relative.full_name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                        </div>
+                        <span>{relative.name || relative.full_name || `Người thân ${index + 1}`}</span>
                       </button>
                     ))}
                   </div>
@@ -1647,6 +2141,7 @@ export default function ServicesPage() {
                     gap: '2rem',
                     background: 'linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)',
                     borderRadius: 20,
+                    minHeight: '400px'
                   }}
                 >
                   {plans.map((assignment: any, idx: number) => (
@@ -1686,18 +2181,71 @@ export default function ServicesPage() {
                           color: 'white',
                           fontSize: 28,
                           marginRight: 20,
-                          boxShadow: '0 2px 8px rgba(59,130,246,0.15)'
+                          boxShadow: '0 2px 8px rgba(59,130,246,0.15)',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          border: '2px solid #e0e7ef'
                         }}>
-                          {/* <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg> */}
+                          {/* Sử dụng avatar từ relative được chọn thay vì assignment.resident_id */}
+                          {relatives[selectedRelativeIndex]?.avatar ? (
+                            <img
+                              src={getAvatarUrl(relatives[selectedRelativeIndex].avatar)}
+                              alt={`Avatar của ${relatives[selectedRelativeIndex].full_name || relatives[selectedRelativeIndex].name}`}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                borderRadius: '50%'
+                              }}
+                              onError={(e) => {
+                                // Fallback to default avatar if image fails to load
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = 'none';
+                                const nextElement = target.nextElementSibling as HTMLElement;
+                                if (nextElement) {
+                                  nextElement.style.display = 'flex';
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <div style={{
+                            display: relatives[selectedRelativeIndex]?.avatar ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                            borderRadius: '50%',
+                            color: 'white',
+                            fontSize: '1.5rem',
+                            fontWeight: 600
+                          }}>
+                            {(relatives[selectedRelativeIndex]?.full_name || relatives[selectedRelativeIndex]?.name || 'U').charAt(0).toUpperCase()}
+                          </div>
                       </div>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '1.5rem', color: '#1e293b', marginBottom: 2 }}>
-                            {assignment.resident_id?.full_name}
+                            {relatives[selectedRelativeIndex]?.full_name || relatives[selectedRelativeIndex]?.name}
                           </div>
-                          <div style={{ color: '#64748b', fontSize: '1rem' }}>
-                            Người giám hộ: <b>{assignment.family_member_id?.full_name}</b>
+                          <div style={{ color: '#64748b', fontSize: '1rem', marginBottom: 4 }}>
+                            Người giám hộ: <b>{user?.name}</b>
+                          </div>
+                          <div style={{ 
+                            fontSize: '0.875rem', 
+                            color: '#10b981', 
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <div style={{
+                              width: '8px',
+                              height: '8px',
+                              background: '#10b981',
+                              borderRadius: '50%',
+                              display: 'inline-block'
+                            }}></div>
+                            {assignment.status === 'active' ? 'Đang sử dụng gói dịch vụ' : 'Gói dịch vụ đã kết thúc'}
                           </div>
                         </div>
                       </div>
@@ -2484,6 +3032,61 @@ export default function ServicesPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirmModal}
+        title="Xác nhận xóa gói dịch vụ"
+        message={`Bạn có chắc muốn xóa gói dịch vụ "${packageToDelete?.plan_name}" không?`}
+        type="confirm"
+        confirmText="Xóa"
+        cancelText="Hủy"
+        onConfirm={async () => {
+          try {
+            await carePlansAPI.delete(packageToDelete._id);
+            // Refresh the care plans list
+            setCarePlans(prev => prev.filter(plan => plan._id !== packageToDelete._id));
+            setSuccessMessage(' Đã xóa gói dịch vụ thành công!');
+            setShowSuccessModal(true);
+          } catch (error) {
+            console.error('Error deleting package:', error);
+            setSuccessMessage('Có lỗi xảy ra khi xóa gói dịch vụ!');
+            setShowSuccessModal(true);
+          }
+          setShowDeleteConfirmModal(false);
+          setPackageToDelete(null);
+        }}
+        onCancel={() => {
+          setShowDeleteConfirmModal(false);
+          setPackageToDelete(null);
+        }}
+      />
+
+      {/* Success Modal */}
+      <ConfirmModal
+        isOpen={showSuccessModal}
+        title={successMessage.includes('✅') ? 'Thành công' : 'Lỗi'}
+        message={successMessage}
+        type={successMessage.includes('✅') ? 'success' : 'error'}
+        confirmText="Đóng"
+        onConfirm={() => {
+          setShowSuccessModal(false);
+          setSuccessMessage('');
+        }}
+        onCancel={() => {
+          setShowSuccessModal(false);
+          setSuccessMessage('');
+        }}
+      />
+
+      {/* Confirm Modal for package selection */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={confirmModal.onCancel}
+      />
       
     </div>
   );

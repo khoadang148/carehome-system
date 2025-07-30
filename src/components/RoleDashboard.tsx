@@ -38,22 +38,26 @@ const ROLE_DASHBOARDS = {
     title: 'Trung tâm Điều hành',
     description: 'Hệ thống quản lý toàn diện viện dưỡng lão',
     cards: [
-     
       {
-        title: 'Lịch thăm',
-        description: 'Xem danh sách lịch thăm',
+        title: 'Quản lý Phân công',
+        description: 'Thiết lập và quản lý phân công nhân viên chăm sóc cho từng cư dân',
+        icon: UserPlusIcon,
+        href: '/admin/staff-assignments',
+        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+      },
+      {
+        title: 'Lịch Thăm Viếng',
+        description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',
         icon: CalendarDaysIcon,
         href: '/staff/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        
       },
       {
-        title: 'Quản lý phòng/giường',
-        description: 'Quản lý phòng/giường',
+        title: 'Quản lý Cơ sở Vật chất',
+        description: 'Quản lý phân bổ phòng và giường cho cư dân',
         icon: BuildingOfficeIcon,
         href: '/admin/room-management',
         gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-        
       },
       /*{
         title: 'Quản lý kho',
@@ -70,20 +74,18 @@ const ROLE_DASHBOARDS = {
     description: ' Công cụ điều hành cho đội ngũ y tế!',
     cards: [
       {
-        title: 'Lịch thăm',
-        description: 'Xem danh sách lịch thăm',
+        title: 'Lịch Thăm Viếng',
+        description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',
         icon: CalendarDaysIcon,
         href: '/staff/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        
       },
       {
-        title: 'Chỉ số sức khỏe',
-        description: 'Theo dõi và ghi nhận chỉ số sức khỏe',
+        title: 'Theo dõi Sức khỏe',
+        description: 'Ghi nhận và theo dõi các chỉ số sinh tồn của cư dân',
         icon: HeartIcon,
         href: '/staff/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-      
       },
     ]
   },
@@ -92,40 +94,40 @@ const ROLE_DASHBOARDS = {
     description: 'Theo dõi và kết nối với người thân',
     cards: [
       {
-        title: 'Thông tin người thân',
-        description: 'Xem tình trạng sức khỏe và sinh hoạt',
+        title: 'Thông tin Cư dân',
+        description: 'Theo dõi tình trạng sức khỏe và sinh hoạt hàng ngày',
         icon: HeartIcon,
         href: '/family',
         gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
         stats: 'Cập nhật hôm nay'
       },
       {
-        title: 'Dấu hiệu sinh tồn',
-        description: 'Theo dõi chỉ số sức khỏe người thân',
+        title: 'Chỉ số Sinh tồn',
+        description: 'Theo dõi các chỉ số sức khỏe quan trọng',
         icon: HeartIcon,
         href: '/family/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
         stats: 'Ghi nhận mới nhất'
       },
       {
-        title: 'Thông tin thuốc',
-        description: 'Lịch uống thuốc và tình trạng sử dụng',
+        title: 'Quản lý Thuốc',
+        description: 'Theo dõi lịch uống thuốc và tình trạng điều trị',
         icon: CubeIcon,
         href: '/family/medication',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         stats: '3 loại thuốc'
       },
       {
-        title: 'Chương trình sinh hoạt',
-        description: 'Các hoạt động người thân tham gia',
+        title: 'Hoạt động Giải trí',
+        description: 'Theo dõi các hoạt động và chương trình tham gia',
         icon: ClipboardDocumentListIcon,
         href: '/family/activities',
         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         stats: '3 chương trình tuần này'
       },
       {
-        title: 'Dịch vụ chăm sóc',
-        description: 'Các dịch vụ đang sử dụng',
+        title: 'Dịch vụ Chăm sóc',
+        description: 'Quản lý các dịch vụ chăm sóc đang sử dụng',
         icon: UsersIcon,
         href: '/services',
         gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',

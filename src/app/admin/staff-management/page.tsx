@@ -19,10 +19,9 @@ import {
   DocumentTextIcon,
   IdentificationIcon,
   AcademicCapIcon,
-  CameraIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { staffAPI } from '@/lib/api';
+import { staffAPI, userAPI } from '@/lib/api';
 
 export default function StaffManagementPage() {
   const { user, loading } = useAuth();
@@ -40,9 +39,7 @@ export default function StaffManagementPage() {
   const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // State cho avatar upload
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
 
   // Lấy danh sách nhân viên
   useEffect(() => {
@@ -344,7 +341,18 @@ export default function StaffManagementPage() {
                           overflow: 'hidden'
                         }}>
                           {staff.avatar ? (
-                            <img src={staff.avatar} alt={staff.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img 
+                              src={userAPI.getAvatarUrl(staff.avatar)} 
+                              alt={staff.full_name} 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  parent.textContent = staff.full_name ? staff.full_name.charAt(0).toUpperCase() : 'N';
+                                }
+                              }}
+                            />
                           ) : (
                             staff.full_name?.charAt(0) || 'N'
                           )}
@@ -529,101 +537,45 @@ export default function StaffManagementPage() {
                 marginBottom: '1.5rem',
                 textAlign: 'center'
               }}>
-                <div style={{
-                  position: 'relative',
-                  width: '80px',
-                  height: '80px',
-                  marginBottom: '1rem',
-                }}>
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #3b82f6 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 700,
-                    fontSize: '1.75rem',
-                    overflow: 'hidden',
-                    boxShadow: '0 12px 32px rgba(99,102,241,0.25), 0 0 0 3px rgba(255,255,255,0.8)',
-                    border: '2px solid rgba(255,255,255,0.9)',
-                    cursor: 'pointer',
-                    transition: 'box-shadow 0.2s',
-                  }}
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Đổi ảnh đại diện"
-                  >
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="avatar preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : selectedStaff.avatar ? (
-                      <img src={selectedStaff.avatar} alt={selectedStaff.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      selectedStaff.full_name?.charAt(0) || 'N'
-                    )}
-                    {/* Overlay icon camera */}
+                                  <div style={{
+                    position: 'relative',
+                    width: '80px',
+                    height: '80px',
+                    marginBottom: '1rem',
+                  }}>
                     <div style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      right: 0,
-                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      width: '100%',
+                      height: '100%',
                       borderRadius: '50%',
-                      padding: 6,
-                      boxShadow: '0 2px 8px rgba(99,102,241,0.15)',
-                      border: '2px solid #fff',
-                      cursor: 'pointer',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #3b82f6 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'background 0.2s',
-                    }}
-                      onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                      title="Tải ảnh lên"
-                    >
-                      <CameraIcon style={{ width: 18, height: 18, color: 'white' }} />
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = ev => setAvatarPreview(ev.target?.result as string);
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-                {/* Nút lưu avatar nếu có preview */}
-                {avatarPreview && (
-                  <button
-                    style={{
-                      marginTop: 8,
-                      padding: '0.5rem 1.25rem',
-                      borderRadius: '1rem',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)',
                       color: 'white',
-                      fontWeight: 600,
-                      border: 'none',
-                      boxShadow: '0 2px 8px rgba(99,102,241,0.15)',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      transition: 'background 0.2s',
-                    }}
-                    onClick={() => {
-                      // Demo: cập nhật avatar local, không gọi API
-                      setSelectedStaff((prev: any) => ({ ...prev, avatar: avatarPreview }));
-                      setAvatarPreview(null);
-                    }}
-                  >
-                    Lưu ảnh đại diện
-                  </button>
-                )}
+                      fontWeight: 700,
+                      fontSize: '1.75rem',
+                      overflow: 'hidden',
+                      boxShadow: '0 12px 32px rgba(99,102,241,0.25), 0 0 0 3px rgba(255,255,255,0.8)',
+                      border: '2px solid rgba(255,255,255,0.9)',
+                    }}>
+                      {selectedStaff.avatar ? (
+                        <img 
+                          src={userAPI.getAvatarUrl(selectedStaff.avatar)} 
+                          alt={selectedStaff.full_name} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              parent.textContent = selectedStaff.full_name ? selectedStaff.full_name.charAt(0).toUpperCase() : 'N';
+                            }
+                          }}
+                        />
+                      ) : (
+                        selectedStaff.full_name?.charAt(0) || 'N'
+                      )}
+                    </div>
+                  </div>
                 
                 <h2 style={{ 
                   fontSize: '1.5rem', 

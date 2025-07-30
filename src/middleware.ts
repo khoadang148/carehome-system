@@ -9,13 +9,12 @@ import { NextRequest, NextResponse } from 'next/server';
  * - Redirects for unauthenticated users
  * - Role-based redirects for authenticated users
  * - Public route access
+ * 
+ * NOTE: Currently disabled because authentication uses localStorage/sessionStorage
+ * instead of cookies. Middleware runs on server-side and cannot access browser storage.
  */
-// export function middleware(request: NextRequest) {
-//   // Use the centralized auth handler
-//   return AuthUtils.handleRequest(request);
-// }
-
 export function middleware(request: NextRequest) {
+  // Temporarily disabled - authentication is handled client-side
   return NextResponse.next();
 }
 

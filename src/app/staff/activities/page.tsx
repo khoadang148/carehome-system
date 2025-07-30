@@ -139,11 +139,15 @@ export default function StaffActivitiesPage() {
         const participations = await activityParticipationsAPI.getByStaffId(user.id);
         
         // Extract unique activity IDs from participations
-        const activityIds = [...new Set(participations.map((p: any) => p.activity_id?._id || p.activity_id))];
+        const activityIds = [...new Set(participations.map((p: any) => p.activity_id?._id || p.activity_id))].filter(Boolean);
         
         // Fetch activity details for each unique activity
         const activityPromises = activityIds.map(async (activityId: any) => {
           try {
+            if (!activityId) {
+              console.warn('Skipping null/undefined activity ID');
+              return null;
+            }
             const activityData = await activitiesAPI.getById(activityId);
             return mapActivityFromAPI(activityData);
           } catch (error) {
@@ -298,7 +302,30 @@ export default function StaffActivitiesPage() {
         return participationDate === activity.date;
       });
       
-      const residentIds = filteredParticipations.map((p: any) => p.resident_id?._id || p.resident_id);
+      // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
+      const uniqueParticipations = filteredParticipations.reduce((acc: any[], current: any) => {
+        const residentId = current.resident_id?._id || current.resident_id;
+        const existingIndex = acc.findIndex(item => 
+          (item.resident_id?._id || item.resident_id) === residentId
+        );
+        
+        if (existingIndex === -1) {
+          // Chưa có, thêm vào
+          acc.push(current);
+        } else {
+          // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
+          const existing = acc[existingIndex];
+          const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+          const currentTime = new Date(current.updated_at || current.created_at || 0);
+          
+          if (currentTime > existingTime) {
+            acc[existingIndex] = current;
+          }
+        }
+        return acc;
+      }, []);
+      
+      const residentIds = uniqueParticipations.map((p: any) => p.resident_id?._id || p.resident_id);
       const filteredResidents = residents.filter((r: any) => residentIds.includes(r.id));
       
       setSelectedActivity(activity);
@@ -321,11 +348,34 @@ export default function StaffActivitiesPage() {
           });
           
           // Lọc participations cho hoạt động này và đúng ngày
-          const joined = participations.filter((p: any) => {
+          const filtered = participations.filter((p: any) => {
             const participationActivityId = p.activity_id?._id || p.activity_id;
             const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
             return participationActivityId === activity.id && participationDate === activity.date;
           });
+          
+          // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
+          const joined = filtered.reduce((acc: any[], current: any) => {
+            const residentId = current.resident_id?._id || current.resident_id;
+            const existingIndex = acc.findIndex(item => 
+              (item.resident_id?._id || item.resident_id) === residentId
+            );
+            
+            if (existingIndex === -1) {
+              // Chưa có, thêm vào
+              acc.push(current);
+            } else {
+              // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
+              const existing = acc[existingIndex];
+              const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+              const currentTime = new Date(current.updated_at || current.created_at || 0);
+              
+              if (currentTime > existingTime) {
+                acc[existingIndex] = current;
+              }
+            }
+            return acc;
+          }, []);
           
           console.log(`Activity ${activity.name} (${activity.id}):`, {
             totalParticipations: participations.length,

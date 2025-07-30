@@ -35,6 +35,7 @@ import { carePlansAPI, roomsAPI } from '@/lib/api';
 import { userAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
+import { activitiesAPI } from '@/lib/api';
 
 // Thêm hàm tính tuổi ở đầu file (sau import)
 const getAge = (dob: string) => {
@@ -152,6 +153,80 @@ export default function FamilyPortalPage() {
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [selectedActivityDate, setSelectedActivityDate] = useState('');
   const [activityHistoryDates, setActivityHistoryDates] = useState<string[]>([]);
+  const [serverToday, setServerToday] = useState<string>('');
+  // Thêm state để cache thời gian hoạt động
+  const [activityTimes, setActivityTimes] = useState<{[activityId: string]: {start: string, end: string}}>( {} );
+
+  // Fetch activity times for all activities when activities change
+  useEffect(() => {
+    const missingIds = activities
+      .map((activity: any) => activity.activity_id?._id || activity.activity_id)
+      .filter((id: any) => id && !activityTimes[id]);
+    if (missingIds.length === 0) return;
+    missingIds.forEach((id: any) => {
+      if (!id) {
+        console.warn('Skipping null/undefined activity ID');
+        return;
+      }
+      activitiesAPI.getById(id)
+        .then(data => {
+          // Chuyển đổi thời gian từ UTC về múi giờ Việt Nam (+7)
+          const convertToVietnamTime = (utcTime: string) => {
+            if (!utcTime) return '';
+            const utcDate = new Date(utcTime);
+            const vietnamTime = new Date(utcDate.getTime() + (7 * 60 * 60 * 1000)); // +7 giờ
+            return vietnamTime.toISOString();
+          };
+          
+          setActivityTimes(prev => ({
+            ...prev,
+            [id]: {
+              start: convertToVietnamTime(data.schedule_time),
+              end: convertToVietnamTime(data.end_time) || (data.duration && data.schedule_time
+                ? convertToVietnamTime(new Date(new Date(data.schedule_time).getTime() + data.duration * 60000).toISOString())
+                : '')
+            }
+          }));
+        })
+        .catch(error => {
+          console.error(`Error fetching activity ${id}:`, error);
+        });
+    });
+  }, [activities, activityTimes]);
+
+  // Lấy ngày hiện tại từ server
+  useEffect(() => {
+    const getServerDate = async () => {
+      try {
+        // Gọi API để lấy ngày hiện tại từ server
+        const response = await fetch('/api/current-date', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Server date:', data.date); // Debug log
+          console.log('Server timezone:', data.timezone); // Debug log
+          console.log('Original time:', data.originalTime); // Debug log
+          console.log('Vietnam time:', data.vietnamTime); // Debug log
+          setServerToday(data.date);
+        } else {
+          // Fallback: sử dụng ngày client nếu API không có sẵn
+          const clientDate = new Date().toISOString().slice(0, 10);
+          console.log('Using client date:', clientDate); // Debug log
+          setServerToday(clientDate);
+        }
+      } catch (error) {
+        // Fallback: sử dụng ngày client nếu có lỗi
+        const clientDate = new Date().toISOString().slice(0, 10);
+        console.log('Error getting server date, using client date:', clientDate); // Debug log
+        setServerToday(clientDate);
+      }
+    };
+    getServerDate();
+  }, []);
 
   // --- PHÂN TRANG GHI CHÚ CHĂM SÓC ---
   const [careNotesPage, setCareNotesPage] = useState(1);
@@ -159,7 +234,7 @@ export default function FamilyPortalPage() {
   const totalNotes = careNotes.length;
   const totalPages = Math.ceil(totalNotes / notesPerPage);
   const paginatedNotes = careNotes.slice((careNotesPage-1)*notesPerPage, careNotesPage*notesPerPage);
-  useEffect(()=>{ setCareNotesPage(1); }, [careNotes]); // Reset về trang 1 khi đổi resident
+  useEffect(()=>{ setCareNotesPage(1); }, [careNotes.length]); // Reset về trang 1 khi đổi resident
 
   // --- PHÂN TRANG CHỈ SỐ SỨC KHỎE ---
   const [vitalPage, setVitalPage] = useState(1);
@@ -167,7 +242,7 @@ export default function FamilyPortalPage() {
   const totalVital = vitalSignsHistory.length;
   const totalVitalPages = Math.ceil(totalVital / vitalPerPage);
   const paginatedVital = vitalSignsHistory.slice((vitalPage-1)*vitalPerPage, vitalPage*vitalPerPage);
-  useEffect(()=>{ setVitalPage(1); }, [vitalSignsHistory]); // Reset về trang 1 khi đổi resident
+  useEffect(()=>{ setVitalPage(1); }, [vitalSignsHistory.length]); // Reset về trang 1 khi đổi resident
 
   // Sửa useEffect fetch resident
   useEffect(() => {
@@ -502,19 +577,81 @@ export default function FamilyPortalPage() {
           if (!grouped[date]) grouped[date] = [];
           grouped[date].push(item);
         });
-        // Get all available dates (desc)
+        // Get all available dates (desc) - chỉ để hiển thị trong lịch sử
         const allDates = Object.keys(grouped).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
         setActivityHistoryDates(allDates);
-        // Default: today or most recent
-        let today = new Date().toISOString().slice(0, 10);
+        
+        // Lấy ngày hôm nay thực sự - sử dụng serverToday nếu có, không thì dùng client
+        const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
+        console.log('Today from API:', todayFromAPI); // Debug log
+        console.log('Available dates:', allDates); // Debug log
+        console.log('Grouped activities:', grouped); // Debug log
+        
         if (!showActivityHistory) {
-          setSelectedActivityDate(today);
-          setActivities(grouped[today] || []);
+          // Chỉ hiển thị hoạt động của ngày hôm nay
+          if (grouped[todayFromAPI] && grouped[todayFromAPI].length > 0) {
+            console.log('Found activities for today:', grouped[todayFromAPI]); // Debug log
+            
+            // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi activity_id
+            const uniqueActivities = grouped[todayFromAPI].reduce((acc: any[], current: any) => {
+              const activityId = current.activity_id?._id || current.activity_id;
+              const existingIndex = acc.findIndex(item => 
+                (item.activity_id?._id || item.activity_id) === activityId
+              );
+              
+              if (existingIndex === -1) {
+                // Chưa có, thêm vào
+                acc.push(current);
+              } else {
+                // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
+                const existing = acc[existingIndex];
+                const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+                const currentTime = new Date(current.updated_at || current.created_at || 0);
+                
+                if (currentTime > existingTime) {
+                  acc[existingIndex] = current;
+                }
+              }
+              return acc;
+            }, []);
+            
+            console.log('Unique activities after deduplication:', uniqueActivities); // Debug log
+            setSelectedActivityDate(todayFromAPI);
+            setActivities(uniqueActivities);
+          } else {
+            // Không có hoạt động hôm nay
+            console.log('No activities for today, showing empty state'); // Debug log
+            setSelectedActivityDate(''); // Reset selected date
+            setActivities([]);
+          }
         } else {
           // If viewing history, keep selected date or pick most recent
           const date = selectedActivityDate && grouped[selectedActivityDate] ? selectedActivityDate : allDates[0] || '';
+          
+          // Loại bỏ trùng lặp cho history mode cũng vậy
+          const dateActivities = grouped[date] || [];
+          const uniqueActivities = dateActivities.reduce((acc: any[], current: any) => {
+            const activityId = current.activity_id?._id || current.activity_id;
+            const existingIndex = acc.findIndex(item => 
+              (item.activity_id?._id || item.activity_id) === activityId
+            );
+            
+            if (existingIndex === -1) {
+              acc.push(current);
+            } else {
+              const existing = acc[existingIndex];
+              const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+              const currentTime = new Date(current.updated_at || current.created_at || 0);
+              
+              if (currentTime > existingTime) {
+                acc[existingIndex] = current;
+              }
+            }
+            return acc;
+          }, []);
+          
           setSelectedActivityDate(date);
-          setActivities(grouped[date] || []);
+          setActivities(uniqueActivities);
         }
       })
       .catch((err) => {
@@ -524,7 +661,7 @@ export default function FamilyPortalPage() {
       })
       .finally(() => setActivitiesLoading(false));
   // eslint-disable-next-line
-}, [selectedResidentId, showActivityHistory]);
+}, [selectedResidentId, showActivityHistory, serverToday]);
 
 // When selectedActivityDate changes in history mode, update activities
 useEffect(() => {
@@ -541,7 +678,29 @@ useEffect(() => {
         if (!grouped[date]) grouped[date] = [];
         grouped[date].push(item);
       });
-      setActivities(grouped[selectedActivityDate] || []);
+      // Loại bỏ trùng lặp cho history mode
+      const dateActivities = grouped[selectedActivityDate] || [];
+      const uniqueActivities = dateActivities.reduce((acc: any[], current: any) => {
+        const activityId = current.activity_id?._id || current.activity_id;
+        const existingIndex = acc.findIndex(item => 
+          (item.activity_id?._id || item.activity_id) === activityId
+        );
+        
+        if (existingIndex === -1) {
+          acc.push(current);
+        } else {
+          const existing = acc[existingIndex];
+          const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+          const currentTime = new Date(current.updated_at || current.created_at || 0);
+          
+          if (currentTime > existingTime) {
+            acc[existingIndex] = current;
+          }
+        }
+        return acc;
+      }, []);
+      
+      setActivities(uniqueActivities);
     })
     .catch(() => setActivities([]))
     .finally(() => setActivitiesLoading(false));
@@ -1188,7 +1347,14 @@ useEffect(() => {
                       />
                     )}
                     <button
-                      onClick={()=>setShowActivityHistory(v=>!v)}
+                      onClick={() => {
+                        setShowActivityHistory(v => !v);
+                        // Khi chuyển về "hôm nay", reset selectedActivityDate về ngày hôm nay
+                        if (showActivityHistory) {
+                          const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
+                          setSelectedActivityDate(todayFromAPI);
+                        }
+                      }}
                       style={{padding:'0.5rem 1rem',borderRadius:'0.5rem',border:'1px solid #8b5cf6',background:showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',color:showActivityHistory?'#8b5cf6':'white',fontSize:'0.875rem',fontWeight:600,cursor:'pointer',transition:'all 0.2s ease',display:'flex',alignItems:'center',gap:'0.5rem'}}
                       onMouseOver={e=>{e.currentTarget.style.background=showActivityHistory?'#f3f4f6':'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';}}
                       onMouseOut={e=>{e.currentTarget.style.background=showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';}}
@@ -1207,9 +1373,20 @@ useEffect(() => {
                     activities.map((activity:any) => {
                       const attended = activity.attendance_status === 'attended';
                       const absent = activity.attendance_status === 'absent';
-                      const pending = activity.attendance_status === 'pending';
-                      const time = activity.activity_id?.schedule_time ? new Date(activity.activity_id.schedule_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
-                      const endTime = activity.activity_id?.end_time ? new Date(activity.activity_id.end_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+                      const activityId = activity.activity_id?._id || activity.activity_id;
+                      // Format thời gian hiển thị
+                      const formatTimeForDisplay = (isoTime: string) => {
+                        if (!isoTime) return '';
+                        const date = new Date(isoTime);
+                        return date.toLocaleTimeString('vi-VN', { 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          hour12: false 
+                        });
+                      };
+                      
+                      const time = activityTimes[activityId]?.start ? formatTimeForDisplay(activityTimes[activityId].start) : '';
+                      const endTimeStr = activityTimes[activityId]?.end ? formatTimeForDisplay(activityTimes[activityId].end) : '';
                       return (
                         <div key={activity._id} style={{display:'flex',alignItems:'center',padding:'1rem',borderRadius:'0.75rem',background:attended?'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)':absent?'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)':'#fff',border:'1px solid',borderColor:attended?'#86efac':absent?'#d1d5db':'#e5e7eb'}}>
                           <div style={{marginRight:'1rem'}}>
@@ -1226,7 +1403,7 @@ useEffect(() => {
                               <span style={{fontWeight:600,color:'#374151'}}>Hoạt động: </span>{activity.activity_id?.activity_name || '---'}
                             </div>
                             <div style={{fontSize:'0.8rem',color:'#6b7280',marginBottom:'0.25rem'}}>
-                              <span style={{fontWeight:600}}>Thời gian: </span>{time}{endTime?` - ${endTime}`:''}
+                              <span style={{fontWeight:600}}>Thời gian: </span>{time}{endTimeStr?` - ${endTimeStr}`:''}
                             </div>
                             <span style={{fontSize:'0.8rem',fontWeight:500,color:attended?'#166534':absent?'#ef4444':'#6b7280'}}>
                               <span style={{fontWeight:600}}>Trạng thái: </span>
@@ -1237,7 +1414,47 @@ useEffect(() => {
                       );
                     })
                   ) : (
-                    <div>Không có dữ liệu hoạt động</div>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '3rem 2rem',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                      borderRadius: '1rem',
+                      border: '2px dashed #cbd5e1',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        width: '4rem',
+                        height: '4rem',
+                        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '1rem'
+                      }}>
+                        <CalendarDaysIcon style={{ width: '2rem', height: '2rem', color: '#64748b' }} />
+                      </div>
+                      <h4 style={{
+                        fontSize: '1.125rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        margin: '0 0 0.5rem 0'
+                      }}>
+                        Chưa có hoạt động hôm nay
+                      </h4>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        color: '#64748b',
+                        margin: 0,
+                        maxWidth: '300px',
+                        lineHeight: 1.5
+                      }}>
+                        Hôm nay chưa có hoạt động nào được lên lịch cho người thân của bạn.
+                      </p>
+                    </div>
                   )}
                 </div>
               </Tab.Panel>
@@ -1324,7 +1541,50 @@ useEffect(() => {
                           );
                         })
                       ) : (
-                        <tr><td colSpan={3}>Không có ghi chú chăm sóc</td></tr>
+                        <tr>
+                          <td colSpan={3} style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '2rem',
+                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                              borderRadius: '1rem',
+                              border: '2px dashed #cbd5e1'
+                            }}>
+                              <div style={{
+                                width: '3rem',
+                                height: '3rem',
+                                background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: '1rem'
+                              }}>
+                                <DocumentTextIcon style={{ width: '1.5rem', height: '1.5rem', color: '#64748b' }} />
+                              </div>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                color: '#374151',
+                                margin: '0 0 0.5rem 0'
+                              }}>
+                                Chưa có ghi chú chăm sóc
+                              </h4>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                color: '#64748b',
+                                margin: 0,
+                                maxWidth: '250px',
+                                lineHeight: 1.5
+                              }}>
+                                Hiện tại chưa có ghi chú chăm sóc nào được ghi nhận.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                     {totalPages > 1 && (
@@ -1393,7 +1653,15 @@ useEffect(() => {
                               {vital.date_time ? formatDateDDMMYYYY(vital.date_time) : ''}
                             </td>
                             <td style={{padding: '1rem', color: '#6b7280'}}>
-                              {vital.date_time ? new Date(vital.date_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                              {vital.date_time ? (() => {
+                                const date = new Date(vital.date_time);
+                                const vietnamTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+                                return vietnamTime.toLocaleTimeString('vi-VN', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit',
+                                  hour12: false 
+                                });
+                              })() : ''}
                             </td>
                             <td style={{padding: '1rem', fontWeight: 700, color: '#ef4444', fontSize: 16}}>
                               {vital.blood_pressure ?? <span style={{color:'#9ca3af'}}>--</span>}
@@ -1414,7 +1682,48 @@ useEffect(() => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={7} style={{padding: '1.5rem', textAlign: 'center', color: '#9ca3af'}}>Không có dữ liệu chỉ số sức khỏe</td>
+                          <td colSpan={7} style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '2rem',
+                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                              borderRadius: '1rem',
+                              border: '2px dashed #cbd5e1'
+                            }}>
+                              <div style={{
+                                width: '3rem',
+                                height: '3rem',
+                                background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: '1rem'
+                              }}>
+                                <HeartIcon style={{ width: '1.5rem', height: '1.5rem', color: '#64748b' }} />
+                              </div>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                color: '#374151',
+                                margin: '0 0 0.5rem 0'
+                              }}>
+                                Chưa có dữ liệu chỉ số sức khỏe
+                              </h4>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                color: '#64748b',
+                                margin: 0,
+                                maxWidth: '250px',
+                                lineHeight: 1.5
+                              }}>
+                                Hiện tại chưa có chỉ số sức khỏe nào được ghi nhận.
+                              </p>
+                            </div>
+                          </td>
                         </tr>
                       )}
                     </tbody>

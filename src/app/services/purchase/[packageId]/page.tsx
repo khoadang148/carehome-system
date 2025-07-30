@@ -10,6 +10,7 @@ import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format, parse, parseISO } from 'date-fns';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 
 export default function PurchaseServicePage({ params }: { params: { packageId: string } }) {
   const router = useRouter();
@@ -30,6 +31,16 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showMainCarePlanModal, setShowMainCarePlanModal] = useState(false);
   const [showDuplicateCarePlanModal, setShowDuplicateCarePlanModal] = useState(false);
+  
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'confirm' as 'confirm' | 'success' | 'error',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
 
   // Check access permissions
   useEffect(() => {
@@ -113,6 +124,7 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   const [selectedBedId, setSelectedBedId] = useState('');
   const [familyPreferences, setFamilyPreferences] = useState({ preferred_room_gender: '', preferred_floor: '', special_requests: '' });
   const [residentAssignments, setResidentAssignments] = useState<any[]>([]);
+  const [allAssignments, setAllAssignments] = useState<any[]>([]);
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -120,99 +132,22 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   const [beds, setBeds] = useState<any[]>([]);
   const [additionalMedications, setAdditionalMedications] = useState<any[]>([]);
   const [roomTypes, setRoomTypes] = useState<any[]>([]);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [loadingBeds, setLoadingBeds] = useState(false);
+  const [loadingRoomTypes, setLoadingRoomTypes] = useState(false);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [residentPackageStatus, setResidentPackageStatus] = useState<{[key: string]: boolean}>({});
   useEffect(() => {
-    roomTypesAPI.getAll().then(setRoomTypes);
+    setLoadingRoomTypes(true);
+    roomTypesAPI.getAll().then(setRoomTypes).catch(error => {
+      console.error('Error loading room types:', error);
+      setRoomTypes([]);
+    }).finally(() => {
+      setLoadingRoomTypes(false);
+    });
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Load residents data for all roles
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
-      if (savedResidents) {
-        try {
-          const parsedResidents = JSON.parse(savedResidents);
-          setResidents(parsedResidents);
-          
-                if (user?.role === 'family') {
-        // For family role, create fake family members data for demo
-        const familyMembers = [
-          {
-            id: 1,
-            name: 'Nguyễn Văn Nam',
-            age: 78,
-            room: 'A01',
-            relationship: 'Cha',
-            condition: 'Tốt',
-            image: '/api/placeholder/60/60'
-          },
-          {
-            id: 2,
-            name: 'Lê Thị Hoa',
-            age: 75,
-            room: 'A02',
-            relationship: 'Mẹ',
-            condition: 'Khá',
-            image: '/api/placeholder/60/60'
-          }
-        ];
-        setFamilyResidents(familyMembers);
-      }
-        } catch (error) {
-          console.error('Error parsing saved residents data:', error);
-          
-          // If there's an error, reset to default data
-          localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
-          setResidents(RESIDENTS_DATA);
-          
-                if (user?.role === 'family') {
-        // For family role, create fake family members data for demo
-        const familyMembers = [
-          {
-            id: 1,
-            name: 'Nguyễn Văn Nam',
-            age: 78,
-            room: 'A01',
-            relationship: 'Cha',
-            condition: 'Tốt',
-            image: '/api/placeholder/60/60'
-          },
-          {
-            id: 2,
-            name: 'Lê Thị Hoa',
-            age: 75,
-            room: 'A02',
-            relationship: 'Mẹ',
-            condition: 'Khá',
-            image: '/api/placeholder/60/60'
-          },
-          {
-            id: 3,
-            name: 'Nguyễn Văn Minh',
-            age: 82,
-            room: 'B05',
-            relationship: 'Ông',
-            condition: 'Tốt',
-            image: '/api/placeholder/60/60'
-          }
-        ];
-        setFamilyResidents(familyMembers);
-      }
-        }
-      } else {
-        // Initialize localStorage with default data if it's empty
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(RESIDENTS_DATA));
-        setResidents(RESIDENTS_DATA);
-        
-                  if (user?.role === 'family') {
-            const familyMembers = RESIDENTS_DATA.slice(0, 2).map((resident: any) => ({
-              ...resident,
-              relationship: resident.id === 1 ? 'Cha' : 'Mẹ'
-            }));
-            setFamilyResidents(familyMembers);
-          }
-      }
-    }
-  }, [user]);
+  
 
   const [allCarePlans, setAllCarePlans] = useState<any[]>([]);
   useEffect(() => {
@@ -223,6 +158,95 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     if (!selectedResident) return;
     carePlansAPI.getByResidentId(selectedResident).then(setResidentAssignments);
   }, [selectedResident]);
+
+  // Kiểm tra từng cư dân có gói chính hay không
+  useEffect(() => {
+    const checkResidentPackages = async () => {
+      if (selectedPackage?.category !== 'main' || residents.length === 0) return;
+      
+      setLoadingAssignments(true);
+      const statusMap: {[key: string]: boolean} = {};
+      
+      try {
+        // Kiểm tra từng cư dân
+        for (const resident of residents) {
+          try {
+            const response = await apiClient.get(`/care-plan-assignments/by-resident/${resident.id}`);
+            const assignments = response.data || [];
+            
+            // Kiểm tra xem cư dân có gói chính active không
+            console.log(`🔍 Checking resident ${resident.name} (${resident.id}):`, assignments);
+            
+            // Kiểm tra dựa trên assigned_room_id - nếu có phòng thì đã đăng ký gói chính
+            const hasRoomAssignment = assignments.some((a: any) => 
+              a.assigned_room_id && 
+              (a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval')
+            );
+            
+            console.log(`  Has room assignment: ${hasRoomAssignment}`);
+            
+            // Nếu có phòng thì chắc chắn đã đăng ký gói chính
+            if (hasRoomAssignment) {
+              statusMap[resident.id] = true;
+              console.log(`✅ Resident ${resident.name} has main package (has room assignment)`);
+              continue;
+            }
+            
+            const hasMainPackage = assignments.some((a: any) => {
+              console.log(`  Assignment:`, a);
+              console.log(`  Care plan IDs:`, a.care_plan_ids);
+              
+              let hasMain = false;
+              
+              // Kiểm tra nếu care_plan_ids là array của objects
+              if (Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0 && typeof a.care_plan_ids[0] === 'object') {
+                hasMain = a.care_plan_ids.some((cp: any) => {
+                  console.log(`    Care plan object:`, cp);
+                  console.log(`    Category:`, cp.category);
+                  return cp.category === 'main';
+                });
+              }
+              // Kiểm tra nếu care_plan_ids là array của strings (IDs)
+              else if (Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0) {
+                console.log(`    Care plan IDs (strings):`, a.care_plan_ids);
+                // Nếu là strings, cần kiểm tra thông qua care_plans array
+                if (a.care_plans && Array.isArray(a.care_plans)) {
+                  hasMain = a.care_plans.some((cp: any) => {
+                    console.log(`    Care plan from care_plans:`, cp);
+                    return cp.category === 'main';
+                  });
+                } else {
+                  // Nếu không có care_plans, thử gọi API để lấy thông tin
+                  console.log(`    No care_plans array, will check via API calls`);
+                }
+              }
+              
+              const validStatus = (a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval');
+              console.log(`  Status: ${a.status}, Valid: ${validStatus}`);
+              console.log(`  Has main package: ${hasMain && validStatus}`);
+              
+              return hasMain && validStatus;
+            });
+            
+            statusMap[resident.id] = hasMainPackage;
+            console.log(`🔍 Resident ${resident.name}: ${hasMainPackage ? 'Has main package' : 'No main package'}`);
+          } catch (error) {
+            console.error(`Error checking resident ${resident.id}:`, error);
+            statusMap[resident.id] = false; // Mặc định là false nếu có lỗi
+          }
+        }
+        
+        setResidentPackageStatus(statusMap);
+        console.log('📋 Resident package status:', statusMap);
+      } catch (error) {
+        console.error('Error checking resident packages:', error);
+      } finally {
+        setLoadingAssignments(false);
+      }
+    };
+    
+    checkResidentPackages();
+  }, [residents, selectedPackage?.category]);
 
   const hasActiveMainCarePlan = residentAssignments.some(a => {
     const carePlanId = Array.isArray(a.care_plan_ids) && a.care_plan_ids[0]?._id;
@@ -236,11 +260,16 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   const canRegisterMain = !(hasActiveMainCarePlan && isSelectedPackageMain);
 
   const checkDuplicatePackage = async () => {
+    try {
     const assignments = await carePlansAPI.getByResidentId(selectedResident);
-    return assignments.some(a =>
+      return assignments.some((a: any) =>
       a.care_plan_ids.some((cp: any) => cp._id === selectedPackage._id) &&
       (a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval')
     );
+    } catch (error) {
+      console.error('Error checking duplicate package:', error);
+      return false;
+    }
   };
 
   // Khi chọn cư dân, tự động set giới tính phòng
@@ -287,12 +316,62 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     });
   }, [user]);
 
+  // Lọc cư dân dựa trên loại gói dịch vụ
+  const getFilteredResidents = () => {
+    console.log('🔍 Filtering residents for package:', selectedPackage?.category);
+    console.log('📊 Total residents:', residents.length);
+    console.log('🔄 Loading assignments:', loadingAssignments);
+    console.log('📋 Resident package status:', residentPackageStatus);
+    
+    // Nếu đang tải assignments, hiển thị tất cả cư dân
+    if (loadingAssignments) {
+      console.log('⏳ Still loading assignments, showing all residents');
+      return residents;
+    }
+    
+    if (selectedPackage?.category === 'main') {
+      // Nếu là gói chính, lọc ra những cư dân chưa có gói chính
+      const filteredResidents = residents.filter(resident => {
+        const hasMainPackage = residentPackageStatus[resident.id] || false;
+        
+        if (hasMainPackage) {
+          console.log(`❌ Resident ${resident.name} has main package, filtering out`);
+        }
+        
+        return !hasMainPackage;
+      });
+      
+      console.log('✅ Filtered residents for main package:', filteredResidents.length);
+      return filteredResidents;
+    }
+    
+    // Nếu là gói bổ sung, hiển thị tất cả cư dân
+    console.log('✅ Showing all residents for supplementary package');
+    return residents;
+  };
+
   useEffect(() => {
-    roomsAPI.getAll().then(data => setRooms(Array.isArray(data) ? data : []));
+    setLoadingRooms(true);
+    roomsAPI.getAll().then(data => {
+      setRooms(Array.isArray(data) ? data : []);
+    }).catch(error => {
+      console.error('Error loading rooms:', error);
+      setRooms([]);
+    }).finally(() => {
+      setLoadingRooms(false);
+    });
   }, []);
 
   useEffect(() => {
-    bedsAPI.getAll().then(data => setBeds(Array.isArray(data) ? data : []));
+    setLoadingBeds(true);
+    bedsAPI.getAll().then(data => {
+      setBeds(Array.isArray(data) ? data : []);
+    }).catch(error => {
+      console.error('Error loading beds:', error);
+      setBeds([]);
+    }).finally(() => {
+      setLoadingBeds(false);
+    });
   }, []);
 
   // 🚀 Thêm thông báo đơn giản và hiệu ứng nâng cao
@@ -605,10 +684,25 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     // Check for existing package
     const existingPackage = checkExistingPackage();
     if (existingPackage) {
-      const confirmUpgrade = window.confirm(
-        `Người thân này đã có gói "${existingPackage.name}". Bạn có muốn nâng cấp lên gói "${selectedPackage?.name}" không?`
-      );
-      if (!confirmUpgrade) return;
+      setConfirmModal({
+        isOpen: true,
+        title: 'Xác nhận nâng cấp gói',
+        message: `Người thân này đã có gói "${existingPackage.name}". Bạn có muốn nâng cấp lên gói "${selectedPackage?.name}" không?`,
+        type: 'confirm',
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          // Calculate discount
+          const discount = calculateDiscount();
+          setDiscountApplied(discount);
+          
+          // Show confirmation dialog
+          setShowConfirmation(true);
+        },
+        onCancel: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      });
+      return;
     }
 
     // Calculate discount
@@ -636,27 +730,34 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     setLoading(true);
     try {
       const carePlansMonthlyCost = selectedPackage?.monthly_price || 0;
-      const totalMonthlyCost = carePlansMonthlyCost + roomMonthlyCost;
-      const payload: any = {
+      let totalMonthlyCost = carePlansMonthlyCost;
+      let payload: any = {
         care_plan_ids: [selectedPackage._id],
         resident_id: selectedResident,
         consultation_notes: medicalNotes || "",
-        selected_room_type: roomType || "",
-        assigned_room_id: selectedRoomId || "",
-        assigned_bed_id: selectedBedId || "",
         family_preferences: {
           preferred_room_gender: familyPreferences.preferred_room_gender || "",
           preferred_floor: Number(familyPreferences.preferred_floor) || 0,
           special_requests: familyPreferences.special_requests || ""
         },
-        total_monthly_cost: totalMonthlyCost,
-        room_monthly_cost: roomMonthlyCost,
         care_plans_monthly_cost: carePlansMonthlyCost,
         start_date: startDate || "",
         additional_medications: Array.isArray(additionalMedications) ? additionalMedications : [],
         status: "active",
         notes: notes || ""
       };
+
+      // Nếu là gói chính, thêm thông tin phòng và giường
+      if (selectedPackage?.category === 'main') {
+        totalMonthlyCost += roomMonthlyCost;
+        payload.selected_room_type = roomType || "";
+        payload.assigned_room_id = selectedRoomId || "";
+        payload.assigned_bed_id = selectedBedId || "";
+        payload.room_monthly_cost = roomMonthlyCost;
+      }
+
+      payload.total_monthly_cost = totalMonthlyCost;
+      
       if (endDate) (payload as any).end_date = endDate;
       console.log('Payload gửi lên:', payload);
       const result = await apiClient.post('/care-plan-assignments', payload);
@@ -722,93 +823,706 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <div style={{ maxWidth: '600px', margin: '2rem auto', background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.07)', padding: 32 }}>
-        {/* Stepper header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 32 }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '2rem 0'
+    }}>
+      <div style={{ 
+        maxWidth: '1200px', 
+        margin: '0 auto', 
+        background: '#fff', 
+        borderRadius: 20, 
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)', 
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        {/* Header với gradient */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
+          padding: '2rem 3rem',
+          color: 'white',
+          textAlign: 'center'
+        }}>
+          <h1 style={{ 
+            fontSize: '2.5rem', 
+            fontWeight: 700, 
+            margin: '0 0 0.5rem 0',
+            letterSpacing: '-0.02em'
+          }}>
+            Đăng Ký Dịch Vụ Chăm Sóc
+          </h1>
+          <p style={{ 
+            fontSize: '1.1rem', 
+            opacity: 0.9, 
+            margin: 0,
+            fontWeight: 400
+          }}>
+            Chọn người thân cần chăm sóc và gói dịch vụ phù hợp
+          </p>
+        </div>
+
+        {/* Stepper header chuyên nghiệp */}
+        <div style={{ 
+          padding: '2rem 3rem 1rem 3rem',
+          background: '#f8fafc',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            maxWidth: '800px',
+            margin: '0 auto'
+          }}>
           {steps.map((label, idx) => (
-            <div key={label} style={{ textAlign: 'center', flex: 1 }}>
+              <div key={label} style={{ 
+                textAlign: 'center', 
+                flex: 1,
+                position: 'relative'
+              }}>
               <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: idx + 1 === step ? '#3b82f6' : '#e5e7eb',
-                color: idx + 1 === step ? '#fff' : '#64748b',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, marginBottom: 4
-              }}>{idx + 1}</div>
-              <div style={{ fontSize: 12, color: idx + 1 === step ? '#3b82f6' : '#64748b', fontWeight: idx + 1 === step ? 700 : 400 }}>{label}</div>
+                  width: 48, 
+                  height: 48, 
+                  borderRadius: '50%',
+                  background: idx + 1 === step 
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                    : idx + 1 < step 
+                    ? '#10b981' 
+                    : '#e5e7eb',
+                  color: idx + 1 <= step ? '#fff' : '#64748b',
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontWeight: 700, 
+                  marginBottom: 12,
+                  fontSize: '1.1rem',
+                  boxShadow: idx + 1 === step ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                  transition: 'all 0.3s ease'
+                }}>
+                  {idx + 1 < step ? '✓' : idx + 1}
+                </div>
+                <div style={{ 
+                  fontSize: '0.875rem', 
+                  color: idx + 1 === step ? '#1d4ed8' : idx + 1 < step ? '#10b981' : '#64748b', 
+                  fontWeight: idx + 1 === step ? 700 : 500,
+                  lineHeight: 1.4
+                }}>
+                  {label}
+                </div>
+                {idx < steps.length - 1 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 24,
+                    left: '60%',
+                    width: '80%',
+                    height: 2,
+                    background: idx + 1 < step ? '#10b981' : '#e5e7eb',
+                    zIndex: -1
+                  }} />
+                )}
                   </div>
                 ))}
+          </div>
             </div>
+
+        {/* Main content area */}
+        <div style={{ padding: '3rem' }}>
 
             {/* Step 1: Chọn người thụ hưởng */}
             {step === 1 && (
-          <div>
-            <label style={{ fontWeight: 600 }}>Chọn người thụ hưởng:</label>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <div style={{ 
+                textAlign: 'center', 
+                marginBottom: '3rem' 
+              }}>
+                <h2 style={{ 
+                  fontSize: '2rem', 
+                  fontWeight: 700, 
+                  color: '#1f2937',
+                  margin: '0 0 1rem 0'
+                }}>
+                  Chọn Người Thụ Hưởng
+                </h2>
+                <p style={{ 
+                  fontSize: '1.1rem', 
+                  color: '#6b7280',
+                  margin: 0,
+                  lineHeight: 1.6
+                }}>
+                  Vui lòng chọn người thân cần đăng ký dịch vụ chăm sóc
+                </p>
+              </div>
+
+              <div style={{
+                background: '#f9fafb',
+                borderRadius: 16,
+                padding: '2rem',
+                border: '2px solid #e5e7eb',
+                marginBottom: '2rem'
+              }}>
+                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1.1rem',
+                  color: '#374151',
+                  marginBottom: '1rem'
+                }}>
+                  Danh sách người thân:
+                </label>
+                {loadingAssignments ? (
+                  <div style={{
+                    background: '#f0f9ff',
+                    borderRadius: 8,
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                    border: '1px solid #0ea5e9'
+                  }}>
+                    <div style={{ fontSize: '0.9rem', color: '#0369a1' }}>
+                      🔄 <strong>Đang tải:</strong> Kiểm tra thông tin đăng ký gói dịch vụ...
+                    </div>
+                  </div>
+                ) : selectedPackage?.category === 'main' && (
+                  <div style={{
+                    background: '#fef3c7',
+                    borderRadius: 8,
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                    border: '1px solid #f59e0b'
+                  }}>
+                    <div style={{ fontSize: '0.9rem', color: '#92400e' }}>
+                      💡 <strong>Lưu ý:</strong> Chỉ hiển thị những cư dân chưa đăng ký gói chính
+                      {!loadingAssignments && (
+                        <span style={{ marginLeft: '0.5rem' }}>
+                          ({getFilteredResidents().length}/{residents.length} cư dân)
+                        </span>
+                      )}
+                      {getFilteredResidents().length > 4 && (
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                          📜 Có thể cuộn xuống để xem thêm cư dân
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                   <Select
-                    options={residents.map(getResidentOption)}
-                    value={residents.map(getResidentOption).find(opt => opt.value === selectedResident) || null}
+                    options={getFilteredResidents().map(getResidentOption)}
+                    value={getFilteredResidents().map(getResidentOption).find(opt => opt.value === selectedResident) || null}
               onChange={opt => setSelectedResident(opt?.value || '')}
-              placeholder="Chọn người thụ hưởng..."
+                    placeholder="Tìm kiếm và chọn người thân..."
                     isSearchable
-            />
-                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                    menuPlacement="auto"
+                    maxMenuHeight={200}
+                  styles={{
+                    control: (provided) => ({
+                      ...provided,
+                      border: '2px solid #d1d5db',
+                      borderRadius: '12px',
+                      padding: '8px',
+                      fontSize: '1rem',
+                      minHeight: '56px',
+                      boxShadow: 'none',
+                      '&:hover': {
+                        borderColor: '#3b82f6'
+                      }
+                    }),
+                    option: (provided, state) => ({
+                      ...provided,
+                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#eff6ff' : 'white',
+                      color: state.isSelected ? 'white' : '#374151',
+                      padding: '12px 16px',
+                      fontSize: '1rem'
+                    }),
+                    menu: (provided) => ({
+                      ...provided,
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                      border: '1px solid #e5e7eb',
+                      maxHeight: '200px',
+                      overflow: 'auto'
+                    }),
+                    menuList: (provided) => ({
+                      ...provided,
+                      maxHeight: '200px',
+                      overflow: 'auto',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: '#cbd5e1 #f1f5f9'
+                    })
+                  }}
+                />
+              </div>
+
+              {/* Selected resident info card */}
+              {selectedResident && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  borderRadius: 16,
+                  padding: '1.5rem',
+                  border: '2px solid #3b82f6',
+                  marginBottom: '2rem'
+                }}>
+                  <h3 style={{ 
+                    fontSize: '1.25rem', 
+                    fontWeight: 600, 
+                    color: '#1e40af',
+                    margin: '0 0 1rem 0'
+                  }}>
+                    Thông tin người được chọn:
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 600, color: '#374151' }}>Tên:</span>
+                      <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                        {residents.find(r => r.id === selectedResident)?.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: '#374151' }}>Tuổi:</span>
+                      <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                        {residents.find(r => r.id === selectedResident)?.age} tuổi
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: '#374151' }}>Giới tính:</span>
+                      <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                        {residents.find(r => r.id === selectedResident)?.gender === 'male' ? 'Nam' : 'Nữ'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: '#374151' }}>Phòng hiện tại:</span>
+                      <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                        {roomNumbers[selectedResident] || 'Chưa được phân bổ'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginTop: '2rem',
+                paddingTop: '2rem',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                <Link href="/services" style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  color: '#6b7280',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                  fontSize: '1rem',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '12px',
+                  border: '2px solid #e5e7eb',
+                  background: 'white',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                }}>
+                  <ArrowLeftIcon style={{ width: 20, height: 20 }} />
+                  Quay lại trang dịch vụ
+                </Link>
                   <button
                     disabled={!selectedResident}
                     onClick={() => setStep(2)}
-                style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600, cursor: !selectedResident ? 'not-allowed' : 'pointer' }}
-              >Tiếp tục</button>
+                  style={{ 
+                    background: selectedResident 
+                      ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                      : '#e5e7eb',
+                    color: selectedResident ? '#fff' : '#9ca3af',
+                    border: 'none', 
+                    borderRadius: 12, 
+                    padding: '1rem 2.5rem', 
+                    fontWeight: 600, 
+                    fontSize: '1.1rem',
+                    cursor: selectedResident ? 'pointer' : 'not-allowed',
+                    boxShadow: selectedResident ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                    transition: 'all 0.3s ease',
+                    minWidth: '160px'
+                  }}
+                  onMouseOver={(e) => {
+                    if (selectedResident) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (selectedResident) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                    }
+                  }}
+                >
+                  Tiếp tục
+                </button>
                 </div>
               </div>
             )}
 
         {/* Step 2: Chọn gói dịch vụ */}
         {step === 2 && (
-          <div>
-            <label style={{ fontWeight: 600 }}>Chọn gói dịch vụ:</label>
-            <div style={{ margin: '1rem 0' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '3rem' 
+            }}>
+              <h2 style={{ 
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#1f2937',
+                margin: '0 0 1rem 0'
+              }}>
+                Xác Nhận Gói Dịch Vụ
+              </h2>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1.6
+              }}>
+                Thông tin chi tiết về gói dịch vụ bạn đã chọn
+              </p>
+            </div>
+
               {selectedPackage ? (
-                <div style={{ padding: 16, background: '#f1f5f9', borderRadius: 8, marginBottom: 12 }}>
-                  <div style={{ fontWeight: 700 }}>{selectedPackage.plan_name}</div>
-                  <div style={{ color: '#3b82f6', fontWeight: 600 }}>{new Intl.NumberFormat('vi-VN').format(selectedPackage.monthly_price)} đ/tháng</div>
-                  <div style={{ color: '#64748b', fontSize: 13 }}>{selectedPackage.description}</div>
+              <div style={{
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                borderRadius: 16,
+                padding: '2rem',
+                border: '2px solid #0ea5e9',
+                marginBottom: '2rem'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: 700, 
+                  color: '#0369a1',
+                  margin: '0 0 1rem 0'
+                }}>
+                  {selectedPackage.plan_name}
+                </h3>
+                <div style={{ 
+                  fontSize: '1.25rem', 
+                  color: '#0ea5e9', 
+                  fontWeight: 700,
+                  marginBottom: '1rem'
+                }}>
+                  {new Intl.NumberFormat('vi-VN').format(selectedPackage.monthly_price)} đ/tháng
+                </div>
+                <p style={{ 
+                  color: '#475569', 
+                  fontSize: '1rem',
+                  lineHeight: 1.6,
+                  margin: '0 0 1.5rem 0'
+                }}>
+                  {selectedPackage.description}
+                </p>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem',
+                  marginTop: '1rem'
+                }}>
+                  <div>
+                    <span style={{ fontWeight: 600, color: '#374151' }}>Loại gói:</span>
+                    <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                      {selectedPackage.category === 'main' ? 'Gói chính' : 'Gói bổ sung'}
+                    </span>
+                  </div>
+                  
+                </div>
                     </div>
               ) : (
-                <div>Đang tải gói dịch vụ...</div>
-              )}
+              <div style={{
+                background: '#fef2f2',
+                borderRadius: 16,
+                padding: '2rem',
+                border: '2px solid #ef4444',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '1.1rem', color: '#dc2626' }}>
+                  Đang tải thông tin gói dịch vụ...
                         </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(1)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Quay lại</button>
-              <button onClick={() => setStep(3)} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Tiếp tục</button>
+              </div>
+            )}
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginTop: '2rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => setStep(1)} 
+                style={{ 
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #d1d5db',
+                  borderRadius: 12, 
+                  padding: '1rem 2rem', 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Quay lại
+              </button>
+              <button 
+                onClick={() => {
+                  // Nếu là gói bổ sung, bỏ qua các bước chọn phòng
+                  if (selectedPackage?.category === 'supplementary') {
+                    setStep(6); // Chuyển thẳng đến bước thông tin bổ sung
+                  } else {
+                    setStep(3);
+                  }
+                }} 
+                style={{ 
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: '#fff',
+                  border: 'none', 
+                  borderRadius: 12, 
+                  padding: '1rem 2.5rem', 
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                }}
+              >
+                Tiếp tục
+              </button>
                         </div>
                         </div>
                            )}
 
         {/* Step 3: Chọn loại phòng */}
         {step === 3 && (
-          <div>
-            <label style={{ fontWeight: 600 }}>Chọn loại phòng:</label>
-            <select value={roomType} onChange={e => setRoomType(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', marginTop: 8 }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '3rem' 
+            }}>
+              <h2 style={{ 
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#1f2937',
+                margin: '0 0 1rem 0'
+              }}>
+                Chọn Loại Phòng
+              </h2>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1.6
+              }}>
+                Lựa chọn loại phòng phù hợp với nhu cầu và ngân sách
+              </p>
+            </div>
+
+            <div style={{
+              background: '#f9fafb',
+              borderRadius: 16,
+              padding: '2rem',
+              border: '2px solid #e5e7eb',
+              marginBottom: '2rem'
+            }}>
+                            <label style={{ 
+                display: 'block',
+                fontWeight: 600, 
+                fontSize: '1.1rem',
+                color: '#374151',
+                marginBottom: '1rem'
+              }}>
+                Loại phòng:
+              </label>
+              {loadingRoomTypes ? (
+                <div style={{
+                  padding: '1rem',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  background: '#f9fafb',
+                  borderRadius: 12,
+                  border: '2px solid #e5e7eb'
+                }}>
+                  Đang tải danh sách loại phòng...
+                </div>
+              ) : (
+                <select 
+                  value={roomType} 
+                  onChange={e => setRoomType(e.target.value)} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '1rem', 
+                    borderRadius: 12, 
+                    border: '2px solid #d1d5db', 
+                    fontSize: '1rem',
+                    background: 'white',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                >
               <option value=''>-- Chọn loại phòng --</option>
               {uniqueRoomTypes.map(r => (
-                <option key={r._id} value={r.room_type}>{r.type_name || roomTypeNameMap[r.room_type] || r.room_type}</option>
+                    <option key={r._id} value={r.room_type}>
+                      {r.type_name || roomTypeNameMap[r.room_type] || r.room_type}
+                    </option>
               ))}
             </select>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(2)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Quay lại</button>
-              <button disabled={!roomType} onClick={() => setStep(4)} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600, cursor: !roomType ? 'not-allowed' : 'pointer' }}>Tiếp tục</button>
+              )}
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginTop: '2rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => setStep(2)} 
+                style={{ 
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #d1d5db',
+                  borderRadius: 12, 
+                  padding: '1rem 2rem', 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Quay lại
+              </button>
+              <button 
+                disabled={!roomType} 
+                onClick={() => setStep(4)} 
+                style={{ 
+                  background: roomType 
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                    : '#e5e7eb',
+                  color: roomType ? '#fff' : '#9ca3af',
+                  border: 'none', 
+                  borderRadius: 12, 
+                  padding: '1rem 2.5rem', 
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: roomType ? 'pointer' : 'not-allowed',
+                  boxShadow: roomType ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px'
+                }}
+              >
+                Tiếp tục
+              </button>
                         </div>
                         </div>
                            )}
                        
         {/* Step 4: Chọn phòng */}
         {step === 4 && (
-          <div>
-            <label style={{ fontWeight: 600 }}>Chọn phòng:</label>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '3rem' 
+            }}>
+              <h2 style={{ 
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#1f2937',
+                margin: '0 0 1rem 0'
+              }}>
+                Chọn Phòng Cụ Thể
+              </h2>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1.6
+              }}>
+                Lựa chọn phòng phù hợp với giới tính và loại phòng đã chọn
+              </p>
+            </div>
+
             {!residentGender ? (
-              <div style={{ color: 'red', margin: '12px 0' }}>
-                Vui lòng cập nhật giới tính cho người thụ hưởng trước khi chọn phòng!
+              <div style={{
+                background: '#fef2f2',
+                borderRadius: 16,
+                padding: '2rem',
+                border: '2px solid #ef4444',
+                textAlign: 'center',
+                marginBottom: '2rem'
+              }}>
+                <div style={{ fontSize: '1.1rem', color: '#dc2626', fontWeight: 600 }}>
+                  ⚠️ Vui lòng cập nhật giới tính cho người thụ hưởng trước khi chọn phòng!
+                </div>
                     </div>
             ) : (
-              <select value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', marginTop: 8 }}>
+              <div style={{
+                background: '#f9fafb',
+                borderRadius: 16,
+                padding: '2rem',
+                border: '2px solid #e5e7eb',
+                marginBottom: '2rem'
+              }}>
+                                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1.1rem',
+                  color: '#374151',
+                  marginBottom: '1rem'
+                }}>
+                  Danh sách phòng phù hợp:
+                </label>
+                {loadingRooms ? (
+                  <div style={{
+                    padding: '1rem',
+                    textAlign: 'center',
+                    color: '#6b7280',
+                    background: '#f9fafb',
+                    borderRadius: 12,
+                    border: '2px solid #e5e7eb'
+                  }}>
+                    Đang tải danh sách phòng...
+                  </div>
+                ) : (
+                  <select 
+                    value={selectedRoomId} 
+                    onChange={e => setSelectedRoomId(e.target.value)} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '1rem', 
+                      borderRadius: 12, 
+                      border: '2px solid #d1d5db', 
+                      fontSize: '1rem',
+                      background: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
                 <option value=''>-- Chọn phòng --</option>
                 {filteredRooms.length === 0 ? (
                   <option disabled>Không có phòng phù hợp</option>
@@ -821,34 +1535,236 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                 )}
               </select>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(3)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Quay lại</button>
-              <button disabled={!residentGender || !selectedRoomId} onClick={() => setStep(5)} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600, cursor: !residentGender || !selectedRoomId ? 'not-allowed' : 'pointer' }}>Tiếp tục</button>
+              </div>
+            )}
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginTop: '2rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => setStep(3)} 
+                style={{ 
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #d1d5db',
+                  borderRadius: 12, 
+                  padding: '1rem 2rem', 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Quay lại
+              </button>
+              <button 
+                disabled={!residentGender || !selectedRoomId} 
+                onClick={() => setStep(5)} 
+                style={{ 
+                  background: (residentGender && selectedRoomId)
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                    : '#e5e7eb',
+                  color: (residentGender && selectedRoomId) ? '#fff' : '#9ca3af',
+                  border: 'none', 
+                  borderRadius: 12, 
+                  padding: '1rem 2.5rem', 
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: (residentGender && selectedRoomId) ? 'pointer' : 'not-allowed',
+                  boxShadow: (residentGender && selectedRoomId) ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px'
+                }}
+              >
+                Tiếp tục
+              </button>
                   </div>
                   </div>
                        )}
                        
         {/* Step 5: Chọn giường */}
         {step === 5 && (
-                <div>
-            <label style={{ fontWeight: 600 }}>Chọn giường:</label>
-            <select value={selectedBedId} onChange={e => setSelectedBedId(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', marginTop: 8 }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '3rem' 
+            }}>
+              <h2 style={{ 
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#1f2937',
+                margin: '0 0 1rem 0'
+              }}>
+                Chọn Giường
+              </h2>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1.6
+              }}>
+                Lựa chọn giường cụ thể trong phòng đã chọn
+              </p>
+            </div>
+
+            <div style={{
+              background: '#f9fafb',
+              borderRadius: 16,
+              padding: '2rem',
+              border: '2px solid #e5e7eb',
+              marginBottom: '2rem'
+            }}>
+                              <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1.1rem',
+                  color: '#374151',
+                  marginBottom: '1rem'
+                }}>
+                  Danh sách giường có sẵn:
+                </label>
+                {loadingBeds ? (
+                  <div style={{
+                    padding: '1rem',
+                    textAlign: 'center',
+                    color: '#6b7280',
+                    background: '#f9fafb',
+                    borderRadius: 12,
+                    border: '2px solid #e5e7eb'
+                  }}>
+                    Đang tải danh sách giường...
+                  </div>
+                ) : (
+                  <select 
+                    value={selectedBedId} 
+                    onChange={e => setSelectedBedId(e.target.value)} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '1rem', 
+                      borderRadius: 12, 
+                      border: '2px solid #d1d5db', 
+                      fontSize: '1rem',
+                      background: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
               <option value=''>-- Chọn giường --</option>
               {beds.filter(b => b.room_id === selectedRoomId && b.status === 'available').map(bed => (
                 <option key={bed._id} value={bed._id}>{bed.bed_number}</option>
               ))}
             </select>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(4)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Quay lại</button>
-              <button disabled={!selectedBedId} onClick={() => setStep(6)} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600, cursor: !selectedBedId ? 'not-allowed' : 'pointer' }}>Tiếp tục</button>
+                )}
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginTop: '2rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => setStep(4)} 
+                style={{ 
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #d1d5db',
+                  borderRadius: 12, 
+                  padding: '1rem 2rem', 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Quay lại
+              </button>
+              <button 
+                disabled={!selectedBedId} 
+                onClick={() => setStep(6)} 
+                style={{ 
+                  background: selectedBedId
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
+                    : '#e5e7eb',
+                  color: selectedBedId ? '#fff' : '#9ca3af',
+                  border: 'none', 
+                  borderRadius: 12, 
+                  padding: '1rem 2.5rem', 
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: selectedBedId ? 'pointer' : 'not-allowed',
+                  boxShadow: selectedBedId ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px'
+                }}
+              >
+                Tiếp tục
+              </button>
                 </div>
               </div>
             )}
 
         {/* Step 6: Thông tin bổ sung */}
         {step === 6 && (
-          <div>
-            <label style={{ fontWeight: 600 }}>Ngày bắt đầu dịch vụ:</label>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '3rem' 
+            }}>
+              <h2 style={{ 
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#1f2937',
+                margin: '0 0 1rem 0'
+              }}>
+                Thông Tin Bổ Sung
+              </h2>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1.6
+              }}>
+                Cung cấp thêm thông tin để chúng tôi phục vụ tốt hơn
+              </p>
+              {selectedPackage?.category === 'supplementary' && (
+                <div style={{
+                  background: '#f0f9ff',
+                  borderRadius: 12,
+                  padding: '1rem',
+                  marginTop: '1rem',
+                  border: '1px solid #0ea5e9'
+                }}>
+                  <div style={{ fontSize: '1rem', color: '#0369a1', textAlign: 'center' }}>
+                    🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì cư dân đã có phòng từ gói chính
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: '#f9fafb',
+              borderRadius: 16,
+              padding: '2rem',
+              border: '2px solid #e5e7eb',
+              marginBottom: '2rem'
+            }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1rem',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Ngày bắt đầu dịch vụ: *
+                </label>
             <DatePicker
               selected={startDate ? new Date(startDate) : null}
               onChange={date => setStartDate(date ? date.toISOString().slice(0, 10) : '')}
@@ -856,46 +1772,248 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
               placeholderText="dd/mm/yyyy"
               minDate={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)}
               maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)}
-              className="your-custom-class"
-              required
-            />
-            <label style={{ fontWeight: 600 }}>Phân loại phòng theo giới tính:</label>
+                  className="date-picker-custom"
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1rem',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Giới tính phòng:
+                </label>
             <input
               type="text"
               value={residentGender === 'male' ? 'Nam' : residentGender === 'female' ? 'Nữ' : ''}
               disabled
-              style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16 }}
-            />
-            <label style={{ fontWeight: 600 }}>Yêu cầu đặc biệt:</label>
-            <input type='text' value={familyPreferences.special_requests} onChange={e => setFamilyPreferences({ ...familyPreferences, special_requests: e.target.value })} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16 }} />
-            <label style={{ fontWeight: 600 }}>Ghi chú tư vấn:</label>
-            <textarea value={medicalNotes} onChange={e => setMedicalNotes(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #e5e7eb', minHeight: 60, marginBottom: 16 }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(5)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Quay lại</button>
-              <button onClick={() => setStep(7)} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }} disabled={!startDate || !familyPreferences.preferred_room_gender}>Tiếp tục</button>
+                  style={{ 
+                    width: '100%', 
+                    padding: '1rem', 
+                    borderRadius: 12, 
+                    border: '2px solid #d1d5db', 
+                    fontSize: '1rem',
+                    background: '#f9fafb',
+                    color: '#6b7280'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1rem',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Yêu cầu đặc biệt:
+                </label>
+                <input 
+                  type='text' 
+                  value={familyPreferences.special_requests} 
+                  onChange={e => setFamilyPreferences({ ...familyPreferences, special_requests: e.target.value })} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '1rem', 
+                    borderRadius: 12, 
+                    border: '2px solid #d1d5db', 
+                    fontSize: '1rem',
+                    background: 'white'
+                  }} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1rem',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Ghi chú tư vấn:
+                </label>
+                <textarea 
+                  value={medicalNotes} 
+                  onChange={e => setMedicalNotes(e.target.value)} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '1rem', 
+                    borderRadius: 12, 
+                    border: '2px solid #d1d5db', 
+                    minHeight: 80, 
+                    fontSize: '1rem',
+                    background: 'white',
+                    resize: 'vertical'
+                  }} 
+                />
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginTop: '2rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => {
+                  // Nếu là gói bổ sung, quay lại step 1 thay vì step 5
+                  if (selectedPackage?.category === 'supplementary') {
+                    setStep(1);
+                  } else {
+                    setStep(5);
+                  }
+                }} 
+                style={{ 
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #d1d5db',
+                  borderRadius: 12, 
+                  padding: '1rem 2rem', 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Quay lại
+              </button>
+              <button 
+                onClick={() => setStep(7)} 
+                style={{ 
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: '#fff',
+                  border: 'none', 
+                  borderRadius: 12, 
+                  padding: '1rem 2.5rem', 
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px'
+                }}
+                disabled={!startDate}
+              >
+                Tiếp tục
+              </button>
             </div>
           </div>
         )}
 
         {/* Step 7: Xác nhận */}
         {step === 7 && (
-                <div>
-            <h3 style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>Xác nhận thông tin đăng ký</h3>
-            <div style={{ background: '#f1f5f9', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-              <div><b>Người thụ hưởng:</b> {residents.find(r => r.id === selectedResident)?.name}</div>
-              <div><b>Gói dịch vụ:</b> {selectedPackage?.plan_name}</div>
-              <div><b>Loại phòng:</b> {roomTypeName}</div>
-              <div><b>Phân loại phòng theo giới tính:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
-              <div><b>Phòng:</b> {selectedRoomObj?.room_number}</div>
-              <div><b>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
-              <div><b>Yêu cầu đặc biệt:</b> {familyPreferences.special_requests}</div>
-              <div><b>Ghi chú tư vấn:</b> {medicalNotes}</div>
-              <div><b>Tiền phòng/tháng:</b> {roomMonthlyCost.toLocaleString()} đ</div>
-              <div><b>Tiền gói dịch vụ/tháng:</b> {selectedPackage?.monthly_price?.toLocaleString()} đ</div>
-              <div><b>Tổng cộng/tháng:</b> {(roomMonthlyCost + (selectedPackage?.monthly_price || 0)).toLocaleString()} đ</div>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '3rem' 
+            }}>
+              <h2 style={{ 
+                fontSize: '2rem', 
+                fontWeight: 700, 
+                color: '#1f2937',
+                margin: '0 0 1rem 0'
+              }}>
+                Xác Nhận Thông Tin
+              </h2>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1.6
+              }}>
+                Kiểm tra lại thông tin trước khi hoàn tất đăng ký
+              </p>
                     </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(6)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Quay lại</button>
+
+            <div style={{
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              borderRadius: 16,
+              padding: '2rem',
+              border: '2px solid #22c55e',
+              marginBottom: '2rem'
+            }}>
+              <h3 style={{ 
+                fontSize: '1.25rem', 
+                fontWeight: 600, 
+                color: '#15803d',
+                margin: '0 0 1.5rem 0'
+              }}>
+                Thông tin đăng ký:
+              </h3>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+                gap: '1rem',
+                fontSize: '1rem'
+              }}>
+                <div><b style={{ color: '#374151' }}>Người thụ hưởng:</b> {residents.find(r => r.id === selectedResident)?.name}</div>
+                <div><b style={{ color: '#374151' }}>Gói dịch vụ:</b> {selectedPackage?.plan_name}</div>
+                                 {selectedPackage?.category === 'main' && (
+                   <>
+                     <div><b style={{ color: '#374151' }}>Loại phòng:</b> {roomTypeName}</div>
+                     <div><b style={{ color: '#374151' }}>Giới tính phòng:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
+                     <div><b style={{ color: '#374151' }}>Phòng:</b> {selectedRoomObj?.room_number}</div>
+                     <div><b style={{ color: '#374151' }}>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
+                   </>
+                 )}
+                <div><b style={{ color: '#374151' }}>Yêu cầu đặc biệt:</b> {familyPreferences.special_requests || 'Không có'}</div>
+                <div><b style={{ color: '#374151' }}>Ghi chú:</b> {medicalNotes || 'Không có'}</div>
+                                 {selectedPackage?.category === 'main' && (
+                   <div><b style={{ color: '#374151' }}>Tiền phòng/tháng:</b> {roomMonthlyCost.toLocaleString()} đ</div>
+                 )}
+                 <div><b style={{ color: '#374151' }}>Tiền gói dịch vụ/tháng:</b> {selectedPackage?.monthly_price?.toLocaleString()} đ</div>
+                <div style={{ 
+                  gridColumn: '1 / -1',
+                  padding: '1rem',
+                  background: '#f8fafc',
+                  borderRadius: 8,
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <b style={{ color: '#1e40af', fontSize: '1.1rem' }}>Tổng cộng/tháng:</b> 
+                                     <span style={{ 
+                     marginLeft: '0.5rem',
+                     color: '#1e40af', 
+                     fontSize: '1.2rem',
+                     fontWeight: 700
+                   }}>
+                     {((selectedPackage?.category === 'main' ? roomMonthlyCost : 0) + (selectedPackage?.monthly_price || 0)).toLocaleString()} đ
+                   </span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginTop: '2rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => setStep(6)} 
+                style={{ 
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #d1d5db',
+                  borderRadius: 12, 
+                  padding: '1rem 2rem', 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Quay lại
+              </button>
                   <button
                     onClick={() => {
                   if (!canRegisterMain) {
@@ -904,20 +2022,76 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
                       }
                   handlePurchase();
                 }}
-                style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}
+                style={{ 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#fff',
+                  border: 'none', 
+                  borderRadius: 12, 
+                  padding: '1rem 2.5rem', 
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px'
+                }}
                 disabled={!canSubmit}
-              >Xác nhận & Đăng ký</button>
+              >
+                Xác nhận & Đăng ký
+              </button>
                 </div>
               </div>
             )}
 
         {/* Step 8: Hoàn tất */}
         {step === 8 && (
-          <div style={{ textAlign: 'center', padding: 32 }}>
-            <div style={{ fontSize: 48, color: '#10b981', marginBottom: 16 }}>✔</div>
-            <h3 style={{ fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Đăng ký thành công!</h3>
-            <div style={{ color: '#64748b', marginBottom: 24 }}>Thông tin đăng ký dịch vụ đã được gửi thành công. Chúng tôi sẽ liên hệ lại để xác nhận.</div>
-            <button onClick={() => router.push('/services')} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}>Về trang dịch vụ</button>
+          <div style={{ 
+            maxWidth: '800px', 
+            margin: '0 auto',
+            textAlign: 'center', 
+            padding: '3rem 0'
+          }}>
+            <div style={{ 
+              fontSize: 64, 
+              color: '#10b981', 
+              marginBottom: '2rem' 
+            }}>
+              ✓
+            </div>
+            <h3 style={{ 
+              fontWeight: 700, 
+              fontSize: '2rem', 
+              marginBottom: '1rem',
+              color: '#1f2937'
+            }}>
+              Đăng ký thành công!
+            </h3>
+            <div style={{ 
+              color: '#6b7280', 
+              marginBottom: '2rem',
+              fontSize: '1.1rem',
+              lineHeight: 1.6
+            }}>
+              Thông tin đăng ký dịch vụ đã được gửi thành công. 
+              <br/>Chúng tôi sẽ liên hệ lại để xác nhận trong thời gian sớm nhất.
+            </div>
+            <button 
+              onClick={() => router.push('/services')} 
+              style={{ 
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                color: '#fff',
+                border: 'none', 
+                borderRadius: 12, 
+                padding: '1rem 2.5rem', 
+                fontWeight: 600,
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Về trang dịch vụ
+            </button>
               </div>
             )}
           </div>
@@ -1032,6 +2206,17 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
            </div>
          </div>
        )}
+
+      {/* Confirm Modal for package upgrade */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={confirmModal.onCancel}
+      />
+    </div>
     </div>
   );
 } 

@@ -23,17 +23,28 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
     return { bg: '#f3f4f6', border: '#d1d5db', text: '#374151' };
   };
 
-  // Fetch staff names by conducted_by if needed
+  // Fetch staff names by conducted_by if needed (fallback for non-populated data)
   useEffect(() => {
     (async () => {
       if (!careNotes) return;
+      
       for (const note of careNotes) {
-        if (note.conducted_by && !note.staff && !staffNames[note.conducted_by] && !requestedIds.current.has(note.conducted_by)) {
+        // Only fetch if conducted_by is a string ID and we don't have the staff name yet
+        if (note.conducted_by && 
+            typeof note.conducted_by === 'string' && 
+            !staffNames[note.conducted_by] && 
+            !requestedIds.current.has(note.conducted_by)) {
           requestedIds.current.add(note.conducted_by);
           try {
+            console.log('Fetching staff name for ID:', note.conducted_by);
             const user = await userAPI.getById(note.conducted_by);
-            setStaffNames(prev => ({ ...prev, [note.conducted_by]: user.full_name || user.username || user.email || '---' }));
-          } catch {
+            console.log('Staff data received:', user);
+            const staffName = user.full_name || user.username || user.email || '---';
+            const staffPosition = user.position || '';
+            const staffDisplay = staffPosition ? `${staffPosition}: ${staffName}` : staffName;
+            setStaffNames(prev => ({ ...prev, [note.conducted_by]: staffDisplay }));
+          } catch (error: any) {
+            console.error('Error fetching staff name for ID:', note.conducted_by, error);
             setStaffNames(prev => ({ ...prev, [note.conducted_by]: '---' }));
           }
         }
@@ -63,19 +74,34 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
       {careNotes.map((careNote, idx) => {
         const colors = getPriorityColor();
         const key = careNote.id || careNote._id || idx;
-        // Lấy tên nhân viên
+        // Lấy tên nhân viên và position
         let staffName = '---';
+        let staffPosition = '';
+        
+        // Try multiple sources for staff name and position
         if (careNote.staff) {
           staffName = careNote.staff.split(',')[0]?.trim();
         } else if (careNote.conducted_by_name) {
           staffName = careNote.conducted_by_name;
+        } else if (careNote.conducted_by && typeof careNote.conducted_by === 'object') {
+          // Handle populated conducted_by object from backend
+          staffName = careNote.conducted_by.full_name || '---';
+          staffPosition = careNote.conducted_by.position || '';
         } else if (careNote.conducted_by && staffNames[careNote.conducted_by]) {
           staffName = staffNames[careNote.conducted_by];
         } else if (careNote.conducted_by_full_name) {
           staffName = careNote.conducted_by_full_name;
+        } else if (careNote.staff_name) {
+          staffName = careNote.staff_name;
         } else if (careNote.full_name) {
           staffName = careNote.full_name;
+        } else if (careNote.conducted_by && typeof careNote.conducted_by === 'string') {
+          // If we have conducted_by as string ID but no staff name yet, show loading
+          staffName = 'Đang tải...';
         }
+        
+        // Format staff display with position
+        const staffDisplay = staffPosition ? `${staffPosition}: ${staffName}` : staffName;
         return (
           <div
             key={key}
@@ -105,7 +131,7 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
                   fontWeight: 600,
                   color: colors.text
                 }}>
-                  Nhân viên: {staffName}
+                  Nhân viên: {staffDisplay}
                 </span>
               </div>
               <span style={{

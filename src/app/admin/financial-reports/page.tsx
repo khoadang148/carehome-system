@@ -14,7 +14,6 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import BillModal from '../../../components/BillModal';
 import { billsAPI } from '../../../lib/api';
 import { Dialog } from '@headlessui/react';
 
@@ -155,21 +154,21 @@ export default function FinancialReportsPage() {
                 <ChartBarIcon className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Báo cáo Tài chính</h1>
-                <p className="text-gray-600 text-base">Thống kê và phân tích tài chính chi tiết</p>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Quản lý hóa đơn</h1>
+                <p className="text-gray-600 text-base">Quản lý hóa đơn và thanh toán</p>
               </div>
             </div>
           </div>
           <div className="ml-auto flex items-center">
             <button
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow transition-all duration-150"
-              onClick={() => setShowBillModal(true)}
+              onClick={() => router.push('/admin/financial-reports/new')}
             >
               + Tạo hóa đơn
             </button>
           </div>
         </div>
-        <BillModal open={showBillModal} onClose={() => setShowBillModal(false)} onSuccess={fetchBills} />
+        
         {/* Filters */}
         <div className="bg-white rounded-xl p-6 mb-8 shadow-sm border border-gray-100">
           <div className="flex flex-wrap gap-4">

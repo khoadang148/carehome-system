@@ -344,18 +344,47 @@ export default function AccountManagementPage() {
             width: 56,
             height: 56,
             borderRadius: '50%',
-            background: '#f3f4f6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+            background: user.avatar ? 'transparent' : '#f3f4f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             fontSize: 28,
             fontWeight: 700,
             color: '#6366f1',
             border: '2px solid #e0e7ff',
             flexShrink: 0,
+            overflow: 'hidden',
           }}
         >
-          <UserCircleIcon style={{ width: 36, height: 36 }} />
+          {user.avatar ? (
+            <img
+              src={user.avatar.startsWith('http') ? user.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${user.avatar}`}
+              alt={user.full_name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '50%',
+              }}
+              onError={(e) => {
+                const target = e.currentTarget as HTMLElement;
+                target.style.display = 'none';
+                const nextSibling = target.nextElementSibling as HTMLElement;
+                if (nextSibling) {
+                  nextSibling.style.display = 'flex';
+                }
+              }}
+            />
+          ) : null}
+          <div style={{ 
+            display: user.avatar ? 'none' : 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%'
+          }}>
+            <UserCircleIcon style={{ width: 36, height: 36 }} />
+          </div>
         </div>
 
         {/* Info */}
@@ -449,18 +478,47 @@ export default function AccountManagementPage() {
             width: 56,
             height: 56,
             borderRadius: '50%',
-            background: '#f3f4f6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+            background: account.avatar ? 'transparent' : '#f3f4f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             fontSize: 28,
             fontWeight: 700,
             color: '#f59e42',
             border: '2px solid #fde68a',
             flexShrink: 0,
+            overflow: 'hidden',
           }}
         >
-          <UserIcon style={{ width: 36, height: 36 }} />
+          {account.avatar ? (
+            <img
+              src={account.avatar.startsWith('http') ? account.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${account.avatar}`}
+              alt={account.full_name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '50%',
+              }}
+              onError={(e) => {
+                const target = e.currentTarget as HTMLElement;
+                target.style.display = 'none';
+                const nextSibling = target.nextElementSibling as HTMLElement;
+                if (nextSibling) {
+                  nextSibling.style.display = 'flex';
+                }
+              }}
+            />
+          ) : null}
+          <div style={{ 
+            display: account.avatar ? 'none' : 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%'
+          }}>
+            <UserIcon style={{ width: 36, height: 36 }} />
+          </div>
         </div>
 
         {/* Info */}
@@ -2071,19 +2129,48 @@ export default function AccountManagementPage() {
               width: 64,
               height: 64,
               borderRadius: '50%',
-              background: 'rgba(255,255,255,0.18)',
+              background: selectedAccount.avatar ? 'transparent' : 'rgba(255,255,255,0.18)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
               fontSize: 32,
               fontWeight: 700,
               border: isStaff ? '2px solid #e0e7ff' : '2px solid #fde68a',
+              overflow: 'hidden',
                 }}>
-              {isStaff ? (
-                <UserCircleIcon style={{ width: 40, height: 40, color: '#fff' }} />
-                  ) : (
-                <UserIcon style={{ width: 40, height: 40, color: '#fff' }} />
-                  )}
+              {selectedAccount.avatar ? (
+                <img
+                  src={selectedAccount.avatar.startsWith('http') ? selectedAccount.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${selectedAccount.avatar}`}
+                  alt={selectedAccount.full_name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                  }}
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLElement;
+                    target.style.display = 'none';
+                    const nextSibling = target.nextElementSibling as HTMLElement;
+                    if (nextSibling) {
+                      nextSibling.style.display = 'flex';
+                    }
+                  }}
+                />
+              ) : null}
+              <div style={{ 
+                display: selectedAccount.avatar ? 'none' : 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%'
+              }}>
+                {isStaff ? (
+                  <UserCircleIcon style={{ width: 40, height: 40, color: '#fff' }} />
+                ) : (
+                  <UserIcon style={{ width: 40, height: 40, color: '#fff' }} />
+                )}
+              </div>
                 </div>
                 <div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>

@@ -387,3 +387,6 @@ export const getBackgroundColorByStatus = (status: string): string => {
       return COLORS.SECONDARY[50];
   }
 }; 
+
+// Cấu hình cho thời gian chuyển trang sau đăng nhập
+export const LOGIN_REDIRECT_DELAY = 0; // milliseconds - chuyển trang ngay lập tức 

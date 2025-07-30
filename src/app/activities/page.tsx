@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   MagnifyingGlassIcon, 
@@ -172,41 +172,45 @@ export default function ActivitiesPage() {
   const weekDates = getWeekDates(selectedWeek);
   
   // Filter activities based on search term and filters
-  const filteredActivities = activities.filter((activity) => {
-    const name = activity.name || '';
-    const description = activity.description || '';
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLocation = filterLocation === 'Tất cả' || activity.location === filterLocation;
-    // Filter theo activity_type (không phải category hiển thị)
-    const matchesCategory = filterCategory === 'Tất cả' || activity.activity_type === filterCategory;
-    // Convert selectedDate (Date) to yyyy-MM-dd for comparison
-    let filterDate = '';
-    if (selectedDate && isValid(selectedDate)) {
-      filterDate = format(selectedDate, 'yyyy-MM-dd');
-    }
-    const activityDate = activity.date || '';
-    const matchesSelectedDate = activityDate === filterDate;
-    return matchesSearch && matchesLocation && matchesSelectedDate && matchesCategory;
-  });
+  const filteredActivities = useMemo(() => {
+    return activities.filter((activity) => {
+      const name = activity.name || '';
+      const description = activity.description || '';
+      const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesLocation = filterLocation === 'Tất cả' || activity.location === filterLocation;
+      // Filter theo activity_type (không phải category hiển thị)
+      const matchesCategory = filterCategory === 'Tất cả' || activity.activity_type === filterCategory;
+      // Convert selectedDate (Date) to yyyy-MM-dd for comparison
+      let filterDate = '';
+      if (selectedDate && isValid(selectedDate)) {
+        filterDate = format(selectedDate, 'yyyy-MM-dd');
+      }
+      const activityDate = activity.date || '';
+      const matchesSelectedDate = activityDate === filterDate;
+      return matchesSearch && matchesLocation && matchesSelectedDate && matchesCategory;
+    });
+  }, [activities, searchTerm, filterLocation, filterCategory, selectedDate]);
 
   // Filter activities for current week when in calendar view
-  const weekActivities = filteredActivities.filter(activity => {
-    if (viewMode === 'list') return true;
-    
-    const activityDate = new Date(activity.date);
-    return weekDates.some(date => 
-      date.toDateString() === activityDate.toDateString()
-    );
-  });
+  const weekActivities = useMemo(() => {
+    return filteredActivities.filter(activity => {
+      if (viewMode === 'list') return true;
+      
+      const activityDate = new Date(activity.date);
+      return weekDates.some(date => 
+        date.toDateString() === activityDate.toDateString()
+      );
+    });
+  }, [filteredActivities, viewMode, weekDates]);
 
   // Get activities for a specific date
-  const getActivitiesForDate = (date: Date) => {
+  const getActivitiesForDate = useCallback((date: Date) => {
     return weekActivities.filter(activity => {
       const activityDate = new Date(activity.date);
       return activityDate.toDateString() === date.toDateString();
     });
-  };
+  }, [weekActivities]);
 
   const getDayLabel = (date: Date) => {
     const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -278,13 +282,37 @@ export default function ActivitiesPage() {
         const participationDate = new Date(p.date).toLocaleDateString('en-CA');
         return participationDate === activity.date;
       });
+      
+      // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
+      const uniqueParticipations = filteredParticipations.reduce((acc: any[], current: any) => {
+        const residentId = current.resident_id?._id || current.resident_id;
+        const existingIndex = acc.findIndex(item => 
+          (item.resident_id?._id || item.resident_id) === residentId
+        );
+        
+        if (existingIndex === -1) {
+          // Chưa có, thêm vào
+          acc.push(current);
+        } else {
+          // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
+          const existing = acc[existingIndex];
+          const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+          const currentTime = new Date(current.updated_at || current.created_at || 0);
+          
+          if (currentTime > existingTime) {
+            acc[existingIndex] = current;
+          }
+        }
+        return acc;
+      }, []);
+      
       // Nếu chỉ muốn người đã có đánh giá/tham gia:
       // const filteredParticipations = participations.filter((p: any) => {
       //   if (!p.date) return false;
       //   const participationDate = new Date(p.date).toISOString().slice(0, 10);
       //   return participationDate === activity.date && p.attendance_status === 'attended';
       // });
-      const residentIds = filteredParticipations.map((p: any) => p.resident_id?._id || p.resident_id);
+      const residentIds = uniqueParticipations.map((p: any) => p.resident_id?._id || p.resident_id);
       const filteredResidents = residents.filter((r: any) => residentIds.includes(r.id));
       setSelectedActivity(activity);
       setEvaluationResidents(filteredResidents);
@@ -306,11 +334,34 @@ export default function ActivitiesPage() {
           });
           
           // Lọc participations cho hoạt động này và đúng ngày
-          const joined = participations.filter((p: any) => {
+          const filtered = participations.filter((p: any) => {
             const participationActivityId = p.activity_id?._id || p.activity_id;
             const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
             return participationActivityId === activity.id && participationDate === activity.date;
           });
+          
+          // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
+          const joined = filtered.reduce((acc: any[], current: any) => {
+            const residentId = current.resident_id?._id || current.resident_id;
+            const existingIndex = acc.findIndex(item => 
+              (item.resident_id?._id || item.resident_id) === residentId
+            );
+            
+            if (existingIndex === -1) {
+              // Chưa có, thêm vào
+              acc.push(current);
+            } else {
+              // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
+              const existing = acc[existingIndex];
+              const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+              const currentTime = new Date(current.updated_at || current.created_at || 0);
+              
+              if (currentTime > existingTime) {
+                acc[existingIndex] = current;
+              }
+            }
+            return acc;
+          }, []);
           
           console.log(`Activity ${activity.name} (${activity.id}):`, {
             totalParticipations: participations.length,
@@ -327,7 +378,7 @@ export default function ActivitiesPage() {
       setActivityParticipantCounts(counts);
     };
     if (activities.length > 0) fetchCounts();
-  }, [activities]);
+  }, [activities.length]); // Chỉ dependency vào length thay vì toàn bộ array
 
   // Loading state
   if (loading) {
@@ -958,99 +1009,175 @@ export default function ActivitiesPage() {
                     e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
                   }}
                 >
-                  {/* Header */}
+                  {/* Header with Activity Name and Status */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    marginBottom: '0.75rem'
+                    marginBottom: '1rem',
+                    paddingBottom: '0.75rem',
+                    borderBottom: '1px solid #e5e7eb'
                   }}>
-                    <div style={{ flex: 1, paddingRight: '1rem' }}>
-                      <h3 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: 600,
-                        color: '#111827',
-                        margin: '0 0 0.5rem 0',
+                    <div style={{ flex: 1 }}>
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        flexWrap: 'wrap'
+                        marginBottom: '0.5rem'
                       }}>
-                        <div style={{
-                          width: '0.75rem',
-                          height: '0.75rem',
-                          borderRadius: '50%',
-                          background: categoryColor
-                        }} />
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Tên hoạt động:
+                        </span>
+                      </div>
+                      <h3 style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: '#111827',
+                        margin: '0 0 0.5rem 0',
+                        lineHeight: 1.3
+                      }}>
                         {activity.name}
+                      </h3>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Loại:
+                        </span>
                         <span style={{
                           display: 'inline-block',
-                          marginLeft: 8,
-                          padding: '2px 12px',
-                          borderRadius: 999,
-                          background: categoryColor + '22',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '9999px',
+                          background: categoryColor + '15',
                           color: categoryColor,
-                          fontWeight: 700,
-                          fontSize: '0.85em',
-                          border: `1.5px solid ${categoryColor}55`,
-                          lineHeight: 1.2,
-                          letterSpacing: '0.01em',
-                          boxShadow: '0 1px 4px 0 ' + categoryColor + '11',
-                          verticalAlign: 'middle'
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                          border: `1px solid ${categoryColor}30`
                         }}>
                           {activity.category}
                         </span>
-                      </h3>
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        gap: '0.25rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Trạng thái:
+                        </span>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: statusColor.bg,
+                          color: statusColor.text,
+                          border: `1px solid ${statusColor.border}`,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {activity.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {activity.description && (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '0.75rem',
+                      background: '#f9fafb',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #f3f4f6'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Mô tả:
+                        </span>
+                      </div>
                       <p style={{
                         fontSize: '0.875rem',
-                        color: '#6b7280',
+                        color: '#4b5563',
                         margin: 0,
-                        lineHeight: 1.4
+                        lineHeight: 1.5,
+                        fontStyle: 'italic'
                       }}>
                         {activity.description}
                       </p>
                     </div>
-                    <div style={{ flexShrink: 0 }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        background: statusColor.bg,
-                        color: statusColor.text,
-                        border: `1px solid ${statusColor.border}`,
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {activity.status}
-                      </span>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Compact Info Grid */}
+                  {/* Key Information Grid */}
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '0.75rem',
-                    marginBottom: '0.75rem',
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0'
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '1rem',
+                    marginBottom: '1rem'
                   }}>
                     {/* Time */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#f0f9ff',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e0f2fe'
                     }}>
-                      <ClockIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#3b82f6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <ClockIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Thời gian</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{activity.startTime} - {activity.endTime} ({activity.duration} Phút)</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Thời gian:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {activity.startTime} - {activity.endTime}
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>({activity.duration} phút)</div>
                       </div>
                     </div>
                     
@@ -1058,13 +1185,28 @@ export default function ActivitiesPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#fef3c7',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #fde68a'
                     }}>
-                      <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <CalendarIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Ngày</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{activity.date ? new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN') : '-'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Ngày:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {activity.date ? new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN') : '-'}
+                        </div>
                       </div>
                     </div>
                     
@@ -1072,13 +1214,28 @@ export default function ActivitiesPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#ecfdf5',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1fae5'
                     }}>
-                      <MapPinIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#10b981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <MapPinIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Địa điểm</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{activity.location}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Địa điểm:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {activity.location}
+                        </div>
                       </div>
                     </div>
                     
@@ -1086,13 +1243,28 @@ export default function ActivitiesPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#fef3c7',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #fde68a'
                     }}>
-                      <UserGroupIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <UserGroupIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Số lượng</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng cư dân tham gia:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
+                        </div>
                       </div>
                     </div>
                   </div>

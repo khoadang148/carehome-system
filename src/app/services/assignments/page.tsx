@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { residentAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
+import { residentAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI, userAPI } from '@/lib/api';
+import { ClipboardDocumentCheckIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 
 export default function ServiceAssignmentsPage() {
@@ -105,7 +106,7 @@ export default function ServiceAssignmentsPage() {
       'packages_selected': { text: 'Đã chọn gói', color: '#3b82f6' },
       'room_assigned': { text: 'Đã phân phòng', color: '#8b5cf6' },
       'payment_completed': { text: 'Đã thanh toán', color: '#10b981' },
-      'active': { text: 'Đang hoạt động', color: '#059669' },
+      'active': { text: 'Đang sử dụng', color: '#059669' },
       'completed': { text: 'Đã hoàn thành', color: '#6b7280' },
       'cancelled': { text: 'Đã hủy', color: '#ef4444' },
       'paused': { text: 'Tạm dừng', color: '#f97316' }
@@ -140,6 +141,39 @@ export default function ServiceAssignmentsPage() {
         position: 'relative',
         zIndex: 1
       }}>
+        {/* Back Button */}
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => router.back()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #d1d5db',
+              background: 'white',
+              color: '#6b7280',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              transition: 'all 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.borderColor = '#9ca3af';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'white';
+              e.currentTarget.style.borderColor = '#d1d5db';
+            }}
+          >
+            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+            Quay lại
+          </button>
+        </div>
+
         {/* Header Section */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -150,17 +184,31 @@ export default function ServiceAssignmentsPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)',
           backdropFilter: 'blur(10px)'
         }}>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 700,
-            margin: 0,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            letterSpacing: '-0.025em'
-          }}>
-            Danh sách cư dân đã đăng ký dịch vụ
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '1rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+            }}>
+              <ClipboardDocumentCheckIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+            </div>
+            <h1 style={{
+              fontSize: '2rem',
+              fontWeight: 700,
+              margin: 0,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.025em'
+            }}>
+              Danh sách cư dân đã đăng ký dịch vụ
+            </h1>
+          </div>
           <p style={{
             fontSize: '1rem',
             color: '#64748b',
@@ -249,7 +297,7 @@ export default function ServiceAssignmentsPage() {
                               overflow: 'hidden'
                             }}>
                               {a.resident?.avatar ? (
-                                <img src={a.resident.avatar} alt={a.resident.full_name || a.resident.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img src={userAPI.getAvatarUrl(a.resident.avatar)} alt={a.resident.full_name || a.resident.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               ) : (
                                 (a.resident?.full_name || a.resident?.name || '').charAt(0)
                               )}
@@ -342,35 +390,37 @@ export default function ServiceAssignmentsPage() {
                               </svg>
                               
                             </button>
-                            <button
-                              title="Xóa"
-                              onClick={() => handleDelete(a._id)}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '0.375rem',
-                                border: '1px solid #ef4444',
-                                backgroundColor: 'white',
-                                color: '#ef4444',
-                                fontSize: '0.75rem',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
-                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M3 6h18"/>
-                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                                <line x1="10" y1="11" x2="10" y2="17"/>
-                                <line x1="14" y1="11" x2="14" y2="17"/>
-                              </svg>
-                              
-                            </button>
+                            {user?.role === 'admin' && (
+                              <button
+                                title="Xóa"
+                                onClick={() => handleDelete(a._id)}
+                                style={{
+                                  padding: '0.5rem',
+                                  borderRadius: '0.375rem',
+                                  border: '1px solid #ef4444',
+                                  backgroundColor: 'white',
+                                  color: '#ef4444',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 6h18"/>
+                                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                  <line x1="10" y1="11" x2="10" y2="17"/>
+                                  <line x1="14" y1="11" x2="14" y2="17"/>
+                                </svg>
+                                
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

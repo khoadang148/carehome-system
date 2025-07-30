@@ -25,7 +25,7 @@ import {
   PlusCircleIcon,
   UsersIcon
 } from '@heroicons/react/24/outline';
-import ReactDOM from 'react-dom';
+import { createPortal } from 'react-dom';
 import { billsAPI, carePlansAPI, roomsAPI, paymentAPI } from '@/lib/api';
 import axios from 'axios';
 import Select from 'react-select';
@@ -61,6 +61,33 @@ export default function FinancePage() {
   const [selectedResident, setSelectedResident] = useState(0);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  
+  // Debug modal state
+  useEffect(() => {
+    console.log('showTermsModal changed:', showTermsModal);
+  }, [showTermsModal]);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showTermsModal) {
+        console.log('Escape key pressed, closing modal');
+        setShowTermsModal(false);
+      }
+    };
+
+    if (showTermsModal) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+      console.log('Modal opened, body overflow hidden');
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+      console.log('Modal closed, body overflow restored');
+    };
+  }, [showTermsModal]);
   const router = useRouter();
   const { user } = useAuth();
   const [familyFinancialData, setFamilyFinancialData] = useState<any[]>([]); // <-- move this here, replace mock
@@ -69,6 +96,8 @@ export default function FinancePage() {
   const [payosData, setPayosData] = useState<any>(null);
   const [payosLoading, setPayosLoading] = useState(false);
   const [payosError, setPayosError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Fetch residents for family
   useEffect(() => {
@@ -450,7 +479,10 @@ export default function FinancePage() {
               
               {/* Terms and Conditions Button */}
               <button
-                onClick={() => setShowTermsModal(true)}
+                onClick={() => {
+                  console.log('Terms button clicked, setting showTermsModal to true');
+                  setShowTermsModal(true);
+                }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -833,9 +865,9 @@ export default function FinancePage() {
                                   pending: { 
                                     text: 'Chờ thanh toán', 
                                     label: 'Chờ thanh toán',
-                                    bg: '#f0fdf4',
-                                    color: '#059669',
-                                    border: '#bbf7d0',
+                                    bg: '#fff7ed',
+                                    color: '#ea580c',
+                                    border: '#fed7aa',
                                     icon: null
                                   },
                                   grace_period: { 
@@ -1543,9 +1575,9 @@ export default function FinancePage() {
                                 pending: { 
                                   text: 'Chờ thanh toán', 
                                   label: 'Chờ thanh toán',
-                                  bg: '#f0fdf4',
-                                  color: '#059669',
-                                  border: '#bbf7d0',
+                                  bg: '#fff7ed',
+                                  color: '#ea580c',
+                                  border: '#fed7aa',
                                   icon: null
                                 },
                                 grace_period: { 
@@ -1784,21 +1816,27 @@ export default function FinancePage() {
       </div>
       {/* Add any other family view content here, then close all wrappers properly */}
       {/* Professional Terms and Conditions Modal */}
-      {showTermsModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(12px)',
-          marginLeft: '12rem'
-        }}>
+      {mounted && showTermsModal && createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(12px)'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTermsModal(false);
+            }
+          }}
+        >
           <div style={{
             background: 'white',
             borderRadius: '1.5rem',
@@ -1862,7 +1900,10 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowTermsModal(false)}
+                  onClick={() => {
+                    console.log('Close button clicked, setting showTermsModal to false');
+                    setShowTermsModal(false);
+                  }}
                   style={{
                     padding: '0.5rem',
                     background: 'rgba(255, 255, 255, 0.1)',
@@ -2241,7 +2282,10 @@ export default function FinancePage() {
               textAlign: 'center'
             }}>
               <button
-                onClick={() => setShowTermsModal(false)}
+                onClick={() => {
+                  console.log('Đã hiểu button clicked, setting showTermsModal to false');
+                  setShowTermsModal(false);
+                }}
                 style={{
                   padding: '0.875rem 2rem',
                   background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
@@ -2267,7 +2311,8 @@ export default function FinancePage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

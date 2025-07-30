@@ -8,8 +8,7 @@ import {
   XMarkIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, photosAPI } from '@/lib/api';
-import { carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 export default function PhotoUploadPage() {
@@ -36,28 +35,56 @@ export default function PhotoUploadPage() {
   useEffect(() => {
     const fetchResidents = async () => {
       try {
-        const data = await residentAPI.getAll();
-        const residentsWithRoom = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
-          let room_number = '';
-          try {
-            const assignments = await carePlansAPI.getByResidentId(resident._id);
-            const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-            const roomId = assignment?.assigned_room_id;
-            if (roomId) {
-              const room = await roomsAPI.getById(roomId);
-              room_number = room?.room_number || '';
-            }
-          } catch {}
-          return { ...resident, room_number };
-        }));
-        setResidents(residentsWithRoom);
-        console.log('Residents with room_number:', residentsWithRoom);
+        // Nếu là staff, chỉ lấy cư dân được phân công
+        if (user?.role === 'staff') {
+          const data = await staffAssignmentsAPI.getMyAssignments();
+          const assignmentsData = Array.isArray(data) ? data : [];
+          
+          const residentsWithRoom = await Promise.all(assignmentsData.map(async (assignment: any) => {
+            const resident = assignment.resident_id;
+            let room_number = '';
+            try {
+              const assignments = await carePlansAPI.getByResidentId(resident._id);
+              const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+              const roomId = assignment?.assigned_room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                room_number = room?.room_number || '';
+              }
+            } catch {}
+            return { ...resident, room_number };
+          }));
+          setResidents(residentsWithRoom);
+          console.log('Staff residents with room_number:', residentsWithRoom);
+        } else {
+          // Nếu là admin, lấy tất cả cư dân
+          const data = await residentAPI.getAll();
+          const residentsWithRoom = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
+            let room_number = '';
+            try {
+              const assignments = await carePlansAPI.getByResidentId(resident._id);
+              const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
+              const roomId = assignment?.assigned_room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                room_number = room?.room_number || '';
+              }
+            } catch {}
+            return { ...resident, room_number };
+          }));
+          setResidents(residentsWithRoom);
+          console.log('All residents with room_number:', residentsWithRoom);
+        }
       } catch (err) {
+        console.error('Error fetching residents:', err);
         setResidents([]);
       }
     };
-    fetchResidents();
-  }, []);
+    
+    if (user) {
+      fetchResidents();
+    }
+  }, [user]);
   
   // Check access permissions
   useEffect(() => {
@@ -194,8 +221,21 @@ export default function PhotoUploadPage() {
       // Lấy resident object từ danh sách residents (so sánh kiểu string)
       const residentObj = residents.find(r => String(r._id) === String(selectedResident));
       console.log('residentObj:', residentObj);
-      const familyId = residentObj.family_member_id || residentObj.familyId || residentObj.family_id;
-      if (!residentObj || !familyId) {
+      
+      if (!residentObj) {
+        setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin cư dân'}));
+        setIsUploading(false);
+        return;
+      }
+      
+      // Kiểm tra familyId - có thể không cần thiết cho staff upload ảnh
+      const familyId = (residentObj as any).family_member_id || (residentObj as any).familyId || (residentObj as any).family_id;
+      console.log('familyId:', familyId);
+      
+      // Nếu là staff và không có familyId, vẫn cho phép upload (có thể là cư dân mới chưa có family)
+      if (user?.role === 'staff' && !familyId) {
+        console.log('Staff upload without familyId - allowed');
+      } else if (!familyId) {
         setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người thân (familyId)'}));
         setIsUploading(false);
         return;
@@ -209,14 +249,20 @@ export default function PhotoUploadPage() {
         formData.append('activity_type', activityType);
         photoTags.forEach(tag => formData.append('tags', tag));
         formData.append('taken_date', new Date().toISOString());
+        
         // Truyền thêm tên người gửi
         let senderName = 'Nhân viên';
         if (user) {
-          if ('full_name' in user && user.full_name) senderName = user.full_name;
-          else if ('username' in user && user.username) senderName = user.username;
-          else if ('email' in user && user.email) senderName = user.email;
+          if ('full_name' in user && (user as any).full_name) senderName = (user as any).full_name;
+          else if ('username' in user && (user as any).username) senderName = (user as any).username;
+          else if ('email' in user && (user as any).email) senderName = (user as any).email;
         }
         formData.append('staff_notes', String(senderName));
+        
+        // Thêm familyId nếu có (cho admin) hoặc để trống (cho staff)
+        if (familyId) {
+          formData.append('family_id', familyId);
+        }
         // formData.append('related_activity_id', '');
         return photosAPI.upload(formData)
           .then(() => {
@@ -242,7 +288,7 @@ export default function PhotoUploadPage() {
       if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
       const timeout = setTimeout(() => {
         setShowResultModal(false);
-        router.push('/residents');
+        router.push('/residents/photos/gallery');
       }, 2000);
       setAutoCloseTimeout(timeout);
     } catch (error) {

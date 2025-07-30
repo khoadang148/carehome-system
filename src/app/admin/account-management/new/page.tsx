@@ -27,6 +27,7 @@ export default function NewAccountPage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
 
@@ -40,6 +41,10 @@ export default function NewAccountPage() {
 
   const handleChange = (field: string, value: string | File | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear validation error when user starts typing
+    if (validationErrors[field]) {
+      setValidationErrors(prev => ({ ...prev, [field]: "" }));
+    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,21 +66,42 @@ export default function NewAccountPage() {
     e.preventDefault();
     setSaving(true);
     setError("");
-    // Validate
-    if (!formData.username.trim() || !formData.password.trim() || !formData.email.trim() || !formData.role) {
-      setError("Vui lòng nhập đầy đủ thông tin bắt buộc.");
-      setSaving(false);
-      return;
+    setValidationErrors({});
+    
+    // Validate form
+    const errors: {[key: string]: string} = {};
+    
+    if (!formData.username.trim()) {
+      errors.username = "Tên đăng nhập không được để trống";
+    } else if (formData.username.length < 3) {
+      errors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      errors.username = "Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới";
     }
-    // Validate email
-    if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-      setError("Email không đúng định dạng.");
-      setSaving(false);
-      return;
+    
+    if (!formData.password.trim()) {
+      errors.password = "Mật khẩu không được để trống";
+    } else if (formData.password.length < 6) {
+      errors.password = "Mật khẩu phải có ít nhất 6 ký tự";
     }
+    
+    if (!formData.email.trim()) {
+      errors.email = "Email không được để trống";
+    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+      errors.email = "Email không đúng định dạng";
+    }
+    
+    if (!formData.role) {
+      errors.role = "Vui lòng chọn vai trò";
+    }
+    
     // Nếu là gia đình thì phải chọn cư dân
     if (formData.role === "family" && !selectedResidentId) {
-      setError("Vui lòng chọn cư dân thuộc tài khoản gia đình này.");
+      errors.resident = "Vui lòng chọn cư dân thuộc tài khoản gia đình này";
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       setSaving(false);
       return;
     }
@@ -106,7 +132,14 @@ export default function NewAccountPage() {
         setError(errData.detail || errData.message || "Tạo tài khoản thất bại!");
       }
     } catch (err: any) {
-      setError(err.message || "Tạo tài khoản thất bại!");
+      // Xử lý lỗi trùng lặp cụ thể
+      if (err.message?.includes('username') || err.message?.includes('tên đăng nhập')) {
+        setValidationErrors(prev => ({ ...prev, username: "Tên đăng nhập đã tồn tại trong hệ thống" }));
+      } else if (err.message?.includes('email')) {
+        setValidationErrors(prev => ({ ...prev, email: "Email đã được sử dụng bởi tài khoản khác" }));
+      } else {
+        setError(err.message || "Tạo tài khoản thất bại! Vui lòng thử lại.");
+      }
     } finally {
       setSaving(false);
     }
@@ -191,10 +224,28 @@ export default function NewAccountPage() {
               value={formData.username}
               onChange={e => handleChange('username', e.target.value)}
               required
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, outline: 'none', transition: 'border-color 0.2s', background: '#f8fafc' }}
+              style={{ 
+                width: '100%', 
+                padding: 14, 
+                borderRadius: 10, 
+                border: validationErrors.username ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
+                fontSize: 15, 
+                marginTop: 2, 
+                outline: 'none', 
+                transition: 'border-color 0.2s', 
+                background: validationErrors.username ? '#fef2f2' : '#f8fafc' 
+              }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              onBlur={e => e.currentTarget.style.borderColor = validationErrors.username ? '#ef4444' : '#e5e7eb'}
             />
+            {validationErrors.username && (
+              <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {validationErrors.username}
+              </div>
+            )}
           </div>
           <div>
             <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Mật khẩu *</label>
@@ -203,10 +254,28 @@ export default function NewAccountPage() {
               value={formData.password}
               onChange={e => handleChange('password', e.target.value)}
               required
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, outline: 'none', transition: 'border-color 0.2s', background: '#f8fafc' }}
+              style={{ 
+                width: '100%', 
+                padding: 14, 
+                borderRadius: 10, 
+                border: validationErrors.password ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
+                fontSize: 15, 
+                marginTop: 2, 
+                outline: 'none', 
+                transition: 'border-color 0.2s', 
+                background: validationErrors.password ? '#fef2f2' : '#f8fafc' 
+              }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              onBlur={e => e.currentTarget.style.borderColor = validationErrors.password ? '#ef4444' : '#e5e7eb'}
             />
+            {validationErrors.password && (
+              <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {validationErrors.password}
+              </div>
+            )}
           </div>
           <div>
             <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Email *</label>
@@ -215,10 +284,28 @@ export default function NewAccountPage() {
               value={formData.email}
               onChange={e => handleChange('email', e.target.value)}
               required
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, outline: 'none', transition: 'border-color 0.2s', background: '#f8fafc' }}
+              style={{ 
+                width: '100%', 
+                padding: 14, 
+                borderRadius: 10, 
+                border: validationErrors.email ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
+                fontSize: 15, 
+                marginTop: 2, 
+                outline: 'none', 
+                transition: 'border-color 0.2s', 
+                background: validationErrors.email ? '#fef2f2' : '#f8fafc' 
+              }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              onBlur={e => e.currentTarget.style.borderColor = validationErrors.email ? '#ef4444' : '#e5e7eb'}
             />
+            {validationErrors.email && (
+              <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {validationErrors.email}
+              </div>
+            )}
           </div>
           <div>
             <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Vai trò *</label>
@@ -226,14 +313,32 @@ export default function NewAccountPage() {
               value={formData.role}
               onChange={e => handleChange('role', e.target.value)}
               required
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, background: '#f8fafc', outline: 'none', transition: 'border-color 0.2s' }}
+              style={{ 
+                width: '100%', 
+                padding: 14, 
+                borderRadius: 10, 
+                border: validationErrors.role ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
+                fontSize: 15, 
+                marginTop: 2, 
+                background: validationErrors.role ? '#fef2f2' : '#f8fafc', 
+                outline: 'none', 
+                transition: 'border-color 0.2s' 
+              }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              onBlur={e => e.currentTarget.style.borderColor = validationErrors.role ? '#ef4444' : '#e5e7eb'}
             >
               <option value="admin">Quản trị viên</option>
               <option value="staff">Nhân viên</option>
               <option value="family">Gia đình</option>
             </select>
+            {validationErrors.role && (
+              <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {validationErrors.role}
+              </div>
+            )}
           </div>
           {/* Nếu là gia đình thì chọn cư dân */}
           {formData.role === "family" && (
@@ -241,15 +346,38 @@ export default function NewAccountPage() {
               <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chọn cư dân thuộc tài khoản này *</label>
               <select
                 value={selectedResidentId}
-                onChange={e => setSelectedResidentId(e.target.value)}
+                onChange={e => {
+                  setSelectedResidentId(e.target.value);
+                  if (validationErrors.resident) {
+                    setValidationErrors(prev => ({ ...prev, resident: "" }));
+                  }
+                }}
                 required
-                style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, background: '#f8fafc', outline: 'none', transition: 'border-color 0.2s' }}
+                style={{ 
+                  width: '100%', 
+                  padding: 14, 
+                  borderRadius: 10, 
+                  border: validationErrors.resident ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
+                  fontSize: 15, 
+                  marginTop: 2, 
+                  background: validationErrors.resident ? '#fef2f2' : '#f8fafc', 
+                  outline: 'none', 
+                  transition: 'border-color 0.2s' 
+                }}
               >
                 <option value="">-- Chọn cư dân --</option>
                 {residents.map(r => (
                   <option key={r._id} value={r._id}>{r.full_name} ({formatDate(r.date_of_birth)})</option>
                 ))}
               </select>
+              {validationErrors.resident && (
+                <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  {validationErrors.resident}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -4,7 +4,6 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { SparklesIcon } from "@heroicons/react/24/outline";
 import { ReactNode } from "react";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import SessionTimeoutModal from "@/components/SessionTimeoutModal";
@@ -14,7 +13,6 @@ interface ClientLayoutProps {
 }
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
-  console.log('[ClientLayout] Mounted');
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
@@ -27,101 +25,29 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const shouldShowHeader = pathname !== "/setup";
   const shouldShowSidebar = true;
   
-  // Enhanced loading spinner with beautiful design
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
-      <div style={{ 
-        height: '100vh', 
-        display: 'flex', 
-        flexDirection: 'column',
-        justifyContent: 'center', 
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
         alignItems: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        position: 'relative',
-        overflow: 'hidden'
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        {/* Background decoration */}
         <div style={{
-          position: 'absolute',
-          top: '-50%',
-          left: '-50%',
-          width: '200%',
-          height: '200%',
-          background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-          animation: 'rotate 20s linear infinite'
-        }} />
-        
-        <div style={{
-          position: 'relative',
-          zIndex: 1,
-          textAlign: 'center'
+          color: 'white',
+          fontSize: '1.125rem',
+          fontWeight: 500
         }}>
-          {/* Logo */}
-          <div style={{
-            width: '4rem',
-            height: '4rem',
-            background: 'rgba(255,255,255,0.2)',
-            borderRadius: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1rem auto',
-            border: '2px solid rgba(255,255,255,0.3)',
-            backdropFilter: 'blur(10px)'
-          }}>
-            <SparklesIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
-          </div>
-          
-          {/* App name */}
-          <h1 style={{
-            fontSize: '1.5rem',
-            fontWeight: 700,
-            color: 'white',
-            margin: '0 0 0.5rem 0',
-            letterSpacing: '-0.025em'
-          }}>
-            CareHome
-          </h1>
-          
-          <p style={{
-            fontSize: '1rem',
-            color: 'rgba(255,255,255,0.8)',
-            margin: '0 0 2rem 0',
-            fontWeight: 500
-          }}>
-            Đang tải hệ thống...
-          </p>
-          
-          {/* Spinner */}
-          <div style={{
-            width: '3rem',
-            height: '3rem',
-            border: '4px solid rgba(255,255,255,0.3)',
-            borderTopColor: 'white',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto'
-          }} />
+          Đang tải...
         </div>
-        
-        <style jsx>{`
-          @keyframes spin {
-            to {
-              transform: rotate(360deg);
-            }
-          }
-          @keyframes rotate {
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
       </div>
     );
   }
   
-  // For login page, or when user is not authenticated
-  if (isLoginPage || !user || isPaymentSpecialPage) {
+  // For login page, or when user is not authenticated (and not loading)
+  if (isLoginPage || (!user && !loading) || isPaymentSpecialPage) {
     return (
       <div style={{
         minHeight: '100vh',
