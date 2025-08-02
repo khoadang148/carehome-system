@@ -130,7 +130,7 @@ export default function PaymentSuccessPage() {
         <div className="redirecting">Đang chuyển hướng...</div>
         <button
           className="back-btn"
-          onClick={() => router.push("/finance")}
+          onClick={() => router.push("/family/finance")}
         >
           Xem hóa đơn
         </button>

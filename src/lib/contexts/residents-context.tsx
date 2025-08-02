@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { residentAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from './auth-context';
 
 // Define types for resident data
@@ -78,12 +78,45 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
         // Fetch room number for this resident
         let roomNumber = 'N/A';
         try {
-          const assignments = await carePlansAPI.getByResidentId(resident._id || resident.id);
-          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-          const roomId = assignment?.assigned_room_id;
-          if (roomId) {
-            const room = await roomsAPI.getById(roomId);
-            roomNumber = room?.room_number || 'N/A';
+          const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id || resident.id);
+          console.log(`Care plan assignments for resident ${resident._id}:`, assignments);
+          
+          if (Array.isArray(assignments) && assignments.length > 0) {
+            // Find the most recent active assignment
+            const activeAssignment = assignments.find((a: any) => 
+              a.status === 'active' || a.status === 'room_assigned' || a.status === 'payment_completed'
+            ) || assignments[0]; // Fallback to first assignment if no active one
+            
+            console.log(`Selected assignment for resident ${resident._id}:`, activeAssignment);
+            
+            // Check if assignment has room information
+            if (activeAssignment?.assigned_room_id) {
+              const roomData = activeAssignment.assigned_room_id;
+              
+              // If roomData is already populated (has room_number), use it directly
+              if (typeof roomData === 'object' && roomData?.room_number) {
+                roomNumber = roomData.room_number;
+                console.log(`Found room number from populated data: ${roomNumber}`);
+              } else {
+                // If roomData is just an ID, fetch the room details
+                const roomId = typeof roomData === 'string' ? roomData : 
+                              typeof roomData === 'object' && roomData?._id ? roomData._id :
+                              String(roomData);
+                
+                if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
+                  console.log(`Fetching room details for ID: ${roomId}`);
+                  const room = await roomsAPI.getById(roomId);
+                  roomNumber = room?.room_number || 'N/A';
+                  console.log(`Fetched room number: ${roomNumber}`);
+                } else {
+                  console.warn(`Invalid room ID: ${roomId}`);
+                }
+              }
+            } else {
+              console.log(`No room assigned for resident ${resident._id}`);
+            }
+          } else {
+            console.log(`No care plan assignments found for resident ${resident._id}`);
           }
         } catch (error) {
           console.error(`Error fetching room for resident ${resident._id}:`, error);

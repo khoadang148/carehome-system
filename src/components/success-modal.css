@@ -1,0 +1,113 @@
+/* Success Modal Styles */
+.success-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 41, 59, 0.25);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.success-modal-content {
+  background: linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%);
+  border-radius: 24px;
+  padding: 2.5rem 2.5rem 2rem 2.5rem;
+  min-width: 340px;
+  box-shadow: 0 8px 40px 0 rgba(16, 185, 129, 0.18), 0 2px 8px 0 rgba(0, 0, 0, 0.08);
+  text-align: center;
+  position: relative;
+  animation: zoomIn 0.2s ease-out;
+}
+
+.checkmark-container {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.checkmark-svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.checkmark-path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: checkmark 0.3s cubic-bezier(0.77, 0, 0.18, 1) forwards;
+  animation-delay: 0.1s;
+}
+
+.success-title {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  color: #166534;
+  letter-spacing: -0.01em;
+}
+
+.success-message {
+  font-size: 18px;
+  color: #166534;
+  margin-bottom: 28px;
+  font-weight: 500;
+}
+
+.success-close-btn {
+  background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 2.2rem;
+  font-weight: 700;
+  font-size: 17px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.12);
+  transition: all 0.2s ease;
+}
+
+.success-close-btn:hover {
+  background: linear-gradient(90deg, #16a34a 0%, #15803d 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+}
+
+.success-close-btn:active {
+  transform: translateY(0);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes checkmark {
+  from {
+    stroke-dashoffset: 40;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+} 

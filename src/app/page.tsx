@@ -2,44 +2,37 @@
 
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        // Nếu chưa đăng nhập, redirect đến trang đăng nhập
-        router.replace('/login');
+        // Nếu chưa đăng nhập và không phải đang ở trang login, redirect đến trang đăng nhập
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
       } else {
         // Nếu đã đăng nhập, redirect dựa trên role
         if (user.role === 'family') {
-          router.replace('/family');
+          router.push('/family');
         } else if (user.role === 'admin') {
-          router.replace('/admin');
+          router.push('/admin');
         } else if (user.role === 'staff') {
-          router.replace('/staff');
+          router.push('/staff');
         } else {
           // Fallback cho các role khác
-          router.replace('/login');
+          router.push('/login');
         }
       }
     }
-  }, [user, loading, router]);
+  }, [user, router, pathname]);
   
-  // Hiển thị loading hoặc null trong khi redirect
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
+ 
   
   return null;
 }

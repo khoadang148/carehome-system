@@ -39,6 +39,21 @@ export default function StaffManagementPage() {
   const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // Thêm state cho modal sửa
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    position: '',
+    qualification: '',
+    status: 'active',
+    notes: ''
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+
 
 
   // Lấy danh sách nhân viên
@@ -82,6 +97,72 @@ export default function StaffManagementPage() {
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setDeleteId(null);
+  };
+
+  // Xử lý sửa nhân viên
+  const handleEdit = (staff: any) => {
+    setEditingStaff(staff);
+    setEditForm({
+      full_name: staff.full_name || '',
+      email: staff.email || '',
+      phone: staff.phone || '',
+      position: staff.position || '',
+      qualification: staff.qualification || '',
+      status: staff.status || 'active',
+      notes: staff.notes || ''
+    });
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+
+    setEditLoading(true);
+    setEditError('');
+
+    try {
+      await staffAPI.update(editingStaff._id, editForm);
+      
+      // Cập nhật danh sách
+      setStaffList(prev => prev.map(staff => 
+        staff._id === editingStaff._id 
+          ? { ...staff, ...editForm }
+          : staff
+      ));
+      
+      setShowEditModal(false);
+      setEditingStaff(null);
+      setEditForm({
+        full_name: '',
+        email: '',
+        phone: '',
+        position: '',
+        qualification: '',
+        status: 'active',
+        notes: ''
+      });
+    } catch (err: any) {
+      setEditError(err?.message || 'Có lỗi xảy ra khi cập nhật thông tin nhân viên');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setShowEditModal(false);
+    setEditingStaff(null);
+    setEditForm({
+      full_name: '',
+      email: '',
+      phone: '',
+      position: '',
+      qualification: '',
+      status: 'active',
+      notes: ''
+    });
+    setEditError('');
   };
 
   // Xử lý redirect trực tiếp trong render thay vì useEffect
@@ -178,6 +259,39 @@ export default function StaffManagementPage() {
                   Tổng số: {filteredStaff.length} nhân viên
                 </p>
               </div>
+            </div>
+            <div>
+              <Link href="/admin/staff-management/add">
+                <button style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                }}
+                >
+                  <PlusCircleIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                  Thêm nhân viên
+                </button>
+              </Link>
             </div>
             
           </div>
@@ -393,6 +507,52 @@ export default function StaffManagementPage() {
                           }}
                         >
                           <EyeIcon style={{ width: '1rem', height: '1rem' }} />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(staff)}
+                          title="Sửa thông tin"
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.375rem',
+                            border: 'none',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#10b981',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.background = '#10b981';
+                            e.currentTarget.style.color = 'white';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                            e.currentTarget.style.color = '#10b981';
+                          }}
+                        >
+                          <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(staff._id)}
+                          title="Xóa nhân viên"
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.375rem',
+                            border: 'none',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.background = '#ef4444';
+                            e.currentTarget.style.color = 'white';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                            e.currentTarget.style.color = '#ef4444';
+                          }}
+                        >
+                          <TrashIcon style={{ width: '1rem', height: '1rem' }} />
                         </button>
                       </div>
                     </td>
@@ -713,6 +873,356 @@ export default function StaffManagementPage() {
               }}>
                 
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal sửa nhân viên */}
+        {showEditModal && editingStaff && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15,23,42,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(12px)',
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1.5rem',
+              padding: '2rem',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 32px 80px -12px rgba(15,23,42,0.3), 0 0 0 1px rgba(226,232,240,0.5)',
+              position: 'relative',
+              border: '1px solid rgba(226,232,240,0.5)'
+            }}>
+              {/* Header */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1.5rem',
+                paddingBottom: '1rem',
+                borderBottom: '1px solid rgba(226,232,240,0.6)'
+              }}>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  margin: 0
+                }}>
+                  Sửa thông tin nhân viên
+                </h2>
+                <button
+                  onClick={cancelEdit}
+                  style={{
+                    background: 'linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    boxShadow: '0 4px 12px rgba(100,116,139,0.15)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={e => { 
+                    e.currentTarget.style.background = 'linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseOut={e => { 
+                    e.currentTarget.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {editError && (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.1)',
+                    border: '1px solid rgba(239,68,68,0.2)',
+                    borderRadius: '0.5rem',
+                    padding: '0.75rem',
+                    color: '#dc2626',
+                    fontSize: '0.875rem'
+                  }}>
+                    {editError}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Họ và tên <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.full_name}
+                      onChange={e => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Email <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={editForm.email}
+                      onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Số điện thoại
+                    </label>
+                    <input
+                      type="tel"
+                      value={editForm.phone}
+                      onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Vị trí
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.position}
+                      onChange={e => setEditForm(prev => ({ ...prev, position: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Bằng cấp
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.qualification}
+                      onChange={e => setEditForm(prev => ({ ...prev, qualification: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Trạng thái
+                    </label>
+                    <select
+                      value={editForm.status}
+                      onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        background: 'white'
+                      }}
+                    >
+                      <option value="active">Đang làm việc</option>
+                      <option value="inactive">Nghỉ việc</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Ghi chú
+                  </label>
+                  <textarea
+                    value={editForm.notes}
+                    onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      fontSize: '0.875rem',
+                      background: 'white',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                {/* Action buttons */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid rgba(226,232,240,0.6)'
+                }}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = '#f9fafb';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = 'white';
+                    }}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editLoading}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      background: editLoading ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      cursor: editLoading ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseOver={e => {
+                      if (!editLoading) {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                      }
+                    }}
+                    onMouseOut={e => {
+                      if (!editLoading) {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                      }
+                    }}
+                  >
+                    {editLoading ? (
+                      <>
+                        <div style={{
+                          width: '1rem',
+                          height: '1rem',
+                          border: '2px solid transparent',
+                          borderTop: '2px solid white',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Đang cập nhật...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                        Cập nhật
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

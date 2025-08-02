@@ -32,7 +32,7 @@ export default function NewStaffAssignmentPage() {
     resident_ids: [] as string[],
     end_date: '',
     notes: '',
-    responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
+    responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'] as string[],
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -56,22 +56,36 @@ export default function NewStaffAssignmentPage() {
         const [staffData, residentsData, assignmentsData] = await Promise.all([
           staffAPI.getAll(),
           residentAPI.getAll(),
-          staffAssignmentsAPI.getAll(),
+          staffAssignmentsAPI.getAllIncludingExpired(),
         ]);
         
-        setStaffList(Array.isArray(staffData) ? staffData : []);
+        // Chỉ lấy những user có role staff
+        const staffOnly = Array.isArray(staffData) ? staffData.filter((staff: any) => staff.role === 'staff') : [];
+        console.log('All users:', staffData);
+        console.log('Staff only:', staffOnly);
+        setStaffList(staffOnly);
         setResidents(Array.isArray(residentsData) ? residentsData : []);
         setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
+        
+        // Debug: Log assignments data
+        console.log('Loaded assignments:', assignmentsData);
+        console.log('Assignments count:', Array.isArray(assignmentsData) ? assignmentsData.length : 0);
         
         // Lấy số phòng cho từng resident
         const residentsArray = Array.isArray(residentsData) ? residentsData : [];
         residentsArray.forEach(async (resident: any) => {
           try {
-            const assignments = await carePlansAPI.getByResidentId(resident._id);
+            // Đảm bảo resident._id là string
+            const residentId = typeof resident._id === 'object' && (resident._id as any)?._id 
+              ? (resident._id as any)._id 
+              : resident._id;
+            const assignments = await carePlansAPI.getByResidentId(residentId);
             const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
             const roomId = assignment?.assigned_room_id;
-            if (roomId) {
-              const room = await roomsAPI.getById(roomId);
+            // Đảm bảo roomId là string, không phải object
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
               setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa cập nhật' }));
             } else {
               setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa cập nhật' }));
@@ -100,19 +114,82 @@ export default function NewStaffAssignmentPage() {
       return;
     }
 
+    // Kiểm tra ngày kết thúc không được ở quá khứ
+    if (formData.end_date && formData.end_date.trim() !== '') {
+      const endDate = new Date(formData.end_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time về 00:00:00
+      
+      if (endDate < today) {
+        alert('Ngày kết thúc phân công không được ở quá khứ. Vui lòng chọn ngày từ hôm nay trở đi.');
+        return;
+      }
+    }
+
+    // Validate staff_id and resident_ids are valid ObjectIds
+    if (!formData.staff_id.match(/^[0-9a-fA-F]{24}$/)) {
+      alert('ID nhân viên không hợp lệ');
+      return;
+    }
+
+    for (const residentId of formData.resident_ids) {
+      if (!residentId.match(/^[0-9a-fA-F]{24}$/)) {
+        alert('ID cư dân không hợp lệ');
+        return;
+      }
+    }
+
+    // Kiểm tra xem có assignment active nào đã tồn tại không (chỉ chặn assignment active, cho phép expired)
+    const existingActiveAssignments: string[] = [];
+    for (const residentId of formData.resident_ids) {
+      const existingAssignment = assignments.find(assignment => {
+        const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+        const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
+        return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
+      });
+      
+      // Chỉ chặn nếu assignment đang active
+      if (existingAssignment && existingAssignment.status === 'active') {
+        const resident = residents.find(r => r._id === residentId);
+        existingActiveAssignments.push(resident?.full_name || residentId.toString());
+      }
+    }
+
+    if (existingActiveAssignments.length > 0) {
+      alert(`Các cư dân sau đã được phân công cho nhân viên này rồi: ${existingActiveAssignments.join(', ')}. Vui lòng bỏ chọn các cư dân này hoặc chọn nhân viên khác.`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Tạo nhiều assignment cho từng resident
       const newAssignments = await Promise.all(
-        formData.resident_ids.map(residentId => 
-          staffAssignmentsAPI.create({
+        formData.resident_ids.map(residentId => {
+          const assignmentData: any = {
             staff_id: formData.staff_id,
             resident_id: residentId,
-            end_date: formData.end_date || undefined,
-            notes: formData.notes,
-            responsibilities: formData.responsibilities,
-          })
-        )
+            responsibilities: formData.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
+          };
+          
+          // Chỉ thêm end_date nếu có giá trị
+          if (formData.end_date && formData.end_date.trim() !== '') {
+            // Ensure the date is in ISO format
+            const date = new Date(formData.end_date);
+            if (!isNaN(date.getTime())) {
+              assignmentData.end_date = date.toISOString();
+            }
+          }
+          
+          // Chỉ thêm notes nếu có giá trị
+          if (formData.notes && formData.notes.trim() !== '') {
+            assignmentData.notes = formData.notes;
+          }
+          
+          // Debug: Log the data being sent
+          console.log('Creating staff assignment with data:', assignmentData);
+          
+          return staffAssignmentsAPI.create(assignmentData);
+        })
       );
       
       // Hiển thị modal thành công
@@ -120,10 +197,45 @@ export default function NewStaffAssignmentPage() {
         count: newAssignments.length,
         staff: selectedStaff,
         residents: selectedResidents,
+        hasExpiredUpdates: formData.resident_ids.some(residentId => {
+          const assignment = assignments.find(a => {
+            const assignmentResidentId = a.resident_id._id || a.resident_id;
+            const assignmentStaffId = a.staff_id._id || a.staff_id;
+            return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
+          });
+          return assignment && assignment.status === 'expired';
+        }),
       });
       setShowSuccessModal(true);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Không thể tạo phân công. Vui lòng thử lại.';
+      console.error('Error creating staff assignment:', err);
+      let errorMessage = 'Không thể tạo phân công. Vui lòng thử lại.';
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Check for duplicate key error and provide a more helpful message
+      if (err.message && err.message.includes('E11000 duplicate key error')) {
+        errorMessage = 'Cư dân này đã được phân công cho nhân viên này rồi. Nếu assignment đã hết hạn, bạn có thể phân công lại. Vui lòng kiểm tra lại danh sách phân công.';
+        
+        // Refresh assignments data to show current state
+        try {
+          const refreshedAssignments = await staffAssignmentsAPI.getAllIncludingExpired();
+          setAssignments(Array.isArray(refreshedAssignments) ? refreshedAssignments : []);
+          console.log('Refreshed assignments after duplicate error:', refreshedAssignments);
+          
+          // Clear selected residents to prevent further errors
+          setFormData(prev => ({ ...prev, resident_ids: [] }));
+        } catch (refreshError) {
+          console.error('Error refreshing assignments:', refreshError);
+        }
+      }
+      
       alert(errorMessage);
     } finally {
       setSubmitting(false);
@@ -147,17 +259,107 @@ export default function NewStaffAssignmentPage() {
     });
   };
 
-  // Get available residents (not assigned to any staff)
+  // Get available residents (not assigned to any staff OR only expired assignments)
   const getAvailableResidents = () => {
     return residents.filter(resident => {
-      // Ẩn những resident đã được phân công cho bất kỳ staff nào (bao gồm cả staff hiện tại)
-      const isAssignedToAnyStaff = assignments.some(
-        assignment => 
-          assignment.resident_id._id === resident._id && 
-          assignment.status === 'active'
-      );
-      return !isAssignedToAnyStaff;
+      // Tìm tất cả assignments cho resident này với staff được chọn
+      const selectedStaffId = formData.staff_id;
+      if (!selectedStaffId) {
+        // Nếu chưa chọn staff, kiểm tra tất cả assignment của resident
+        const residentAssignments = assignments.filter(assignment => {
+          const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+          const residentId = resident._id;
+          return assignmentResidentId === residentId;
+        });
+        
+        // Debug: Log assignment details
+        console.log(`Resident ${resident.full_name} (${resident._id}) assignments:`, residentAssignments);
+        
+        // Nếu không có assignment nào -> có thể phân công
+        if (residentAssignments.length === 0) {
+          console.log(`Resident ${resident.full_name} - No assignments, can be assigned`);
+          return true;
+        }
+        
+        // Nếu có assignment active -> không thể phân công
+        const hasActiveAssignment = residentAssignments.some(assignment => assignment.status === 'active');
+        if (hasActiveAssignment) {
+          console.log(`Resident ${resident.full_name} - Has active assignment, cannot be assigned`);
+          return false;
+        }
+        
+        // Nếu chỉ có assignment expired -> có thể phân công lại
+        const hasOnlyExpiredAssignments = residentAssignments.every(assignment => assignment.status === 'expired');
+        if (hasOnlyExpiredAssignments) {
+          console.log(`Resident ${resident.full_name} - Has only expired assignments, can be reassigned`);
+          return true;
+        }
+        
+        // Trường hợp khác -> không thể phân công
+        console.log(`Resident ${resident.full_name} - Other case, cannot be assigned`);
+        return false;
+      } else {
+        // Nếu đã chọn staff, kiểm tra assignment cụ thể với staff này
+        const specificAssignment = assignments.find(assignment => {
+          const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+          const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
+          const residentId = resident._id;
+          return assignmentResidentId === residentId && assignmentStaffId === selectedStaffId;
+        });
+        
+        // Debug: Log specific assignment
+        console.log(`Resident ${resident.full_name} with staff ${selectedStaffId}:`, specificAssignment);
+        
+        // Nếu không có assignment với staff này -> có thể phân công
+        if (!specificAssignment) {
+          console.log(`Resident ${resident.full_name} - No assignment with selected staff, can be assigned`);
+          return true;
+        }
+        
+        // Nếu có assignment active với staff này -> không thể phân công
+        if (specificAssignment.status === 'active') {
+          console.log(`Resident ${resident.full_name} - Has active assignment with selected staff, cannot be assigned`);
+          return false;
+        }
+        
+        // Nếu có assignment expired với staff này -> có thể phân công lại
+        if (specificAssignment.status === 'expired') {
+          console.log(`Resident ${resident.full_name} - Has expired assignment with selected staff, can be reassigned`);
+          return true;
+        }
+        
+        // Nếu có assignment với status khác -> có thể phân công lại
+        console.log(`Resident ${resident.full_name} - Has assignment with status ${specificAssignment.status}, can be reassigned`);
+        return true;
+        
+        // Trường hợp khác -> không thể phân công
+        console.log(`Resident ${resident.full_name} - Other case, cannot be assigned`);
+        return false;
+      }
     });
+  };
+
+  // Helper function to check if resident has expired assignments
+  const hasExpiredAssignments = (residentId: string) => {
+    const residentAssignments = assignments.filter(assignment => {
+      const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+      return assignmentResidentId === residentId;
+    });
+    
+    return residentAssignments.length > 0 && residentAssignments.every(assignment => assignment.status === 'expired');
+  };
+
+  // Helper function to get assignment status for a resident with selected staff
+  const getAssignmentStatus = (residentId: string) => {
+    if (!formData.staff_id) return null;
+    
+    const assignment = assignments.find(assignment => {
+      const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+      const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
+      return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
+    });
+    
+    return assignment ? assignment.status : null;
   };
 
   // Get filtered residents based on search term
@@ -178,6 +380,21 @@ export default function NewStaffAssignmentPage() {
   const selectedResidents = residents.filter(resident => 
     formData.resident_ids.includes(resident._id)
   );
+
+  // Check if form is valid
+  const isFormValid = () => {
+    if (!formData.staff_id || formData.resident_ids.length === 0) return false;
+    
+    // Check if end date is in the past
+    if (formData.end_date && formData.end_date.trim() !== '') {
+      const endDate = new Date(formData.end_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (endDate < today) return false;
+    }
+    
+    return true;
+  };
 
   if (loading) {
     return (
@@ -203,45 +420,198 @@ export default function NewStaffAssignmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
-      <div className="bg-white shadow-lg border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
+    <>
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        position: 'relative'
+      }}>
+      {/* Background decorations */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(139, 92, 246, 0.03) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none'
+      }} />
+      
+      <div style={{
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Header Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <Link
                 href="/admin/staff-assignments"
-                className="mr-4 p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
+                style={{
+                  padding: '0.5rem',
+                  color: '#6b7280',
+                  borderRadius: '0.5rem',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.color = '#374151';
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                <ArrowLeftIcon className="w-6 h-6" />
+                <ArrowLeftIcon style={{ width: '1.5rem', height: '1.5rem' }} />
               </Link>
+              <div style={{
+                width: '3.5rem',
+                height: '3.5rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              }}>
+                <UserPlusIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                <h1 style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
                   Tạo phân công mới
                 </h1>
-                <p className="text-sm text-gray-500 mt-1">Phân công nhân viên phụ trách cư dân</p>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Phân công nhân viên phụ trách cư dân 
+                  ({getAvailableResidents().length} cư dân khả dụng, 
+                  {getAvailableResidents().filter(r => hasExpiredAssignments(r._id)).length} có thể phân công lại)
+                </p>
               </div>
             </div>
-            <div className="flex space-x-3">
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
                 onClick={resetForm}
-                className="px-6 py-3 text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all duration-200 hover:shadow-md font-medium"
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: 'white'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#9ca3af';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
                 Làm mới
               </button>
               <button
                 onClick={handleCreate}
-                disabled={submitting || !formData.staff_id || formData.resident_ids.length === 0}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
+                disabled={submitting || !isFormValid()}
+                style={{
+                  padding: '0.75rem 2rem',
+                  background: submitting || !isFormValid() 
+                    ? '#9ca3af' 
+                    : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: submitting || !isFormValid() ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: submitting || !isFormValid() 
+                    ? 'none' 
+                    : '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  opacity: submitting || !isFormValid() ? 0.6 : 1
+                }}
+                onMouseOver={e => {
+                  if (!submitting && isFormValid()) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                  }
+                }}
+                onMouseOut={e => {
+                  if (!submitting && isFormValid()) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                  }
+                }}
               >
                 {submitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                    <div style={{
+                      width: '1.25rem',
+                      height: '1.25rem',
+                      border: '2px solid transparent',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }}></div>
                     Đang tạo...
                   </>
                 ) : (
                   <>
-                    <UserPlusIcon className="w-5 h-5 mr-3" />
+                    <UserPlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
                     Tạo phân công
                   </>
                 )}
@@ -249,7 +619,6 @@ export default function NewStaffAssignmentPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Error Message */}
       {error && (
@@ -352,6 +721,13 @@ export default function NewStaffAssignmentPage() {
                             <div
                               key={resident._id}
                               onClick={() => {
+                                // Không cho phép chọn resident đã có assignment active với staff được chọn
+                                if (formData.staff_id && getAssignmentStatus(resident._id) === 'active') {
+                                  alert(`Cư dân ${resident.full_name} đã được phân công cho nhân viên này rồi. Vui lòng chọn cư dân khác hoặc nhân viên khác.`);
+                                  return;
+                                }
+                                
+                                // Cho phép chọn resident có assignment expired (có thể phân công lại)
                                 if (isSelected) {
                                   setFormData({
                                     ...formData,
@@ -392,6 +768,21 @@ export default function NewStaffAssignmentPage() {
                                     <p className={`text-sm ${isSelected ? 'text-green-700' : 'text-gray-500'}`}>
                                       Phòng: {roomNumbers[resident._id] || 'Chưa cập nhật'}
                                     </p>
+                                    {formData.staff_id && getAssignmentStatus(resident._id) === 'active' && (
+                                      <p className="text-xs text-red-600 font-medium mt-1">
+                                        ⚠️ Đã được phân công cho nhân viên này
+                                      </p>
+                                    )}
+                                    {formData.staff_id && getAssignmentStatus(resident._id) === 'expired' && (
+                                      <p className="text-xs text-orange-600 font-medium mt-1">
+                                        🔄 Có thể phân công lại (đã hết hạn)
+                                      </p>
+                                    )}
+                                    {!formData.staff_id && hasExpiredAssignments(resident._id) && (
+                                      <p className="text-xs text-orange-600 font-medium mt-1">
+                                        🔄 Có thể phân công lại
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                                 <div className={`
@@ -422,7 +813,7 @@ export default function NewStaffAssignmentPage() {
                                 <UserPlusIcon className="w-8 h-8 text-gray-400" />
                               </div>
                               <p className="text-lg font-medium mb-2">Không có cư dân nào khả dụng</p>
-                              <p className="text-sm">Tất cả cư dân đã được phân công cho nhân viên khác</p>
+                              <p className="text-sm">Tất cả cư dân đã được phân công hoặc chưa có assignment expired</p>
                             </>
                           )}
                         </div>
@@ -455,14 +846,21 @@ export default function NewStaffAssignmentPage() {
                       type="date"
                       value={formData.end_date}
                       onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]} // Không cho chọn ngày quá khứ
                       className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:outline-none transition-all duration-200 text-lg"
                     />
                     <p className="text-sm text-gray-500 mt-2 flex items-center">
                       <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Để trống nếu không có ngày kết thúc cụ thể
+                      Để trống nếu không có ngày kết thúc cụ thể. Ngày kết thúc phải từ hôm nay trở đi.
                     </p>
+                    {formData.end_date && new Date(formData.end_date) < new Date(new Date().setHours(0, 0, 0, 0)) && (
+                      <p className="text-sm text-red-600 mt-2 flex items-center">
+                        <ExclamationTriangleIcon className="w-4 h-4 mr-2" />
+                        Ngày kết thúc không được ở quá khứ!
+                      </p>
+                    )}
                   </div>
 
                   {/* Notes */}
@@ -621,6 +1019,7 @@ export default function NewStaffAssignmentPage() {
           </div>
         )}
       </div>
+    </div>
 
       {/* Success Modal */}
       {showSuccessModal && successData && (
@@ -634,7 +1033,7 @@ export default function NewStaffAssignmentPage() {
               
               {/* Success Title */}
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Tạo phân công thành công!
+                {successData.hasExpiredUpdates ? 'Cập nhật phân công thành công!' : 'Tạo phân công thành công!'}
               </h2>
               
               {/* Success Details */}
@@ -657,7 +1056,10 @@ export default function NewStaffAssignmentPage() {
               
               {/* Success Message */}
               <p className="text-gray-600 mb-8">
-                Phân công đã được tạo thành công và nhân viên có thể bắt đầu thực hiện trách nhiệm của mình.
+                {successData.hasExpiredUpdates 
+                  ? 'Phân công đã được cập nhật thành công từ trạng thái hết hạn và nhân viên có thể bắt đầu thực hiện trách nhiệm của mình.'
+                  : 'Phân công đã được tạo thành công và nhân viên có thể bắt đầu thực hiện trách nhiệm của mình.'
+                }
               </p>
               
               {/* Action Buttons */}
@@ -674,5 +1076,6 @@ export default function NewStaffAssignmentPage() {
         </div>
       )}
     </div>
+    </>
   );
 } 

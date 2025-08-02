@@ -13,7 +13,6 @@ export { default as CareNotesDisplay } from './staff/CareNotesDisplay';
 
 // Family Components
 export { default as FamilyDashboardWidgets } from './family/FamilyDashboardWidgets';
-export { default as FamilyFinance } from './family/FamilyFinance';
 
 // Shared Components
 export { default as VitalSignsMonitor } from './shared/VitalSignsMonitor';

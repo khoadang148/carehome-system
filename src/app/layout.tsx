@@ -5,6 +5,7 @@ import ClientLayout from "@/components/layout/ClientLayout";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ResidentsProvider } from "@/lib/contexts/residents-context";
 import { ActivitiesProvider } from "@/lib/contexts/activities-context";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,6 +33,7 @@ export default function RootLayout({
           <ResidentsProvider>
             <ActivitiesProvider>
               <ClientLayout>{children}</ClientLayout>
+              <ToastProvider />
             </ActivitiesProvider>
           </ResidentsProvider>
         </AuthProvider>

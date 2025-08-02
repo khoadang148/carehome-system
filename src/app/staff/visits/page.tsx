@@ -9,8 +9,6 @@ import {
   UserGroupIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  XCircleIcon,
-  EyeIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   ArrowLeftIcon,
@@ -54,8 +52,7 @@ export default function StaffVisitsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [timeStatusFilter, setTimeStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
+
 
   // Load visits data
   useEffect(() => {
@@ -127,7 +124,7 @@ export default function StaffVisitsPage() {
   const filteredVisits = visits
     .filter(visit => {
       const matchesSearch = 
-        visit.family_member_id.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (visit.family_member_id?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
         visit.purpose.toLowerCase().includes(searchTerm.toLowerCase()) ||
         visit.residents_name.some(name => name.toLowerCase().includes(searchTerm.toLowerCase()));
       
@@ -151,26 +148,7 @@ export default function StaffVisitsPage() {
       return createdB.getTime() - createdA.getTime();
     });
 
-  // Modal management
-  useEffect(() => {
-    if (showDetailModal) {
-      document.body.classList.add('hide-header');
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.classList.remove('hide-header');
-      document.body.style.overflow = 'unset';
-    }
-    
-    return () => {
-      document.body.classList.remove('hide-header');
-      document.body.style.overflow = 'unset';
-    };
-  }, [showDetailModal]);
 
-  const handleViewDetail = (visit: Visit) => {
-    setSelectedVisit(visit);
-    setShowDetailModal(true);
-  };
 
   if (loading) {
     return (
@@ -534,7 +512,7 @@ export default function StaffVisitsPage() {
                                 fontSize: '0.875rem',
                                 fontWeight: 600
                               }}>
-                                {visit.family_member_id.full_name.charAt(0)}
+                                {visit.family_member_id?.full_name?.charAt(0) || '?'}
                               </div>
                               <div>
                                 <div style={{
@@ -553,7 +531,7 @@ export default function StaffVisitsPage() {
                                   color: '#1f2937',
                                   margin: '0 0 0.25rem 0'
                                 }}>
-                                  {visit.family_member_id.full_name}
+                                  {visit.family_member_id?.full_name}
                                 </h3>
                                 <p style={{
                                   fontSize: '0.875rem',
@@ -564,7 +542,7 @@ export default function StaffVisitsPage() {
                                   gap: '0.25rem'
                                 }}>
                                   <UsersIcon style={{ width: '0.875rem', height: '0.875rem' }} />
-                                  Thăm: {visit.residents_name.join(', ')}
+                                  Thăm người thân: {visit.residents_name.join(', ')}
                                 </p>
                               </div>
                             </div>
@@ -587,25 +565,7 @@ export default function StaffVisitsPage() {
                               {statusConfig.label}
                             </span>
                             
-                            <button
-                              title="Xem chi tiết lịch thăm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetail(visit);
-                              }}
-                              style={{
-                                padding: '0.5rem',
-                                background: '#f3f4f6',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '0.5rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              <EyeIcon style={{ width: '1rem', height: '1rem', color: '#6b7280' }} />
-                            </button>
+
                           </div>
                         </div>
 
@@ -683,242 +643,7 @@ export default function StaffVisitsPage() {
         </div>
       </div>
 
-      {/* Detail Modal */}
-      {showDetailModal && selectedVisit && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.75)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            width: '100%',
-            maxWidth: '600px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '2rem 2rem 1rem 2rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  borderRadius: '0.75rem',
-                  padding: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-                }}>
-                  <EyeIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
-                </div>
-                <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  margin: 0
-                }}>
-                  Chi tiết lịch thăm
-                </h2>
-              </div>
-              <button
-                title="Đóng"
-                onClick={() => setShowDetailModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem'
-                }}
-              >
-                <XCircleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
-              </button>
-            </div>
 
-            {/* Modal Content */}
-            <div style={{ padding: '2rem' }}>
-              <div style={{ display: 'grid', gap: '1.5rem' }}>
-                {/* Visitor Info */}
-                <div style={{
-                  padding: '1.5rem',
-                  background: '#f8fafc',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                    <div style={{
-                      width: '3rem',
-                      height: '3rem',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontSize: '1rem',
-                      fontWeight: 600
-                    }}>
-                      {selectedVisit.family_member_id.full_name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1f2937', margin: 0 }}>
-                        {selectedVisit.family_member_id.full_name}
-                      </h3>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                        Người đặt lịch thăm
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    background: getStatusConfig(selectedVisit).bg,
-                    color: getStatusConfig(selectedVisit).color,
-                    border: `1px solid ${getStatusConfig(selectedVisit).border}`
-                  }}>
-                    {React.createElement(getStatusConfig(selectedVisit).icon, { 
-                      style: { width: '1rem', height: '1rem' } 
-                    })}
-                    {getStatusConfig(selectedVisit).label}
-                  </div>
-                </div>
-
-                {/* Visit Details */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '1rem'
-                }}>
-                  <div style={{
-                    padding: '1rem',
-                    background: 'white',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.5rem' }}>
-                      Ngày thăm
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#1f2937' }}>
-                      {format(new Date(selectedVisit.visit_date), 'EEEE, dd/MM/yyyy', { locale: vi })}
-                    </div>
-                  </div>
-
-                  <div style={{
-                    padding: '1rem',
-                    background: 'white',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.5rem' }}>
-                      Giờ thăm
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#1f2937' }}>
-                      {selectedVisit.visit_time}
-                    </div>
-                  </div>
-
-                  <div style={{
-                    padding: '1rem',
-                    background: 'white',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.5rem' }}>
-                      Thời gian
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#1f2937' }}>
-                      {selectedVisit.duration} phút
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Purpose */}
-                <div style={{
-                  padding: '1.5rem',
-                  background: '#fffbeb',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #fde68a'
-                }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400e', margin: '0 0 0.5rem 0' }}>
-                    Mục đích thăm
-                  </h4>
-                  <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0 }}>
-                    {selectedVisit.purpose}
-                  </p>
-                </div>
-
-                {/* Residents */}
-                <div style={{
-                  padding: '1.5rem',
-                  background: '#f0f9ff',
-                  borderRadius: '0.75rem',
-                  border: '1px solid #7dd3fc'
-                }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#0369a1', margin: '0 0 1rem 0' }}>
-                    Người được thăm ({selectedVisit.residents_name.length})
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {selectedVisit.residents_name.map((name, index) => (
-                      <span
-                        key={index}
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          background: '#0369a1',
-                          color: 'white',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 500
-                        }}
-                      >
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {selectedVisit.notes && (
-                  <div style={{
-                    padding: '1.5rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#374151', margin: '0 0 0.5rem 0' }}>
-                      Ghi chú
-                    </h4>
-                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                      {selectedVisit.notes}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 } 

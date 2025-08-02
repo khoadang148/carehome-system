@@ -44,6 +44,11 @@ export default function StaffAssignmentsPage() {
     responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
   });
 
+  // Simple edit form for end date only
+  const [simpleEditForm, setSimpleEditForm] = useState({
+    end_date: '',
+  });
+
   const [submitting, setSubmitting] = useState(false);
 
   // Check permissions
@@ -140,6 +145,38 @@ export default function StaffAssignmentsPage() {
     }
   };
 
+  // Handle simple update for end date only
+  const handleSimpleUpdate = async () => {
+    if (!selectedAssignment) return;
+
+    setSubmitting(true);
+    try {
+      const updatedAssignment = await staffAssignmentsAPI.update(selectedAssignment._id, {
+        end_date: simpleEditForm.end_date || undefined,
+      });
+      
+      setAssignments(prev => 
+        prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a)
+      );
+      setShowEditModal(false);
+      setSimpleEditForm({ end_date: '' });
+      setSelectedAssignment(null);
+      
+      // Show success message
+      setSuccessData({
+        type: 'update',
+        message: 'Cập nhật ngày kết thúc thành công!',
+        assignment: updatedAssignment,
+      });
+      setShowSuccessModal(true);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Không thể cập nhật ngày kết thúc. Vui lòng thử lại.';
+      alert(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Handle delete assignment
   const handleDelete = async () => {
     if (!selectedAssignment) return;
@@ -192,6 +229,15 @@ export default function StaffAssignmentsPage() {
       end_date: assignment.end_date ? new Date(assignment.end_date).toISOString().split('T')[0] : '',
       notes: assignment.notes || '',
       responsibilities: assignment.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
+    });
+    setShowEditModal(true);
+  };
+
+  // Open simple edit modal for end date only
+  const openSimpleEditModal = (assignment: any) => {
+    setSelectedAssignment(assignment);
+    setSimpleEditForm({
+      end_date: assignment.end_date ? new Date(assignment.end_date).toISOString().split('T')[0] : '',
     });
     setShowEditModal(true);
   };
@@ -286,51 +332,188 @@ export default function StaffAssignmentsPage() {
   const groupedAssignments = getGroupedAssignments();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
-      <div className="bg-white shadow-lg border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Quản lý phân công nhân viên
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">Quản lý tất cả phân công giữa nhân viên và cư dân</p>
+    <>
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        position: 'relative'
+      }}>
+      {/* Background decorations */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(139, 92, 246, 0.03) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none'
+      }} />
+      
+      <div style={{
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Header Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1.5rem',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{
+                width: '3.5rem',
+                height: '3.5rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              }}>
+                <UserGroupIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+              </div>
+              <div>
+                <h1 style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Quản lý phân công nhân viên
+                </h1>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Quản lý tất cả phân công giữa nhân viên và cư dân
+                </p>
+              </div>
             </div>
             <Link
               href="/admin/staff-assignments/new"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl flex items-center transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.75rem',
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                textDecoration: 'none'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+              }}
             >
-              <PlusIcon className="w-5 h-5 mr-3" />
+              <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
               Tạo phân công mới
             </Link>
           </div>
         </div>
-      </div>
 
       {/* Error Message */}
       {error && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-          <div className="bg-red-50 border-l-4 border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md">
-            <div className="flex items-center">
-              <ExclamationTriangleIcon className="w-5 h-5 mr-3" />
-              <p className="font-medium">{error}</p>
+        <div style={{
+          maxWidth: '1400px',
+          margin: '0 auto',
+          padding: '0 1.5rem',
+          marginTop: '1.5rem'
+        }}>
+          <div style={{
+            background: '#fef2f2',
+            borderLeft: '4px solid #f87171',
+            color: '#dc2626',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <ExclamationTriangleIcon style={{ width: '1.25rem', height: '1.25rem', marginRight: '0.75rem' }} />
+              <p style={{ fontWeight: 500, margin: 0 }}>{error}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div style={{
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '0 1.5rem 2rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
+      }}>
         {loadingData ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Đang tải dữ liệu...</p>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '16rem'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                border: '2px solid transparent',
+                borderTop: '2px solid #2563eb',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 1rem auto'
+              }}></div>
+              <p style={{ color: '#6b7280' }}>Đang tải dữ liệu...</p>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)'
+          }}>
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
@@ -509,15 +692,21 @@ export default function StaffAssignmentsPage() {
                                       </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                      <div className="flex items-center">
-                                         <button
-                                            onClick={() => openDeleteModal(assignment)}
-                                            className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                                            title="Xóa"
-                                          >
-                                            <TrashIcon className="w-4 h-4" />
-                                          </button>
-                                        
+                                      <div className="flex items-center space-x-2">
+                                        <button
+                                          onClick={() => openSimpleEditModal(assignment)}
+                                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                                          title="Chỉnh sửa ngày kết thúc"
+                                        >
+                                          <PencilIcon className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => openDeleteModal(assignment)}
+                                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                          title="Xóa"
+                                        >
+                                          <TrashIcon className="w-4 h-4" />
+                                        </button>
                                       </div>
                                     </td>
                                   </tr>
@@ -545,138 +734,66 @@ export default function StaffAssignmentsPage() {
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                   <PencilIcon className="w-5 h-5 text-blue-600" />
                 </div>
-                Chỉnh sửa Phân công
+                Chỉnh sửa ngày kết thúc
               </h2>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Nhân viên <span style={{color: '#ef4444'}}>*</span>
-                  </label>
-                  <select
-                    value={formData.staff_id}
-                    onChange={(e) => setFormData({ ...formData, staff_id: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '2px solid #e5e7eb',
-                      fontSize: '0.875rem',
-                      background: 'white',
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <option value="">Chọn nhân viên</option>
-                    {staffs.map((staff) => (
-                      <option key={staff._id} value={staff._id}>
-                        {staff.full_name} - {staff.email}
-                      </option>
-                    ))}
-                  </select>
+              
+              {/* Assignment Info */}
+              {selectedAssignment && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600">Nhân viên:</span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {selectedAssignment.staff_id?.full_name || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600">Cư dân:</span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {selectedAssignment.resident_id?.full_name || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600">Ngày phân công:</span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {formatDate(selectedAssignment.assigned_date)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4">
-                  <label style={{
-                    display: 'block',
+              )}
+
+              {/* End Date Input */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4">
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Ngày kết thúc <span style={{color: '#ef4444'}}>*</span>
+                </label>
+                <input
+                  type="date"
+                  value={simpleEditForm.end_date}
+                  onChange={(e) => setSimpleEditForm({ ...simpleEditForm, end_date: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '2px solid #e5e7eb',
                     fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Cư dân <span style={{color: '#ef4444'}}>*</span>
-                  </label>
-                  <select
-                    value={formData.resident_ids[0] || ''}
-                    onChange={(e) => setFormData({ ...formData, resident_ids: [e.target.value] })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '2px solid #e5e7eb',
-                      fontSize: '0.875rem',
-                      background: 'white',
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <option value="">Chọn cư dân</option>
-                    {residents
-                      .filter(resident => {
-                        // Ẩn những resident đã được phân công cho bất kỳ staff nào
-                        const isAssignedToAnyStaff = assignments.some(
-                          assignment => 
-                            assignment.resident_id._id === resident._id && 
-                            assignment.status === 'active'
-                        );
-                        return !isAssignedToAnyStaff;
-                      })
-                      .map((resident) => (
-                        <option key={resident._id} value={resident._id}>
-                          {resident.full_name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4">
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ngày kết thúc
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '2px solid #e5e7eb',
-                      fontSize: '0.875rem',
-                      background: 'white',
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                  />
-                </div>
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4">
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ghi chú
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '2px solid #e5e7eb',
-                      fontSize: '0.875rem',
-                      background: 'white',
-                      resize: 'vertical',
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                    placeholder="📝 Ghi chú về phân công..."
-                  />
-                </div>
+                    background: 'white',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Để trống nếu không muốn đặt ngày kết thúc
+                </p>
               </div>
+
               <div style={{
                 display: 'flex',
                 justifyContent: 'flex-end',
@@ -686,7 +803,8 @@ export default function StaffAssignmentsPage() {
                 <button
                   onClick={() => {
                     setShowEditModal(false);
-                    resetForm();
+                    setSimpleEditForm({ end_date: '' });
+                    setSelectedAssignment(null);
                   }}
                   style={{
                     padding: '0.75rem 1.5rem',
@@ -704,7 +822,7 @@ export default function StaffAssignmentsPage() {
                   Hủy
                 </button>
                 <button
-                  onClick={handleUpdate}
+                  onClick={handleSimpleUpdate}
                   disabled={submitting}
                   style={{
                     padding: '0.75rem 1.5rem',
@@ -733,7 +851,7 @@ export default function StaffAssignmentsPage() {
                       Đang cập nhật...
                     </div>
                   ) : (
-                    'Cập nhật'
+                    'Cập nhật ngày kết thúc'
                   )}
                 </button>
               </div>
@@ -838,5 +956,7 @@ export default function StaffAssignmentsPage() {
         </div>
       )}
     </div>
+    </div>
+    </>
   );
 } 

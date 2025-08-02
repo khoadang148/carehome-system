@@ -25,26 +25,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const shouldShowHeader = pathname !== "/setup";
   const shouldShowSidebar = true;
   
-  // Show loading spinner while checking authentication
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-      }}>
-        <div style={{
-          color: 'white',
-          fontSize: '1.125rem',
-          fontWeight: 500
-        }}>
-          Đang tải...
-        </div>
-      </div>
-    );
-  }
   
   // For login page, or when user is not authenticated (and not loading)
   if (isLoginPage || (!user && !loading) || isPaymentSpecialPage) {

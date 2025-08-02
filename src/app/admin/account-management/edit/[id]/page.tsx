@@ -15,6 +15,10 @@ export default function EditAccountPage() {
   const [error, setError] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  
+  // State cho modal thông báo thành công
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -45,8 +49,8 @@ export default function EditAccountPage() {
     setError("");
     try {
       await userAPI.update(id, formData);
-      alert("Cập nhật thành công!");
-      router.push("/admin/account-management");
+      setSuccessMessage("Tài khoản đã được cập nhật thành công!");
+      setShowSuccessModal(true);
     } catch (err) {
       setError("Có lỗi khi cập nhật tài khoản!");
     } finally {
@@ -201,13 +205,17 @@ export default function EditAccountPage() {
             </div>
             {avatarUploading && <span style={{ color: '#6366f1', fontSize: 13, marginTop: 4 }}>Đang tải ảnh lên...</span>}
           </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'transparent', background: 'linear-gradient(135deg, #6366f1 0%, #2563eb 100%)', WebkitBackgroundClip: 'text', margin: 0, letterSpacing: '-0.01em', textAlign: 'center' }}>Chỉnh sửa tài khoản nhân viên</h2>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'transparent', background: 'linear-gradient(135deg, #6366f1 0%, #2563eb 100%)', WebkitBackgroundClip: 'text', margin: 0, letterSpacing: '-0.01em', textAlign: 'center' }}>
+            {formData.role === 'family' ? 'Chỉnh sửa tài khoản gia đình' : 'Chỉnh sửa tài khoản nhân viên'}
+          </h2>
           <p style={{ color: '#64748b', marginBottom: 24, marginTop: 8, textAlign: 'center', fontSize: 15 }}>Cập nhật thông tin tài khoản</p>
         </div>
         {/* Form fields */}
         <div style={{ display: 'grid', gap: 18, width: '100%' }}>
           <div>
-            <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Tên nhân viên *</label>
+            <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>
+              {formData.role === 'family' ? 'Tên người giám hộ *' : 'Tên nhân viên *'}
+            </label>
             <input
               type="text"
               value={formData.name || formData.full_name || ''}
@@ -246,18 +254,20 @@ export default function EditAccountPage() {
               <option value="family">Gia đình</option>
             </select>
           </div>
-          <div>
-            <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chức vụ *</label>
-            <input
-              type="text"
-              value={formData.position || ''}
-              onChange={e => handleChange('position', e.target.value)}
-              required
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, outline: 'none', transition: 'border-color 0.2s', background: '#f8fafc' }}
-              onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
-            />
-          </div>
+          {formData.role !== 'family' && (
+            <div>
+              <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chức vụ *</label>
+              <input
+                type="text"
+                value={formData.position || ''}
+                onChange={e => handleChange('position', e.target.value)}
+                required
+                style={{ width: '100%', padding: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 15, marginTop: 2, outline: 'none', transition: 'border-color 0.2s', background: '#f8fafc' }}
+                onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
+                onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              />
+            </div>
+          )}
           <div>
             <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Trạng thái</label>
             <select
@@ -305,9 +315,107 @@ export default function EditAccountPage() {
             display: 'flex',
             alignItems: 'center',
             gap: 8
-          }}>{saving ? 'Đang lưu...' : (<><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{marginRight: 4}}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Cập nhật</>)}</button>
+          }}>{saving ? 'Đang lưu...' : (<><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{marginRight: 4}}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Cập nhật</>)}          </button>
         </div>
       </form>
+
+      {/* Modal thông báo thành công */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15,23,42,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(12px)',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            border: '1px solid rgba(255,255,255,0.2)'
+          }}>
+            {/* Icon thành công */}
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 8px 24px rgba(16,185,129,0.3)'
+            }}>
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+
+            {/* Tiêu đề */}
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              margin: '0 0 0.75rem 0',
+              letterSpacing: '-0.01em'
+            }}>
+              Thành công!
+            </h3>
+
+            {/* Nội dung */}
+            <p style={{
+              fontSize: '1rem',
+              color: '#64748b',
+              margin: '0 0 2rem 0',
+              lineHeight: 1.6
+            }}>
+              {successMessage}
+            </p>
+
+            {/* Nút đóng */}
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                router.push("/admin/account-management");
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.75rem',
+                padding: '0.875rem 2rem',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+                minWidth: '120px'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(99,102,241,0.4)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(99,102,241,0.3)';
+              }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

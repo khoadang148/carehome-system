@@ -1,19 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Tối ưu hóa development
-  reactStrictMode: false, // Tắt strict mode để tránh double render trong development
-  swcMinify: true,
+  reactStrictMode: true, // Bật strict mode để phát hiện lỗi sớm
   
   // Tối ưu hóa images
   images: {
     domains: ['localhost'],
-    unoptimized: true
+    unoptimized: false, // Bật tối ưu hóa images
+    formats: ['image/webp', 'image/avif'], // Hỗ trợ format hiện đại
   },
   
   // Tối ưu hóa webpack
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer) {
-      // Tắt một số optimization trong development để tăng tốc
+      // Tối ưu hóa development
       config.optimization = {
         ...config.optimization,
         removeAvailableModules: false,
@@ -21,6 +21,15 @@ const nextConfig = {
         splitChunks: false,
       }
     }
+    
+    // Tối ưu hóa bundle size
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    }
+    
     return config
   },
   
@@ -28,7 +37,45 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,
-  }
+  },
+  
+  // Tối ưu hóa performance
+  compress: true,
+  poweredByHeader: false,
+  
+  // Tối ưu hóa headers
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin',
+          },
+        ],
+      },
+    ]
+  },
+  
+  // Tối ưu hóa redirects
+  async redirects() {
+    return [
+      {
+        source: '/home',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig

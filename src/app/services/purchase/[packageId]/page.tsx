@@ -12,7 +12,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { format, parse, parseISO } from 'date-fns';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 
-export default function PurchaseServicePage({ params }: { params: { packageId: string } }) {
+export default function PurchaseServicePage({ params }: { params: Promise<{ packageId: string }> }) {
   const router = useRouter();
   const { user } = useAuth();
   const [selectedResident, setSelectedResident] = useState('');
@@ -92,8 +92,8 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
     'Hoàn tất'
   ];
 
-  // Get packageId from params directly
-  const packageId = params.packageId;
+  // Get packageId from params using React.use()
+  const packageId = React.use(params).packageId;
 
   // Fetch gói dịch vụ từ API theo packageId
   useEffect(() => {
@@ -303,8 +303,10 @@ export default function PurchaseServicePage({ params }: { params: { packageId: s
           const assignments = await carePlansAPI.getByResidentId(resident.id);
           const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
           const roomId = assignment?.assigned_room_id;
-          if (roomId) {
-            const room = await roomsAPI.getById(roomId);
+          // Đảm bảo roomId là string, không phải object
+          const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+          if (roomIdString) {
+            const room = await roomsAPI.getById(roomIdString);
             setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
           } else {
             setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));

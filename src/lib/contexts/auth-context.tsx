@@ -31,7 +31,7 @@ export interface User {
 // Define auth context interface
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User | null>;
   logout: () => void;
   loading: boolean;
   refreshUser: () => Promise<void>;
@@ -75,9 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
     
-    // Delay check to ensure DOM is ready
-    const timer = setTimeout(checkUserSession, 100);
-    return () => clearTimeout(timer);
+    // Use requestAnimationFrame to ensure DOM is ready and avoid hydration issues
+    const frameId = requestAnimationFrame(() => {
+      checkUserSession();
+    });
+    
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
   // Login function: only allow family role
@@ -103,16 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Set user state ngay lập tức
           setUser(userObj);
           
-          // Không redirect ở đây, để login page xử lý
-          return true;
+          // Trả về userObj thay vì true
+          return userObj;
         } else {
           throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
         }
       }
-      return false;
+      return null;
     } catch (error) {
-      // Đảm bảo không set user state khi có lỗi
-      setUser(null);
+      // Không set user state khi có lỗi để tránh gây reload
+      // setUser(null); // Xóa dòng này
       throw error;
     }
   };

@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { useResidents } from '@/lib/contexts/residents-context';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI, staffAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
 import ConfirmModal from '@/components/ConfirmModal';
 import NotificationModal from '@/components/NotificationModal';
 
-export default function ActivityDetailPage({ params }: { params: { id: string } }) {
+export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const { id } = use(params);
   const { residents, loading: residentsLoading, error: residentsError } = useResidents();
   const { user } = useAuth();
   const [activity, setActivity] = useState<any>(null);
@@ -69,7 +70,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       try {
         setLoading(true);
         setError(null);
-        const activityId = params.id;
+        const activityId = id;
         const apiActivity = await activitiesAPI.getById(activityId);
         if (apiActivity) {
           setActivity(mapActivityFromAPI(apiActivity));
@@ -84,14 +85,14 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       }
     };
     fetchActivity();
-  }, [params.id]);
+  }, [id]);
 
   // Fetch staff list
   useEffect(() => {
     const fetchStaffList = async () => {
       try {
         // Lấy danh sách staff thật từ API
-        const users = await userAPI.getAll({ role: 'staff' });
+        const users = await staffAPI.getAll();
         // Chỉ lấy staff có _id hợp lệ
         const staff = users.filter((u: any) => u.role === 'staff' && typeof u._id === 'string' && u._id.length === 24);
         setStaffList(staff.map((u: any) => ({ id: u._id, name: u.full_name, role: u.role })));
@@ -2137,9 +2138,9 @@ const activityResidents: ActivityResident[] = Object.values(
       {/* Modal phân công nhân viên hướng dẫn */}
       <Dialog open={assignStaffModalOpen} onClose={() => setAssignStaffModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
-          <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+          <div className="fixed inset-0 bg-black opacity-30" />
           <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
-            <Dialog.Title className="text-lg font-bold mb-4">Phân công nhân viên hướng dẫn</Dialog.Title>
+            <h2 className="text-lg font-bold mb-4">Phân công nhân viên hướng dẫn</h2>
             <select
               value={selectedStaffId || ''}
               onChange={e => setSelectedStaffId(e.target.value)}

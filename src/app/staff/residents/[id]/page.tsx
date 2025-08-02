@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -28,7 +28,7 @@ import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
 
 
-export default function ResidentDetailPage({ params }: { params: { id: string } }) {
+export default function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { user } = useAuth();
   const [resident, setResident] = useState<any>(null);
@@ -45,8 +45,8 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
   const [bedNumber, setBedNumber] = useState<string>('Chưa cập nhật');
   const [bedLoading, setBedLoading] = useState(false);
   
-  // Get residentId from params directly
-  const residentId = params.id;
+  // Get residentId from params using React.use()
+  const residentId = React.use(params).id;
   
   useEffect(() => {
     // Fetch resident from API
@@ -78,8 +78,10 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
           const assignments = await carePlansAPI.getByResidentId(residentId);
           const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
           const roomId = assignment?.assigned_room_id;
-          if (roomId) {
-            const room = await roomsAPI.getById(roomId);
+          // Đảm bảo roomId là string, không phải object
+          const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+          if (roomIdString) {
+            const room = await roomsAPI.getById(roomIdString);
             setRoomNumber(room?.room_number || 'Chưa cập nhật');
           } else {
             setRoomNumber('Chưa cập nhật');
@@ -93,16 +95,18 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
         setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
         // Lấy số giường nếu có assigned_bed_id
         setBedLoading(true);
-        let currentAssignment = null;
+        let currentAssignment: any = null;
         if (Array.isArray(assignments)) {
           currentAssignment = assignments.find(a =>
             (a.resident_id?._id || a.resident_id) === residentId
           ) || assignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
         }
-        const assignedBedId = currentAssignment?.assigned_bed_id;
-        if (assignedBedId) {
+        const assignedBedId = currentAssignment?.assigned_bed_id as any;
+        // Đảm bảo assignedBedId là string, không phải object
+        const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
+        if (bedIdString) {
           try {
-            const bed = await bedsAPI.getById(assignedBedId);
+            const bed = await bedsAPI.getById(bedIdString);
             setBedNumber(bed?.bed_number || 'Chưa cập nhật');
           } catch {
             setBedNumber('Chưa cập nhật');
@@ -429,7 +433,7 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                     }}>
                       <UserIcon style={{ width: '1rem', height: '1rem' }} />
                       <span>Tuổi:</span>
-                      <span>{resident.age}</span>
+                      <span>{resident.age} tuổi</span>
                     </span>
                     {/* Phòng */}
                     <span style={{
@@ -635,18 +639,54 @@ export default function ResidentDetailPage({ params }: { params: { id: string } 
                 {carePlanAssignments.length > 0 && carePlanAssignments[0].care_plan_ids && carePlanAssignments[0].care_plan_ids.length > 0 ? (
                   <div style={{ display: 'grid', gap: '0.75rem' }}>
                     {carePlanAssignments[0].care_plan_ids.map((plan: any, idx: number) => (
-                      <div key={plan._id || idx} style={{
-                        background: 'rgba(255,255,255,0.8)',
-                        borderRadius: '0.5rem',
-                        padding: '1rem',
-                        border: '1px solid #d1fae5',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <div style={{ fontWeight: 600, fontSize: '1rem', color: '#059669' }}>{plan.plan_name || 'Gói dịch vụ'}</div>
+                      <Link
+                        key={plan._id || idx}
+                        href={`/staff/residents/${residentId}/services/${carePlanAssignments[0]._id}`}
+                        style={{
+                          background: 'rgba(255,255,255,0.8)',
+                          borderRadius: '0.5rem',
+                          padding: '1rem',
+                          border: '1px solid #d1fae5',
+                          marginBottom: '0.5rem',
+                          textDecoration: 'none',
+                          transition: 'all 0.2s ease',
+                          cursor: 'pointer',
+                          display: 'block'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
+                          e.currentTarget.style.borderColor = '#10b981';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
+                          e.currentTarget.style.borderColor = '#d1fae5';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <div style={{ 
+                          fontWeight: 600, 
+                          fontSize: '1rem', 
+                          color: '#059669',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}>
+                          <span>{plan.plan_name || 'Gói dịch vụ'}</span>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            color: '#10b981',
+                            fontWeight: 500
+                          }}>
+                            Xem chi tiết →
+                          </span>
+                        </div>
                         <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
                           Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 ) : (

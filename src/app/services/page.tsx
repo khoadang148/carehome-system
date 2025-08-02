@@ -594,9 +594,14 @@ export default function ServicesPage() {
   // Handler for staff confirm register
   async function handleStaffRegisterConfirm() {
     if (!selectedStaffResidentId || !selectedPackage) return;
+    // Đảm bảo selectedStaffResidentId là string
+    const residentId = typeof selectedStaffResidentId === 'object' && (selectedStaffResidentId as any)?._id 
+      ? (selectedStaffResidentId as any)._id 
+      : selectedStaffResidentId;
+    
     // 1. Lấy danh sách gói đã đăng ký của cư dân
     try {
-      const carePlans = await carePlansAPI.getByResidentId(selectedStaffResidentId);
+      const carePlans = await carePlansAPI.getByResidentId(residentId);
       // 2. Kiểm tra trùng gói
       const selectedPlan = carePlans.find((plan: any) => plan.planId === selectedPackage && ['active', 'pending_approval'].includes(plan.status));
       if (selectedPlan) {
@@ -604,7 +609,7 @@ export default function ServicesPage() {
         return;
       }
       // 3. Nếu hợp lệ, chuyển sang trang đăng ký
-      router.push(`/services/purchase/${selectedPackage}?residentId=${selectedStaffResidentId}`);
+      router.push(`/services/purchase/${selectedPackage}?residentId=${residentId}`);
       setShowStaffRegisterModal(false);
       setSelectedStaffResidentId(null);
     } catch (err) {
@@ -890,146 +895,173 @@ export default function ServicesPage() {
         
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', 
-          gap: '2.5rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+          gap: '2rem',
           alignItems: 'stretch',
           maxWidth: '1400px',
           margin: '0 auto'
         }}>
           {loadingCarePlans ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem' }}>
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '4rem 2rem' }}>
               <div style={{
                 display: 'inline-flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '1rem'
+                gap: '1.5rem',
+                background: 'rgba(255, 255, 255, 0.9)',
+                borderRadius: '20px',
+                padding: '3rem',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  border: '3px solid #e2e8f0',
-                  borderTop: '3px solid #667eea',
+                  width: '4rem',
+                  height: '4rem',
+                  border: '4px solid #e2e8f0',
+                  borderTop: '4px solid #667eea',
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite'
                 }} />
                 <div style={{
-                  fontSize: '1.1rem',
-                  color: '#64748b',
-                  fontWeight: 500
+                  fontSize: '1.25rem',
+                  color: '#374151',
+                  fontWeight: 600
                 }}>
                   Đang tải danh sách gói dịch vụ...
                 </div>
+                <div style={{
+                  fontSize: '0.95rem',
+                  color: '#6b7280'
+                }}>
+                  Vui lòng chờ trong giây lát
+                </div>
               </div>
             </div>
-                      ) : carePlansError ? (
-              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem' }}>
+          ) : carePlansError ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '4rem 2rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1.5rem',
+                background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                border: '2px solid #fecaca',
+                borderRadius: '20px',
+                padding: '3rem',
+                boxShadow: '0 20px 40px rgba(239, 68, 68, 0.15)',
+                maxWidth: '500px'
+              }}>
                 <div style={{
-                  display: 'inline-flex',
-                  flexDirection: 'column',
+                  width: '4rem',
+                  height: '4rem',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '1rem',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  borderRadius: '16px',
-                  padding: '2rem'
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 20px rgba(239, 68, 68, 0.3)'
                 }}>
-                  <div style={{
-                    width: '3rem',
-                    height: '3rem',
-                    background: '#ef4444',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </div>
-                  <div style={{
-                    fontSize: '1.1rem',
-                    color: '#dc2626',
-                    fontWeight: 600
-                  }}>
-                    {carePlansError}
-                  </div>
+                  <svg style={{width: '2rem', height: '2rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div style={{
+                  fontSize: '1.25rem',
+                  color: '#dc2626',
+                  fontWeight: 700
+                }}>
+                  {carePlansError}
+                </div>
+                <div style={{
+                  fontSize: '0.95rem',
+                  color: '#b91c1c',
+                  textAlign: 'center'
+                }}>
+                  Vui lòng thử lại sau hoặc liên hệ hỗ trợ
                 </div>
               </div>
-            ) : carePlans.length === 0 ? (
-              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem' }}>
+            </div>
+          ) : carePlans.length === 0 ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '4rem 2rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1.5rem',
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                border: '2px solid #bae6fd',
+                borderRadius: '20px',
+                padding: '3rem',
+                boxShadow: '0 20px 40px rgba(14, 165, 233, 0.15)',
+                maxWidth: '500px'
+              }}>
                 <div style={{
-                  display: 'inline-flex',
-                  flexDirection: 'column',
+                  width: '4rem',
+                  height: '4rem',
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '1rem',
-                  background: 'rgba(102, 126, 234, 0.1)',
-                  border: '1px solid rgba(102, 126, 234, 0.2)',
-                  borderRadius: '16px',
-                  padding: '2rem'
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 20px rgba(14, 165, 233, 0.3)'
                 }}>
-                  <div style={{
-                    width: '3rem',
-                    height: '3rem',
-                    background: '#667eea',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                    </svg>
-                  </div>
-                  <div style={{
-                    fontSize: '1.1rem',
-                    color: '#374151',
-                    fontWeight: 600
-                  }}>
-                    Không có gói dịch vụ nào.
-                  </div>
-                  <div style={{
-                    fontSize: '0.9rem',
-                    color: '#64748b'
-                  }}>
-                    Vui lòng liên hệ quản trị viên để thêm gói dịch vụ.
-                  </div>
+                  <svg style={{width: '2rem', height: '2rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                </div>
+                <div style={{
+                  fontSize: '1.25rem',
+                  color: '#0c4a6e',
+                  fontWeight: 700
+                }}>
+                  Không có gói dịch vụ nào
+                </div>
+                <div style={{
+                  fontSize: '0.95rem',
+                  color: '#0369a1',
+                  textAlign: 'center'
+                }}>
+                  Vui lòng liên hệ quản trị viên để thêm gói dịch vụ mới
                 </div>
               </div>
+            </div>
           ) : carePlans.map((pkg: any, index: number) => (
             <div
               key={pkg._id}
               style={{
-                background: 'white',
-                borderRadius: '1rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '24px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)',
                 border: pkg.category === 'main'
                   ? '2px solid #dc2626'
-                  : '1px solid #e5e7eb',
-                padding: '1.5rem',
-                maxWidth: 380,
+                  : '1px solid rgba(226, 232, 240, 0.8)',
+                padding: '2rem',
+                maxWidth: '100%',
                 margin: '0 auto',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'stretch',
-                fontFamily: "'Inter', sans-serif",
-                marginBottom: '1.5rem',
-                transition: 'all 0.3s ease',
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 position: 'relative',
                 overflow: 'hidden',
-                cursor: user?.role === 'family' ? 'default' : 'pointer'
+                cursor: user?.role === 'family' ? 'default' : 'pointer',
+                backdropFilter: 'blur(10px)',
+                minHeight: '600px'
               }}
               onMouseEnter={(e) => {
                 if (user?.role !== 'family') {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                e.currentTarget.style.borderColor = pkg.category === 'main' ? '#b91c1c' : '#d1d5db';
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.borderColor = pkg.category === 'main' ? '#b91c1c' : '#cbd5e1';
                 }
               }}
               onMouseLeave={(e) => {
                 if (user?.role !== 'family') {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-                e.currentTarget.style.borderColor = pkg.category === 'main' ? '#dc2626' : '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)';
+                  e.currentTarget.style.borderColor = pkg.category === 'main' ? '#dc2626' : 'rgba(226, 232, 240, 0.8)';
                 }
               }}
               onClick={() => {
@@ -1038,59 +1070,99 @@ export default function ServicesPage() {
                 }
               }}
             >
+              {/* Background decoration */}
+              <div style={{
+                position: 'absolute',
+                top: '-50px',
+                right: '-50px',
+                width: '150px',
+                height: '150px',
+                background: pkg.category === 'main'
+                  ? 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(185, 28, 28, 0.05) 100%)'
+                  : 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
+                borderRadius: '50%',
+                zIndex: 0
+              }} />
+              
               {/* Top accent line */}
               <div style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
-                height: '3px',
+                height: '4px',
                 background: pkg.category === 'main' 
-                  ? '#dc2626'
-                  : '#3b82f6',
-                borderRadius: '1rem 1rem 0 0'
+                  ? 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)'
+                  : 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '24px 24px 0 0'
               }} />
               
               {/* Header */}
               <div style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '1rem',
-                paddingTop: '0.25rem'
+                alignItems: 'flex-start',
+                gap: '1rem',
+                marginBottom: '1.5rem',
+                paddingTop: '0.5rem',
+                position: 'relative',
+                zIndex: 1
               }}>
                 <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
+                  width: '3.5rem',
+                  height: '3.5rem',
                   background: pkg.category === 'main'
-                    ? '#dc2626'
-                    : '#3b82f6',
-                  borderRadius: '0.5rem',
+                    ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+                    : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  borderRadius: '16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  boxShadow: pkg.category === 'main'
+                    ? '0 8px 20px rgba(220, 38, 38, 0.3)'
+                    : '0 8px 20px rgba(59, 130, 246, 0.3)',
+                  position: 'relative'
                 }}>
-                  <svg style={{width: '1.25rem', height: '1.25rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{width: '1.5rem', height: '1.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
+                  {/* Shine effect */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: '2px',
+                    width: '20px',
+                    height: '20px',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50%',
+                    filter: 'blur(1px)'
+                  }} />
                 </div>
                 <div style={{flex: 1}}>
                   <h2 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 600,
-                    color: '#111827',
+                    fontSize: '1.5rem',
+                    fontWeight: 700,
+                    color: '#1e293b',
                     margin: 0,
-                    lineHeight: 1.3
+                    lineHeight: 1.2,
+                    marginBottom: '0.25rem'
                   }}>
                     {pkg.plan_name}
                   </h2>
                   <div style={{
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
+                    fontSize: '0.95rem',
+                    color: '#64748b',
                     fontWeight: 500,
-                    marginTop: '0.125rem'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}>
-                    Gói dịch vụ
+                    <div style={{
+                      width: '6px',
+                      height: '6px',
+                      background: pkg.category === 'main' ? '#dc2626' : '#3b82f6',
+                      borderRadius: '50%'
+                    }} />
+                    {pkg.category === 'main' ? 'Gói dịch vụ chính' : 'Gói dịch vụ bổ sung'}
                   </div>
                 </div>
               </div>
@@ -1098,62 +1170,96 @@ export default function ServicesPage() {
               {/* Price section */}
               <div style={{
                 background: pkg.category === 'main'
-                  ? '#fef2f2'
-                  : '#f8fafc',
-                borderRadius: '0.75rem',
+                  ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+                  : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                borderRadius: '16px',
                 padding: '1rem',
-                marginBottom: '1rem',
+                marginBottom: '1.25rem',
                 border: pkg.category === 'main'
                   ? '1px solid #fecaca'
-                  : '1px solid #e2e8f0',
-                textAlign: 'center'
+                  : '1px solid #bae6fd',
+                textAlign: 'center',
+                position: 'relative',
+                overflow: 'hidden'
               }}>
+                {/* Background pattern */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-15px',
+                  right: '-15px',
+                  width: '60px',
+                  height: '60px',
+                  background: pkg.category === 'main'
+                    ? 'radial-gradient(circle, rgba(220, 38, 38, 0.08) 0%, transparent 70%)'
+                    : 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%)',
+                  borderRadius: '50%'
+                }} />
+                
                 <div style={{
                   fontSize: '0.75rem',
-                  color: '#6b7280',
+                  color: pkg.category === 'main' ? '#991b1b' : '#0c4a6e',
                   fontWeight: 600,
                   marginBottom: '0.5rem',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
+                  letterSpacing: '0.08em',
+                  position: 'relative',
+                  zIndex: 1
                 }}>
                   Giá hàng tháng
                 </div>
                 <div style={{
-                  fontSize: '1.75rem',
-                  fontWeight: 700,
-                  color: pkg.category === 'main' ? '#dc2626' : '#1f2937',
-                  lineHeight: 1
+                  fontSize: '1.875rem',
+                  fontWeight: 800,
+                  color: pkg.category === 'main' ? '#dc2626' : '#1e40af',
+                  lineHeight: 1,
+                  marginBottom: '0.125rem',
+                  position: 'relative',
+                  zIndex: 1
                 }}>
                   {new Intl.NumberFormat('vi-VN').format(pkg.monthly_price)}
-                  <span style={{fontSize: '0.875rem', fontWeight: 600}}> đ</span>
+                  <span style={{fontSize: '1rem', fontWeight: 600, marginLeft: '0.25rem'}}>đ</span>
+                </div>
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: pkg.category === 'main' ? '#b91c1c' : '#0369a1',
+                  fontWeight: 500,
+                  position: 'relative',
+                  zIndex: 1
+                }}>
+                  Thanh toán hàng tháng
                 </div>
               </div>
 
               {/* Description */}
               <div style={{
-                fontSize: '0.875rem',
-                color: '#4b5563',
-                lineHeight: 1.5,
-                marginBottom: '1rem'
+                fontSize: '0.95rem',
+                color: '#475569',
+                lineHeight: 1.6,
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                background: 'rgba(248, 250, 252, 0.8)',
+                borderRadius: '12px',
+                border: '1px solid rgba(226, 232, 240, 0.5)'
               }}>
                 {pkg.description}
               </div>
 
               {/* Features list */}
-              <div style={{flex: 1}}>
+              <div style={{flex: 1, marginBottom: '1.5rem'}}>
                 <div style={{
-                  fontWeight: 600,
-                  color: '#111827',
+                  fontWeight: 700,
+                  color: '#1e293b',
                   marginBottom: '0.75rem',
-                  fontSize: '0.875rem',
+                  fontSize: '0.95rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  borderRadius: '8px',
+                  border: '1px solid #bae6fd'
                 }}>
-                  <svg style={{width: '1rem', height: '1rem', color: '#10b981'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Dịch vụ bao gồm
+                  Dịch vụ bao gồm:
                 </div>
                 <div style={{
                   display: 'grid',
@@ -1162,23 +1268,35 @@ export default function ServicesPage() {
                   {pkg.services_included?.map((feature: string, i: number) => (
                     <div key={i} style={{
                       display: 'flex',
-                      alignItems: 'flex-start',
+                      alignItems: 'center',
                       gap: '0.5rem',
-                      padding: '0.5rem',
-                      background: '#f9fafb',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #f3f4f6'
-                    }}>
+                      padding: '0.5rem 0.75rem',
+                      background: 'rgba(248, 250, 252, 0.8)',
+                      borderRadius: '8px',
+                      border: '1px solid #f1f5f9',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateX(2px)';
+                      e.currentTarget.style.background = 'rgba(240, 249, 255, 0.9)';
+                      e.currentTarget.style.borderColor = '#bae6fd';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateX(0)';
+                      e.currentTarget.style.background = 'rgba(248, 250, 252, 0.8)';
+                      e.currentTarget.style.borderColor = '#f1f5f9';
+                    }}
+                    >
                       <div style={{
                         width: '1rem',
                         height: '1rem',
-                        background: '#10b981',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
-                        marginTop: '0.125rem'
+                        boxShadow: '0 1px 4px rgba(16, 185, 129, 0.3)'
                       }}>
                         <svg style={{width: '0.5rem', height: '0.5rem', color: 'white'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -1187,7 +1305,7 @@ export default function ServicesPage() {
                       <span style={{
                         color: '#374151',
                         fontWeight: 500,
-                        fontSize: '0.875rem',
+                        fontSize: '0.85rem',
                         lineHeight: 1.4
                       }}>
                         {feature}
@@ -1198,7 +1316,7 @@ export default function ServicesPage() {
               </div>
 
               {/* Action button */}
-              <div style={{marginTop: '1rem'}}>
+              <div style={{marginTop: 'auto'}}>
                 {user?.role === 'staff' ? (
                   <button
                     onClick={(e) => {
@@ -1207,41 +1325,44 @@ export default function ServicesPage() {
                     }}
                     style={{
                       width: '100%',
-                      padding: '0.75rem 1rem',
-                      background: '#3b82f6',
+                      padding: '1rem 1.5rem',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '0.5rem',
-                      fontWeight: 600,
-                      fontSize: '0.875rem',
+                      borderRadius: '16px',
+                      fontWeight: 700,
+                      fontSize: '1rem',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)',
+                      position: 'relative',
+                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#2563eb';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 12px 28px rgba(59, 130, 246, 0.4)';
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#3b82f6';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
                     }}
                   >
-                    Đăng ký cho cư dân
-                  </button>
-                ) : user?.role === 'family' ? (
-                  <div style={{
+                    <span style={{ position: 'relative', zIndex: 1 }}>
+                      Đăng ký cho cư dân
+                    </span>
+                    {/* Shine effect */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: '-100%',
                       width: '100%',
-                      padding: '0.75rem 1rem',
-                    background: '#f3f4f6',
-                    color: '#6b7280',
-                    border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontWeight: 600,
-                      fontSize: '0.875rem',
-                    textAlign: 'center'
-                  }}>
-                    Chỉ xem thông tin
-                  </div>
+                      height: '100%',
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                      transition: 'left 0.5s ease'
+                    }} />
+                  </button>
                 ) : null}
               </div>
 
@@ -1249,8 +1370,8 @@ export default function ServicesPage() {
               {user?.role === 'admin' && (
                 <div style={{
                   display: 'flex',
-                  gap: '0.5rem',
-                  marginTop: '0.75rem'
+                  gap: '0.75rem',
+                  marginTop: '1rem'
                 }}>
                   <button
                     onClick={(e) => {
@@ -1259,30 +1380,31 @@ export default function ServicesPage() {
                     }}
                     style={{
                       flex: 1,
-                      padding: '0.5rem',
-                      background: '#3b82f6',
+                      padding: '0.75rem',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '0.375rem',
-                      fontWeight: 500,
-                      fontSize: '0.75rem',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '0.25rem'
+                      gap: '0.5rem',
+                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#2563eb';
                       e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#3b82f6';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
                     }}
                   >
-                    <PencilIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+                    <PencilIcon style={{ width: '1rem', height: '1rem' }} />
                     Sửa
                   </button>
                   <button
@@ -1293,70 +1415,84 @@ export default function ServicesPage() {
                     }}
                     style={{
                       flex: 1,
-                      padding: '0.5rem',
-                      background: '#ef4444',
+                      padding: '0.75rem',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '0.375rem',
-                      fontWeight: 500,
-                      fontSize: '0.75rem',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '0.25rem'
+                      gap: '0.5rem',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#dc2626';
                       e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.4)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#ef4444';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
                     }}
                   >
-                    <TrashIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+                    <TrashIcon style={{ width: '1rem', height: '1rem' }} />
                     Xóa
                   </button>
                 </div>
               )}
 
-              {/* Main package badge */}
-              {pkg.category === 'main' && (
+              {/* Package badges */}
+              {pkg.category === 'main' ? (
                 <div style={{
                   position: 'absolute',
-                  top: '-0.5rem',
-                  right: '-0.5rem',
-                  background: '#dc2626',
+                  top: '0.5rem',
+                  right: '0.8rem',
+                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
                   color: 'white',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
+                  padding: '0.375rem 0.75rem',
+                  borderRadius: '14px',
                   fontSize: '0.75rem',
-                  fontWeight: 600,
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  fontWeight: 700,
+                  boxShadow: '0 3px 10px rgba(220, 38, 38, 0.35)',
                   zIndex: 10,
-                  border: '2px solid white'
+                  border: '1.5px solid white',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  maxWidth: '100px',
+                  textAlign: 'center',
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }}>
                   Gói chính
                 </div>
-              )}
-              
-              {/* Popular badge */}
-              {pkg.category !== 'main' && (
+              ) : (
                 <div style={{
                   position: 'absolute',
-                  top: '-0.5rem',
-                  right: '-0.5rem',
-                  background: '#f59e0b',
+                  top: '0.5rem',
+                  right: '1rem',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                   color: 'white',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
+                  padding: '0.375rem 0.75rem',
+                  borderRadius: '14px',
                   fontSize: '0.75rem',
-                  fontWeight: 600,
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  fontWeight: 700,
+                  boxShadow: '0 3px 10px rgba(245, 158, 11, 0.35)',
                   zIndex: 10,
-                  border: '2px solid white'
+                  border: '1.5px solid white',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  maxWidth: '150px',
+                  textAlign: 'center',
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }}>
                   Gói bổ sung
                 </div>
@@ -1369,84 +1505,253 @@ export default function ServicesPage() {
         <div style={{
           marginTop: '4rem',
           textAlign: 'center',
-          padding: '2rem',
-          background: 'rgba(255, 255, 255, 0.9)',
-          borderRadius: '20px',
-          backdropFilter: 'blur(10px)'
+          padding: '3rem 2rem',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
+          borderRadius: '24px',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
-          <h3 style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 600, 
-            color: '#374151',
-            marginBottom: '1rem'
-          }}>
-            Tại sao chọn chúng tôi?
-          </h3>
+          {/* Background decoration */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '2rem',
-            marginTop: '2rem'
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: '60px',
-                height: '60px',
-                background: 'linear-gradient(45deg, #667eea, #764ba2)',
-                borderRadius: '50%',
-                margin: '0 auto 1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '1.5rem'
-              }}>
-                ⭐
+            position: 'absolute',
+            top: '-100px',
+            left: '-100px',
+            width: '200px',
+            height: '200px',
+            background: 'radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%)',
+            borderRadius: '50%'
+          }} />
+          <div style={{
+            position: 'absolute',
+            bottom: '-80px',
+            right: '-80px',
+            width: '160px',
+            height: '160px',
+            background: 'radial-gradient(circle, rgba(118, 75, 162, 0.1) 0%, transparent 70%)',
+            borderRadius: '50%'
+          }} />
+          
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <h3 style={{ 
+              fontSize: '2rem', 
+              fontWeight: 700, 
+              color: '#1e293b',
+              marginBottom: '1rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              Tại sao chọn chúng tôi?
+            </h3>
+            <p style={{
+              fontSize: '1.1rem',
+              color: '#64748b',
+              marginBottom: '3rem',
+              maxWidth: '600px',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              lineHeight: 1.6
+            }}>
+              Chúng tôi cam kết mang lại dịch vụ chăm sóc chất lượng cao nhất với đội ngũ chuyên gia giàu kinh nghiệm
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '2.5rem',
+              marginTop: '2rem'
+            }}>
+              <div style={{ 
+                textAlign: 'center',
+                padding: '2rem 1.5rem',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%)',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(102, 126, 234, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              >
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  borderRadius: '50%',
+                  margin: '0 auto 1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 20px rgba(251, 191, 36, 0.3)',
+                  position: 'relative'
+                }}>
+                  <svg style={{ width: '2rem', height: '2rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  {/* Shine effect */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    width: '20px',
+                    height: '20px',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50%',
+                    filter: 'blur(2px)'
+                  }} />
+                </div>
+                <h4 style={{ 
+                  fontWeight: 700, 
+                  marginBottom: '0.75rem', 
+                  color: '#1e293b',
+                  fontSize: '1.25rem'
+                }}>
+                  Chất lượng cao
+                </h4>
+                <p style={{ 
+                  color: '#64748b', 
+                  fontSize: '0.95rem',
+                  lineHeight: 1.6,
+                  margin: 0
+                }}>
+                  Đội ngũ chuyên gia giàu kinh nghiệm với chứng chỉ quốc tế
+                </p>
               </div>
-              <h4 style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>Chất lượng cao</h4>
-              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                Đội ngũ chuyên gia giàu kinh nghiệm
-              </p>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: '60px',
-                height: '60px',
-                background: 'linear-gradient(45deg, #667eea, #764ba2)',
-                borderRadius: '50%',
-                margin: '0 auto 1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '1.5rem'
-              }}>
-                🏥
+              
+              <div style={{ 
+                textAlign: 'center',
+                padding: '2rem 1.5rem',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%)',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              >
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  borderRadius: '50%',
+                  margin: '0 auto 1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)',
+                  position: 'relative'
+                }}>
+                  <svg style={{ width: '2rem', height: '2rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  {/* Shine effect */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    width: '20px',
+                    height: '20px',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50%',
+                    filter: 'blur(2px)'
+                  }} />
+                </div>
+                <h4 style={{ 
+                  fontWeight: 700, 
+                  marginBottom: '0.75rem', 
+                  color: '#1e293b',
+                  fontSize: '1.25rem'
+                }}>
+                  Cơ sở hiện đại
+                </h4>
+                <p style={{ 
+                  color: '#64748b', 
+                  fontSize: '0.95rem',
+                  lineHeight: 1.6,
+                  margin: 0
+                }}>
+                  Trang thiết bị y tế tiên tiến và môi trường sống tiện nghi
+                </p>
               </div>
-              <h4 style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>Cơ sở hiện đại</h4>
-              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                Trang thiết bị y tế tiên tiến
-              </p>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: '60px',
-                height: '60px',
-                background: 'linear-gradient(45deg, #667eea, #764ba2)',
-                borderRadius: '50%',
-                margin: '0 auto 1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '1.5rem'
-              }}>
-                💝
+              
+              <div style={{ 
+                textAlign: 'center',
+                padding: '2rem 1.5rem',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%)',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(16, 185, 129, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              >
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '50%',
+                  margin: '0 auto 1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+                  position: 'relative'
+                }}>
+                  <svg style={{ width: '2rem', height: '2rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {/* Shine effect */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    width: '20px',
+                    height: '20px',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50%',
+                    filter: 'blur(2px)'
+                  }} />
+                </div>
+                <h4 style={{ 
+                  fontWeight: 700, 
+                  marginBottom: '0.75rem', 
+                  color: '#1e293b',
+                  fontSize: '1.25rem'
+                }}>
+                  Chăm sóc tận tâm
+                </h4>
+                <p style={{ 
+                  color: '#64748b', 
+                  fontSize: '0.95rem',
+                  lineHeight: 1.6,
+                  margin: 0
+                }}>
+                  Sự quan tâm chu đáo 24/7 với tình yêu thương như gia đình
+                </p>
               </div>
-              <h4 style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>Chăm sóc tận tâm</h4>
-              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                Sự quan tâm chu đáo 24/7
-              </p>
             </div>
           </div>
         </div>
@@ -1571,7 +1876,7 @@ export default function ServicesPage() {
                 Đăng ký dịch vụ
               </h4>
               <p style={{ color: '#0c4a6e', lineHeight: 1.6, margin: 0 }}>
-              Mỗi người thụ hưởng có thể đăng ký đồng thời nhiều gói dịch vụ tại một thời điểm.
+              Mỗi người cao tuổi chỉ có thể đăng ký 1 gói dịch vụ chính và có thể đăng ký thêm nhiều gói dịch vụ bổổ sung.
                Việc đăng ký được thực hiện sau khi đội ngũ nhân viên đã tư vấn kỹ lưỡng, 
                dựa trên tình trạng sức khỏe và nhu cầu cá nhân của người cao tuổi,
                 nhằm đảm bảo lựa chọn phù hợp và tối ưu nhất.             </p>
@@ -1695,61 +2000,6 @@ export default function ServicesPage() {
             </div>
           </div>
 
-          {/* Additional Information */}
-          <div style={{
-            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            border: '1px solid #cbd5e1',
-            borderRadius: '16px',
-            padding: '1.5rem',
-            marginBottom: '2rem'
-          }}>
-            <h4 style={{ 
-              fontSize: '1.125rem', 
-              fontWeight: 600, 
-              color: '#475569', 
-              marginBottom: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              {/* <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg> */}
-              Thông tin bổ sung & Cam kết dịch vụ
-            </h4>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '1rem',
-              fontSize: '0.875rem',
-              color: '#64748b'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', background: '#3b82f6', borderRadius: '50%' }}></div>
-                <span><strong>Thời gian xử lý:</strong> 1-3 ngày làm việc</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></div>
-                <span><strong>Hoàn tiền:</strong> 5-7 ngày làm việc</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', background: '#f59e0b', borderRadius: '50%' }}></div>
-                <span><strong>Hỗ trợ:</strong> 24/7 qua hotline</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%' }}></div>
-                <span><strong>Bảo mật:</strong> Thông tin tuyệt đối</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', background: '#8b5cf6', borderRadius: '50%' }}></div>
-                <span><strong>Chất lượng:</strong> ISO 9001:2015</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', background: '#06b6d4', borderRadius: '50%' }}></div>
-                <span><strong>Đội ngũ:</strong> Chuyên gia y tế</span>
-              </div>
-            </div>
-          </div>
           
           {/* CTA Button */}
           <div style={{
@@ -1782,9 +2032,9 @@ export default function ServicesPage() {
                 justifyContent: 'center',
                 boxShadow: '0 4px 15px rgba(14, 165, 233, 0.3)'
               }}>
-                {/* <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg style={{ width: '24px', height: '24px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg> */}
+                </svg>
               </div>
               <h4 style={{ 
                 color: '#0c4a6e', 
@@ -1900,9 +2150,9 @@ export default function ServicesPage() {
                   justifyContent: 'center',
                   boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
                 }}>
-                  {/* <svg style={{ width: '26px', height: '26px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <svg style={{ width: '26px', height: '26px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg> */}
+                  </svg> 
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e40af', margin: 0 }}>
@@ -2704,14 +2954,14 @@ export default function ServicesPage() {
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'all 0.2s',
-          marginLeft: '9rem',
+          marginLeft: '9.5rem',
         }}>
           <div style={{
             background: 'white',
             borderRadius: 20,
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-            width: '95%',
-            maxWidth: '1050px',
+            width: '98%',
+            maxWidth: '1600px',
             maxHeight: '100vh',
             overflow: 'hidden',
             position: 'relative',
@@ -2957,7 +3207,7 @@ export default function ServicesPage() {
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                  marginLeft: '23rem'
+                  marginLeft: '80rem'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';

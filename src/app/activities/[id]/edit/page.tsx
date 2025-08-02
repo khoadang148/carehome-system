@@ -43,7 +43,7 @@ function mapActivityType(type: string): string {
   return map[type] || type;
 }
 
-export default function EditActivityPage({ params }: { params: { id: string } }) {
+export default function EditActivityPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -53,8 +53,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   
-  // Get activityId from params directly
-  const activityId = params.id;
+  // Get activityId from params using React.use()
+  const activityId = use(params).id;
   
   const { 
     register, 

@@ -1,15 +1,33 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { 
+  ArrowLeftIcon, 
+  EyeIcon, 
+  PencilIcon, 
+  UserGroupIcon, 
+  MagnifyingGlassIcon,
+  CheckIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  InformationCircleIcon,
+  XCircleIcon,
+  SparklesIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  MapPinIcon,
+  UserIcon,
+  CalendarIcon
+} from '@heroicons/react/24/outline';
 import { useResidents } from '@/lib/contexts/residents-context';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { activitiesAPI, activityParticipationsAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, staffAssignmentsAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
 
-export default function ActivityDetailPage({ params }: { params: { id: string } }) {
+export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { residents, loading: residentsLoading, error: residentsError } = useResidents();
   const { user } = useAuth();
@@ -25,6 +43,35 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
   const [addingResident, setAddingResident] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [staffAssignments, setStaffAssignments] = useState<any[]>([]);
+  const [assignedResidentIds, setAssignedResidentIds] = useState<string[]>([]);
+  const [notificationModal, setNotificationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+  
+  // Function to show notification modal
+  const showNotification = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    console.log('Showing notification:', { title, message, type });
+    setNotificationModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  // Function to close notification modal
+  const closeNotification = () => {
+    setNotificationModal(prev => ({ ...prev, isOpen: false }));
+  };
   
   // Check access permissions
   useEffect(() => {
@@ -44,7 +91,8 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       try {
         setLoading(true);
         setError(null);
-        const activityId = params.id;
+        const resolvedParams = await params;
+        const activityId = resolvedParams.id;
         const apiActivity = await activitiesAPI.getById(activityId);
         if (apiActivity) {
           setActivity(mapActivityFromAPI(apiActivity));
@@ -59,7 +107,42 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       }
     };
     fetchActivity();
-  }, [params.id]);
+  }, [params]);
+
+  // Lấy staff assignments và danh sách cư dân được phân công
+  useEffect(() => {
+    const fetchStaffAssignments = async () => {
+      if (!user?.id) return;
+      
+      try {
+        console.log('Fetching staff assignments for user:', user.id);
+        const assignments = await staffAssignmentsAPI.getMyAssignments();
+        console.log('Staff assignments:', assignments);
+        
+        setStaffAssignments(Array.isArray(assignments) ? assignments : []);
+        
+        // Lấy danh sách resident IDs được phân công (chỉ active assignments)
+        const residentIds = Array.isArray(assignments) 
+          ? assignments
+              .filter((assignment: any) => assignment.status === 'active' && assignment.resident_id)
+              .map((assignment: any) => 
+                typeof assignment.resident_id === 'object' 
+                  ? assignment.resident_id._id 
+                  : assignment.resident_id
+              )
+          : [];
+        
+        console.log('Assigned resident IDs (active only):', residentIds);
+        setAssignedResidentIds(residentIds);
+      } catch (error) {
+        console.error('Error fetching staff assignments:', error);
+        setStaffAssignments([]);
+        setAssignedResidentIds([]);
+      }
+    };
+    
+    fetchStaffAssignments();
+  }, [user?.id]);
 
   // Function to cleanup duplicate participations
   const cleanupDuplicateParticipations = async (participationsData: any[]) => {
@@ -320,7 +403,11 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
     });
     
     if (invalidEvaluations.length > 0) {
-      alert(`Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`);
+      showNotification(
+        'Thiếu thông tin',
+        `Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`,
+        'warning'
+      );
       return;
     }
     
@@ -412,7 +499,11 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       setRefreshTrigger(prev => prev + 1);
       
       setEvaluationMode(false);
-      alert('Đánh giá đã được lưu thành công!');
+      showNotification(
+        'Lưu đánh giá thành công',
+        'Đánh giá tham gia hoạt động đã được lưu thành công!',
+        'success'
+      );
     } catch (error: any) {
       console.error('Error saving evaluations:', error);
       let errorMessage = 'Có lỗi xảy ra khi lưu đánh giá. Vui lòng thử lại.';
@@ -423,7 +514,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
         errorMessage = `Lỗi: ${error.message}`;
       }
       
-      alert(errorMessage);
+      showNotification('Lỗi lưu đánh giá', errorMessage, 'error');
     } finally {
       setSaving(false);
     }
@@ -490,10 +581,10 @@ const activityResidents: ActivityResident[] = Object.values(
     return acc;
   }, {} as { [residentId: string]: ActivityResident })
 );
-  // Tạo danh sách cư dân từ evaluations state, chỉ lấy những cư dân tham gia hoạt động này
+  // Tạo danh sách cư dân từ evaluations state, chỉ lấy những cư dân tham gia hoạt động này VÀ được phân công
   const residentsFromEvaluations: ActivityResident[] = Object.entries(evaluations)
     .filter(([residentId, evaluation]) => {
-      // Chỉ lấy những cư dân có participation record cho hoạt động này
+      // Chỉ lấy những cư dân có participation record cho hoạt động này VÀ được phân công cho staff hiện tại
       const participation = participations.find((p: any) => {
         const pResidentId = p.resident_id?._id || p.resident_id;
         const participationActivityId = p.activity_id?._id || p.activity_id;
@@ -505,7 +596,10 @@ const activityResidents: ActivityResident[] = Object.values(
                participationDate === activityDate;
       });
       
-      return participation !== undefined;
+      // Kiểm tra xem cư dân có được phân công cho staff hiện tại không
+      const isAssigned = assignedResidentIds.includes(residentId);
+      
+      return participation !== undefined && isAssigned;
     })
     .map(([residentId, evaluation]) => {
       const participation = participations.find((p: any) => {
@@ -570,7 +664,35 @@ const activityResidents: ActivityResident[] = Object.values(
   const participationCount = activityResidents.length;
   console.log('Participation count:', participationCount);
   
-  const residentsNotJoined = residents.filter((r: any) => !joinedResidentIds.includes(r.id));
+  // Lấy danh sách cư dân được phân công cho staff hiện tại (chưa tham gia hoạt động này)
+  const residentsNotJoined = staffAssignments
+    .filter((assignment: any) => assignment.status === 'active')
+    .map((assignment: any) => {
+      const resident = assignment.resident_id;
+      const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
+      
+      return {
+        id: resident._id,
+        name: resident.full_name || '',
+        age: age || '',
+        careLevel: resident.care_level || '',
+        emergencyContact: resident.emergency_contact?.name || '',
+        contactPhone: resident.emergency_contact?.phone || '',
+        avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+        gender: (resident.gender || '').toLowerCase(),
+        assignmentStatus: assignment.status || 'unknown',
+        assignmentId: assignment._id,
+        endDate: assignment.end_date,
+        assignedDate: assignment.assigned_date,
+      };
+    })
+    .filter((resident: any) => !joinedResidentIds.includes(resident.id)); // Chỉ lấy cư dân chưa tham gia
+
+  // Debug logs
+  console.log('Staff assignments:', staffAssignments);
+  console.log('Assigned resident IDs (active only):', assignedResidentIds);
+  console.log('Residents not joined (from assignments):', residentsNotJoined.map(r => ({ id: r.id, name: r.name })));
+  console.log('Total residents available for assignment:', residentsNotJoined.length);
 
   // Thêm cư dân vào hoạt động
   const handleAddResident = async () => {
@@ -599,7 +721,11 @@ const activityResidents: ActivityResident[] = Object.values(
     });
     
     if (isAlreadyParticipating) {
-      alert('Cư dân này đã được thêm vào hoạt động này rồi.');
+      showNotification(
+        'Cư dân đã tham gia',
+        'Cư dân này đã được thêm vào hoạt động này rồi.',
+        'warning'
+      );
       return;
     }
     
@@ -621,6 +747,13 @@ const activityResidents: ActivityResident[] = Object.values(
       });
       setAddResidentModalOpen(false);
       setSelectedResidentId(null);
+      
+      showNotification(
+        'Thêm cư dân thành công',
+        'Cư dân đã được thêm vào hoạt động thành công!',
+        'success'
+      );
+      
       // Reload participations
       const participationsData = await activityParticipationsAPI.getByActivityId(
         activity.id, 
@@ -630,6 +763,12 @@ const activityResidents: ActivityResident[] = Object.values(
       // Dọn dẹp duplicate participations (nếu có)
       const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
       setParticipations(cleanedParticipations);
+      
+      showNotification(
+        'Lưu đánh giá thành công',
+        'Đánh giá tham gia hoạt động đã được lưu thành công!',
+        'success'
+      );
     } catch (err: any) {
       console.error('Error adding resident:', err);
       let errorMessage = 'Không thể thêm cư dân vào hoạt động. Vui lòng thử lại.';
@@ -640,7 +779,7 @@ const activityResidents: ActivityResident[] = Object.values(
         errorMessage = `Lỗi: ${err.message}`;
       }
       
-      alert(errorMessage);
+      showNotification('Lỗi thêm cư dân', errorMessage, 'error');
     } finally {
       setAddingResident(false);
     }
@@ -1249,7 +1388,11 @@ const activityResidents: ActivityResident[] = Object.values(
                     <button
                       onClick={() => {
                         if (participationCount >= activity.capacity) {
-                          alert(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`);
+                          showNotification(
+                            'Đã đạt sức chứa tối đa',
+                            `Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`,
+                            'warning'
+                          );
                           return;
                         }
                         setAddResidentModalOpen(true);
@@ -1638,8 +1781,8 @@ const activityResidents: ActivityResident[] = Object.values(
       {/* Modal chọn cư dân */}
       <Dialog open={addResidentModalOpen} onClose={() => setAddResidentModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
-          <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
+          <div className="fixed inset-0 bg-black opacity-30" />
+          <Dialog.Panel className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
             <Dialog.Title className="text-lg font-bold mb-4">Chọn cư dân để thêm vào hoạt động</Dialog.Title>
             <select
               value={selectedResidentId || ''}
@@ -1648,7 +1791,7 @@ const activityResidents: ActivityResident[] = Object.values(
             >
               <option value="">-- Chọn cư dân --</option>
               {residentsNotJoined.map((r: any) => (
-                <option key={r.id} value={r.id}>{r.name} (Phòng: {r.room || 'N/A'})</option>
+                <option key={r.id} value={r.id}>{r.name} ({r.age} tuổi, {r.gender === 'male' ? 'Nam' : r.gender === 'female' ? 'Nữ' : 'Khác'})</option>
               ))}
             </select>
             <div className="flex justify-end gap-2">
@@ -1667,7 +1810,76 @@ const activityResidents: ActivityResident[] = Object.values(
                 {addingResident ? 'Đang thêm...' : 'Thêm'}
               </button>
             </div>
+          </Dialog.Panel>
           </div>
+      </Dialog>
+
+      {/* Notification Modal */}
+      <Dialog open={notificationModal.isOpen} onClose={closeNotification} className="fixed z-50 inset-0 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
+          <div className="fixed inset-0 bg-black opacity-30" />
+          <Dialog.Panel className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
+            <div className="flex items-start gap-4">
+              {/* Icon */}
+              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                notificationModal.type === 'success' ? 'bg-green-100' :
+                notificationModal.type === 'error' ? 'bg-red-100' :
+                notificationModal.type === 'warning' ? 'bg-yellow-100' :
+                'bg-blue-100'
+              }`}>
+                {notificationModal.type === 'success' && (
+                  <CheckCircleIcon className="w-6 h-6 text-green-600" />
+                )}
+                {notificationModal.type === 'error' && (
+                  <XCircleIcon className="w-6 h-6 text-red-600" />
+                )}
+                {notificationModal.type === 'warning' && (
+                  <ExclamationTriangleIcon className="w-6 h-6 text-yellow-600" />
+                )}
+                {notificationModal.type === 'info' && (
+                  <InformationCircleIcon className="w-6 h-6 text-blue-600" />
+                )}
+              </div>
+              
+              {/* Content */}
+              <div className="flex-1">
+                <Dialog.Title className={`text-lg font-semibold mb-2 ${
+                  notificationModal.type === 'success' ? 'text-green-800' :
+                  notificationModal.type === 'error' ? 'text-red-800' :
+                  notificationModal.type === 'warning' ? 'text-yellow-800' :
+                  'text-blue-800'
+                }`}>
+                  {notificationModal.title}
+                </Dialog.Title>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {notificationModal.message}
+                </p>
+              </div>
+              
+              {/* Close button */}
+              <button
+                onClick={closeNotification}
+                className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              >
+                <XMarkIcon className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Action button */}
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={closeNotification}
+                className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
+                  notificationModal.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                  notificationModal.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
+                  notificationModal.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' :
+                  'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                Đóng
+              </button>
+            </div>
+          </Dialog.Panel>
         </div>
       </Dialog>
 

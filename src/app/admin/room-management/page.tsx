@@ -253,7 +253,7 @@ export default function RoomManagementPage() {
                   <th style={thStyle}>Số phòng</th>
                   <th style={thStyle}>Loại phòng</th>
                   <th style={thStyle}>Số giường</th>
-                  <th style={thStyle}>Giới tính</th>
+                  <th style={thStyle}>Loại phòng theo giới tính</th>
                   <th style={thStyle}>Tầng</th>
                   <th style={thStyle}>Trạng thái</th>
                   <th style={thStyle}></th>

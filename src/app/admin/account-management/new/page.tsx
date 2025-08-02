@@ -23,6 +23,8 @@ export default function NewAccountPage() {
     email: "",
     role: "staff",
     avatar: null as File | null,
+    address: "",
+    notes: "",
   });
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -30,6 +32,10 @@ export default function NewAccountPage() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
+  
+  // State cho modal thông báo thành công
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     if (formData.role === "family") {
@@ -118,16 +124,21 @@ export default function NewAccountPage() {
       data.append("status", "active");
       data.append("created_at", new Date().toISOString());
       data.append("updated_at", new Date().toISOString());
-      const res = await userAPI.create(data);
-      if (res.status === 201) {
-        const user = res.data;
-        // Nếu là gia đình, cập nhật resident
-        if (formData.role === "family" && selectedResidentId) {
-          await residentAPI.update(selectedResidentId, { family_member_id: user._id });
-        }
-        alert("Tạo tài khoản thành công!");
-        router.push("/admin/account-management");
-      } else {
+      // Thêm các trường mới cho family accounts
+      if (formData.role === "family") {
+        if (formData.address) data.append("address", formData.address);
+        if (formData.notes) data.append("notes", formData.notes);
+      }
+              const res = await userAPI.create(data);
+        if (res.status === 201) {
+          const user = res.data;
+          // Nếu là gia đình, cập nhật resident
+          if (formData.role === "family" && selectedResidentId) {
+            await residentAPI.update(selectedResidentId, { family_member_id: user._id });
+          }
+          setSuccessMessage("Tài khoản đã được tạo thành công!");
+          setShowSuccessModal(true);
+        } else {
         const errData = res.data;
         setError(errData.detail || errData.message || "Tạo tài khoản thất bại!");
       }
@@ -342,43 +353,93 @@ export default function NewAccountPage() {
           </div>
           {/* Nếu là gia đình thì chọn cư dân */}
           {formData.role === "family" && (
-            <div>
-              <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chọn cư dân thuộc tài khoản này *</label>
-              <select
-                value={selectedResidentId}
-                onChange={e => {
-                  setSelectedResidentId(e.target.value);
-                  if (validationErrors.resident) {
-                    setValidationErrors(prev => ({ ...prev, resident: "" }));
-                  }
-                }}
-                required
-                style={{ 
-                  width: '100%', 
-                  padding: 14, 
-                  borderRadius: 10, 
-                  border: validationErrors.resident ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
-                  fontSize: 15, 
-                  marginTop: 2, 
-                  background: validationErrors.resident ? '#fef2f2' : '#f8fafc', 
-                  outline: 'none', 
-                  transition: 'border-color 0.2s' 
-                }}
-              >
-                <option value="">-- Chọn cư dân --</option>
-                {residents.map(r => (
-                  <option key={r._id} value={r._id}>{r.full_name} ({formatDate(r.date_of_birth)})</option>
-                ))}
-              </select>
-              {validationErrors.resident && (
-                <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  {validationErrors.resident}
-                </div>
-              )}
-            </div>
+            <>
+              <div>
+                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chọn cư dân thuộc tài khoản này *</label>
+                <select
+                  value={selectedResidentId}
+                  onChange={e => {
+                    setSelectedResidentId(e.target.value);
+                    if (validationErrors.resident) {
+                      setValidationErrors(prev => ({ ...prev, resident: "" }));
+                    }
+                  }}
+                  required
+                  style={{ 
+                    width: '100%', 
+                    padding: 14, 
+                    borderRadius: 10, 
+                    border: validationErrors.resident ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
+                    fontSize: 15, 
+                    marginTop: 2, 
+                    background: validationErrors.resident ? '#fef2f2' : '#f8fafc', 
+                    outline: 'none', 
+                    transition: 'border-color 0.2s' 
+                  }}
+                >
+                  <option value="">-- Chọn cư dân --</option>
+                  {residents.map(r => (
+                    <option key={r._id} value={r._id}>{r.full_name} ({formatDate(r.date_of_birth)})</option>
+                  ))}
+                </select>
+                {validationErrors.resident && (
+                  <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    {validationErrors.resident}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Địa chỉ</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={e => handleChange('address', e.target.value)}
+                  placeholder="Nhập địa chỉ của người giám hộ"
+                  style={{ 
+                    width: '100%', 
+                    padding: 14, 
+                    borderRadius: 10, 
+                    border: '1.5px solid #e5e7eb', 
+                    fontSize: 15, 
+                    marginTop: 2, 
+                    outline: 'none', 
+                    transition: 'border-color 0.2s', 
+                    background: '#f8fafc' 
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
+                  onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Ghi chú</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={e => handleChange('notes', e.target.value)}
+                  placeholder="Nhập ghi chú về tài khoản (tùy chọn)"
+                  rows={3}
+                  style={{ 
+                    width: '100%', 
+                    padding: 14, 
+                    borderRadius: 10, 
+                    border: '1.5px solid #e5e7eb', 
+                    fontSize: 15, 
+                    marginTop: 2, 
+                    outline: 'none', 
+                    transition: 'border-color 0.2s', 
+                    background: '#f8fafc',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
+                  onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+            </>
           )}
         </div>
         {error && <div style={{ color: 'red', marginTop: 16 }}>{error}</div>}
@@ -408,9 +469,107 @@ export default function NewAccountPage() {
             display: 'flex',
             alignItems: 'center',
             gap: 8
-          }}>{saving ? 'Đang lưu...' : (<><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{marginRight: 4}}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Tạo tài khoản</>)}</button>
+          }}>{saving ? 'Đang lưu...' : (<><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{marginRight: 4}}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Tạo tài khoản</>)}          </button>
         </div>
       </form>
+
+      {/* Modal thông báo thành công */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15,23,42,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(12px)',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem',
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            border: '1px solid rgba(255,255,255,0.2)'
+          }}>
+            {/* Icon thành công */}
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 8px 24px rgba(16,185,129,0.3)'
+            }}>
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+
+            {/* Tiêu đề */}
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              margin: '0 0 0.75rem 0',
+              letterSpacing: '-0.01em'
+            }}>
+              Thành công!
+            </h3>
+
+            {/* Nội dung */}
+            <p style={{
+              fontSize: '1rem',
+              color: '#64748b',
+              margin: '0 0 2rem 0',
+              lineHeight: 1.6
+            }}>
+              {successMessage}
+            </p>
+
+            {/* Nút đóng */}
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                router.push("/admin/account-management");
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.75rem',
+                padding: '0.875rem 2rem',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+                minWidth: '120px'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(99,102,241,0.4)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(99,102,241,0.3)';
+              }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

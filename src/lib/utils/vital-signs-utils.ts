@@ -195,7 +195,28 @@ export function validateVitalSigns(data: any) {
  * Transform API data to VitalSigns format
  */
 export function transformApiVitalSignsData(apiData: any, residents: any[]): any {
-  const resident = residents.find(r => r.id === (apiData.resident_id || apiData.residentId));
+  const residentId = apiData.resident_id || apiData.residentId;
+  
+  // Try multiple ways to find the resident
+  let resident = residents.find(r => r.id === residentId);
+  if (!resident) {
+    // Try with _id if id doesn't match
+    resident = residents.find(r => r.id === apiData.resident_id?._id || apiData.residentId?._id);
+  }
+  if (!resident) {
+    // Try with string comparison
+    resident = residents.find(r => String(r.id) === String(residentId));
+  }
+  
+  // Debug log for resident mapping
+  console.log('🔍 Resident mapping:', {
+    apiDataId: residentId,
+    apiDataResidentId: apiData.resident_id,
+    apiDataResidentIdType: typeof apiData.resident_id,
+    availableResidentIds: residents.map(r => r.id),
+    foundResident: resident,
+    residentName: resident?.name
+  });
   
   // Parse date and time from date_time field
   let date = '', time = '';
@@ -226,17 +247,77 @@ export function transformApiVitalSignsData(apiData: any, residents: any[]): any 
     respiratoryRate: apiData.respiratory_rate || apiData.respiratoryRate,
   };
 
+  // Handle recordedBy - ensure it's always a string
+  let recordedBy = 'Staff';
+  if (apiData.recorded_by) {
+    if (typeof apiData.recorded_by === 'object' && apiData.recorded_by !== null) {
+      // If it's an object, extract the ID or name
+      recordedBy = apiData.recorded_by._id || apiData.recorded_by.id || apiData.recorded_by.full_name || apiData.recorded_by.fullName || 'Staff';
+    } else if (typeof apiData.recorded_by === 'string') {
+      recordedBy = apiData.recorded_by;
+    }
+  } else if (apiData.recordedBy) {
+    if (typeof apiData.recordedBy === 'object' && apiData.recordedBy !== null) {
+      recordedBy = apiData.recordedBy._id || apiData.recordedBy.id || apiData.recordedBy.full_name || apiData.recordedBy.fullName || 'Staff';
+    } else if (typeof apiData.recordedBy === 'string') {
+      recordedBy = apiData.recordedBy;
+    }
+  }
+
+  // Get resident name with fallback
+  let residentName = '';
+  if (resident?.name) {
+    residentName = resident.name;
+  } else if (apiData.resident_name) {
+    residentName = apiData.resident_name;
+  } else if (apiData.resident_id?.full_name) {
+    residentName = apiData.resident_id.full_name;
+  } else if (apiData.residentId?.full_name) {
+    residentName = apiData.residentId.full_name;
+  } else {
+    residentName = `Resident ${residentId}`;
+  }
+
+  // Get resident avatar
+  let residentAvatar = '';
+  if (resident?.avatar) {
+    residentAvatar = Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar;
+  } else if (apiData.resident_id?.avatar) {
+    residentAvatar = Array.isArray(apiData.resident_id.avatar) ? apiData.resident_id.avatar[0] : apiData.resident_id.avatar;
+  } else if (apiData.residentId?.avatar) {
+    residentAvatar = Array.isArray(apiData.residentId.avatar) ? apiData.residentId.avatar[0] : apiData.residentId.avatar;
+  }
+
+  // Ensure residentId is always a string
+  let finalResidentId = '';
+  if (typeof apiData.resident_id === 'string') {
+    finalResidentId = apiData.resident_id;
+  } else if (typeof apiData.residentId === 'string') {
+    finalResidentId = apiData.residentId;
+  } else if (apiData.resident_id?._id) {
+    finalResidentId = apiData.resident_id._id;
+  } else if (apiData.residentId?._id) {
+    finalResidentId = apiData.residentId._id;
+  } else if (apiData.resident_id?.id) {
+    finalResidentId = apiData.resident_id.id;
+  } else if (apiData.residentId?.id) {
+    finalResidentId = apiData.residentId.id;
+  } else {
+    finalResidentId = String(apiData.resident_id || apiData.residentId || '');
+  }
+
   return {
     id: apiData._id || apiData.id,
-    residentId: apiData.resident_id || apiData.residentId,
-    residentName: resident?.name || '',
+    residentId: finalResidentId,
+    residentName,
+    residentAvatar,
     date,
     time,
     ...vitalSignsData,
     weight: apiData.weight,
     bloodSugar: apiData.bloodSugar,
     notes: apiData.notes,
-    recordedBy: apiData.recorded_by || apiData.recordedBy || 'Staff',
+    recordedBy,
     status: evaluateVitalSignsStatus(vitalSignsData)
   };
 }

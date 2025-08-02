@@ -32,7 +32,11 @@ export default function ServiceAssignmentsPage() {
         const allAssignments = await Promise.all(
           resList.map(async (r: any) => {
             try {
-              const data = await carePlansAPI.getByResidentId(r._id);
+              // Đảm bảo r._id là string
+            const residentId = typeof r._id === 'object' && (r._id as any)?._id 
+              ? (r._id as any)._id 
+              : r._id;
+            const data = await carePlansAPI.getByResidentId(residentId);
               // Lấy số phòng giống resident page
               const assignment = Array.isArray(data) ? data.find((a: any) => a.assigned_room_id) : null;
               const roomId = assignment?.assigned_room_id?._id || assignment?.assigned_room_id;

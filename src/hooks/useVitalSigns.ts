@@ -12,6 +12,7 @@ export interface VitalSigns {
   id: string;
   residentId: string;
   residentName: string;
+  residentAvatar?: string;
   date: string;
   time: string;
   bloodPressure: string;
@@ -31,6 +32,7 @@ export interface Resident {
   name: string;
   room: string;
   age: number;
+  avatar?: string;
 }
 
 export interface UseVitalSignsReturn {
@@ -55,19 +57,28 @@ export function useVitalSigns(): UseVitalSignsReturn {
   const loadResidents = useCallback(async () => {
     try {
       let resList = await residentAPI.getAll();
+      console.log('All residents from API:', resList);
       
       // If user is staff, filter residents by staff assignment
       if (user?.role === 'staff' && user?.id) {
+        console.log('User is staff, filtering residents by assignments...');
         try {
           const staffAssignments = await staffAssignmentsAPI.getByStaff(user.id);
-          const assignedResidentIds = staffAssignments.map((assignment: any) => 
-            assignment.resident_id._id || assignment.resident_id
-          );
+          console.log('Raw staff assignments:', staffAssignments);
+          
+          const assignedResidentIds = staffAssignments.map((assignment: any) => {
+            const residentId = assignment.resident_id._id || assignment.resident_id;
+            console.log('Assignment resident ID:', residentId);
+            return residentId;
+          });
           
           // Filter residents to only show assigned ones
-          resList = resList.filter((resident: any) => 
-            assignedResidentIds.includes(resident._id || resident.id)
-          );
+          resList = resList.filter((resident: any) => {
+            const residentId = resident._id || resident.id;
+            const isAssigned = assignedResidentIds.includes(residentId);
+            console.log(`Resident ${residentId} (${resident.full_name}) assigned:`, isAssigned);
+            return isAssigned;
+          });
           
           console.log('Staff assignments:', staffAssignments);
           console.log('Assigned resident IDs:', assignedResidentIds);
@@ -77,6 +88,8 @@ export function useVitalSigns(): UseVitalSignsReturn {
           // If error fetching assignments, show no residents for staff
           resList = [];
         }
+      } else {
+        console.log('User is not staff or no user ID, showing all residents');
       }
       
       // Get room information for each resident
@@ -98,8 +111,11 @@ export function useVitalSigns(): UseVitalSignsReturn {
         try {
           const assignments = await carePlansAPI.getByResidentId(r._id);
           const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-          if (assignment?.assigned_room_id) {
-            const room = await roomsAPI.getById(assignment.assigned_room_id);
+          const roomId = assignment?.assigned_room_id;
+          // Đảm bảo roomId là string, không phải object
+          const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+          if (roomIdString) {
+            const room = await roomsAPI.getById(roomIdString);
             roomNumber = room?.room_number || 'Chưa phân phòng';
           }
         } catch (error) {
@@ -111,9 +127,11 @@ export function useVitalSigns(): UseVitalSignsReturn {
           name: r.full_name || r.fullName || r.name || 'Chưa có tên',
           room: roomNumber,
           age: age,
+          avatar: Array.isArray(r.avatar) ? r.avatar[0] : r.avatar || null,
         };
       }));
       
+      console.log('Final mapped residents:', mappedResidents);
       setResidents(mappedResidents);
       return mappedResidents;
     } catch (error) {
@@ -129,7 +147,13 @@ export function useVitalSigns(): UseVitalSignsReturn {
       const staffList = await staffAPI.getAll();
       const map: { [id: string]: string } = {};
       staffList.forEach((staff: any) => {
-        map[staff._id || staff.id] = staff.full_name || staff.fullName || staff.username || staff.email;
+        const staffId = staff._id || staff.id;
+        const staffName = staff.full_name || staff.fullName || staff.username || staff.email || 'Staff';
+        
+        // Ensure we only store string values
+        if (staffId && typeof staffName === 'string') {
+          map[staffId] = staffName;
+        }
       });
       setStaffMap(map);
     } catch (error) {
@@ -217,8 +241,8 @@ export function useVitalSigns(): UseVitalSignsReturn {
       
       // Improved date matching - handle different date formats
       let matchDate = true;
-      if (date) {
-        const filterDate = date; // YYYY-MM-DD format
+      if (date && date.trim()) {
+        const filterDate = date.trim(); // YYYY-MM-DD format
         
         // Extract date part from vs.date (handle both YYYY-MM-DD and ISO datetime)
         let vsDatePart = '';
@@ -232,7 +256,11 @@ export function useVitalSigns(): UseVitalSignsReturn {
           }
         }
         
-        matchDate = vsDatePart === filterDate;
+        // Normalize both dates to ensure consistent comparison
+        const normalizedFilterDate = filterDate.replace(/-/g, '');
+        const normalizedVsDate = vsDatePart.replace(/-/g, '');
+        
+        matchDate = normalizedVsDate === normalizedFilterDate;
         
         // Debug log
         console.log('📅 Date comparison:', {
@@ -240,8 +268,13 @@ export function useVitalSigns(): UseVitalSignsReturn {
           vsDate: vs.date,
           vsDatePart,
           filterDate,
+          normalizedFilterDate,
+          normalizedVsDate,
           matchDate
         });
+      } else {
+        // If no date filter, show all records
+        matchDate = true;
       }
       
       return matchResident && matchDate;

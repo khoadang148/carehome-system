@@ -75,22 +75,31 @@ export default function StaffResidentsPage() {
         const data = await staffAssignmentsAPI.getMyAssignments();
         const assignmentsData = Array.isArray(data) ? data : [];
         
-        // Map API data về đúng format UI
-        const mapped = assignmentsData.map((assignment: any) => {
-          const resident = assignment.resident_id;
-          const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
-          
-          return {
-            id: resident._id,
-            name: resident.full_name || '',
-            age: age || '',
-            careLevel: resident.care_level || '',
-            emergencyContact: resident.emergency_contact?.name || '',
-            contactPhone: resident.emergency_contact?.phone || '',
-            avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-            gender: (resident.gender || '').toLowerCase(),
-          };
-        });
+        // Debug: Log assignments data
+        console.log('Raw assignments data:', assignmentsData);
+        
+        // Map API data về đúng format UI và chỉ lấy những assignment active
+        const mapped = assignmentsData
+          .filter((assignment: any) => assignment.status === 'active') // Chỉ lấy active assignments
+          .map((assignment: any) => {
+            const resident = assignment.resident_id;
+            const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
+            
+            return {
+              id: resident._id,
+              name: resident.full_name || '',
+              age: age || '',
+              careLevel: resident.care_level || '',
+              emergencyContact: resident.emergency_contact?.name || '',
+              contactPhone: resident.emergency_contact?.phone || '',
+              avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+              gender: (resident.gender || '').toLowerCase(),
+              assignmentStatus: assignment.status || 'unknown',
+              assignmentId: assignment._id,
+              endDate: assignment.end_date,
+              assignedDate: assignment.assigned_date,
+            };
+          });
         
         setResidentsData(mapped);
         
@@ -100,8 +109,10 @@ export default function StaffResidentsPage() {
             const assignments = await carePlansAPI.getByResidentId(resident.id);
             const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
             const roomId = assignment?.assigned_room_id;
-            if (roomId) {
-              const room = await roomsAPI.getById(roomId);
+            // Đảm bảo roomId là string, không phải object
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
               setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
             } else {
               setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
@@ -199,6 +210,7 @@ export default function StaffResidentsPage() {
             gap: '1rem'
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              
               <div style={{
                 width: '3.5rem',
                 height: '3.5rem',
@@ -229,40 +241,9 @@ export default function StaffResidentsPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {residentsData.length} cư dân được phân công cho bạn
+                  Tổng số: {residentsData.length} cư dân đang được phân công cho bạn
                 </p>
               </div>
-            </div>
-            
-            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
-              <Link 
-                href="/staff" 
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  padding: '0.875rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.3s ease',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
-                }}
-              >
-                <ArrowLeftIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                Quay lại
-              </Link>
             </div>
           </div>
         </div>
@@ -429,6 +410,15 @@ export default function StaffResidentsPage() {
                     </th>
                     <th style={{
                       padding: '1rem',
+                      textAlign: 'left',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151'
+                    }}>
+                      Trạng thái
+                    </th>
+                    <th style={{
+                      padding: '1rem',
                       textAlign: 'center',
                       fontSize: '0.875rem',
                       fontWeight: 600,
@@ -562,9 +552,30 @@ export default function StaffResidentsPage() {
                           }}>
                             {resident.contactPhone}
                           </p>
-                                                 </div>
-                       </td>
-                       <td style={{padding: '1rem'}}>
+                        </div>
+                      </td>
+                      <td style={{padding: '1rem'}}>
+                        <span style={{
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          color: '#10b981',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600
+                        }}>
+                          Đang quản lý
+                        </span>
+                        {resident.endDate && (
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            margin: '0.25rem 0 0 0'
+                          }}>
+                            Hết hạn: {new Date(resident.endDate).toLocaleDateString('vi-VN')}
+                          </p>
+                        )}
+                      </td>
+                      <td style={{padding: '1rem'}}>
                          <div style={{
                            display: 'flex',
                            justifyContent: 'center',

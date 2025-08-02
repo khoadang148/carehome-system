@@ -186,17 +186,47 @@ export function parseAIRecommendation(feedback: any): ParsedAIRecommendation[] {
     console.log('Found objectives:', objectives);
   }
   
-  // Extract detailed description - chỉ tìm pattern chính xác
+  // Extract detailed description - tìm pattern chính xác và các pattern khác
   let detailedDescription = '';
+  
+  // Pattern chính: "**Mô tả:** Nội dung mô tả"
   const descriptionSection = feedback.match(/\*\*Mô tả:\*\*\s*([^*]+)/);
   if (descriptionSection) {
     detailedDescription = descriptionSection[1].trim();
-    console.log('Found detailed description:', detailedDescription.substring(0, 100) + '...');
+    console.log('Found detailed description (Pattern 1):', detailedDescription.substring(0, 100) + '...');
   } else {
-    // Lấy đoạn đầu tiên của feedback làm mô tả
-    const lines = feedback.split('\n').filter(line => line.trim());
-    detailedDescription = lines.slice(0, 3).join(' ').trim();
-    console.log('Using first paragraph as description:', detailedDescription.substring(0, 100) + '...');
+    // Pattern phụ: Tìm phần mô tả có thời gian cụ thể (như trong hình ảnh)
+    const timeBasedDescription = feedback.match(/(\d{2}:\d{2}\s*-\s*\d{2}:\d{2}.*?)(?=\d{2}:\d{2}|$)/gs);
+    if (timeBasedDescription && timeBasedDescription.length > 0) {
+      detailedDescription = timeBasedDescription.join('\n').trim();
+      console.log('Found time-based description (Pattern 2):', detailedDescription.substring(0, 100) + '...');
+    } else {
+      // Pattern khác: Tìm phần mô tả có chứa từ khóa "Chuẩn bị", "Tham gia", "Khuyến khích"
+      const actionBasedDescription = feedback.match(/([^**\n]*(?:Chuẩn bị|Tham gia|Khuyến khích|Hỗ trợ|Đảm bảo)[^**\n]*)/);
+      if (actionBasedDescription) {
+        detailedDescription = actionBasedDescription[1].trim();
+        console.log('Found action-based description (Pattern 3):', detailedDescription.substring(0, 100) + '...');
+      } else {
+        // Pattern dự phòng: Tìm đoạn văn có chứa từ khóa mô tả
+        const descriptionKeywords = feedback.match(/([^**\n]+(?:Chuẩn bị|Tham gia|Khuyến khích|Hỗ trợ)[^**\n]+)/);
+        if (descriptionKeywords) {
+          detailedDescription = descriptionKeywords[1].trim();
+          console.log('Found keyword-based description (Pattern 4):', detailedDescription.substring(0, 100) + '...');
+        } else {
+          // Pattern cuối: Tìm bất kỳ đoạn văn nào có chứa thông tin hữu ích
+          const usefulContent = feedback.match(/([^**\n]{20,200})/);
+          if (usefulContent) {
+            detailedDescription = usefulContent[1].trim();
+            console.log('Found useful content (Pattern 5):', detailedDescription.substring(0, 100) + '...');
+          } else {
+            // Lấy đoạn đầu tiên của feedback làm mô tả
+            const lines = feedback.split('\n').filter(line => line.trim());
+            detailedDescription = lines.slice(0, 3).join(' ').trim();
+            console.log('Using first paragraph as description (Pattern 6):', detailedDescription.substring(0, 100) + '...');
+          }
+        }
+      }
+    }
   }
   
   // Extract benefits - chỉ tìm pattern chính xác

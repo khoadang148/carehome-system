@@ -29,10 +29,30 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { format, parseISO } from 'date-fns';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useVitalSigns, VitalSigns } from '@/hooks/useVitalSigns';
 import { getVitalSignsStatusColor } from '@/lib/utils/vital-signs-utils';
 import { VITAL_SIGNS_STATUS_LABELS } from '@/lib/constants/vital-signs';
-import VitalSignsForm from '@/components/VitalSignsForm';
+import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, userAPI } from '@/lib/api';
+
+// Helper function to ensure string values
+const ensureString = (value: any): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value !== null) {
+    // Handle resident object
+    if (value.full_name || value.fullName || value.name) {
+      return value.full_name || value.fullName || value.name;
+    }
+    // Handle staff object
+    if (value.username || value.email) {
+      return value.username || value.email;
+    }
+    // Handle other objects - try to get a meaningful string
+    if (value._id) return String(value._id);
+    if (value.id) return String(value.id);
+    return 'Unknown';
+  }
+  if (value === null || value === undefined) return 'N/A';
+  return String(value || 'N/A');
+};
 
 export default function StaffVitalSignsPage() {
   const { user } = useAuth();
@@ -51,87 +71,199 @@ export default function StaffVitalSignsPage() {
     }
   }, [user, router]);
   
-  // Use the custom hook for data management
-  const {
-    vitalSigns,
-    residents,
-    staffMap,
-    loading,
-    addVitalSigns,
-    validateForm,
-    getFilteredVitalSigns
-  } = useVitalSigns();
+  // State management
+  const [vitalSigns, setVitalSigns] = useState<any[]>([]);
+  const [residents, setResidents] = useState<any[]>([]);
+  const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
+  const [staffMap, setStaffMap] = useState<{[key: string]: string}>({});
+  const [loading, setLoading] = useState(false);
 
   // UI state
   const [selectedResident, setSelectedResident] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [currentDate, setCurrentDate] = useState(() => {
+    const now = new Date();
+    const yyyy = now.getUTCFullYear();
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [filterDate, setFilterDate] = useState<Date | null>(new Date());
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationIdRef = useRef(0);
-  const [pendingSuccess, setPendingSuccess] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Modal management effect
+  // Load residents from API when component mounts
   useEffect(() => {
-    if (showAddForm) {
-      document.body.classList.add('hide-header');
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.classList.remove('hide-header');
-      document.body.style.overflow = 'unset';
-    }
-    
-    return () => {
-      document.body.classList.remove('hide-header');
-      document.body.style.overflow = 'unset';
+    const fetchResidents = async () => {
+      setLoading(true);
+      try {
+        let mapped: any[] = [];
+        
+        if (user?.role === 'staff') {
+          // Staff chỉ thấy residents được phân công
+          const data = await staffAssignmentsAPI.getMyAssignments();
+          const assignmentsData = Array.isArray(data) ? data : [];
+          
+          // Debug: Log assignments data
+          console.log('Raw assignments data:', assignmentsData);
+          
+          // Map API data về đúng format UI và chỉ lấy những assignment active
+          mapped = assignmentsData
+            .filter((assignment: any) => assignment.status === 'active') // Chỉ lấy active assignments
+            .map((assignment: any) => {
+              const resident = assignment.resident_id;
+              
+              return {
+                id: resident._id,
+                name: resident.full_name || '',
+                avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+                assignmentStatus: assignment.status || 'unknown',
+                assignmentId: assignment._id,
+              };
+            });
+        } else if (user?.role === 'admin') {
+          // Admin thấy tất cả residents
+          const data = await residentAPI.getAll();
+          const residentsData = Array.isArray(data) ? data : [];
+          
+          mapped = residentsData.map((resident: any) => ({
+            id: resident._id,
+            name: resident.full_name || '',
+            avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+          }));
+        }
+        
+        setResidents(mapped);
+        
+        // Lấy số phòng cho từng resident
+        mapped.forEach(async (resident: any) => {
+          try {
+            const assignments = await carePlansAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
+            const roomId = assignment?.assigned_room_id;
+            // Đảm bảo roomId là string, không phải object
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+            } else {
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+            }
+          } catch {
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+          }
+        });
+        
+      } catch (err) {
+        console.error('Error loading residents:', err);
+        setResidents([]);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [showAddForm]);
-
-  // Handle form submission
-  const handleAddVitalSigns = async (data: Partial<VitalSigns>) => {
-    try {
-      await addVitalSigns(data);
-      setShowAddForm(false);
-      setShowSuccessModal(true);
-      setTimeout(() => setShowSuccessModal(false), 1500);
-    } catch (error) {
-      toast.error('Lỗi khi thêm chỉ số sức khỏe!', { position: 'top-right' });
-      notificationIdRef.current += 1;
-      setNotifications(prev => [
-        {
-          id: notificationIdRef.current,
-          message: 'Lỗi khi thêm chỉ số sức khỏe!',
-          type: 'error',
-          time: new Date().toLocaleString('vi-VN')
-        },
-        ...prev
-      ]);
-      throw error;
+    
+    if (user) {
+      fetchResidents();
     }
+  }, [user]);
+
+  // Load vital signs data
+  useEffect(() => {
+    const fetchVitalSigns = async () => {
+      try {
+        const data = await vitalSignsAPI.getAll();
+        const vitalSignsData = Array.isArray(data) ? data : [];
+        setVitalSigns(vitalSignsData);
+        
+        // Build staff map
+        const staffIds = [...new Set(vitalSignsData.map(vs => vs.recorded_by).filter(Boolean))];
+        const staffMapData: {[key: string]: string} = {};
+        
+        for (const staffId of staffIds) {
+          if (staffId && typeof staffId === 'string' && staffId.trim() !== '') {
+            try {
+              const staff = await userAPI.getById(staffId);
+              staffMapData[staffId] = staff?.username || staff?.email || 'Unknown';
+            } catch (error) {
+              console.warn(`Failed to fetch staff with ID ${staffId}:`, error);
+              staffMapData[staffId] = 'Unknown';
+            }
+          }
+        }
+        
+        setStaffMap(staffMapData);
+      } catch (err) {
+        console.error('Error loading vital signs:', err);
+        setVitalSigns([]);
+      }
+    };
+    
+    if (user) {
+      fetchVitalSigns();
+    }
+  }, [user]);
+
+  // Transform vital signs data for display
+  const transformVitalSignsForDisplay = (vitalSignsData: any[]) => {
+    return vitalSignsData.map(vs => {
+      // Find resident info
+      const resident = residents.find(r => r.id === vs.resident_id);
+      
+      return {
+        id: vs._id,
+        residentId: vs.resident_id,
+        residentName: resident?.name || 'Unknown',
+        residentAvatar: resident?.avatar,
+        date: vs.date,
+        time: vs.time,
+        bloodPressure: vs.blood_pressure || vs.bloodPressure,
+        heartRate: vs.heart_rate || vs.heartRate,
+        temperature: vs.temperature,
+        oxygenSaturation: vs.oxygen_saturation || vs.oxygenSaturation,
+        respiratoryRate: vs.respiratory_rate || vs.respiratoryRate,
+        weight: vs.weight,
+        notes: vs.notes,
+        recordedBy: vs.recorded_by || vs.recordedBy || null,
+      };
+    });
   };
 
-  // Khi modal đóng, nếu vừa submit thành công thì show toast/notification ở page
-  useEffect(() => {
-    if (!showAddForm && pendingSuccess) {
-      toast.success('Thêm chỉ số sức khỏe thành công!', { position: 'top-right' });
-      notificationIdRef.current += 1;
-      setNotifications(prev => [
-        {
-          id: notificationIdRef.current,
-          message: 'Thêm chỉ số sức khỏe thành công!',
-          type: 'success',
-          time: new Date().toLocaleString('vi-VN')
-        },
-        ...prev
-      ]);
-      setPendingSuccess(false);
+  // Get filtered vital signs
+  const getFilteredVitalSigns = (residentId?: string, date?: string) => {
+    let filtered = vitalSigns;
+    
+    if (residentId) {
+      filtered = filtered.filter(vs => vs.resident_id === residentId);
     }
-  }, [showAddForm, pendingSuccess]);
+    
+    if (date) {
+      filtered = filtered.filter(vs => {
+        try {
+          const dateObj = new Date(vs.date);
+          if (isNaN(dateObj.getTime())) {
+            return false; // Skip invalid dates
+          }
+          const vsDate = dateObj.toISOString().split('T')[0];
+          return vsDate === date;
+        } catch (error) {
+          console.warn('Invalid date in vital signs:', vs.date);
+          return false; // Skip invalid dates
+        }
+      });
+    }
+    
+    return transformVitalSignsForDisplay(filtered);
+  };
+
+
 
   // Get filtered data
   const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, currentDate);
+
+  // Debug logs
+  console.log('Component residents:', residents);
+  console.log('Component user:', user);
+  console.log('Selected resident:', selectedResident);
 
   // Loading state
   if (loading) {
@@ -167,6 +299,27 @@ export default function StaffVitalSignsPage() {
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+          }
+          
+          .datepicker-wrapper {
+            width: 100%;
+          }
+          
+          .datepicker-wrapper input {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            outline: none;
+            background: white;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          
+          .datepicker-wrapper input:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
           }
         `
       }} />
@@ -244,7 +397,7 @@ export default function StaffVitalSignsPage() {
                 </div>
               </div>
               <button
-                onClick={() => setShowAddForm(true)}
+                onClick={() => router.push('/staff/vital-signs/add')}
                 disabled={user?.role === 'staff' && residents.length === 0}
                 style={{
                   display: 'flex',
@@ -278,54 +431,98 @@ export default function StaffVitalSignsPage() {
 
           {/* Filters */}
           <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
             marginBottom: '2rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)'
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '1.5rem',
+              alignItems: 'end'
+            }}>
               {/* Resident Filter */}
               <div>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#374151',
-                  marginBottom: '0.5rem'
+                  marginBottom: '0.75rem',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
                 }}>
-                  Lọc theo người cao tuổi
+                   Lọc theo người cao tuổi
                 </label>
                 <select
                   value={selectedResident || ''}
                   onChange={(e) => setSelectedResident(e.target.value || null)}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
+                    padding: '1rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.75rem',
                     fontSize: '0.875rem',
-                    outline: 'none'
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                  }}
+                  disabled={residents.length === 0}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#ef4444';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                   }}
                 >
-                  <option value="">Tất cả người cao tuổi được phân công</option>
+                  <option value="">
+                    {residents.length === 0 
+                      ? (user?.role === 'staff' 
+                          ? 'Chưa được phân công cư dân nào' 
+                          : 'Chưa có cư dân nào trong hệ thống')
+                      : 'Tất cả người cao tuổi được phân công'
+                    }
+                  </option>
                   {residents.map(resident => (
                     <option key={resident.id} value={resident.id}>
-                      {resident.name} - Phòng {resident.room}
+                      {resident.name} - Phòng {roomNumbers[resident.id] || 'Chưa cập nhật'}
                     </option>
                   ))}
                 </select>
                 {residents.length === 0 && user?.role === 'staff' && (
                   <div style={{
-                    marginTop: '0.5rem',
-                    padding: '0.75rem',
-                    background: '#fef3c7',
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                     border: '1px solid #f59e0b',
-                    borderRadius: '0.5rem',
+                    borderRadius: '0.75rem',
                     fontSize: '0.875rem',
-                    color: '#92400e'
+                    color: '#92400e',
+                    boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)'
                   }}>
                     ⚠️ Bạn chưa được phân công quản lý cư dân nào. Vui lòng liên hệ admin để được phân công.
+                  </div>
+                )}
+                {residents.length === 0 && user?.role === 'admin' && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                    border: '1px solid #3b82f6',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    color: '#1e40af',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.1)'
+                  }}>
+                    ℹ️ Chưa có cư dân nào trong hệ thống.
                   </div>
                 )}
               </div>
@@ -335,9 +532,12 @@ export default function StaffVitalSignsPage() {
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#374151',
-                  marginBottom: '0.5rem'
+                  marginBottom: '0.75rem',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
                 }}>
                   Lọc theo ngày
                 </label>
@@ -346,16 +546,27 @@ export default function StaffVitalSignsPage() {
                   onChange={(date: Date | null) => {
                     setFilterDate(date);
                     if (date) {
-                      const yyyy = date.getFullYear();
-                      const mm = String(date.getMonth() + 1).padStart(2, '0');
-                      const dd = String(date.getDate()).padStart(2, '0');
+                      // Use UTC to avoid timezone issues
+                      const yyyy = date.getUTCFullYear();
+                      const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getUTCDate()).padStart(2, '0');
                       setCurrentDate(`${yyyy}-${mm}-${dd}`);
                     } else {
-                      setCurrentDate('');
+                      // Reset to today's date when cleared
+                      const now = new Date();
+                      const yyyy = now.getUTCFullYear();
+                      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+                      const dd = String(now.getUTCDate()).padStart(2, '0');
+                      setCurrentDate(`${yyyy}-${mm}-${dd}`);
                     }
                   }}
                   dateFormat="dd/MM/yyyy"
-                  className="w-full px-3 py-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  wrapperClassName="datepicker-wrapper"
+                  placeholderText="Chọn ngày..."
+                  isClearable={true}
+                  showYearDropdown={true}
+                  showMonthDropdown={true}
+                  dropdownMode="select"
                 />
               </div>
 
@@ -364,40 +575,76 @@ export default function StaffVitalSignsPage() {
 
           {/* Vital Signs List */}
           <div style={{
-            background: 'white',
+            background: '#ffffff',
             borderRadius: '1rem',
             overflow: 'hidden',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+            border: '1px solid #e5e7eb'
           }}>
             <div style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb',
-              background: '#f9fafb'
+              padding: '1.5rem 2rem',
+              borderBottom: '1px solid #f3f4f6',
+              background: '#ffffff'
             }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 600,
-                color: '#1f2937',
-                margin: 0
-              }}>
-                Danh sách chỉ số sức khỏe({filteredVitalSigns.length})
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h2 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 600,
+                    color: '#ef4444',
+                    margin: 0,
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Danh sách chỉ số sức khỏe
+                  </h2>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: '0.25rem 0 0 0',
+                    fontWeight: 400
+                  }}>
+                    Tổng số: {filteredVitalSigns.length} bản ghi
+                  </p>
+                </div>
+                
+              </div>
             </div>
 
             {filteredVitalSigns.length === 0 ? (
               <div style={{
-                padding: '3rem',
+                padding: '3rem 2rem',
                 textAlign: 'center',
-                color: '#6b7280'
+                background: '#ffffff'
               }}>
-                <HeartIcon style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem', opacity: 0.5 }} />
-                <p style={{ fontSize: '1.125rem', fontWeight: 500, margin: '0 0 0.5rem 0' }}>
+                <div style={{
+                  width: '3rem',
+                  height: '3rem',
+                  background: '#f3f4f6',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem'
+                }}>
+                  <HeartIcon style={{ width: '1.5rem', height: '1.5rem', color: '#9ca3af' }} />
+                </div>
+                <h3 style={{ 
+                  fontSize: '1.125rem', 
+                  fontWeight: 600, 
+                  margin: '0 0 0.5rem 0',
+                  color: '#374151'
+                }}>
                   {residents.length === 0 && user?.role === 'staff' 
                     ? 'Bạn chưa được phân công quản lý cư dân nào'
                     : 'Chưa có chỉ số sức khỏe nào'
                   }
-                </p>
-                <p style={{ margin: 0 }}>
+                </h3>
+                <p style={{ 
+                  margin: 0, 
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  lineHeight: '1.5'
+                }}>
                   {residents.length === 0 && user?.role === 'staff'
                     ? 'Vui lòng liên hệ admin để được phân công quản lý cư dân'
                     : 'Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe'
@@ -408,29 +655,96 @@ export default function StaffVitalSignsPage() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#f9fafb' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                    <tr style={{ 
+                      background: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb'
+                    }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#374151',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Người cao tuổi
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#374151',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Ngày giờ
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#dc2626',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Huyết áp
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#059669',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Nhịp tim
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#ea580c',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Nhiệt độ
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#2563eb',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         SpO2
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#059669',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Ghi chú
                       </th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#7c3aed',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
                         Người nhập chỉ số
                       </th>
                     </tr>
@@ -440,11 +754,18 @@ export default function StaffVitalSignsPage() {
                       <tr 
                         key={vs.id}
                         style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          background: index % 2 === 0 ? 'white' : '#fafafa'
+                          borderBottom: '1px solid #f3f4f6',
+                          background: index % 2 === 0 ? 'white' : '#fafafa',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#f8fafc';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = index % 2 === 0 ? 'white' : '#fafafa';
                         }}
                       >
-                        <td style={{ padding: '1rem' }}>
+                        <td style={{ padding: '1rem 1.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <div style={{
                               width: '2.5rem',
@@ -456,42 +777,137 @@ export default function StaffVitalSignsPage() {
                               justifyContent: 'center',
                               color: 'white',
                               fontSize: '0.875rem',
-                              fontWeight: 600
+                              fontWeight: 600,
+                              overflow: 'hidden'
                             }}>
-                              {vs.residentName.charAt(0)}
+                              {vs.residentAvatar ? (
+                                <img
+                                  src={userAPI.getAvatarUrl(vs.residentAvatar)}
+                                  alt={ensureString(vs.residentName)}
+                                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                      parent.textContent = ensureString(vs.residentName).charAt(0).toUpperCase();
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                ensureString(vs.residentName).charAt(0).toUpperCase()
+                              )}
                             </div>
                             <div>
                               <div style={{ fontWeight: 500, color: '#1f2937' }}>
-                                {vs.residentName}
+                                {ensureString(vs.residentName)}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                ID: {ensureString(vs.residentId)}
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           <div>
-                            {format(parseISO(vs.date), 'dd/MM/yyyy')}
+                            {(() => {
+                              try {
+                                const dateObj = new Date(vs.date);
+                                if (!isNaN(dateObj.getTime())) {
+                                  return format(dateObj, 'dd/MM/yyyy');
+                                }
+                                return 'Invalid Date';
+                              } catch (error) {
+                                return 'Invalid Date';
+                              }
+                            })()}
                           </div>
                           <div style={{ color: '#6b7280' }}>
                             {vs.time || ''}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
-                          {vs.bloodPressure}
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          <span style={{ 
+                            color: '#dc2626', 
+                            fontWeight: 600,
+                            padding: '0.25rem 0.5rem',
+                            background: '#fef2f2',
+                            borderRadius: '0.375rem',
+                            border: '1px solid #fecaca'
+                          }}>
+                            {vs.bloodPressure}
+                          </span>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
-                          {vs.heartRate} bpm
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          <span style={{ 
+                            color: '#059669', 
+                            fontWeight: 600,
+                            padding: '0.25rem 0.5rem',
+                            background: '#f0fdf4',
+                            borderRadius: '0.375rem',
+                            border: '1px solid #bbf7d0'
+                          }}>
+                            {vs.heartRate} bpm
+                          </span>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
-                          {vs.temperature}°C
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          <span style={{ 
+                            color: '#ea580c', 
+                            fontWeight: 600,
+                            padding: '0.25rem 0.5rem',
+                            background: '#fff7ed',
+                            borderRadius: '0.375rem',
+                            border: '1px solid #fed7aa'
+                          }}>
+                            {vs.temperature}°C
+                          </span>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
-                          {vs.oxygenSaturation}%
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          <span style={{ 
+                            color: '#2563eb', 
+                            fontWeight: 600,
+                            padding: '0.25rem 0.5rem',
+                            background: '#eff6ff',
+                            borderRadius: '0.375rem',
+                            border: '1px solid #bfdbfe'
+                          }}>
+                            {vs.oxygenSaturation}%
+                          </span>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
-                          {vs.notes || ''}
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          {vs.notes ? (
+                            <span style={{ 
+                              color: '#059669', 
+                              fontWeight: 500,
+                              padding: '0.25rem 0.5rem',
+                              background: '#f0fdf4',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #bbf7d0',
+                              fontSize: '0.75rem'
+                            }}>
+                              {vs.notes}
+                            </span>
+                          ) : (
+                            <span style={{ 
+                              color: '#6b7280', 
+                              fontStyle: 'italic',
+                              fontSize: '0.75rem'
+                            }}>
+                              Không có ghi chú
+                            </span>
+                          )}
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                          {staffMap[vs.recordedBy] || vs.recordedBy}
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          <span style={{ 
+                            color: '#7c3aed', 
+                            fontWeight: 500,
+                            padding: '0.25rem 0.5rem',
+                            background: '#faf5ff',
+                            borderRadius: '0.375rem',
+                            border: '1px solid #e9d5ff',
+                            fontSize: '0.75rem'
+                          }}>
+                            {vs.recordedBy ? (staffMap[vs.recordedBy] || 'Unknown') : 'N/A'}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -502,13 +918,6 @@ export default function StaffVitalSignsPage() {
           </div>
         </div>
       </div>
-
-      {/* Add Form Modal */}
-      <VitalSignsForm
-        isOpen={showAddForm}
-        onClose={() => setShowAddForm(false)}
-        onSubmit={handleAddVitalSigns}
-      />
 
       {/* Notification Center Button */}
       <div style={{ position: 'fixed', top: 24, right: 32, zIndex: 2000 }}>
@@ -595,70 +1004,7 @@ export default function StaffVitalSignsPage() {
         )}
       </div>
 
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.4)',
-          zIndex: 3000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1.5rem',
-            padding: '2.5rem',
-            maxWidth: '400px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-            animation: 'slideUp 0.3s ease-out'
-          }}>
-            <div style={{
-              width: '4rem',
-              height: '4rem',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              boxShadow: '0 10px 25px rgba(16,185,129,0.3)'
-            }}>
-              <CheckCircleIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
-            </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', margin: '0 0 1rem 0' }}>
-              Thêm chỉ số sức khỏe thành công!
-            </h2>
-            <p style={{ fontSize: '1rem', color: '#6b7280', margin: 0 }}>
-              Dữ liệu đã được cập nhật vào hệ thống.
-            </p>
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              style={{
-                marginTop: '2rem',
-                padding: '0.75rem 2rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.75rem',
-                fontSize: '1rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(16,185,129,0.3)'
-              }}
-            >
-              Đóng
-            </button>
-          </div>
-        </div>
-      )}
+
     </>
   );
 } 

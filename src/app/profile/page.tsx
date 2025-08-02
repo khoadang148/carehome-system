@@ -302,7 +302,11 @@ export default function ProfilePage() {
       return;
     }
     setRoomLoading(true);
-    carePlansAPI.getByResidentId(selectedResidentId)
+            // Đảm bảo selectedResidentId là string
+        const residentId = typeof selectedResidentId === 'object' && (selectedResidentId as any)?._id 
+          ? (selectedResidentId as any)._id 
+          : selectedResidentId;
+        carePlansAPI.getByResidentId(residentId)
       .then((assignments: any[]) => {
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
         const roomId = assignment?.assigned_room_id;

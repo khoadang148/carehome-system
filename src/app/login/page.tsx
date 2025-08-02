@@ -20,6 +20,11 @@ import {
   AcademicCapIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
+import type { User } from '@/lib/contexts/auth-context';
+import { toast } from 'react-toastify';
+import React from 'react';
+import SuccessModal from '@/components/SuccessModal';
+import './login-animations.css';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -57,6 +62,8 @@ export default function LoginPage() {
     quantumParticles: [],
     bubbles: []
   });
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [userName, setUserName] = useState<string | undefined>(undefined);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,7 +83,14 @@ export default function LoginPage() {
 
   // Immediate redirect nếu user đã đăng nhập
   useEffect(() => {
-    if (!loading && user && !hasRedirected.current) {
+    // Reset hasRedirected khi user là null hoặc loading
+    if (!user || loading) {
+      hasRedirected.current = false;
+      return;
+    }
+    
+    // Chỉ redirect khi user thực sự hợp lệ và chưa redirect
+    if (!hasRedirected.current) {
       hasRedirected.current = true;
       
       const redirectTo = (url: string) => {
@@ -118,8 +132,9 @@ export default function LoginPage() {
     const savedSuccess = localStorage.getItem('login_success');
     const savedAttempts = localStorage.getItem('login_attempts');
     
-    // Reset redirect flag khi component mount
+    // Reset redirect flag khi component mount hoặc khi user thay đổi
     setShouldRedirect(false);
+    hasRedirected.current = false;
     
     // Chỉ khôi phục thông báo nếu user chưa đăng nhập và chưa hiển thị thông báo
     if (!user && !loading && !messageDisplayed) {
@@ -235,9 +250,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     setSessionDebug({
-      access_token: sessionStorage.getItem('access_token'),
-      user: sessionStorage.getItem('user'),
-      session_start: sessionStorage.getItem('session_start'),
+      access_token: localStorage.getItem('access_token'),
+      user: localStorage.getItem('user'),
+      session_start: localStorage.getItem('session_start'),
     });
   }, [user, loading]);
 
@@ -274,14 +289,20 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔍 handleSubmit called - preventing default reload');
+    
+    // Xóa lỗi khi bắt đầu đăng nhập lại
+    setError('');
+    localStorage.removeItem('login_error');
     
     // Validation cơ bản
     if (!email.trim() || !password.trim()) {
+      console.log('❌ Validation failed - empty fields');
       setErrorWithStorage('Vui lòng nhập đầy đủ email và mật khẩu');
       return;
     }
     
-    // Không xóa thông báo lỗi khi bắt đầu submit
+    console.log('✅ Starting login process...');
     setIsLoading(true);
 
     // Tạo timeout promise để tránh chờ quá lâu
@@ -290,40 +311,41 @@ export default function LoginPage() {
     });
 
     try {
+      console.log('🔄 Calling login API...');
       // Race giữa login và timeout
-      const success = await Promise.race([
+      const user = await Promise.race([
         login(email, password),
         timeoutPromise
       ]);
-      
-      if (success) {
-        // Xóa thông báo lỗi khi thành công
+      const typedUser = user as User | null;
+      if (typedUser) {
+        console.log('✅ Login successful - redirecting...');
         setError('');
         localStorage.removeItem('login_error');
-        
-        // Hiển thị thông báo thành công ngắn gọn
-        setSuccessWithStorage('Đăng nhập thành công');
-        
-        // Chuyển trang ngay lập tức không cần delay
-        setShouldRedirect(true);
-        
-        // Tự động xóa thông báo thành công sau 3 giây
-        setTimeout(() => {
-          setSuccessWithStorage('');
-        }, 3000);
-      } else {
-        // Nếu không thành công, không reset form để user có thể thử lại
-        // Giữ nguyên email và password
+        setUserName(typedUser.name);
+        // Lưu thông báo thành công vào localStorage
+        localStorage.setItem('login_success', `Chào mừng bạn quay lại, ${typedUser.name || 'bạn'}!`);
+        // Chuyển trang ngay lập tức
+        if (typedUser.role === 'family') {
+          router.push('/family');
+        } else if (typedUser.role === 'admin') {
+          router.push('/admin');
+        } else if (typedUser.role === 'staff') {
+          router.push('/staff');
+        } else if (returnUrl && returnUrl !== '/login') {
+          router.push(returnUrl);
+        } else {
+          router.push('/');
+        }
       }
+      // Không cần else, vì nếu không thành công sẽ vào catch
     } catch (err: any) {
-      // Xử lý lỗi và đảm bảo loading state được reset
+      console.log('❌ Login failed:', err.message);
       setIsLoading(false);
-      setShouldRedirect(false); // Không cho phép redirect khi có lỗi
-      
-      // Xóa thông báo thành công khi có lỗi
+      setShouldRedirect(false);
       setSuccess('');
       localStorage.removeItem('login_success');
-      
+
       if (err.response?.status === 401) {
         setErrorWithStorage('Email hoặc mật khẩu không đúng');
       } else if (err.response?.status === 403) {
@@ -337,381 +359,390 @@ export default function LoginPage() {
       } else {
         setErrorWithStorage('Email hoặc mật khẩu không đúng');
       }
-      
-      // Đảm bảo thông báo lỗi hiển thị ít nhất 5 giây
-      setTimeout(() => {
-        setErrorWithStorage('');
-      }, 5000);
-      
-      return; // Thoát sớm để tránh finally block
+
+      // Xóa setTimeout tự động xóa lỗi
+      // setTimeout(() => {
+      //   setErrorWithStorage('');
+      // }, 5000);
+
+      return;
     }
-    
-    // Reset loading state
+
     setIsLoading(false);
   };
 
-  return (
-    <div style={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(120deg, #f9e7c4 0%, #fbc2eb 100%)',
-      position: 'relative',
-      overflow: 'hidden',
-      fontFamily: 'inherit',
-    }}>
-      {/* Glassmorphism overlay */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(255,255,255,0.10)',
-        backdropFilter: 'blur(10px)',
-        zIndex: 1
-      }} />
-      {/* Shine sweep effect */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(120deg, transparent 60%, rgba(255,255,255,0.18) 80%, transparent 100%)',
-        mixBlendMode: 'lighten',
-        animation: 'shineSweep 12s linear infinite',
-        pointerEvents: 'none',
-        zIndex: 3
-      }} />
-      <style jsx global>{`
-        @keyframes shineSweep {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes pulseLoop {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.07); }
-        }
-        @keyframes floatLoop {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-8px) scale(1.03); }
-        }
-        @keyframes glowLoop {
-          0%, 100% { filter: brightness(1) drop-shadow(0 0 0px #fff6); }
-          50% { filter: brightness(1.15) drop-shadow(0 0 12px #fff8); }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    // Không xóa lỗi khi nhập lại email
+  };
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    // Không xóa lỗi khi nhập lại password
+  };
 
-      `}</style>
-      {/* Subtle Animated Grid */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          linear-gradient(90deg, transparent 98%, rgba(148, 163, 184, 0.1) 99%, transparent 100%),
-          linear-gradient(0deg, transparent 98%, rgba(148, 163, 184, 0.1) 99%, transparent 100%)
-        `,
-        backgroundSize: '80px 80px',
-        animation: 'subtleGridFloat 45s linear infinite',
-        pointerEvents: 'none',
-        opacity: 0.3
-      }} />
-      
-      {/* Quantum Particle System */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          radial-gradient(circle 2px at 20% 30%, #00ffff 100%, transparent 100%),
-          radial-gradient(circle 1px at 40% 70%, #ff00ff 100%, transparent 100%),
-          radial-gradient(circle 1px at 90% 40%, #ffff00 100%, transparent 100%),
-          radial-gradient(circle 2px at 60% 10%, #00ff00 100%, transparent 100%),
-          radial-gradient(circle 1px at 10% 90%, #ff0080 100%, transparent 100%),
-          radial-gradient(circle 1px at 80% 20%, #0080ff 100%, transparent 100%),
-          radial-gradient(circle 2px at 30% 60%, #ff8000 100%, transparent 100%),
-          radial-gradient(circle 1px at 70% 80%, #8000ff 100%, transparent 100%)
-        `,
-        backgroundSize: '200px 200px, 300px 300px, 250px 250px, 180px 180px, 220px 220px, 280px 280px, 240px 240px, 260px 260px',
-        animation: 'quantumParticles 30s linear infinite',
-        pointerEvents: 'none'
-      }} />
-      
-      {/* Ultra Advanced Energy Field */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          conic-gradient(from 0deg at 25% 25%, 
-            rgba(255, 8, 68, 0.6) 0deg, 
-            rgba(0, 201, 255, 0.6) 72deg, 
-            rgba(131, 56, 236, 0.6) 144deg, 
-            rgba(6, 255, 165, 0.6) 216deg, 
-            rgba(255, 107, 53, 0.6) 288deg, 
-            rgba(255, 8, 68, 0.6) 360deg),
-          conic-gradient(from 180deg at 75% 75%, 
-            rgba(233, 69, 96, 0.5) 0deg, 
-            rgba(0, 114, 255, 0.5) 60deg, 
-            rgba(255, 0, 110, 0.5) 120deg, 
-            rgba(0, 180, 216, 0.5) 180deg, 
-            rgba(255, 149, 0, 0.5) 240deg, 
-            rgba(58, 12, 163, 0.5) 300deg, 
-            rgba(233, 69, 96, 0.5) 360deg)
-        `,
-        pointerEvents: 'none',
-        animation: 'advancedEnergyField 15s ease-in-out infinite alternate, slowRotate 60s linear infinite',
-        filter: 'blur(1px)',
-        mixBlendMode: 'screen'
-      }} />
-      
-      {/* Futuristic Scanning Lines */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          repeating-linear-gradient(
-            0deg,
-            transparent 0px,
-            transparent 2px,
-            rgba(0, 255, 255, 0.1) 2px,
-            rgba(0, 255, 255, 0.1) 4px
-          )
-        `,
-        animation: 'scanLines 8s linear infinite',
-        pointerEvents: 'none',
-        opacity: 0.3
-      }} />
-      
-      {/* Revolutionary Floating Elements with 3D Effects */}
-      <div style={{
-        position: 'absolute',
-        top: '8%',
-        left: '4%',
-        width: '200px',
-        height: '200px',
-        background: `
-          conic-gradient(from 45deg, #ff0844, #ff6b35, #00c9ff, #ff0844),
-          radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0%, transparent 70%)
-        `,
-        borderRadius: '50%',
-        animation: 'revolutionary3DFloat 8s ease-in-out infinite, holoGlow 4s ease-in-out infinite alternate',
-      display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: `
-          0 0 100px rgba(255, 8, 68, 0.9),
-          0 0 200px rgba(255, 107, 53, 0.7),
-          0 0 300px rgba(0, 201, 255, 0.5),
-          inset 0 0 50px rgba(255, 255, 255, 0.3),
-          0 50px 100px rgba(0, 0, 0, 0.5)
-        `,
-        border: '3px solid rgba(255, 255, 255, 0.3)',
-        transform: 'translateZ(0)',
-        filter: 'drop-shadow(0 0 30px rgba(255, 8, 68, 0.8))',
-        backdropFilter: 'blur(10px)'
-    }}>
-      <div style={{
-          width: '100px',
-          height: '100px',
-          background: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: '50%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <HeartIcon style={{ 
-            width: '60px', 
-            height: '60px', 
-  color: 'white',
-            filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 1)) drop-shadow(0 0 40px rgba(255, 8, 68, 1))',
-            animation: 'revolutionaryIconPulse 3s ease-in-out infinite'
-          }} />
-        </div>
-      </div>
-      
-      {/* Holographic Medical Cross */}
-      <div style={{
-        position: 'absolute',
-        top: '55%',
-        right: '6%',
-        width: '180px',
-        height: '180px',
-        background: `
-          linear-gradient(45deg, 
-            rgba(0, 201, 255, 0.8) 0%, 
-            rgba(0, 114, 255, 0.9) 25%, 
-            rgba(0, 78, 146, 0.8) 50%, 
-            rgba(0, 201, 255, 0.9) 75%, 
-            rgba(0, 114, 255, 0.8) 100%),
-          conic-gradient(from 0deg, transparent 30%, rgba(255, 255, 255, 0.3) 35%, transparent 40%)
-        `,
-        clipPath: 'polygon(40% 0%, 60% 0%, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0% 60%, 0% 40%, 40% 40%)',
-        animation: 'revolutionary3DFloat 6s ease-in-out infinite reverse, holoCross 10s linear infinite',
-        boxShadow: `
-          0 0 80px rgba(0, 201, 255, 1),
-          0 0 160px rgba(0, 114, 255, 0.8),
-          0 0 240px rgba(0, 78, 146, 0.6),
-          inset 0 0 40px rgba(255, 255, 255, 0.4)
-        `,
-        filter: 'drop-shadow(0 0 40px rgba(0, 201, 255, 0.9))',
-        backdropFilter: 'blur(15px)'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        bottom: '12%',
-        left: '2%',
-        width: '160px',
-        height: '300px',
-        background: `
-          repeating-linear-gradient(
-            45deg,
-            rgba(6, 255, 165, 0.6) 0px,
-            rgba(0, 180, 216, 0.8) 20px,
-            rgba(0, 119, 182, 0.6) 40px,
-            rgba(6, 255, 165, 0.8) 60px
-          )
-        `,
-        borderRadius: '50% 50% 50% 50% / 20% 20% 80% 80%',
-        animation: 'quantumDNAHelix 12s ease-in-out infinite, revolutionary3DFloat 7s ease-in-out infinite',
-        clipPath: 'ellipse(50% 85% at 50% 50%)',
-        boxShadow: `
-          0 0 100px rgba(6, 255, 165, 0.9),
-          0 0 200px rgba(0, 180, 216, 0.7),
-          inset 0 0 60px rgba(255, 255, 255, 0.3)
-        `,
-        filter: 'drop-shadow(0 0 50px rgba(6, 255, 165, 0.8))',
-        transform: 'perspective(500px) rotateX(15deg)',
-        backdropFilter: 'blur(10px)'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        top: '35%',
-        right: '20%',
-        width: '120px',
-        height: '120px',
-        background: `
-          conic-gradient(from 0deg, 
-            rgba(255, 0, 110, 0.9), 
-            rgba(131, 56, 236, 0.9), 
-            rgba(58, 12, 163, 0.9), 
-            rgba(255, 0, 110, 0.9)),
-          radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 60%)
-        `,
-        borderRadius: '30%',
-        animation: 'revolutionary3DFloat 9s ease-in-out infinite, technologicalSpin 20s linear infinite',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: `
-          0 0 60px rgba(255, 0, 110, 1),
-          0 0 120px rgba(131, 56, 236, 0.8),
-          0 0 180px rgba(58, 12, 163, 0.6),
-          inset 0 0 40px rgba(255, 255, 255, 0.4)
-        `,
-        border: '2px solid rgba(255, 255, 255, 0.5)',
-        filter: 'drop-shadow(0 0 30px rgba(255, 0, 110, 0.9))',
-        backdropFilter: 'blur(12px)'
+  // Chặn mọi reload có thể xảy ra
+  useEffect(() => {
+    const handleUnload = () => {
+      console.log('🔄 Page unload detected');
+    };
+
+    window.addEventListener('unload', handleUnload);
+
+    return () => {
+      window.removeEventListener('unload', handleUnload);
+    };
+  }, []);
+
+  // Log khi component mount/unmount
+  useEffect(() => {
+    console.log('📱 LoginPage mounted');
+    return () => {
+      console.log('📱 LoginPage unmounted');
+    };
+  }, []);
+
+  return (
+    <>
+      <SuccessModal open={showSuccessModal} onClose={() => setShowSuccessModal(false)} name={userName} />
+      <div style={{ 
+        minHeight: '100vh',
+        background: 'linear-gradient(120deg, #f9e7c4 0%, #fbc2eb 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+        fontFamily: 'inherit',
       }}>
-        <BuildingOffice2Icon style={{ 
-          width: '60px', 
-          height: '60px', 
-          color: 'white', 
-          filter: 'drop-shadow(0 0 15px rgba(255, 255, 255, 1)) drop-shadow(0 0 30px rgba(255, 0, 110, 1))',
-          animation: 'revolutionaryIconFloat 4s ease-in-out infinite'
-        }} />
-      </div>
-      
-      {randomValues.quantumParticles.length > 0 && randomValues.quantumParticles.map((particle, i) => (
-        <div key={`quantum-${i}`} style={{
-          position: 'absolute',
-          left: `${particle.left}%`,
-          top: `${particle.top}%`,
-          width: `${particle.width}px`,
-          height: `${particle.height}px`,
-          background: `
-            radial-gradient(circle, 
-              ${particle.color}, 
-              transparent 70%)
-          `,
-          borderRadius: '50%',
-          animation: `quantumEnergyFlow ${particle.duration}s linear infinite`,
-          animationDelay: `${particle.delay}s`,
-          filter: `blur(${particle.blur}px)`,
-          pointerEvents: 'none',
-          boxShadow: `0 0 ${particle.shadow}px currentColor`
-        }} />
-      ))}
-      
+        {/* Glassmorphism overlay */}
         <div style={{
           position: 'absolute',
           inset: 0,
-        background: `
-          radial-gradient(circle at 10% 20%, rgba(255, 8, 68, 0.9) 0%, transparent 50%),
-          radial-gradient(circle at 80% 80%, rgba(255, 107, 53, 0.8) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(0, 201, 255, 0.9) 0%, transparent 60%),
-          radial-gradient(circle at 70% 10%, rgba(255, 0, 110, 0.8) 0%, transparent 50%),
-          radial-gradient(circle at 20% 80%, rgba(131, 56, 236, 0.9) 0%, transparent 55%),
-          radial-gradient(circle at 90% 30%, rgba(6, 255, 165, 0.8) 0%, transparent 45%),
-          radial-gradient(circle at 30% 60%, rgba(0, 116, 216, 0.7) 0%, transparent 50%),
-          radial-gradient(circle at 60% 70%, rgba(233, 69, 96, 0.8) 0%, transparent 40%)
-        `,
-        pointerEvents: 'none',
-        animation: 'megaBackgroundShift 12s ease-in-out infinite alternate'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          conic-gradient(from 0deg at 25% 25%, rgba(255, 8, 68, 0.4) 0deg, rgba(255, 107, 53, 0.4) 90deg, rgba(0, 201, 255, 0.4) 180deg, rgba(255, 8, 68, 0.4) 360deg),
-          conic-gradient(from 180deg at 75% 75%, rgba(131, 56, 236, 0.4) 0deg, rgba(6, 255, 165, 0.4) 90deg, rgba(233, 69, 96, 0.4) 180deg, rgba(131, 56, 236, 0.4) 360deg)
-        `,
-        pointerEvents: 'none',
-        animation: 'neonPulse 6s ease-in-out infinite alternate, rotate 20s linear infinite'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          linear-gradient(45deg, rgba(255, 8, 68, 0.3) 0%, transparent 25%, rgba(0, 201, 255, 0.4) 50%, transparent 75%, rgba(255, 107, 53, 0.3) 100%),
-          linear-gradient(-45deg, rgba(131, 56, 236, 0.4) 0%, transparent 30%, rgba(6, 255, 165, 0.3) 70%, transparent 100%),
-          linear-gradient(90deg, rgba(233, 69, 96, 0.3) 0%, transparent 50%, rgba(255, 149, 0, 0.4) 100%)
-        `,
-        pointerEvents: 'none',
-        animation: 'energyWaves 10s ease-in-out infinite alternate-reverse'
-      }} />
-      
-      {/* Ultra Dynamic Light Beams */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `
-          linear-gradient(45deg, transparent 40%, rgba(255, 8, 68, 0.1) 50%, transparent 60%),
-          linear-gradient(-45deg, transparent 30%, rgba(0, 201, 255, 0.1) 50%, transparent 70%),
-          linear-gradient(135deg, transparent 45%, rgba(6, 255, 165, 0.1) 55%, transparent 65%)
-        `,
-        pointerEvents: 'none',
-        animation: 'lightSweep 15s linear infinite'
-      }} />
-      
-      {/* Magical Floating Bubbles */}
-      {randomValues.bubbles.length > 0 && randomValues.bubbles.map((bubble, i) => (
-        <div key={i} style={{
+          background: 'rgba(255,255,255,0.10)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 1
+        }} />
+        {/* Shine sweep effect */}
+        <div style={{
           position: 'absolute',
-          left: `${bubble.left}%`,
-          top: `${bubble.top}%`,
-          width: `${bubble.width}px`,
-          height: `${bubble.height}px`,
-          background: `radial-gradient(circle, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1))`,
-          borderRadius: '50%',
-          animation: `megaBubbleFloat ${bubble.duration}s ease-in-out infinite`,
-          animationDelay: `${bubble.delay}s`,
-          backdropFilter: 'blur(4px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          inset: 0,
+          background: 'linear-gradient(120deg, transparent 60%, rgba(255,255,255,0.18) 80%, transparent 100%)',
+          mixBlendMode: 'lighten',
+          animation: 'shineSweep 12s linear infinite',
+          pointerEvents: 'none',
+          zIndex: 3
+        }} />
+
+        {/* Subtle Animated Grid */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            linear-gradient(90deg, transparent 98%, rgba(148, 163, 184, 0.1) 99%, transparent 100%),
+            linear-gradient(0deg, transparent 98%, rgba(148, 163, 184, 0.1) 99%, transparent 100%)
+          `,
+          backgroundSize: '80px 80px',
+          animation: 'subtleGridFloat 45s linear infinite',
+          pointerEvents: 'none',
+          opacity: 0.3
+        }} />
+        
+        {/* Quantum Particle System */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            radial-gradient(circle 2px at 20% 30%, #00ffff 100%, transparent 100%),
+            radial-gradient(circle 1px at 40% 70%, #ff00ff 100%, transparent 100%),
+            radial-gradient(circle 1px at 90% 40%, #ffff00 100%, transparent 100%),
+            radial-gradient(circle 2px at 60% 10%, #00ff00 100%, transparent 100%),
+            radial-gradient(circle 1px at 10% 90%, #ff0080 100%, transparent 100%),
+            radial-gradient(circle 1px at 80% 20%, #0080ff 100%, transparent 100%),
+            radial-gradient(circle 2px at 30% 60%, #ff8000 100%, transparent 100%),
+            radial-gradient(circle 1px at 70% 80%, #8000ff 100%, transparent 100%)
+          `,
+          backgroundSize: '200px 200px, 300px 300px, 250px 250px, 180px 180px, 220px 220px, 280px 280px, 240px 240px, 260px 260px',
+          animation: 'quantumParticles 30s linear infinite',
           pointerEvents: 'none'
         }} />
-      ))}
         
+        {/* Ultra Advanced Energy Field */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            conic-gradient(from 0deg at 25% 25%, 
+              rgba(255, 8, 68, 0.6) 0deg, 
+              rgba(0, 201, 255, 0.6) 72deg, 
+              rgba(131, 56, 236, 0.6) 144deg, 
+              rgba(6, 255, 165, 0.6) 216deg, 
+              rgba(255, 107, 53, 0.6) 288deg, 
+              rgba(255, 8, 68, 0.6) 360deg),
+            conic-gradient(from 180deg at 75% 75%, 
+              rgba(233, 69, 96, 0.5) 0deg, 
+              rgba(0, 114, 255, 0.5) 60deg, 
+              rgba(255, 0, 110, 0.5) 120deg, 
+              rgba(0, 180, 216, 0.5) 180deg, 
+              rgba(255, 149, 0, 0.5) 240deg, 
+              rgba(58, 12, 163, 0.5) 300deg, 
+              rgba(233, 69, 96, 0.5) 360deg)
+          `,
+          pointerEvents: 'none',
+          animation: 'advancedEnergyField 15s ease-in-out infinite alternate, slowRotate 60s linear infinite',
+          filter: 'blur(1px)',
+          mixBlendMode: 'screen'
+        }} />
+        
+        {/* Futuristic Scanning Lines */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            repeating-linear-gradient(
+              0deg,
+              transparent 0px,
+              transparent 2px,
+              rgba(0, 255, 255, 0.1) 2px,
+              rgba(0, 255, 255, 0.1) 4px
+            )
+          `,
+          animation: 'scanLines 8s linear infinite',
+          pointerEvents: 'none',
+          opacity: 0.3
+        }} />
+        
+        {/* Revolutionary Floating Elements with 3D Effects */}
+        <div style={{
+          position: 'absolute',
+          top: '8%',
+          left: '4%',
+          width: '200px',
+          height: '200px',
+          background: `
+            conic-gradient(from 45deg, #ff0844, #ff6b35, #00c9ff, #ff0844),
+            radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0%, transparent 70%)
+          `,
+          borderRadius: '50%',
+          animation: 'revolutionary3DFloat 8s ease-in-out infinite, holoGlow 4s ease-in-out infinite alternate',
+        display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: `
+            0 0 100px rgba(255, 8, 68, 0.9),
+            0 0 200px rgba(255, 107, 53, 0.7),
+            0 0 300px rgba(0, 201, 255, 0.5),
+            inset 0 0 50px rgba(255, 255, 255, 0.3),
+            0 50px 100px rgba(0, 0, 0, 0.5)
+          `,
+          border: '3px solid rgba(255, 255, 255, 0.3)',
+          transform: 'translateZ(0)',
+          filter: 'drop-shadow(0 0 30px rgba(255, 8, 68, 0.8))',
+          backdropFilter: 'blur(10px)'
+      }}>
+        <div style={{
+            width: '100px',
+            height: '100px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <HeartIcon style={{ 
+              width: '60px', 
+              height: '60px', 
+    color: 'white',
+              filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 1)) drop-shadow(0 0 40px rgba(255, 8, 68, 1))',
+              animation: 'revolutionaryIconPulse 3s ease-in-out infinite'
+            }} />
+          </div>
+        </div>
+        
+        {/* Holographic Medical Cross */}
+        <div style={{
+          position: 'absolute',
+          top: '55%',
+          right: '6%',
+          width: '180px',
+          height: '180px',
+          background: `
+            linear-gradient(45deg, 
+              rgba(0, 201, 255, 0.8) 0%, 
+              rgba(0, 114, 255, 0.9) 25%, 
+              rgba(0, 78, 146, 0.8) 50%, 
+              rgba(0, 201, 255, 0.9) 75%, 
+              rgba(0, 114, 255, 0.8) 100%),
+            conic-gradient(from 0deg, transparent 30%, rgba(255, 255, 255, 0.3) 35%, transparent 40%)
+          `,
+          clipPath: 'polygon(40% 0%, 60% 0%, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0% 60%, 0% 40%, 40% 40%)',
+          animation: 'revolutionary3DFloat 6s ease-in-out infinite reverse, holoCross 10s linear infinite',
+          boxShadow: `
+            0 0 80px rgba(0, 201, 255, 1),
+            0 0 160px rgba(0, 114, 255, 0.8),
+            0 0 240px rgba(0, 78, 146, 0.6),
+            inset 0 0 40px rgba(255, 255, 255, 0.4)
+          `,
+          filter: 'drop-shadow(0 0 40px rgba(0, 201, 255, 0.9))',
+          backdropFilter: 'blur(15px)'
+        }} />
+        
+        <div style={{
+          position: 'absolute',
+          bottom: '12%',
+          left: '2%',
+          width: '160px',
+          height: '300px',
+          background: `
+            repeating-linear-gradient(
+              45deg,
+              rgba(6, 255, 165, 0.6) 0px,
+              rgba(0, 180, 216, 0.8) 20px,
+              rgba(0, 119, 182, 0.6) 40px,
+              rgba(6, 255, 165, 0.8) 60px
+            )
+          `,
+          borderRadius: '50% 50% 50% 50% / 20% 20% 80% 80%',
+          animation: 'quantumDNAHelix 12s ease-in-out infinite, revolutionary3DFloat 7s ease-in-out infinite',
+          clipPath: 'ellipse(50% 85% at 50% 50%)',
+          boxShadow: `
+            0 0 100px rgba(6, 255, 165, 0.9),
+            0 0 200px rgba(0, 180, 216, 0.7),
+            inset 0 0 60px rgba(255, 255, 255, 0.3)
+          `,
+          filter: 'drop-shadow(0 0 50px rgba(6, 255, 165, 0.8))',
+          transform: 'perspective(500px) rotateX(15deg)',
+          backdropFilter: 'blur(10px)'
+        }} />
+        
+        <div style={{
+          position: 'absolute',
+          top: '35%',
+          right: '20%',
+          width: '120px',
+          height: '120px',
+          background: `
+            conic-gradient(from 0deg, 
+              rgba(255, 0, 110, 0.9), 
+              rgba(131, 56, 236, 0.9), 
+              rgba(58, 12, 163, 0.9), 
+              rgba(255, 0, 110, 0.9)),
+            radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 60%)
+          `,
+          borderRadius: '30%',
+          animation: 'revolutionary3DFloat 9s ease-in-out infinite, technologicalSpin 20s linear infinite',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: `
+            0 0 60px rgba(255, 0, 110, 1),
+            0 0 120px rgba(131, 56, 236, 0.8),
+            0 0 180px rgba(58, 12, 163, 0.6),
+            inset 0 0 40px rgba(255, 255, 255, 0.4)
+          `,
+          border: '2px solid rgba(255, 255, 255, 0.5)',
+          filter: 'drop-shadow(0 0 30px rgba(255, 0, 110, 0.9))',
+          backdropFilter: 'blur(12px)'
+        }}>
+          <BuildingOffice2Icon style={{ 
+            width: '60px', 
+            height: '60px', 
+            color: 'white', 
+            filter: 'drop-shadow(0 0 15px rgba(255, 255, 255, 1)) drop-shadow(0 0 30px rgba(255, 0, 110, 1))',
+            animation: 'revolutionaryIconFloat 4s ease-in-out infinite'
+          }} />
+        </div>
+        
+        {randomValues.quantumParticles.length > 0 && randomValues.quantumParticles.map((particle, i) => (
+          <div key={`quantum-${i}`} style={{
+            position: 'absolute',
+            left: `${particle.left}%`,
+            top: `${particle.top}%`,
+            width: `${particle.width}px`,
+            height: `${particle.height}px`,
+            background: `
+              radial-gradient(circle, 
+                ${particle.color}, 
+                transparent 70%)
+            `,
+            borderRadius: '50%',
+            animation: `quantumEnergyFlow ${particle.duration}s linear infinite`,
+            animationDelay: `${particle.delay}s`,
+            filter: `blur(${particle.blur}px)`,
+            pointerEvents: 'none',
+            boxShadow: `0 0 ${particle.shadow}px currentColor`
+          }} />
+        ))}
+        
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+          background: `
+            radial-gradient(circle at 10% 20%, rgba(255, 8, 68, 0.9) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 107, 53, 0.8) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(0, 201, 255, 0.9) 0%, transparent 60%),
+            radial-gradient(circle at 70% 10%, rgba(255, 0, 110, 0.8) 0%, transparent 50%),
+            radial-gradient(circle at 20% 80%, rgba(131, 56, 236, 0.9) 0%, transparent 55%),
+            radial-gradient(circle at 90% 30%, rgba(6, 255, 165, 0.8) 0%, transparent 45%),
+            radial-gradient(circle at 30% 60%, rgba(0, 116, 216, 0.7) 0%, transparent 50%),
+            radial-gradient(circle at 60% 70%, rgba(233, 69, 96, 0.8) 0%, transparent 40%)
+          `,
+          pointerEvents: 'none',
+          animation: 'megaBackgroundShift 12s ease-in-out infinite alternate'
+        }} />
+        
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            conic-gradient(from 0deg at 25% 25%, rgba(255, 8, 68, 0.4) 0deg, rgba(255, 107, 53, 0.4) 90deg, rgba(0, 201, 255, 0.4) 180deg, rgba(255, 8, 68, 0.4) 360deg),
+            conic-gradient(from 180deg at 75% 75%, rgba(131, 56, 236, 0.4) 0deg, rgba(6, 255, 165, 0.4) 90deg, rgba(233, 69, 96, 0.4) 180deg, rgba(131, 56, 236, 0.4) 360deg)
+          `,
+          pointerEvents: 'none',
+          animation: 'neonPulse 6s ease-in-out infinite alternate, rotate 20s linear infinite'
+        }} />
+        
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            linear-gradient(45deg, rgba(255, 8, 68, 0.3) 0%, transparent 25%, rgba(0, 201, 255, 0.4) 50%, transparent 75%, rgba(255, 107, 53, 0.3) 100%),
+            linear-gradient(-45deg, rgba(131, 56, 236, 0.4) 0%, transparent 30%, rgba(6, 255, 165, 0.3) 70%, transparent 100%),
+            linear-gradient(90deg, rgba(233, 69, 96, 0.3) 0%, transparent 50%, rgba(255, 149, 0, 0.4) 100%)
+          `,
+          pointerEvents: 'none',
+          animation: 'energyWaves 10s ease-in-out infinite alternate-reverse'
+        }} />
+        
+        {/* Ultra Dynamic Light Beams */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            linear-gradient(45deg, transparent 40%, rgba(255, 8, 68, 0.1) 50%, transparent 60%),
+            linear-gradient(-45deg, transparent 30%, rgba(0, 201, 255, 0.1) 50%, transparent 70%),
+            linear-gradient(135deg, transparent 45%, rgba(6, 255, 165, 0.1) 55%, transparent 65%)
+          `,
+          pointerEvents: 'none',
+          animation: 'lightSweep 15s linear infinite'
+        }} />
+        
+        {/* Magical Floating Bubbles */}
+        {randomValues.bubbles.length > 0 && randomValues.bubbles.map((bubble, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            left: `${bubble.left}%`,
+            top: `${bubble.top}%`,
+            width: `${bubble.width}px`,
+            height: `${bubble.height}px`,
+            background: `radial-gradient(circle, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1))`,
+            borderRadius: '50%',
+            animation: `megaBubbleFloat ${bubble.duration}s ease-in-out infinite`,
+            animationDelay: `${bubble.delay}s`,
+            backdropFilter: 'blur(4px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            pointerEvents: 'none'
+          }} />
+        ))}
+          
           <div style={{
         position: 'absolute',
         top: '10%',
@@ -1457,10 +1488,7 @@ export default function LoginPage() {
                     type="email"
                     placeholder={"example@email.com"}
                     value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      // Không xóa thông báo khi user nhập lại
-                    }}
+                    onChange={handleEmailChange}
                     style={{
                       width: '100%',
                         padding: '0.875rem 1rem 0.875rem 2.75rem',
@@ -1515,10 +1543,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Nhập mật khẩu của bạn"
                     value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      // Không xóa thông báo khi user nhập lại
-                    }}
+                    onChange={handlePasswordChange}
                     style={{
                       width: '100%',
                         padding: '0.875rem 2.75rem 0.875rem 2.75rem',
@@ -1672,5 +1697,6 @@ export default function LoginPage() {
       </div>
       
     </div>
+  </>
   );
 } 

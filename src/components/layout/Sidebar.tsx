@@ -45,7 +45,7 @@ const menuGroups: MenuGroup[] = [
     title: "Quản lý chính",
     items: [
       { name: 'Màn hình chính', href: '/', icon: HomeIcon, roles: ['admin','staff'], color: '#667eea' },
-      { name: 'Người cao tuổi', href: '/residents', icon: UserIcon, roles: ['admin'], color: '#10b981' },
+      { name: 'Người cao tuổi', href: '/admin/residents', icon: UserIcon, roles: ['admin'], color: '#10b981' },
       { name: 'Nhân viên', href: '/admin/staff-management', icon: UsersIcon, roles: ['admin'], color: '#6366f1' },
       { name: 'Quản lý người cao tuổi', href: '/staff/residents', icon: UserGroupIcon, roles: ['staff'], color: '#6366f1' },
     ]
@@ -54,7 +54,7 @@ const menuGroups: MenuGroup[] = [
     title: "Lối tắt chăm sóc",
     items: [
       { name: 'Ghi chú chăm sóc', href: '/staff/assessments', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
-      { name: 'Đăng ảnh hoạt động', href: '/residents/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
+      { name: 'Đăng ảnh hoạt động', href: '/staff/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
       
     ]
   },
@@ -63,18 +63,19 @@ const menuGroups: MenuGroup[] = [
     items: [
       { name: 'Chương trình sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['admin'], color: '#f59e0b' },
       { name: 'Hoạt động sinh hoạt', href: '/staff/activities', icon: CalendarIcon, roles: ['staff'], color: '#3b82f6' },
-      { name: 'Trợ lý thông minh', href: '/ai-recommendations', icon: SparklesIcon, roles: ['admin'], color: '#8b5cf6' },
+      { name: 'Trợ lý thông minh', href: '/admin/ai-recommendations', icon: SparklesIcon, roles: ['admin'], color: '#8b5cf6' },
       { name: 'Thông tin', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
       { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1' },
       { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1' },
-      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'family','admin'], color: '#6366f1' },
+      { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'admin'], color: '#6366f1' },
+      { name: 'Dịch vụ', href: '/family/services', icon: CubeIcon, roles: [ 'family',], color: '#6366f1' },
       
     ]
   },
   {
     title: "Dữ liệu & Báo cáo",
     items: [
-      { name: 'Hóa đơn', href: '/finance', icon: BanknotesIcon, roles: ['family'], color: '#16a34a' },
+      { name: 'Hóa đơn', href: '/family/finance', icon: BanknotesIcon, roles: ['family'], color: '#16a34a' },
       { name: 'Hóa đơn', href: '/admin/financial-reports', icon: BanknotesIcon, roles: ['admin'], color: '#16a34a' }
 
     ]

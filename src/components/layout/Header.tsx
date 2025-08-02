@@ -5,6 +5,7 @@ import { Menu, Transition } from '@headlessui/react';
 import { BellIcon, UserCircleIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
+import ClientOnly from '@/components/ClientOnly';
 
 interface Notification {
   id: number;
@@ -44,7 +45,7 @@ const mockNotifications: Notification[] = [
 ];
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   
@@ -149,37 +150,78 @@ export default function Header() {
       <div style={{display: 'flex', alignItems: 'center', gap: '1.25rem'}}>
 
 
-        {!user ? (
-          <button 
-            onClick={handleLogin}
-            style={{
+        <ClientOnly fallback={
+          <div style={{
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem',
+            padding: '0.625rem 1.25rem',
+            borderRadius: '0.5rem',
+            background: 'rgba(255, 255, 255, 0.1)',
+            color: 'white'
+          }}>
+            <div style={{
+              width: '1.125rem', 
+              height: '1.125rem',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              borderTop: '2px solid white',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            Loading...
+          </div>
+        }>
+          {loading ? (
+            <div style={{
               display: 'flex', 
               alignItems: 'center', 
               gap: '0.5rem',
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              color: '#667eea', 
               padding: '0.625rem 1.25rem',
               borderRadius: '0.5rem',
-              border: 'none',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              transition: 'all 0.2s ease-in-out',
-              fontSize: '0.875rem'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-            }}
-          >
-            <UserCircleIcon style={{width: '1.125rem', height: '1.125rem'}} />
-            Đăng nhập
-          </button>
-        ) : (
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white'
+            }}>
+              <div style={{
+                width: '1.125rem', 
+                height: '1.125rem',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderTop: '2px solid white',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
+              Loading...
+            </div>
+          ) : !user ? (
+            <button 
+              onClick={handleLogin}
+              style={{
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                color: '#667eea', 
+                padding: '0.625rem 1.25rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease-in-out',
+                fontSize: '0.875rem'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              <UserCircleIcon style={{width: '1.125rem', height: '1.125rem'}} />
+              Đăng nhập
+            </button>
+          ) : (
           <>
             {/* Role badge */}
 
@@ -424,6 +466,7 @@ export default function Header() {
             </Menu>
           </>
         )}
+        </ClientOnly>
       </div>
     </header>
   );

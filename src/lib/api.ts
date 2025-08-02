@@ -14,6 +14,13 @@ const apiClient = axios.create({
   timeout: 15000, // Tăng timeout lên 15 giây cho tất cả requests
 });
 
+// Utility function to check if user is authenticated
+export const isAuthenticated = () => {
+  if (typeof window === 'undefined') return false;
+  const token = localStorage.getItem('access_token');
+  return !!token;
+};
+
 // Utility function to handle API errors
 const handleApiError = (error: any, context: string) => {
   if (error.response) {
@@ -51,6 +58,11 @@ apiClient.interceptors.request.use(
       
       // Thêm token vào header
       config.headers['Authorization'] = `Bearer ${token}`;
+      
+      // Debug log để kiểm tra token
+      console.log('Request with token:', config.url, token.substring(0, 20) + '...');
+    } else {
+      console.warn('No token found for request:', config.url);
     }
     
     return config;
@@ -66,11 +78,22 @@ apiClient.interceptors.response.use(
   async (error) => {
     // Nếu gặp 401 thì chỉ logout, không thử refresh
     if (error.response?.status === 401) {
+      console.error('401 Unauthorized - Redirecting to login');
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
       }
       window.location.href = '/login';
       return Promise.reject(error);
+    }
+    
+    // Xử lý lỗi 403 Forbidden
+    if (error.response?.status === 403) {
+      console.error('403 Forbidden - Access denied:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        hasToken: !!localStorage.getItem('access_token'),
+        tokenPreview: localStorage.getItem('access_token')?.substring(0, 20) + '...'
+      });
     }
 
     return Promise.reject(error);
@@ -178,11 +201,24 @@ export const authAPI = {
   logout: async () => {
     try {
       const response = await apiClient.post(endpoints.auth.logout);
-      // Xóa token khỏi cookie
-      // XÓA: deleteCookie('access_token');
+      // Xóa token khỏi localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+      }
       return response.data;
     } catch (error) {
       const errorMessage = handleApiError(error, 'Logout');
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Test authentication và lấy thông tin user hiện tại
+  me: async () => {
+    try {
+      const response = await apiClient.get('/auth/me');
+      return response.data;
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Failed to get current user info');
       throw new Error(errorMessage);
     }
   },
@@ -196,7 +232,8 @@ export const userAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
     }
   },
   getProfile: async () => {
@@ -333,7 +370,8 @@ export const residentAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching residents:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
     }
   },
 
@@ -435,14 +473,29 @@ export const residentAPI = {
 export const staffAPI = {
   getAll: async (params?: any) => {
     try {
-      const accessToken = typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null;
-      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-      // Sử dụng endpoint /users?role=staff để lấy danh sách staff
-      const response = await apiClient.get('/users', { params: { ...params, role: 'staff' }, headers });
+      // Kiểm tra authentication
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated, redirecting to login');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return [];
+      }
+      
+      // Sử dụng endpoint /users với filter role=staff
+      console.log('Fetching staff with params:', { role: 'staff', ...params });
+      const response = await apiClient.get('/users', { 
+        params: { 
+          role: 'staff',
+          ...params 
+        } 
+      });
+      console.log('Staff API response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching staff:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
     }
   },
 
@@ -519,6 +572,16 @@ export const staffAssignmentsAPI = {
     }
   },
 
+  getAllIncludingExpired: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/staff-assignments/all-including-expired', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all staff assignments including expired:', error);
+      throw error;
+    }
+  },
+
   getById: async (id: string) => {
     try {
       const response = await apiClient.get(`/staff-assignments/${id}`);
@@ -559,8 +622,6 @@ export const staffAssignmentsAPI = {
     }
   },
 
-
-
   getByStaff: async (staffId: string) => {
     try {
       const response = await apiClient.get(`/staff-assignments/by-staff/${staffId}`);
@@ -600,7 +661,8 @@ export const activitiesAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching activities:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
     }
   },
 
@@ -1043,9 +1105,14 @@ export const roomsAPI = {
     try {
       const response = await apiClient.get(`${endpoints.rooms}/${id}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error fetching room with ID ${id}:`, error);
-      // Trả về null thay vì throw error
+      // Handle 400 Bad Request (invalid ID) and 404 Not Found gracefully
+      if (error.response?.status === 400 || error.response?.status === 404) {
+        console.warn(`Room with ID ${id} not found or invalid`);
+        return null;
+      }
+      // For other errors, still return null but log the error
       return null;
     }
   },
@@ -1741,6 +1808,15 @@ export const billsAPI = {
       throw error;
     }
   },
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/bills/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching bill with ID ${id}:`, error);
+      throw error;
+    }
+  },
   update: async (id: string, data: any) => {
     try {
       const response = await apiClient.patch(`/bills/${id}`, data);
@@ -1831,6 +1907,15 @@ export const bedAssignmentsAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching bed assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  getByResidentId: async (residentId: string) => {
+    try {
+      const response = await apiClient.get(`/bed-assignments/by-resident`, { params: { resident_id: residentId } });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching bed assignments by residentId ${residentId}:`, error);
       throw error;
     }
   },

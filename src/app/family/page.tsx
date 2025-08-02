@@ -36,6 +36,8 @@ import { userAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { activitiesAPI } from '@/lib/api';
+import { staffAssignmentsAPI } from '@/lib/api';
+import SuccessModal from '@/components/SuccessModal';
 
 // Thêm hàm tính tuổi ở đầu file (sau import)
 const getAge = (dob: string) => {
@@ -79,6 +81,7 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
 export default function FamilyPortalPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
+
   // Thay state resident thành residents (mảng) và selectedResidentId
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
@@ -99,9 +102,8 @@ export default function FamilyPortalPage() {
   const [showMessageModal, setShowMessageModal] = useState(false);
 
   // Thêm modal xem nhân viên phụ trách
-  const [showStaffModal, setShowStaffModal] = useState(false);
 
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   const [successModalData, setSuccessModalData] = useState<{
     title: string;
     message: string;
@@ -146,6 +148,11 @@ export default function FamilyPortalPage() {
   // Thêm state để lưu staffName tạm thời khi fetch từ API
   const [fetchedStaffNames, setFetchedStaffNames] = useState<{[id: string]: string}>({});
 
+  // Thêm state cho nhân viên phụ trách
+  const [assignedStaff, setAssignedStaff] = useState<any[]>([]);
+  const [assignedStaffLoading, setAssignedStaffLoading] = useState(false);
+  const [assignedStaffError, setAssignedStaffError] = useState('');
+
   // --- HOẠT ĐỘNG SINH HOẠT STATE ---
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -156,6 +163,18 @@ export default function FamilyPortalPage() {
   const [serverToday, setServerToday] = useState<string>('');
   // Thêm state để cache thời gian hoạt động
   const [activityTimes, setActivityTimes] = useState<{[activityId: string]: {start: string, end: string}}>( {} );
+
+  const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  useEffect(() => {
+    const msg = localStorage.getItem('login_success');
+    if (msg) {
+      setSuccessMessage(msg);
+      setShowSuccessModal(true);
+      localStorage.removeItem('login_success');
+    }
+  }, []);
 
   // Fetch activity times for all activities when activities change
   useEffect(() => {
@@ -286,12 +305,20 @@ export default function FamilyPortalPage() {
     })
   )) : [];
 
-  // Tạo danh sách staff cho modal
-  const staffMembers = staffInCharge.map((staffName: string, index: number) => ({
-    id: `staff-${index}`,
-    name: staffName,
-    role: 'Nhân viên chăm sóc'
-  }));
+  // Tạo danh sách staff cho modal - sử dụng dữ liệu thực từ assignedStaff
+  const staffMembers = assignedStaff.map((assignment: any, index: number) => {
+    const staff = assignment.staff_id;
+    const staffName = staff?.full_name || staff?.fullName || staff?.name || staff?.username || staff?.email || 'Chưa rõ';
+    const staffPosition = staff?.position || 'Nhân viên chăm sóc';
+    
+    return {
+      id: assignment._id || `staff-${index}`,
+      name: staffName,
+      role: staffPosition,
+      assignment: assignment,
+      staff_id: staff // Thêm staff_id để truy cập thông tin chi tiết
+    };
+  });
 
   // Handler functions for button actions
   const handleContactStaff = () => {
@@ -430,9 +457,9 @@ export default function FamilyPortalPage() {
 
 
   useEffect(() => {
-    console.log('Modal states:', { showMessageModal, showStaffModal });
+    console.log('Modal states:', { showMessageModal });
     // Only hide header for modals, not the main page
-    const hasModalOpen = showMessageModal || showStaffModal;
+    const hasModalOpen = showMessageModal;
     
     if (hasModalOpen) {
       console.log('Modal is open - adding hide-header class');
@@ -448,7 +475,7 @@ export default function FamilyPortalPage() {
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     };
-  }, [showMessageModal, showStaffModal]);
+      }, [showMessageModal]);
 
   // Ensure header is shown when component mounts
   useEffect(() => {
@@ -547,8 +574,10 @@ export default function FamilyPortalPage() {
         // Tìm assignment có assigned_room_id
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
         const roomId = assignment?.assigned_room_id;
-        if (roomId) {
-          return roomsAPI.getById(roomId)
+        // Đảm bảo roomId là string, không phải object
+        const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+        if (roomIdString) {
+          return roomsAPI.getById(roomIdString)
             .then((room: any) => {
               setRoomNumber(room?.room_number || 'Chưa cập nhật');
             })
@@ -559,6 +588,53 @@ export default function FamilyPortalPage() {
       })
       .catch(() => setRoomNumber('Chưa cập nhật'))
       .finally(() => setRoomLoading(false));
+  }, [selectedResidentId]);
+
+  // Lấy thông tin nhân viên phụ trách khi đổi resident
+  useEffect(() => {
+    if (!selectedResidentId) {
+      setAssignedStaff([]);
+      return;
+    }
+    setAssignedStaffLoading(true);
+    setAssignedStaffError('');
+    staffAssignmentsAPI.getByResident(selectedResidentId)
+      .then(async (data) => {
+        const assignments = Array.isArray(data) ? data : [];
+        // Lọc chỉ những assignment đang active
+        const activeAssignments = assignments.filter((assignment: any) => 
+          assignment.status === 'active' || !assignment.status
+        );
+        
+        // Fetch thông tin chi tiết của từng staff member
+        const staffWithDetails = await Promise.all(
+          activeAssignments.map(async (assignment: any) => {
+            try {
+              if (assignment.staff_id?._id) {
+                const staffDetails = await userAPI.getById(assignment.staff_id._id);
+                return {
+                  ...assignment,
+                  staff_id: {
+                    ...assignment.staff_id,
+                    ...staffDetails // Merge thông tin chi tiết
+                  }
+                };
+              }
+              return assignment;
+            } catch (error) {
+              console.error('Error fetching staff details:', error);
+              return assignment;
+            }
+          })
+        );
+        
+        setAssignedStaff(staffWithDetails);
+      })
+      .catch(() => {
+        setAssignedStaffError('Không lấy được thông tin nhân viên phụ trách');
+        setAssignedStaff([]);
+      })
+      .finally(() => setAssignedStaffLoading(false));
   }, [selectedResidentId]);
 
   // Fetch activities when resident or mode changes
@@ -715,6 +791,7 @@ useEffect(() => {
       else router.replace('/login');
     }
   }, [user, loading, router]);
+
   if (loading || (user && user.role !== 'family')) return null;
 
   if (dataLoading) return <div>Đang tải thông tin người thân...</div>;
@@ -732,1248 +809,1206 @@ useEffect(() => {
     </div>
   );
 
+ 
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
-    }}>
-      {/* Professional Notification Banner */}
-      {notifications.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          right: '0',
-          zIndex: 10000,
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          color: 'white',
-          padding: '1rem 2rem',
-          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-          animation: 'slideDown 0.4s ease-out'
-        }}>
+    <>
+      <SuccessModal open={showSuccessModal} onClose={() => setShowSuccessModal(false)} name={successMessage} />
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        position: 'relative'
+      }}>
+        {/* Professional Notification Banner */}
+        {notifications.length > 0 && (
           <div style={{
-            maxWidth: '1400px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem'
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            right: '0',
+            zIndex: 10000,
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            padding: '1rem 2rem',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+            animation: 'slideDown 0.4s ease-out'
           }}>
             <div style={{
+              maxWidth: '1400px',
+              margin: '0 auto',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               gap: '1rem'
             }}>
               <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+                </div>
+                <div>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    margin: '0 0 0.25rem 0'
+                  }}>
+                    {notifications[notifications.length - 1]?.title}
+                  </h4>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    margin: 0,
+                    opacity: 0.9
+                  }}>
+                    {notifications[notifications.length - 1]?.message}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button
+                  onClick={() => setNotifications(prev => prev.slice(0, -1))}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '0.25rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'none';
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+                  }}
+                >
+                  <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal for Important Actions */}
+        {showSuccessModal && successModalData && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            backdropFilter: 'blur(4px)',
+            animation: 'fadeIn 0.3s ease-out'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '1.5rem',
+              padding: '2.5rem',
+              maxWidth: '500px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              animation: 'slideUp 0.3s ease-out'
+            }}>
+              {/* Success Icon */}
+              <div style={{
+                width: '5rem',
+                height: '5rem',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
+              }}>
+                <CheckCircleIcon style={{ width: '2.5rem', height: '2.5rem', color: 'white' }} />
+              </div>
+
+              {/* Modal Content */}
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 700,
+                color: '#111827',
+                margin: '0 0 1rem 0'
+              }}>
+                {successModalData.title}
+              </h2>
+
+              <p style={{
+                fontSize: '1rem',
+                color: '#6b7280',
+                margin: '0 0 1.5rem 0',
+                lineHeight: 1.6
+              }}>
+                {successModalData.message}
+              </p>
+
+              {/* Close Button */}
+              <div style={{
+                display: 'flex',
                 justifyContent: 'center'
               }}>
-                <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  style={{
+                    padding: '1rem 3rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.75rem',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                    minWidth: '120px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                  }}
+                >
+                  Đóng
+                </button>
               </div>
-              <div>
-                <h4 style={{
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  margin: '0 0 0.25rem 0'
-                }}>
-                  {notifications[notifications.length - 1]?.title}
-                </h4>
-                <p style={{
-                  fontSize: '0.875rem',
-                  margin: 0,
-                  opacity: 0.9
-                }}>
-                  {notifications[notifications.length - 1]?.message}
-                </p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <button
-                onClick={() => setNotifications(prev => prev.slice(0, -1))}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.color = 'white';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'none';
-                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
-                }}
-              >
-                <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Success Modal for Important Actions */}
-      {showSuccessModal && successModalData && (
+        {/* Background decorations */}
         <div style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10001,
-          backdropFilter: 'blur(4px)',
-          animation: 'fadeIn 0.3s ease-out'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1.5rem',
-            padding: '2.5rem',
-            maxWidth: '500px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            animation: 'slideUp 0.3s ease-out'
-          }}>
-            {/* Success Icon */}
-            <div style={{
-              width: '5rem',
-              height: '5rem',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
-            }}>
-              <CheckCircleIcon style={{ width: '2.5rem', height: '2.5rem', color: 'white' }} />
-            </div>
-
-            {/* Modal Content */}
-            <h2 style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: '#111827',
-              margin: '0 0 1rem 0'
-            }}>
-              {successModalData.title}
-            </h2>
-
-            <p style={{
-              fontSize: '1rem',
-              color: '#6b7280',
-              margin: '0 0 1.5rem 0',
-              lineHeight: 1.6
-            }}>
-              {successModalData.message}
-            </p>
-
-            {/* Close Button */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center'
-            }}>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                style={{
-                  padding: '1rem 3rem',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.75rem',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                  minWidth: '120px'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                }}
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Background decorations */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.03) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none'
-      }} />
-      
-      <div style={{
-        maxWidth: '1400px', 
-        margin: '0 auto', 
-        padding: '2rem 1.5rem',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        {/* Header Section */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              <div style={{
-                width: '3.5rem',
-                height: '3.5rem',
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                borderRadius: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
-              }}>
-                <UsersIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
-              </div>
-              <div>
-                <h1 style={{
-                  fontSize: '2rem', 
-                  fontWeight: 700, 
-                  margin: 0,
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.025em'
-                }}>
-                  Thông tin người thân 
-                </h1>
-                <p style={{
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: 500
-                }}>
-                  Theo dõi và kết nối với người thân của bạn
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+          background: `
+            radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.03) 0%, transparent 50%)
+          `,
+          pointerEvents: 'none'
+        }} />
         
-        {/* Enhanced Family Member Selector */}
-        {residents.length > 1 && (
-          <div style={{ 
-            marginBottom: '2.5rem', 
-            maxWidth: 5000,
+        <div style={{
+          maxWidth: '1400px', 
+          margin: '0 auto', 
+          padding: '2rem 1.5rem',
+          position: 'relative',
+          zIndex: 1
+        }}>
+          {/* Header Section */}
+          <div style={{
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            marginBottom: '2rem',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             backdropFilter: 'blur(10px)'
           }}>
             <div style={{
-              display: 'flex',
+              display: 'flex', 
+              justifyContent: 'space-between', 
               alignItems: 'center',
-              gap: '1rem',
-              marginBottom: '1.5rem'
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                <div style={{
+                  width: '3.5rem',
+                  height: '3.5rem',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  borderRadius: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                }}>
+                  <UsersIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+                </div>
+                <div>
+                  <h1 style={{
+                    fontSize: '2rem', 
+                    fontWeight: 700, 
+                    margin: 0,
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Thông tin người thân 
+                  </h1>
+                  <p style={{
+                    fontSize: '1rem',
+                    color: '#64748b',
+                    margin: '0.25rem 0 0 0',
+                    fontWeight: 500
+                  }}>
+                    Theo dõi và kết nối với người thân của bạn
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Enhanced Family Member Selector */}
+          {residents.length > 1 && (
+            <div style={{ 
+              marginBottom: '2.5rem', 
+              maxWidth: 5000,
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1rem',
+              padding: '1.5rem',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(10px)'
             }}>
               <div style={{
-                width: '3rem',
-                height: '3rem',
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                borderRadius: '1rem',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                gap: '1rem',
+                marginBottom: '1.5rem'
               }}>
-                <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
-              </div>
-              <div>
-                <h3 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  margin: 0,
+                <div style={{
+                  width: '3rem',
+                  height: '3rem',
                   background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.025em'
+                  borderRadius: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
                 }}>
-                  Chọn người thân để xem thông tin
-                </h3>
-                
+                  <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    margin: 0,
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Chọn người thân để xem thông tin
+                  </h3>
+                  
+                </div>
+              </div>
+              
+              {/* Enhanced react-select dropdown */}
+              <Select
+                options={residents.map((r: any) => ({
+                  value: r._id,
+                  label: r.full_name || r.fullName || 'Chưa rõ',
+                  avatar: getAvatarUrl(r.avatar || r.avatarUrl) || '/default-avatar.svg',
+                  relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+                }))}
+                value={(() => {
+                  const found = residents.find((r: any) => r._id === selectedResidentId);
+                  return found ? {
+                    value: found._id,
+                    label: found.full_name || found.fullName || 'Chưa rõ',
+                    avatar: getAvatarUrl(found.avatar || found.avatarUrl) || '/default-avatar.svg',
+                    relationship: found.relationship || found.emergency_contact?.relationship || found.emergencyContact?.relationship || 'Chưa rõ'
+                  } : null;
+                })()}
+                onChange={opt => setSelectedResidentId(opt?.value)}
+                formatOptionLabel={formatOptionLabel}
+                isSearchable
+                styles={{
+                  control: (base, state) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    minHeight: 70,
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    boxShadow: state.isFocused 
+                      ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)' 
+                      : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                    borderColor: state.isFocused ? '#8b5cf6' : '#e5e7eb',
+                    borderWidth: state.isFocused ? '2px' : '1px',
+                    paddingLeft: '1rem',
+                    paddingRight: '1rem',
+                    transition: 'all 0.2s ease',
+                    background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)'
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    background: state.isSelected 
+                      ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' 
+                      : state.isFocused 
+                      ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' 
+                      : '#fff',
+                    color: state.isSelected ? '#7c3aed' : '#111827',
+                    cursor: 'pointer',
+                    paddingTop: '1rem',
+                    paddingBottom: '1rem',
+                    paddingLeft: '1.5rem',
+                    paddingRight: '1.5rem',
+                    fontSize: '1.125rem',
+                    fontWeight: state.isSelected ? 700 : 600,
+                    borderBottom: '1px solid #f1f5f9',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateX(4px)'
+                    }
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    overflow: 'hidden'
+                  }),
+                  menuList: (base) => ({
+                    ...base,
+                    padding: '0.5rem'
+                  }),
+                  singleValue: (base) => ({
+                    ...base,
+                    color: '#7c3aed',
+                    fontWeight: 700
+                  }),
+                  placeholder: (base) => ({
+                    ...base,
+                    color: '#9ca3af',
+                    fontWeight: 500
+                  }),
+                  dropdownIndicator: (base) => ({
+                    ...base,
+                    color: '#8b5cf6',
+                    '&:hover': {
+                      color: '#7c3aed'
+                    }
+                  }),
+                  indicatorSeparator: (base) => ({
+                    ...base,
+                    backgroundColor: '#e5e7eb'
+                  })
+                }}
+                placeholder='Chọn người thân...'
+              />
+            </div>
+          )}
+          {/* Resident Overview */}
+          <div style={{
+            background: '#fff',
+            borderRadius: 20,
+            border: '1.5px solid #e5e7eb',
+            boxShadow: '0 4px 24px rgba(30,41,59,0.08)',
+            padding: '2.5rem 3rem',
+            maxWidth: 1500,
+            margin: '2rem auto',
+          }}>
+            {/* Avatar, tên, badge ở trên cùng, căn giữa */}
+            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32}}>
+              <img src={getAvatarUrl(selectedResident?.avatar)} alt="avatar"
+                style={{width: 120, height: 120, borderRadius: '50%', border: '4px solid #6366f1', boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)', objectFit: 'cover', marginBottom: 12}} />
+              <div style={{fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 2, letterSpacing: 0.2, textTransform: 'uppercase'}}>Người cao tuổi:</div>
+              <h1 style={{fontWeight: 800, fontSize: 28, color: '#1e293b', margin: 0, lineHeight: 1.2, textAlign: 'center'}}>{selectedResident?.full_name}</h1>
+              <div style={{
+                fontSize: 14, fontWeight: 600, marginTop: 8,
+                background: selectedResident?.status === 'active' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)',
+                color: 'white', borderRadius: 20, padding: '6px 16px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center'
+              }}>{selectedResident?.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}</div>
+              <div style={{fontSize: 13, color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8}}>
+                <CalendarDaysIcon style={{width: 16, height: 16}} />
+                Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa cập nhật'}
               </div>
             </div>
-            
-            {/* Enhanced react-select dropdown */}
-            <Select
-              options={residents.map((r: any) => ({
-                value: r._id,
-                label: r.full_name || r.fullName || 'Chưa rõ',
-                avatar: getAvatarUrl(r.avatar || r.avatarUrl) || '/default-avatar.svg',
-                relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
-              }))}
-              value={(() => {
-                const found = residents.find((r: any) => r._id === selectedResidentId);
-                return found ? {
-                  value: found._id,
-                  label: found.full_name || found.fullName || 'Chưa rõ',
-                  avatar: getAvatarUrl(found.avatar || found.avatarUrl) || '/default-avatar.svg',
-                  relationship: found.relationship || found.emergency_contact?.relationship || found.emergencyContact?.relationship || 'Chưa rõ'
-                } : null;
-              })()}
-              onChange={opt => setSelectedResidentId(opt?.value)}
-              formatOptionLabel={formatOptionLabel}
-              isSearchable
-              styles={{
-                control: (base, state) => ({
-                  ...base,
-                  borderRadius: '1rem',
-                  minHeight: 70,
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  boxShadow: state.isFocused 
-                    ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)' 
-                    : '0 4px 12px rgba(0, 0, 0, 0.05)',
-                  borderColor: state.isFocused ? '#8b5cf6' : '#e5e7eb',
-                  borderWidth: state.isFocused ? '2px' : '1px',
-                  paddingLeft: '1rem',
-                  paddingRight: '1rem',
-                  transition: 'all 0.2s ease',
-                  background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)'
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  background: state.isSelected 
-                    ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' 
-                    : state.isFocused 
-                    ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' 
-                    : '#fff',
-                  color: state.isSelected ? '#7c3aed' : '#111827',
-                  cursor: 'pointer',
-                  paddingTop: '1rem',
-                  paddingBottom: '1rem',
-                  paddingLeft: '1.5rem',
-                  paddingRight: '1.5rem',
-                  fontSize: '1.125rem',
-                  fontWeight: state.isSelected ? 700 : 600,
-                  borderBottom: '1px solid #f1f5f9',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'translateX(4px)'
-                  }
-                }),
-                menu: (base) => ({
-                  ...base,
-                  borderRadius: '1rem',
-                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  overflow: 'hidden'
-                }),
-                menuList: (base) => ({
-                  ...base,
-                  padding: '0.5rem'
-                }),
-                singleValue: (base) => ({
-                  ...base,
-                  color: '#7c3aed',
-                  fontWeight: 700
-                }),
-                placeholder: (base) => ({
-                  ...base,
-                  color: '#9ca3af',
-                  fontWeight: 500
-                }),
-                dropdownIndicator: (base) => ({
-                  ...base,
-                  color: '#8b5cf6',
-                  '&:hover': {
-                    color: '#7c3aed'
-                  }
-                }),
-                indicatorSeparator: (base) => ({
-                  ...base,
-                  backgroundColor: '#e5e7eb'
-                })
-              }}
-              placeholder='Chọn người thân...'
-            />
-          </div>
-        )}
-        {/* Resident Overview */}
-        <div style={{
-          background: '#fff',
-          borderRadius: 20,
-          border: '1.5px solid #e5e7eb',
-          boxShadow: '0 4px 24px rgba(30,41,59,0.08)',
-          padding: '2.5rem 3rem',
-          maxWidth: 1500,
-          margin: '2rem auto',
-        }}>
-          {/* Avatar, tên, badge ở trên cùng, căn giữa */}
-          <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32}}>
-            <img src={getAvatarUrl(selectedResident?.avatar)} alt="avatar"
-              style={{width: 120, height: 120, borderRadius: '50%', border: '4px solid #6366f1', boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)', objectFit: 'cover', marginBottom: 12}} />
-            <div style={{fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 2, letterSpacing: 0.2, textTransform: 'uppercase'}}>Người cao tuổi:</div>
-            <h1 style={{fontWeight: 800, fontSize: 28, color: '#1e293b', margin: 0, lineHeight: 1.2, textAlign: 'center'}}>{selectedResident?.full_name}</h1>
-            <div style={{
-              fontSize: 14, fontWeight: 600, marginTop: 8,
-              background: selectedResident?.status === 'active' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)',
-              color: 'white', borderRadius: 20, padding: '6px 16px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center'
-            }}>{selectedResident?.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}</div>
-            <div style={{fontSize: 13, color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8}}>
-              <CalendarDaysIcon style={{width: 16, height: 16}} />
-              Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa cập nhật'}
-            </div>
-          </div>
-          {/* Grid 2 cột: Thông tin cá nhân + Liên hệ khẩn cấp | Chỉ số sức khỏe */}
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start'}}>
-            {/* Cột trái: Thông tin cá nhân + Liên hệ khẩn cấp */}
-            <div style={{display: 'flex', flexDirection: 'column', gap: 32}}>
+            {/* Layout 1 cột: 3 card thông tin */}
+            <div style={{display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1200, margin: '0 auto'}}>
               {/* Card Thông tin cá nhân */}
-              <div style={{background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)', border: '1px solid #e2e8f0', borderRadius: 16, padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
-                <div style={{fontWeight: 700, color: '#1e293b', fontSize: 18, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottom: '2px solid #6366f1'}}>
-                  <div style={{background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: '50%', padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                    <UsersIcon style={{width: 18, height: 18, color: 'white'}} />
+              <div style={{background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)', border: '1px solid #e2e8f0', borderRadius: 16, padding: '24px 28px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
+                <div style={{fontWeight: 700, color: '#1e293b', fontSize: 20, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14, paddingBottom: 14, borderBottom: '3px solid #6366f1'}}>
+                  <div style={{background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: '50%', padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)'}}>
+                    <UsersIcon style={{width: 20, height: 20, color: 'white'}} />
                   </div>
                   Thông tin cá nhân
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: '1fr', gap: 14, fontSize: 15}}>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                    <span style={{color: '#64748b', fontWeight: 600}}>Họ và tên người cao tuổi:</span>
-                    <span style={{color: '#1e293b', fontWeight: 600, textAlign: 'center'}}>{selectedResident?.full_name}</span>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24, fontSize: 16}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+                    <div style={{display: 'flex', flexDirection: 'column', padding: '16px 20px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', borderRadius: 12, border: '1px solid #cbd5e1'}}>
+                      <span style={{color: '#475569', fontWeight: 600, fontSize: 14, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Họ và tên</span>
+                      <span style={{color: '#1e293b', fontWeight: 800, fontSize: 18}}>{selectedResident?.full_name}</span>
+                    </div>
+                    <div style={{display: 'flex', flexDirection: 'column', padding: '16px 20px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', borderRadius: 12, border: '1px solid #cbd5e1'}}>
+                      <span style={{color: '#475569', fontWeight: 600, fontSize: 14, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Giới tính</span>
+                      <span style={{color: '#1e293b', fontWeight: 800, fontSize: 18}}>
+                        {selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa cập nhật')}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                    <span style={{color: '#64748b', fontWeight: 600}}>Ngày sinh:</span>
-                    <span style={{color: '#1e293b', fontWeight: 600}}>
-                      {selectedResident?.date_of_birth || selectedResident?.dateOfBirth ? 
-                        `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}` : 
-                        'Chưa cập nhật'
-                      }
-                    </span>
-                  </div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                    <span style={{color: '#64748b', fontWeight: 600}}>Giới tính:</span>
-                    <span style={{color: '#1e293b', fontWeight: 600}}>
-                      {selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa cập nhật')}
-                    </span>
-                  </div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                    <span style={{color: '#64748b', fontWeight: 600}}>Phòng:</span>
-                    <span style={{color: '#1e293b', fontWeight: 600}}>
-                      {roomLoading ? 'Đang tải...' : roomNumber}
-                    </span>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+                    <div style={{display: 'flex', flexDirection: 'column', padding: '16px 20px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', borderRadius: 12, border: '1px solid #cbd5e1'}}>
+                      <span style={{color: '#475569', fontWeight: 600, fontSize: 14, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Ngày sinh</span>
+                      <span style={{color: '#1e293b', fontWeight: 800, fontSize: 18}}>
+                        {selectedResident?.date_of_birth || selectedResident?.dateOfBirth ? 
+                          `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}` : 
+                          'Chưa cập nhật'
+                        }
+                      </span>
+                    </div>
+                    <div style={{display: 'flex', flexDirection: 'column', padding: '16px 20px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', borderRadius: 12, border: '1px solid #cbd5e1'}}>
+                      <span style={{color: '#475569', fontWeight: 600, fontSize: 14, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Phòng</span>
+                      <span style={{color: '#1e293b', fontWeight: 800, fontSize: 18}}>
+                        {roomLoading ? 'Đang tải...' : roomNumber}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
+              
               {/* Card Liên hệ khẩn cấp */}
-              <div style={{background: 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)', border: '1px solid #fecaca', borderRadius: 16, padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
+              <div style={{background: 'linear-gradient(135deg, #fef2f2 0%, #ffffff 100%)', border: '1px solid #fecaca', borderRadius: 16, padding: '20px 24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
                 <div style={{fontWeight: 700, color: '#1e293b', fontSize: 18, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottom: '2px solid #ef4444'}}>
                   <div style={{background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderRadius: '50%', padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                     <PhoneIcon style={{width: 18, height: 18, color: 'white'}} />
                   </div>
                   Liên hệ khẩn cấp
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: '1fr', gap: 14, fontSize: 15}}>
-                  {selectedResident?.emergency_contact?.name ? (
-                    <>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                        <span style={{color: '#64748b', fontWeight: 600}}>Tên người liên hệ:</span>
-                        <span style={{color: '#1e293b', fontWeight: 600}}>{selectedResident.emergency_contact.name}</span>
-                      </div>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                        <span style={{color: '#64748b', fontWeight: 600}}>Quan hệ với người cao tuổi:</span>
-                        <span style={{color: '#1e293b', fontWeight: 600}}>{selectedResident.emergency_contact.relationship}</span>
-                      </div>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0'}}>
-                        <span style={{color: '#64748b', fontWeight: 600}}>Số điện thoại liên hệ:</span>
-                        <span style={{color: '#1e293b', fontWeight: 600}}>{selectedResident.emergency_contact.phone}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{textAlign: 'center', color: '#64748b', fontStyle: 'italic', padding: '16px 0'}}>
-                      Chưa cập nhật thông tin liên hệ khẩn cấp
+                {selectedResident?.emergency_contact?.name ? (
+                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, fontSize: 15}}>
+                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca'}}>
+                      <span style={{color: '#dc2626', fontWeight: 600, fontSize: 13, marginBottom: 4}}>Tên người liên hệ</span>
+                      <span style={{color: '#1e293b', fontWeight: 700, fontSize: 15, textAlign: 'center'}}>{selectedResident.emergency_contact.name}</span>
                     </div>
-                  )}
-                </div>
+                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca'}}>
+                      <span style={{color: '#dc2626', fontWeight: 600, fontSize: 13, marginBottom: 4}}>Quan hệ</span>
+                      <span style={{color: '#1e293b', fontWeight: 700, fontSize: 15, textAlign: 'center'}}>{selectedResident.emergency_contact.relationship}</span>
+                    </div>
+                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca'}}>
+                      <span style={{color: '#dc2626', fontWeight: 600, fontSize: 13, marginBottom: 4}}>Số điện thoại</span>
+                      <span style={{color: '#1e293b', fontWeight: 700, fontSize: 15, textAlign: 'center'}}>{selectedResident.emergency_contact.phone}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{textAlign: 'center', color: '#64748b', fontStyle: 'italic', padding: '20px', background: '#fef2f2', borderRadius: 12, border: '1px dashed #fecaca'}}>
+                    Chưa cập nhật thông tin liên hệ khẩn cấp
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Cột phải: Chỉ số sức khỏe */}
-            <div style={{display: 'flex', flexDirection: 'column', gap: 32, justifyContent: 'flex-start'}}>
-              <div style={{background: '#fff', border: '1.5px solid #e0e7ef', borderRadius: 18, padding: '2.5rem 2rem 2rem 2rem', boxShadow: '0 2px 8px #e0e7ef'}}>
+              
+              {/* Card Chỉ số sức khỏe */}
+              <div style={{background: '#fff', border: '1.5px solid #e0e7ef', borderRadius: 18, padding: '20px 24px', boxShadow: '0 2px 8px #e0e7ef'}}>
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16}}>
-                  <svg width="22" height="22" fill="#ef3b7d" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                  <span style={{fontWeight: 700, fontSize: 19, color: '#1e293b', textAlign: 'center'}}>Chỉ số sức khỏe của {selectedResident?.full_name}</span>
+                  
+                  <span style={{fontWeight: 700, fontSize: 18, color: '#1e293b', textAlign: 'center'}}>Chỉ số sức khỏe của {selectedResident?.full_name}</span>
                 </div>
-                <div style={{fontSize: 15, color: '#64748b', marginBottom: 22, textAlign: 'center'}}>
+                <div style={{fontSize: 14, color: '#64748b', marginBottom: 20, textAlign: 'center', padding: '8px 16px', background: '#f8fafc', borderRadius: 8}}>
                   Lần cập nhật gần nhất: {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYY(vitalSigns.date_time) : 'Không có dữ liệu'}
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.2rem', fontSize: 16, marginBottom: 22}}>
-                  <div style={{background: '#fef2f2', borderRadius: 12, padding: '1.2rem', border: '1px solid #fecaca'}}>
-                    <div style={{color: '#b91c1c', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Huyết áp (mmHg)</div>
-                    <div style={{fontWeight: 700, color: '#dc2626', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.blood_pressure ?? '--'}</div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', fontSize: 15, marginBottom: 20}}>
+                  <div style={{background: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)', borderRadius: 12, padding: '16px 12px', border: '1px solid #fecaca', textAlign: 'center'}}>
+                    <div style={{color: '#b91c1c', fontWeight: 600, fontSize: 13, marginBottom: 6}}>Huyết áp (mmHg)</div>
+                    <div style={{fontWeight: 700, color: '#dc2626', fontSize: 18}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.blood_pressure ?? '--'}</div>
                   </div>
-                  <div style={{background: '#f0fdf4', borderRadius: 12, padding: '1.2rem', border: '1px solid #bbf7d0'}}>
-                    <div style={{color: '#047857', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Nhịp tim (bpm)</div>
-                    <div style={{fontWeight: 700, color: '#10b981', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.heart_rate ?? '--'}</div>
+                  <div style={{background: 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)', borderRadius: 12, padding: '16px 12px', border: '1px solid #bbf7d0', textAlign: 'center'}}>
+                    <div style={{color: '#047857', fontWeight: 600, fontSize: 13, marginBottom: 6}}>Nhịp tim (bpm)</div>
+                    <div style={{fontWeight: 700, color: '#10b981', fontSize: 18}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.heart_rate ?? '--'}</div>
                   </div>
-                  <div style={{background: '#fefce8', borderRadius: 12, padding: '1.2rem', border: '1px solid #fde68a'}}>
-                    <div style={{color: '#b45309', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Nhiệt độ cơ thể</div>
-                    <div style={{fontWeight: 700, color: '#f59e42', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.temperature ?? '--'}°C</div>
+                  <div style={{background: 'linear-gradient(135deg, #fefce8 0%, #fde68a 100%)', borderRadius: 12, padding: '16px 12px', border: '1px solid #fde68a', textAlign: 'center'}}>
+                    <div style={{color: '#b45309', fontWeight: 600, fontSize: 13, marginBottom: 6}}>Nhiệt độ cơ thể</div>
+                    <div style={{fontWeight: 700, color: '#f59e42', fontSize: 18}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.temperature ?? '--'}°C</div>
                   </div>
-                  <div style={{background: '#f3f4f6', borderRadius: 12, padding: '1.2rem', border: '1px solid #e0e7ef'}}>
-                    <div style={{color: '#6366f1', fontWeight: 600, fontSize: 14, marginBottom: 2}}>Cân nặng hiện tại</div>
-                    <div style={{fontWeight: 700, color: '#6366f1', fontSize: 19}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.weight ?? '--'} kg</div>
+                  <div style={{background: 'linear-gradient(135deg, #f3f4f6 0%, #e0e7ef 100%)', borderRadius: 12, padding: '16px 12px', border: '1px solid #e0e7ef', textAlign: 'center'}}>
+                    <div style={{color: '#6366f1', fontWeight: 600, fontSize: 13, marginBottom: 6}}>Cân nặng hiện tại</div>
+                    <div style={{fontWeight: 700, color: '#6366f1', fontSize: 18}}>{vitalLoading ? 'Đang tải...' : vitalSigns?.weight ?? '--'} kg</div>
                   </div>
                 </div>
-                <div style={{marginTop: 8, padding: '0.9rem 1.1rem', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', color: '#059669', fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center'}}>
-                  <span style={{width: 13, height: 13, background: '#10b981', borderRadius: '50%', display: 'inline-block'}}></span>
+                <div style={{padding: '12px 16px', background: 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)', borderRadius: 12, border: '1px solid #bbf7d0', color: '#059669', fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center'}}>
+                  <span style={{width: 12, height: 12, background: '#10b981', borderRadius: '50%', display: 'inline-block'}}></span>
                   Tình trạng: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Tabbed Information */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          overflow: 'hidden'
-        }}>
-          <Tab.Group>
-            <Tab.List style={{
-              display: 'flex',
-              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
-              <Tab className={({ selected }) => 
-                `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  selected 
-                    ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
-                }`
-              }>
-                Hoạt động sinh hoạt
-              </Tab>
-              <Tab className={({ selected }) => 
-                `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  selected 
-                    ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
-                }`
-              }>
-                Ghi chú chăm sóc
-              </Tab>
-              <Tab className={({ selected }) => 
-                `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  selected 
-                    ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
-                }`
-              }>
-                Chỉ số sức khỏe
-              </Tab>
-            </Tab.List>
-
-            <Tab.Panels>
-              <Tab.Panel style={{padding: '2rem'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.5rem',flexWrap:'wrap',gap:'1rem'}}>
-                  <h3 style={{fontSize:'1.125rem',fontWeight:600,color:'#111827',margin:0}}>
-                    {showActivityHistory ? 'Lịch sử hoạt động' : 'Hoạt động hôm nay'}
-                  </h3>
-                  <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap'}}>
-                    {showActivityHistory && (
-                      <DatePicker
-                        selected={selectedActivityDate ? new Date(selectedActivityDate) : null}
-                        onChange={date => {
-                          if (!date) return;
-                          const iso = date.toISOString().slice(0,10);
-                          if (activityHistoryDates.includes(iso)) setSelectedActivityDate(iso);
-                        }}
-                        includeDates={activityHistoryDates.map(d=>new Date(d))}
-                        openToDate={selectedActivityDate ? new Date(selectedActivityDate) : undefined}
-                        dateFormat="EEEE, d 'tháng' M, yyyy"
-                        locale={vi}
-                        popperPlacement="bottom"
-                        showPopperArrow={false}
-                        customInput={
-                          <button style={{padding:'0.5rem 1rem',borderRadius:'0.75rem',border:'2px solid #3b82f6',background:'white',fontSize:'1rem',fontWeight:600,color:'#374151',cursor:'pointer',minWidth:'220px',textAlign:'left',boxShadow:'0 2px 8px rgba(59,130,246,0.07)'}}>
-                            {formatDateDDMMYYYY(selectedActivityDate)}
-                          </button>
-                        }
-                      />
-                    )}
-                    <button
-                      onClick={() => {
-                        setShowActivityHistory(v => !v);
-                        // Khi chuyển về "hôm nay", reset selectedActivityDate về ngày hôm nay
-                        if (showActivityHistory) {
-                          const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
-                          setSelectedActivityDate(todayFromAPI);
-                        }
-                      }}
-                      style={{padding:'0.5rem 1rem',borderRadius:'0.5rem',border:'1px solid #8b5cf6',background:showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',color:showActivityHistory?'#8b5cf6':'white',fontSize:'0.875rem',fontWeight:600,cursor:'pointer',transition:'all 0.2s ease',display:'flex',alignItems:'center',gap:'0.5rem'}}
-                      onMouseOver={e=>{e.currentTarget.style.background=showActivityHistory?'#f3f4f6':'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';}}
-                      onMouseOut={e=>{e.currentTarget.style.background=showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';}}
-                    >
-                      <CalendarDaysIcon style={{width:'1rem',height:'1rem'}}/>
-                      {showActivityHistory?'Xem hôm nay':'Xem lịch sử hoạt động'}
-                    </button>
+              {/* Card Nhân viên phụ trách */}
+             
+                
+                {assignedStaffLoading ? (
+                  <div style={{textAlign: 'center', padding: '20px', color: '#64748b'}}>
+                    <div style={{fontSize: 16, fontWeight: 600}}>Đang tải thông tin nhân viên...</div>
                   </div>
-                </div>
-                <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
-                  {activitiesLoading ? (
-                    <div>Đang tải dữ liệu hoạt động...</div>
-                  ) : activitiesError ? (
-                    <div style={{color:'red'}}>{activitiesError}</div>
-                  ) : Array.isArray(activities) && activities.length > 0 ? (
-                    activities.map((activity:any) => {
-                      const attended = activity.attendance_status === 'attended';
-                      const absent = activity.attendance_status === 'absent';
-                      const activityId = activity.activity_id?._id || activity.activity_id;
-                      // Format thời gian hiển thị
-                      const formatTimeForDisplay = (isoTime: string) => {
-                        if (!isoTime) return '';
-                        const date = new Date(isoTime);
-                        return date.toLocaleTimeString('vi-VN', { 
-                          hour: '2-digit', 
-                          minute: '2-digit',
-                          hour12: false 
-                        });
-                      };
-                      
-                      const time = activityTimes[activityId]?.start ? formatTimeForDisplay(activityTimes[activityId].start) : '';
-                      const endTimeStr = activityTimes[activityId]?.end ? formatTimeForDisplay(activityTimes[activityId].end) : '';
-                      return (
-                        <div key={activity._id} style={{display:'flex',alignItems:'center',padding:'1rem',borderRadius:'0.75rem',background:attended?'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)':absent?'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)':'#fff',border:'1px solid',borderColor:attended?'#86efac':absent?'#d1d5db':'#e5e7eb'}}>
-                          <div style={{marginRight:'1rem'}}>
-                            {attended ? (
-                              <CheckCircleIcon style={{width:'1.5rem',height:'1.5rem',color:'#16a34a'}}/>
-                            ) : absent ? (
-                              <XCircleIcon style={{width:'1.5rem',height:'1.5rem',color:'#ef4444'}}/>
-                            ) : (
-                              <ClockIcon style={{width:'1.5rem',height:'1.5rem',color:'#6b7280'}}/>
-                            )}
-                          </div>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:'0.95rem',fontWeight:600,color:'#111827',marginBottom:'0.25rem'}}>
-                              <span style={{fontWeight:600,color:'#374151'}}>Hoạt động: </span>{activity.activity_id?.activity_name || '---'}
+                ) : assignedStaffError ? (
+                  <div style={{textAlign: 'center', padding: '20px', color: '#ef4444', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca'}}>
+                    <div style={{fontSize: 16, fontWeight: 600}}>{assignedStaffError}</div>
+                  </div>
+                                  ) : assignedStaff.length > 0 ? (
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+                      {assignedStaff.map((assignment: any, index: number) => {
+                        const staff = assignment.staff_id;
+                        const staffName = staff?.full_name || staff?.fullName || staff?.name || staff?.username || staff?.email || 'Chưa rõ';
+                        const staffPosition = staff?.position || 'Nhân viên chăm sóc';
+                        
+                        return (
+                          <div key={assignment._id || index} style={{
+                            background: 'white',
+                            borderRadius: 12,
+                            padding: '20px',
+                            border: '1px solid #dbeafe',
+                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.1)'
+                          }}>
+                            {/* Header với icon và title */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              marginBottom: 16
+                            }}>
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                background: '#3b82f6',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <UsersIcon style={{width: '20px', height: '20px', color: 'white'}} />
+                              </div>
+                              <h3 style={{
+                                fontSize: '18px',
+                                fontWeight: 700,
+                                color: '#1e293b',
+                                margin: 0
+                              }}>
+                                Nhân viên phụ trách chăm sóc
+                              </h3>
                             </div>
-                            <div style={{fontSize:'0.8rem',color:'#6b7280',marginBottom:'0.25rem'}}>
-                              <span style={{fontWeight:600}}>Thời gian: </span>{time}{endTimeStr?` - ${endTimeStr}`:''}
+                            
+                            {/* Separator line */}
+                            <div style={{
+                              height: '2px',
+                              background: '#3b82f6',
+                              marginBottom: 16
+                            }} />
+                            
+                            {/* Content - 3 cột thông tin */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(3, 1fr)',
+                              gap: 16
+                            }}>
+                              {/* Cột 1: Tên nhân viên */}
+                              <div style={{
+                                background: '#eff6ff',
+                                borderRadius: 8,
+                                padding: '12px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: '#3b82f6',
+                                  fontWeight: 600,
+                                  marginBottom: 4
+                                }}>
+                                  Tên nhân viên
+                                </div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  color: '#1e293b',
+                                  fontWeight: 700
+                                }}>
+                                  {staffName}
+                                </div>
+                              </div>
+                              
+                              {/* Cột 2: Chức vụ */}
+                              <div style={{
+                                background: '#eff6ff',
+                                borderRadius: 8,
+                                padding: '12px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: '#3b82f6',
+                                  fontWeight: 600,
+                                  marginBottom: 4
+                                }}>
+                                  Chức vụ
+                                </div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  color: '#1e293b',
+                                  fontWeight: 700
+                                }}>
+                                  {staffPosition}
+                                </div>
+                              </div>
+                              
+                              {/* Cột 3: Số điện thoại */}
+                              <div style={{
+                                background: '#eff6ff',
+                                borderRadius: 8,
+                                padding: '12px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: '#3b82f6',
+                                  fontWeight: 600,
+                                  marginBottom: 4
+                                }}>
+                                  Số điện thoại
+                                </div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  color: '#1e293b',
+                                  fontWeight: 700
+                                }}>
+                                  {staff?.phone || 'Chưa cập nhật'}
+                                </div>
+                              </div>
                             </div>
-                            <span style={{fontSize:'0.8rem',fontWeight:500,color:attended?'#166534':absent?'#ef4444':'#6b7280'}}>
-                              <span style={{fontWeight:600}}>Trạng thái: </span>
-                              {attended ? 'Đã tham gia' : absent ? <>Không tham gia{activity.performance_notes && <> - Lý do: <span style={{color:'#ef4444'}}>{activity.performance_notes}</span></>}</> : 'Chưa tham gia'}
-                            </span>
                           </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '3rem 2rem',
-                      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                      borderRadius: '1rem',
-                      border: '2px dashed #cbd5e1',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{
-                        width: '4rem',
-                        height: '4rem',
-                        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '1rem'
-                      }}>
-                        <CalendarDaysIcon style={{ width: '2rem', height: '2rem', color: '#64748b' }} />
-                      </div>
-                      <h4 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: 600,
-                        color: '#374151',
-                        margin: '0 0 0.5rem 0'
-                      }}>
-                        Chưa có hoạt động hôm nay
-                      </h4>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#64748b',
-                        margin: 0,
-                        maxWidth: '300px',
-                        lineHeight: 1.5
-                      }}>
-                        Hôm nay chưa có hoạt động nào được lên lịch cho người thân của bạn.
-                      </p>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              </Tab.Panel>
-              
-              <Tab.Panel style={{padding: '2rem'}}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  marginBottom: '1.5rem'
-                }}>
-                  Ghi chú chăm sóc gần đây
-                </h3>
-                <div style={{overflowX: 'auto'}}>
-                  <table style={{width: '100%', borderCollapse: 'collapse', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderRadius: '0.75rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}>
-                    <thead>
-                      <tr>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ngày</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nội dung ghi chú</th>
-                        <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhân viên chăm sóc</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {careNotesLoading ? (
-                        <tr><td colSpan={3}>Đang tải ghi chú chăm sóc...</td></tr>
-                      ) : careNotesError ? (
-                        <tr><td colSpan={3} style={{color: 'red'}}>{careNotesError}</td></tr>
-                      ) : Array.isArray(paginatedNotes) && paginatedNotes.length > 0 ? (
-                        paginatedNotes.map((note: any) => {
-                          return (
-                            <tr key={note._id} style={{borderTop: '1px solid #e5e7eb'}}>
-                              <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}>
-                                {note.date ? formatDateDDMMYYYY(note.date) : ''}
-                              </td>
-                              <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}>
-                                <div style={{fontWeight: 700, marginBottom: 4}}>{note.assessment_type || 'Đánh giá'}</div>
-                                <div style={{marginBottom: 2}}><span style={{fontWeight: 600}}>Ghi chú: </span>{note.notes || 'Không có ghi chú'}</div>
-                                <div><span style={{fontWeight: 600}}>Khuyến nghị: </span>{note.recommendations || 'Không có khuyến nghị'}</div>
-                              </td>
-                              <td style={{padding: '0.75rem', fontSize: '0.95em'}}>
-                                <span style={{fontWeight: 700, color: '#8b5cf6'}}>{
-                                  (() => {
-                                    let conductedBy = note.conducted_by;
-                                    if (typeof conductedBy === 'object' && conductedBy !== null) {
-                                      const name = conductedBy.full_name || conductedBy.fullName || conductedBy.name || conductedBy.username || conductedBy.email || '';
-                                      const pos = conductedBy.position;
-                                      return pos ? `${pos}: ${name}` : name;
-                                    }
-                                    // Nếu conductedBy là tên (có dấu tiếng Việt), hiển thị trực tiếp
-                                    if (conductedBy && /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/.test(conductedBy)) {
-                                      return conductedBy;
-                                    }
-                                    const staff = staffList.find((s: any) => String(s._id) === String(conductedBy));
-                                    if (staff) {
-                                      const name = staff.fullName || staff.full_name || staff.name || staff.username || staff.email;
-                                      const pos = staff.position;
-                                      return pos ? `${pos}: ${name}` : name;
-                                    }
-                                    if (conductedBy && fetchedStaffNames[conductedBy]) {
-                                      return fetchedStaffNames[conductedBy];
-                                    }
-                                    if (conductedBy && !fetchedStaffNames[conductedBy]) {
-                                      // Dùng userAPI.getById để lấy tên staff
-                                      userAPI.getById(conductedBy)
-                                        .then(data => {
-                                          setFetchedStaffNames(prev => ({
-                                            ...prev,
-                                            [conductedBy]: (data.position ? `${data.position}: ` : '') + (data.full_name || data.fullName || data.name || data.username || data.email || conductedBy)
-                                          }));
-                                        })
-                                        .catch(() => {
-                                          setFetchedStaffNames(prev => ({
-                                            ...prev,
-                                            [conductedBy]: conductedBy
-                                          }));
-                                        });
-                                      return 'Đang tải...';
-                                    }
-                                    return conductedBy || '---';
-                                  })()
-                                }</span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={3} style={{ padding: '3rem 2rem', textAlign: 'center' }}>
-                            <div style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '2rem',
-                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                              borderRadius: '1rem',
-                              border: '2px dashed #cbd5e1'
-                            }}>
-                              <div style={{
-                                width: '3rem',
-                                height: '3rem',
-                                background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginBottom: '1rem'
-                              }}>
-                                <DocumentTextIcon style={{ width: '1.5rem', height: '1.5rem', color: '#64748b' }} />
-                              </div>
-                              <h4 style={{
-                                fontSize: '1rem',
-                                fontWeight: 600,
-                                color: '#374151',
-                                margin: '0 0 0.5rem 0'
-                              }}>
-                                Chưa có ghi chú chăm sóc
-                              </h4>
-                              <p style={{
-                                fontSize: '0.875rem',
-                                color: '#64748b',
-                                margin: 0,
-                                maxWidth: '250px',
-                                lineHeight: 1.5
-                              }}>
-                                Hiện tại chưa có ghi chú chăm sóc nào được ghi nhận.
-                              </p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                    {totalPages > 1 && (
-                      <tfoot>
-                        <tr>
-                          <td colSpan={3} style={{textAlign:'center',padding:'1rem 0'}}>
-                            <button onClick={()=>setCareNotesPage(p=>Math.max(1,p-1))} disabled={careNotesPage===1} style={{marginRight:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:careNotesPage===1?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:careNotesPage===1?'not-allowed':'pointer'}}>← Trang trước</button>
-                            <span style={{fontWeight:600,color:'#7c3aed'}}>Trang {careNotesPage}/{totalPages}</span>
-                            <button onClick={()=>setCareNotesPage(p=>Math.min(totalPages,p+1))} disabled={careNotesPage===totalPages} style={{marginLeft:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:careNotesPage===totalPages?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:careNotesPage===totalPages?'not-allowed':'pointer'}}>Trang sau →</button>
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
-              </Tab.Panel>
-              
-              <Tab.Panel style={{padding: '2rem'}}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  marginBottom: '1.5rem'
-                }}>
-                  Lịch sử chỉ số sức khỏe
-                </h3>
-                <div style={{overflowX: 'auto'}}>
-                  <table style={{
-                    width: '100%',
-                    borderCollapse: 'separate',
-                    borderSpacing: 0,
-                    background: 'white',
-                    borderRadius: 16,
-                    boxShadow: '0 4px 24px rgba(139,92,246,0.07)',
-                    overflow: 'hidden'
-                  }}>
-                    <thead>
-                      <tr style={{
-                        background: 'linear-gradient(90deg, #ede9fe 0%, #f3f4f6 100%)'
-                      }}>
-                        {['Ngày', 'Thời gian đo', 'Huyết áp', 'Nhịp tim', 'Nhiệt độ', 'Cân nặng', 'Ghi chú'].map((h, i) => (
-                          <th key={i} style={{
-                            padding: '1rem',
-                            textAlign: 'left',
-                            color: '#7c3aed',
-                            fontWeight: 800,
-                            fontSize: 15,
-                            letterSpacing: 1,
-                            borderBottom: '2px solid #ede9fe',
-                            textTransform: 'uppercase'
-                          }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vitalHistoryLoading ? (
-                        <tr><td colSpan={7} style={{padding: '1.5rem', textAlign: 'center', color: '#8b5cf6'}}>Đang tải dữ liệu...</td></tr>
-                      ) : paginatedVital.length > 0 ? (
-                        paginatedVital.map((vital: any, index: number) => (
-                          <tr key={vital._id}
-                            style={{
-                              background: index % 2 === 0 ? '#fff' : '#f8fafc',
-                              transition: 'background 0.2s'
-                            }}>
-                            <td style={{padding: '1rem', fontWeight: 600, color: '#374151'}}>
-                              {vital.date_time ? formatDateDDMMYYYY(vital.date_time) : ''}
-                            </td>
-                            <td style={{padding: '1rem', color: '#6b7280'}}>
-                              {vital.date_time ? (() => {
-                                const date = new Date(vital.date_time);
-                                const vietnamTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));
-                                return vietnamTime.toLocaleTimeString('vi-VN', { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit',
-                                  hour12: false 
-                                });
-                              })() : ''}
-                            </td>
-                            <td style={{padding: '1rem', fontWeight: 700, color: '#ef4444', fontSize: 16}}>
-                              {vital.blood_pressure ?? <span style={{color:'#9ca3af'}}>--</span>}
-                            </td>
-                            <td style={{padding: '1rem', fontWeight: 700, color: '#10b981', fontSize: 16}}>
-                                {vital.heart_rate ?? <span style={{color:'#9ca3af'}}>--</span>}
-                            </td>
-                            <td style={{padding: '1rem', fontWeight: 700, color: '#f59e0b', fontSize: 16}}>
-                              {vital.temperature ?? <span style={{color:'#9ca3af'}}>--</span>}
-                            </td>
-                            <td style={{padding: '1rem', fontWeight: 700, color: '#6366f1', fontSize: 16}}>
-                              {vital.weight ?? <span style={{color:'#9ca3af'}}>--</span>}
-                            </td>
-                            <td style={{padding: '1rem', color: '#6b7280', fontStyle: 'italic', fontSize: 15}}>
-                              {vital.notes ?? <span style={{color:'#9ca3af'}}>--</span>}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={7} style={{ padding: '3rem 2rem', textAlign: 'center' }}>
-                            <div style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '2rem',
-                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                              borderRadius: '1rem',
-                              border: '2px dashed #cbd5e1'
-                            }}>
-                              <div style={{
-                                width: '3rem',
-                                height: '3rem',
-                                background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginBottom: '1rem'
-                              }}>
-                                <HeartIcon style={{ width: '1.5rem', height: '1.5rem', color: '#64748b' }} />
-                              </div>
-                              <h4 style={{
-                                fontSize: '1rem',
-                                fontWeight: 600,
-                                color: '#374151',
-                                margin: '0 0 0.5rem 0'
-                              }}>
-                                Chưa có dữ liệu chỉ số sức khỏe
-                              </h4>
-                              <p style={{
-                                fontSize: '0.875rem',
-                                color: '#64748b',
-                                margin: 0,
-                                maxWidth: '250px',
-                                lineHeight: 1.5
-                              }}>
-                                Hiện tại chưa có chỉ số sức khỏe nào được ghi nhận.
-                              </p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {totalVitalPages > 1 && (
-                  <tfoot>
-                    <tr>
-                      <td colSpan={7} style={{textAlign:'center',padding:'1rem 0'}}>
-                        <button onClick={()=>setVitalPage(p=>Math.max(1,p-1))} disabled={vitalPage===1} style={{marginRight:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:vitalPage===1?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:vitalPage===1?'not-allowed':'pointer'}}>← Trang trước</button>
-                        <span style={{fontWeight:600,color:'#7c3aed'}}>Trang {vitalPage}/{totalVitalPages}</span>
-                        <button onClick={()=>setVitalPage(p=>Math.min(totalVitalPages,p+1))} disabled={vitalPage===totalVitalPages} style={{marginLeft:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:vitalPage===totalVitalPages?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:vitalPage===totalVitalPages?'not-allowed':'pointer'}}>Trang sau →</button>
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </Tab.Panel>
-            </Tab.Panels>
-          </Tab.Group>
-        </div>
-      </div>
-
-      {/* Modal hiển thị danh sách nhân viên phụ trách */}
-      {showStaffModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 10002,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          animation: 'fadeIn 0.2s ease-out',
-          marginLeft: '140px'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '0',
-            width: '520px',
-            maxWidth: '120vw',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            animation: 'slideUp 0.3s ease-out'
-          }}>
-            {/* Header đơn giản */}
-            <div style={{
-              background: '#f8fafc',
-              borderRadius: '1rem 1rem 0 0',
-              padding: '1.5rem',
-              borderBottom: '1px solid #e2e8f0'
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem'
-                }}>
+                ) : (
                   <div style={{
-                    width: '3rem',
-                    height: '3rem',
-                    background: '#6366f1',
-                    borderRadius: '0.5rem',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
-                  </div>
-                  <div>
-                    <h2 style={{
-                      fontSize: '1.5rem',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      margin: '0 0 0.25rem 0'
-                    }}>
-                      Đội ngũ chăm sóc
-                    </h2>
-                    <p style={{
-                      fontSize: '0.85rem',
-                      color: '#6b7280',
-                      margin: 0
-                    }}>
-                      Nhân viên đang chăm sóc người cao tuổi {selectedResident?.fullName}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowStaffModal(false)}
-                  title="Đóng"
-                  style={{
-                    width: '2rem',
-                    height: '2rem',
-                    background: 'transparent',
-                    border: 'none',
-                    borderRadius: '0.375rem',
-                    cursor: 'pointer',
-                    display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#6b7280',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.background = '#f3f4f6';
-                    e.currentTarget.style.color = '#374151';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#6b7280';
-                  }}
-                >
-                  <XMarkIcon style={{width: '1.125rem', height: '1.125rem'}} />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div style={{
-              padding: '1.5rem',
-              background: 'white'
-            }}>
-              {/* Staff list đơn giản */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem'
-              }}>
-                {staffMembers.map((staff) => (
-                  <div key={staff.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '1rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    transition: 'all 0.2s ease',
-                    cursor: 'pointer'
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.background = '#f3f4f6';
-                    e.currentTarget.style.borderColor = '#d1d5db';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.background = '#f9fafb';
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                  }}
-                  >
+                    padding: '2rem',
+                    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                    borderRadius: 12,
+                    border: '2px dashed #0ea5e9',
+                    textAlign: 'center'
+                  }}>
                     <div style={{
+                      width: '3rem',
+                      height: '3rem',
+                      background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                      borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.75rem'
+                      justifyContent: 'center',
+                      marginBottom: '1rem'
                     }}>
-                      <div style={{
-                        width: '2.5rem',
-                        height: '2.5rem',
-                        background: '#6366f1',
-                        borderRadius: '0.375rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <svg style={{width: '1rem', height: '1rem', color: 'white'}} fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <div style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#1f2937',
-                          marginBottom: '0.25rem'
-                        }}>
-                          {staff.name}
-                        </div>
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: '#6b7280'
-                        }}>
-                          {staff.role}
-                        </div>
-                      </div>
+                      <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
                     </div>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowStaffModal(false);
-                        router.push(`/family/contact-staff?staffId=${staff.id}`);
-                      }}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: '#6366f1',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = '#5b21b6';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = '#6366f1';
-                      }}
-                    >
-                      <ChatBubbleLeftRightIcon style={{width: '0.875rem', height: '0.875rem'}} />
-                      Nhắn tin
-                    </button>
+                    <h4 style={{
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: '#1e293b',
+                      margin: '0 0 0.5rem 0'
+                    }}>
+                      Chưa có nhân viên phụ trách
+                    </h4>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#64748b',
+                      margin: 0,
+                      maxWidth: '300px',
+                      lineHeight: 1.5
+                    }}>
+                      Hiện tại chưa có nhân viên nào được phân công chăm sóc người thân của bạn.
+                    </p>
                   </div>
-                ))}
-              </div>
-
-              {/* Footer message đơn giản */}
-              <div style={{
-                marginTop: '1rem',
-                padding: '0.75rem',
-                background: '#fef3c7',
-                borderRadius: '0.375rem',
-                textAlign: 'center'
-              }}>
-                <p style={{
-                  fontSize: '0.75rem',
-                  color: '#92400e',
-                  margin: 0,
-                  lineHeight: 1.4
-                }}>
-                  Đội ngũ của chúng tôi luôn sẵn sàng hỗ trợ bạn
-                </p>
-              </div>
+                )}
+              
             </div>
           </div>
+
+          {/* Tabbed Information */}
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1rem',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            overflow: 'hidden'
+          }}>
+            <Tab.Group>
+              <Tab.List style={{
+                display: 'flex',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <Tab className={({ selected }) => 
+                  `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                    selected 
+                      ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
+                  }`
+                }>
+                  Hoạt động sinh hoạt
+                </Tab>
+                <Tab className={({ selected }) => 
+                  `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                    selected 
+                      ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
+                  }`
+                }>
+                  Ghi chú chăm sóc
+                </Tab>
+                <Tab className={({ selected }) => 
+                  `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                    selected 
+                      ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
+                  }`
+                }>
+                  Chỉ số sức khỏe
+                </Tab>
+              </Tab.List>
+
+              <Tab.Panels>
+                <Tab.Panel style={{padding: '2rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.5rem',flexWrap:'wrap',gap:'1rem'}}>
+                    <h3 style={{fontSize:'1.125rem',fontWeight:600,color:'#111827',margin:0}}>
+                      {showActivityHistory ? 'Lịch sử hoạt động' : 'Hoạt động hôm nay'}
+                    </h3>
+                    <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap'}}>
+                      {showActivityHistory && (
+                        <DatePicker
+                          selected={selectedActivityDate ? new Date(selectedActivityDate) : null}
+                          onChange={date => {
+                            if (!date) return;
+                            const iso = date.toISOString().slice(0,10);
+                            if (activityHistoryDates.includes(iso)) setSelectedActivityDate(iso);
+                          }}
+                          includeDates={activityHistoryDates.map(d=>new Date(d))}
+                          openToDate={selectedActivityDate ? new Date(selectedActivityDate) : undefined}
+                          dateFormat="EEEE, d 'tháng' M, yyyy"
+                          locale={vi}
+                          popperPlacement="bottom"
+                          showPopperArrow={false}
+                          customInput={
+                            <button style={{padding:'0.5rem 1rem',borderRadius:'0.75rem',border:'2px solid #3b82f6',background:'white',fontSize:'1rem',fontWeight:600,color:'#374151',cursor:'pointer',minWidth:'220px',textAlign:'left',boxShadow:'0 2px 8px rgba(59,130,246,0.07)'}}>
+                              {formatDateDDMMYYYY(selectedActivityDate)}
+                            </button>
+                          }
+                        />
+                      )}
+                      <button
+                        onClick={() => {
+                          setShowActivityHistory(v => !v);
+                          // Khi chuyển về "hôm nay", reset selectedActivityDate về ngày hôm nay
+                          if (showActivityHistory) {
+                            const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
+                            setSelectedActivityDate(todayFromAPI);
+                          }
+                        }}
+                        style={{padding:'0.5rem 1rem',borderRadius:'0.5rem',border:'1px solid #8b5cf6',background:showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',color:showActivityHistory?'#8b5cf6':'white',fontSize:'0.875rem',fontWeight:600,cursor:'pointer',transition:'all 0.2s ease',display:'flex',alignItems:'center',gap:'0.5rem'}}
+                        onMouseOver={e=>{e.currentTarget.style.background=showActivityHistory?'#f3f4f6':'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';}}
+                        onMouseOut={e=>{e.currentTarget.style.background=showActivityHistory?'white':'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';}}
+                      >
+                        <CalendarDaysIcon style={{width:'1rem',height:'1rem'}}/>
+                        {showActivityHistory?'Xem hôm nay':'Xem lịch sử hoạt động'}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
+                    {activitiesLoading ? (
+                      <div>Đang tải dữ liệu hoạt động...</div>
+                    ) : activitiesError ? (
+                      <div style={{color:'red'}}>{activitiesError}</div>
+                    ) : Array.isArray(activities) && activities.length > 0 ? (
+                      activities.map((activity:any) => {
+                        const attended = activity.attendance_status === 'attended';
+                        const absent = activity.attendance_status === 'absent';
+                        const activityId = activity.activity_id?._id || activity.activity_id;
+                        // Format thời gian hiển thị
+                        const formatTimeForDisplay = (isoTime: string) => {
+                          if (!isoTime) return '';
+                          const date = new Date(isoTime);
+                          return date.toLocaleTimeString('vi-VN', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: false 
+                          });
+                        };
+                        
+                        const time = activityTimes[activityId]?.start ? formatTimeForDisplay(activityTimes[activityId].start) : '';
+                        const endTimeStr = activityTimes[activityId]?.end ? formatTimeForDisplay(activityTimes[activityId].end) : '';
+                        return (
+                          <div key={activity._id} style={{display:'flex',alignItems:'center',padding:'1rem',borderRadius:'0.75rem',background:attended?'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)':absent?'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)':'#fff',border:'1px solid',borderColor:attended?'#86efac':absent?'#d1d5db':'#e5e7eb'}}>
+                            <div style={{marginRight:'1rem'}}>
+                              {attended ? (
+                                <CheckCircleIcon style={{width:'1.5rem',height:'1.5rem',color:'#16a34a'}}/>
+                              ) : absent ? (
+                                <XCircleIcon style={{width:'1.5rem',height:'1.5rem',color:'#ef4444'}}/>
+                              ) : (
+                                <ClockIcon style={{width:'1.5rem',height:'1.5rem',color:'#6b7280'}}/>
+                              )}
+                            </div>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:'0.95rem',fontWeight:600,color:'#111827',marginBottom:'0.25rem'}}>
+                                <span style={{fontWeight:600,color:'#374151'}}>Hoạt động: </span>{activity.activity_id?.activity_name || '---'}
+                              </div>
+                              <div style={{fontSize:'0.8rem',color:'#6b7280',marginBottom:'0.25rem'}}>
+                                <span style={{fontWeight:600}}>Thời gian: </span>{time}{endTimeStr?` - ${endTimeStr}`:''}
+                              </div>
+                              <span style={{fontSize:'0.8rem',fontWeight:500,color:attended?'#166534':absent?'#ef4444':'#6b7280'}}>
+                                <span style={{fontWeight:600}}>Trạng thái: </span>
+                                {attended ? 'Đã tham gia' : absent ? <>Không tham gia{activity.performance_notes && <> - Lý do: <span style={{color:'#ef4444'}}>{activity.performance_notes}</span></>}</> : 'Chưa tham gia'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '3rem 2rem',
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                        borderRadius: '1rem',
+                        border: '2px dashed #cbd5e1',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{
+                          width: '4rem',
+                          height: '4rem',
+                          background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: '1rem'
+                        }}>
+                          <CalendarDaysIcon style={{ width: '2rem', height: '2rem', color: '#64748b' }} />
+                        </div>
+                        <h4 style={{
+                          fontSize: '1.125rem',
+                          fontWeight: 600,
+                          color: '#374151',
+                          margin: '0 0 0.5rem 0'
+                        }}>
+                          Chưa có hoạt động hôm nay
+                        </h4>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          color: '#64748b',
+                          margin: 0,
+                          maxWidth: '300px',
+                          lineHeight: 1.5
+                        }}>
+                          Hôm nay chưa có hoạt động nào được lên lịch cho người thân của bạn.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </Tab.Panel>
+                
+                <Tab.Panel style={{padding: '2rem'}}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    marginBottom: '1.5rem'
+                  }}>
+                    Ghi chú chăm sóc gần đây
+                  </h3>
+                  <div style={{overflowX: 'auto'}}>
+                    <table style={{width: '100%', borderCollapse: 'collapse', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderRadius: '0.75rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}>
+                      <thead>
+                        <tr>
+                          <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Ngày</th>
+                          <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nội dung ghi chú</th>
+                          <th style={{padding: '0.75rem', textAlign: 'left', color: '#6b7280', fontWeight: 700, fontSize: '0.95em'}}>Nhân viên chăm sóc</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {careNotesLoading ? (
+                          <tr><td colSpan={3}>Đang tải ghi chú chăm sóc...</td></tr>
+                        ) : careNotesError ? (
+                          <tr><td colSpan={3} style={{color: 'red'}}>{careNotesError}</td></tr>
+                        ) : Array.isArray(paginatedNotes) && paginatedNotes.length > 0 ? (
+                          paginatedNotes.map((note: any) => {
+                            return (
+                              <tr key={note._id} style={{borderTop: '1px solid #e5e7eb'}}>
+                                <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#6b7280', whiteSpace: 'nowrap'}}>
+                                  {note.date ? formatDateDDMMYYYY(note.date) : ''}
+                                </td>
+                                <td style={{padding: '0.75rem', fontSize: '0.95em', color: '#374151'}}>
+                                  <div style={{fontWeight: 700, marginBottom: 4}}>{note.assessment_type || 'Đánh giá'}</div>
+                                  <div style={{marginBottom: 2}}><span style={{fontWeight: 600}}>Ghi chú: </span>{note.notes || 'Không có ghi chú'}</div>
+                                  <div><span style={{fontWeight: 600}}>Khuyến nghị: </span>{note.recommendations || 'Không có khuyến nghị'}</div>
+                                </td>
+                                <td style={{padding: '0.75rem', fontSize: '0.95em'}}>
+                                  <span style={{fontWeight: 700, color: '#8b5cf6'}}>{
+                                    (() => {
+                                      let conductedBy = note.conducted_by;
+                                      if (typeof conductedBy === 'object' && conductedBy !== null) {
+                                        const name = conductedBy.full_name || conductedBy.fullName || conductedBy.name || conductedBy.username || conductedBy.email || '';
+                                        const pos = conductedBy.position;
+                                        return pos ? `${pos}: ${name}` : name;
+                                      }
+                                      // Nếu conductedBy là tên (có dấu tiếng Việt), hiển thị trực tiếp
+                                      if (conductedBy && /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/.test(conductedBy)) {
+                                        return conductedBy;
+                                      }
+                                      const staff = staffList.find((s: any) => String(s._id) === String(conductedBy));
+                                      if (staff) {
+                                        const name = staff.fullName || staff.full_name || staff.name || staff.username || staff.email;
+                                        const pos = staff.position;
+                                        return pos ? `${pos}: ${name}` : name;
+                                      }
+                                      if (conductedBy && fetchedStaffNames[conductedBy]) {
+                                        return fetchedStaffNames[conductedBy];
+                                      }
+                                      if (conductedBy && !fetchedStaffNames[conductedBy]) {
+                                        // Dùng userAPI.getById để lấy tên staff
+                                        userAPI.getById(conductedBy)
+                                          .then(data => {
+                                            setFetchedStaffNames(prev => ({
+                                              ...prev,
+                                              [conductedBy]: (data.position ? `${data.position}: ` : '') + (data.full_name || data.fullName || data.name || data.username || data.email || conductedBy)
+                                            }));
+                                          })
+                                          .catch(() => {
+                                            setFetchedStaffNames(prev => ({
+                                              ...prev,
+                                              [conductedBy]: conductedBy
+                                            }));
+                                          });
+                                        return 'Đang tải...';
+                                      }
+                                      return conductedBy || '---';
+                                    })()
+                                  }</span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={3} style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '2rem',
+                                background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                                borderRadius: '1rem',
+                                border: '2px dashed #cbd5e1'
+                              }}>
+                                <div style={{
+                                  width: '3rem',
+                                  height: '3rem',
+                                  background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginBottom: '1rem'
+                                }}>
+                                  <DocumentTextIcon style={{ width: '1.5rem', height: '1.5rem', color: '#64748b' }} />
+                                </div>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 600,
+                                  color: '#374151',
+                                  margin: '0 0 0.5rem 0'
+                                }}>
+                                  Chưa có ghi chú chăm sóc
+                                </h4>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  color: '#64748b',
+                                  margin: 0,
+                                  maxWidth: '250px',
+                                  lineHeight: 1.5
+                                }}>
+                                  Hiện tại chưa có ghi chú chăm sóc nào được ghi nhận.
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                    {totalPages > 1 && (
+                      <div style={{textAlign:'center',padding:'1rem 0'}}>
+                        <button onClick={()=>setCareNotesPage(p=>Math.max(1,p-1))} disabled={careNotesPage===1} style={{marginRight:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:careNotesPage===1?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:careNotesPage===1?'not-allowed':'pointer'}}>← Trang trước</button>
+                        <span style={{fontWeight:600,color:'#7c3aed'}}>Trang {careNotesPage}/{totalPages}</span>
+                        <button onClick={()=>setCareNotesPage(p=>Math.min(totalPages,p+1))} disabled={careNotesPage===totalPages} style={{marginLeft:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:careNotesPage===totalPages?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:careNotesPage===totalPages?'not-allowed':'pointer'}}>Trang sau →</button>
+                      </div>
+                    )}
+                  </div>
+                </Tab.Panel>
+                
+                <Tab.Panel style={{padding: '2rem'}}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    marginBottom: '1.5rem'
+                  }}>
+                    Lịch sử chỉ số sức khỏe
+                  </h3>
+                  <div style={{overflowX: 'auto'}}>
+                    <table style={{
+                      width: '100%',
+                      borderCollapse: 'separate',
+                      borderSpacing: 0,
+                      background: 'white',
+                      borderRadius: 16,
+                      boxShadow: '0 4px 24px rgba(139,92,246,0.07)',
+                      overflow: 'hidden'
+                    }}>
+                      <thead>
+                        <tr style={{
+                          background: 'linear-gradient(90deg, #ede9fe 0%, #f3f4f6 100%)'
+                        }}>
+                          {['Ngày', 'Thời gian đo', 'Huyết áp', 'Nhịp tim', 'Nhiệt độ', 'Cân nặng', 'Ghi chú'].map((h, i) => (
+                            <th key={i} style={{
+                              padding: '1rem',
+                              textAlign: 'left',
+                              color: '#7c3aed',
+                              fontWeight: 800,
+                              fontSize: 15,
+                              letterSpacing: 1,
+                              borderBottom: '2px solid #ede9fe',
+                              textTransform: 'uppercase'
+                            }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vitalHistoryLoading ? (
+                          <tr><td colSpan={7} style={{padding: '1.5rem', textAlign: 'center', color: '#8b5cf6'}}>Đang tải dữ liệu...</td></tr>
+                        ) : paginatedVital.length > 0 ? (
+                          paginatedVital.map((vital: any, index: number) => (
+                            <tr key={vital._id}
+                              style={{
+                                background: index % 2 === 0 ? '#fff' : '#f8fafc',
+                                transition: 'background 0.2s'
+                              }}>
+                              <td style={{padding: '1rem', fontWeight: 600, color: '#374151'}}>
+                                {vital.date_time ? formatDateDDMMYYYY(vital.date_time) : ''}
+                              </td>
+                              <td style={{padding: '1rem', color: '#6b7280'}}>
+                                {vital.date_time ? (() => {
+                                  const date = new Date(vital.date_time);
+                                  const vietnamTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+                                  return vietnamTime.toLocaleTimeString('vi-VN', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit',
+                                    hour12: false 
+                                  });
+                                })() : ''}
+                              </td>
+                              <td style={{padding: '1rem', fontWeight: 700, color: '#ef4444', fontSize: 16}}>
+                                {vital.blood_pressure ?? <span style={{color:'#9ca3af'}}>--</span>}
+                              </td>
+                              <td style={{padding: '1rem', fontWeight: 700, color: '#10b981', fontSize: 16}}>
+                                  {vital.heart_rate ?? <span style={{color:'#9ca3af'}}>--</span>}
+                              </td>
+                              <td style={{padding: '1rem', fontWeight: 700, color: '#f59e0b', fontSize: 16}}>
+                                {vital.temperature ?? <span style={{color:'#9ca3af'}}>--</span>}
+                              </td>
+                              <td style={{padding: '1rem', fontWeight: 700, color: '#6366f1', fontSize: 16}}>
+                                {vital.weight ?? <span style={{color:'#9ca3af'}}>--</span>}
+                              </td>
+                              <td style={{padding: '1rem', color: '#6b7280', fontStyle: 'italic', fontSize: 15}}>
+                                {vital.notes ?? <span style={{color:'#9ca3af'}}>--</span>}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={7} style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '2rem',
+                                background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                                borderRadius: '1rem',
+                                border: '2px dashed #cbd5e1'
+                              }}>
+                                <div style={{
+                                  width: '3rem',
+                                  height: '3rem',
+                                  background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginBottom: '1rem'
+                                }}>
+                                  <HeartIcon style={{ width: '1.5rem', height: '1.5rem', color: '#64748b' }} />
+                                </div>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 600,
+                                  color: '#374151',
+                                  margin: '0 0 0.5rem 0'
+                                }}>
+                                  Chưa có dữ liệu chỉ số sức khỏe
+                                </h4>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  color: '#64748b',
+                                  margin: 0,
+                                  maxWidth: '250px',
+                                  lineHeight: 1.5
+                                }}>
+                                  Hiện tại chưa có chỉ số sức khỏe nào được ghi nhận.
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalVitalPages > 1 && (
+                    <div style={{textAlign:'center',padding:'1rem 0'}}>
+                      <button onClick={()=>setVitalPage(p=>Math.max(1,p-1))} disabled={vitalPage===1} style={{marginRight:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:vitalPage===1?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:vitalPage===1?'not-allowed':'pointer'}}>← Trang trước</button>
+                      <span style={{fontWeight:600,color:'#7c3aed'}}>Trang {vitalPage}/{totalVitalPages}</span>
+                      <button onClick={()=>setVitalPage(p=>Math.min(totalVitalPages,p+1))} disabled={vitalPage===totalVitalPages} style={{marginLeft:8,padding:'0.4rem 1rem',borderRadius:6,border:'1px solid #8b5cf6',background:vitalPage===totalVitalPages?'#ede9fe':'#fff',color:'#8b5cf6',fontWeight:600,cursor:vitalPage===totalVitalPages?'not-allowed':'pointer'}}>Trang sau →</button>
+                    </div>
+                  )}
+                </Tab.Panel>
+              </Tab.Panels>
+            </Tab.Group>
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* Modal hiển thị danh sách nhân viên phụ trách */}
+
+      </div>
+    </>
   );
 } 

@@ -17,7 +17,8 @@ import {
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  XMarkIcon
+  XMarkIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 interface ValidationErrors {
@@ -218,19 +219,26 @@ export default function NewBillPage() {
       return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            {/* Header - improved professional look */}
+            <div className="rounded-2xl shadow bg-gradient-to-r from-blue-200 to-indigo-200 px-8 py-8 mb-8 flex flex-col md:flex-row md:items-center md:gap-6">
+              <div className="flex items-center gap-6 mb-4 md:mb-0">
                 <button
                   onClick={() => router.back()}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                  className="bg-white hover:bg-gray-50 text-gray-700 font-semibold px-6 py-3 rounded-lg shadow transition-all duration-150 flex items-center gap-2"
                 >
-                  <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
+                  <ArrowLeftIcon className="w-5 h-5" />
+                  
                 </button>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Tạo hóa đơn mới</h1>
-                  <p className="text-sm text-gray-500">Nhập thông tin hóa đơn cho cư dân</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <ChartBarIcon className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Tạo hóa đơn mới</h1>
+                    <p className="text-gray-600 text-base">Nhập thông tin hóa đơn cho cư dân</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -238,7 +246,7 @@ export default function NewBillPage() {
         </div>
 
         {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Form Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">

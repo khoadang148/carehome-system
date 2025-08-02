@@ -181,7 +181,8 @@ export default function AccountManagementPage() {
       residentName: '',
       password: '',
       emergencyContact: '',
-      address: ''
+      address: '',
+      notes: ''
     });
     setShowCreateModal(true);
   };
@@ -1439,6 +1440,29 @@ export default function AccountManagementPage() {
                     fontSize: '0.875rem',
                     outline: 'none',
                     transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Ghi chú</label>
+                <textarea
+                  value={formData.notes || ''}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  placeholder="Nhập ghi chú về tài khoản (tùy chọn)"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
                   }}
                   onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
                   onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
