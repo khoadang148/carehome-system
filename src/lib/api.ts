@@ -113,8 +113,8 @@ const endpoints = {
   users: '/users',
   // Resident management
   residents: '/residents',
-  // Staff management
-  staff: '/staff',
+  // Staff management (handled through users endpoint with role filtering)
+  staff: '/users',
   // Activity management
   activities: '/activities',
   // Activity participations
@@ -482,9 +482,9 @@ export const staffAPI = {
         return [];
       }
       
-      // Sử dụng endpoint /users với filter role=staff
+      // Sử dụng endpoint /users/by-role với filter role=staff
       console.log('Fetching staff with params:', { role: 'staff', ...params });
-      const response = await apiClient.get('/users', { 
+      const response = await apiClient.get('/users/by-role', { 
         params: { 
           role: 'staff',
           ...params 
@@ -521,7 +521,7 @@ export const staffAPI = {
 
   update: async (id: string, staff: any) => {
     try {
-      const response = await apiClient.put(`${endpoints.staff}/${id}`, staff);
+      const response = await apiClient.patch(`${endpoints.staff}/${id}`, staff);
       return response.data;
     } catch (error) {
       console.error(`Error updating staff with ID ${id}:`, error);
@@ -1783,6 +1783,19 @@ export const carePlanAssignmentsAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error updating care plan assignment status with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  renew: async (id: string, newEndDate: string, newStartDate?: string) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/${id}/renew`, {
+        newEndDate,
+        ...(newStartDate && { newStartDate })
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error renewing care plan assignment with ID ${id}:`, error);
       throw error;
     }
   },

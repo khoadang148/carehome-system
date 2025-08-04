@@ -24,8 +24,7 @@ import {
   CloudIcon as CloudIconSolid
 } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+
 import { format, parseISO } from 'date-fns';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -80,14 +79,7 @@ export default function StaffVitalSignsPage() {
 
   // UI state
   const [selectedResident, setSelectedResident] = useState<string | null>(null);
-  const [currentDate, setCurrentDate] = useState(() => {
-    const now = new Date();
-    const yyyy = now.getUTCFullYear();
-    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(now.getUTCDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  });
-  const [filterDate, setFilterDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationIdRef = useRef(0);
@@ -173,6 +165,15 @@ export default function StaffVitalSignsPage() {
       try {
         const data = await vitalSignsAPI.getAll();
         const vitalSignsData = Array.isArray(data) ? data : [];
+        console.log('=== FETCHED VITAL SIGNS ===');
+        console.log('Raw vital signs data:', vitalSignsData);
+        console.log('Vital signs count:', vitalSignsData.length);
+        
+        if (vitalSignsData.length > 0) {
+          console.log('First vital sign sample:', vitalSignsData[0]);
+          console.log('Resident IDs in vital signs:', vitalSignsData.map(vs => vs.resident_id));
+        }
+        
         setVitalSigns(vitalSignsData);
         
         // Build staff map
@@ -209,47 +210,143 @@ export default function StaffVitalSignsPage() {
       // Find resident info
       const resident = residents.find(r => r.id === vs.resident_id);
       
-      return {
-        id: vs._id,
-        residentId: vs.resident_id,
-        residentName: resident?.name || 'Unknown',
-        residentAvatar: resident?.avatar,
-        date: vs.date,
-        time: vs.time,
-        bloodPressure: vs.blood_pressure || vs.bloodPressure,
-        heartRate: vs.heart_rate || vs.heartRate,
-        temperature: vs.temperature,
-        oxygenSaturation: vs.oxygen_saturation || vs.oxygenSaturation,
-        respiratoryRate: vs.respiratory_rate || vs.respiratoryRate,
-        weight: vs.weight,
-        notes: vs.notes,
-        recordedBy: vs.recorded_by || vs.recordedBy || null,
-      };
+      // Handle date_time field from backend
+      const dateTime = vs.date_time || vs.date;
+      let date = '';
+      let time = '';
+      
+      if (dateTime) {
+        try {
+          // Parse date string from backend (format: "2025-08-03T00:58:06.112Z")
+          let dateObj: Date;
+          
+          if (typeof dateTime === 'string') {
+            // Parse date string from backend more carefully
+            // If it's ISO format like "2025-08-03T00:58:06.112Z"
+            if (dateTime.includes('T') && dateTime.includes('Z')) {
+              dateObj = new Date(dateTime);
+            } else {
+              // If it's just date string like "2025-08-03", parse manually
+              const parts = dateTime.split('-');
+              if (parts.length === 3) {
+                const year = parseInt(parts[0]);
+                const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+                const day = parseInt(parts[2]);
+                dateObj = new Date(year, month, day);
+              } else {
+                dateObj = new Date(dateTime);
+              }
+            }
+          } else {
+            // If it's a Date object, use it directly
+            dateObj = dateTime;
+          }
+          
+          if (!isNaN(dateObj.getTime())) {
+            // Subtract 7 hours to compensate for backend GMT+7 adjustment
+            const adjustedDate = new Date(dateObj.getTime() - 7 * 60 * 60 * 1000);
+            
+            // Format date as DD/MM/YYYY for Vietnamese format
+            const day = String(adjustedDate.getDate()).padStart(2, '0');
+            const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+            const year = adjustedDate.getFullYear();
+            date = `${day}/${month}/${year}`;
+            console.log('Final formatted date:', date);
+            
+            time = adjustedDate.toLocaleTimeString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+          }
+        } catch (error) {
+          console.warn('Error processing date_time:', error);
+        }
+      }
+      
+              return {
+          id: vs._id,
+          residentId: vs.resident_id,
+          residentName: resident?.name || 'Unknown',
+          residentAvatar: resident?.avatar,
+          date: date,
+          time: time,
+          bloodPressure: vs.blood_pressure || vs.bloodPressure,
+          heartRate: vs.heart_rate || vs.heartRate,
+          temperature: vs.temperature,
+          oxygenSaturation: vs.oxygen_level || vs.oxygen_saturation || vs.oxygenSaturation,
+          respiratoryRate: vs.respiratory_rate || vs.respiratoryRate,
+          weight: vs.weight,
+          notes: vs.notes,
+          recordedBy: vs.recorded_by || vs.recordedBy || null,
+        };
     });
   };
 
   // Get filtered vital signs
-  const getFilteredVitalSigns = (residentId?: string, date?: string) => {
+  const getFilteredVitalSigns = (residentId?: string, dateFilter?: string) => {
     let filtered = vitalSigns;
     
+    console.log('=== FILTER DEBUG ===');
+    console.log('Filtering by residentId:', residentId);
+    console.log('Filtering by date:', dateFilter);
+    console.log('Total vital signs before filter:', filtered.length);
+    
     if (residentId) {
-      filtered = filtered.filter(vs => vs.resident_id === residentId);
+      filtered = filtered.filter(vs => {
+        const match = vs.resident_id === residentId;
+        console.log(`Vital sign resident_id: ${vs.resident_id}, match: ${match}`);
+        return match;
+      });
+      console.log('After resident filter:', filtered.length);
     }
     
-    if (date) {
+    if (dateFilter) {
       filtered = filtered.filter(vs => {
+        const dateTime = vs.date_time || vs.date;
+        if (!dateTime) return false;
+        
         try {
-          const dateObj = new Date(vs.date);
-          if (isNaN(dateObj.getTime())) {
-            return false; // Skip invalid dates
+          let dateObj: Date;
+          
+          if (typeof dateTime === 'string') {
+            if (dateTime.includes('T') && dateTime.includes('Z')) {
+              dateObj = new Date(dateTime);
+            } else {
+              const parts = dateTime.split('-');
+              if (parts.length === 3) {
+                const year = parseInt(parts[0]);
+                const month = parseInt(parts[1]) - 1;
+                const day = parseInt(parts[2]);
+                dateObj = new Date(year, month, day);
+              } else {
+                dateObj = new Date(dateTime);
+              }
+            }
+          } else {
+            dateObj = dateTime;
           }
-          const vsDate = dateObj.toISOString().split('T')[0];
-          return vsDate === date;
+          
+          if (!isNaN(dateObj.getTime())) {
+            // Subtract 7 hours to compensate for backend GMT+7 adjustment
+            const adjustedDate = new Date(dateObj.getTime() - 7 * 60 * 60 * 1000);
+            
+            // Format date as YYYY-MM-DD for comparison
+            const day = String(adjustedDate.getDate()).padStart(2, '0');
+            const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+            const year = adjustedDate.getFullYear();
+            const formattedDate = `${year}-${month}-${day}`;
+            
+            const match = formattedDate === dateFilter;
+            console.log(`Vital sign date: ${formattedDate}, filter: ${dateFilter}, match: ${match}`);
+            return match;
+          }
         } catch (error) {
-          console.warn('Invalid date in vital signs:', vs.date);
-          return false; // Skip invalid dates
+          console.warn('Error processing date for filter:', error);
         }
+        
+        return false;
       });
+      console.log('After date filter:', filtered.length);
     }
     
     return transformVitalSignsForDisplay(filtered);
@@ -258,12 +355,18 @@ export default function StaffVitalSignsPage() {
 
 
   // Get filtered data
-  const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, currentDate);
+  const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, selectedDate || undefined);
 
   // Debug logs
+  console.log('=== VITAL SIGNS PAGE DEBUG ===');
   console.log('Component residents:', residents);
   console.log('Component user:', user);
   console.log('Selected resident:', selectedResident);
+
+  console.log('Raw vital signs data:', vitalSigns);
+  console.log('Filtered vital signs:', filteredVitalSigns);
+  console.log('Residents length:', residents.length);
+  console.log('Vital signs length:', vitalSigns.length);
 
   // Loading state
   if (loading) {
@@ -301,26 +404,7 @@ export default function StaffVitalSignsPage() {
             100% { transform: rotate(360deg); }
           }
           
-          .datepicker-wrapper {
-            width: 100%;
-          }
-          
-          .datepicker-wrapper input {
-            width: 100%;
-            padding: 1rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.75rem;
-            font-size: 0.875rem;
-            outline: none;
-            background: white;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          }
-          
-          .datepicker-wrapper input:focus {
-            border-color: #ef4444;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
+
         `
       }} />
       
@@ -541,34 +625,35 @@ export default function StaffVitalSignsPage() {
                 }}>
                   Lọc theo ngày
                 </label>
-                <DatePicker
-                  selected={filterDate}
-                  onChange={(date: Date | null) => {
-                    setFilterDate(date);
-                    if (date) {
-                      // Use UTC to avoid timezone issues
-                      const yyyy = date.getUTCFullYear();
-                      const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-                      const dd = String(date.getUTCDate()).padStart(2, '0');
-                      setCurrentDate(`${yyyy}-${mm}-${dd}`);
-                    } else {
-                      // Reset to today's date when cleared
-                      const now = new Date();
-                      const yyyy = now.getUTCFullYear();
-                      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-                      const dd = String(now.getUTCDate()).padStart(2, '0');
-                      setCurrentDate(`${yyyy}-${mm}-${dd}`);
-                    }
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    background: 'white',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                    color: '#374151'
                   }}
-                  dateFormat="dd/MM/yyyy"
-                  wrapperClassName="datepicker-wrapper"
-                  placeholderText="Chọn ngày..."
-                  isClearable={true}
-                  showYearDropdown={true}
-                  showMonthDropdown={true}
-                  dropdownMode="select"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#ef4444';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  }}
                 />
+                
               </div>
+
+
 
             </div>
           </div>
@@ -730,23 +815,35 @@ export default function StaffVitalSignsPage() {
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: 600, 
-                        color: '#059669',
+                        color: '#7c3aed',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                       }}>
-                        Ghi chú
+                        Nhịp thở
                       </th>
                       <th style={{ 
                         padding: '1rem 1.5rem', 
                         textAlign: 'left', 
                         fontSize: '0.75rem', 
                         fontWeight: 600, 
-                        color: '#7c3aed',
+                        color: '#059669',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                       }}>
-                        Người nhập chỉ số
+                        Cân nặng
                       </th>
+                      <th style={{ 
+                        padding: '1rem 1.5rem', 
+                        textAlign: 'left', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: '#059669',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Ghi chú
+                      </th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -809,17 +906,7 @@ export default function StaffVitalSignsPage() {
                         </td>
                         <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           <div>
-                            {(() => {
-                              try {
-                                const dateObj = new Date(vs.date);
-                                if (!isNaN(dateObj.getTime())) {
-                                  return format(dateObj, 'dd/MM/yyyy');
-                                }
-                                return 'Invalid Date';
-                              } catch (error) {
-                                return 'Invalid Date';
-                              }
-                            })()}
+                            {vs.date || 'Invalid Date'}
                           </div>
                           <div style={{ color: '#6b7280' }}>
                             {vs.time || ''}
@@ -874,6 +961,50 @@ export default function StaffVitalSignsPage() {
                           </span>
                         </td>
                         <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          {vs.respiratoryRate ? (
+                            <span style={{ 
+                              color: '#7c3aed', 
+                              fontWeight: 600,
+                              padding: '0.25rem 0.5rem',
+                              background: '#faf5ff',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #e9d5ff'
+                            }}>
+                              {vs.respiratoryRate} lần/phút
+                            </span>
+                          ) : (
+                            <span style={{ 
+                              color: '#6b7280', 
+                              fontStyle: 'italic',
+                              fontSize: '0.75rem'
+                            }}>
+                              Chưa ghi nhận
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
+                          {vs.weight ? (
+                            <span style={{ 
+                              color: '#059669', 
+                              fontWeight: 600,
+                              padding: '0.25rem 0.5rem',
+                              background: '#f0fdf4',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #bbf7d0'
+                            }}>
+                              {vs.weight} kg
+                            </span>
+                          ) : (
+                            <span style={{ 
+                              color: '#6b7280', 
+                              fontStyle: 'italic',
+                              fontSize: '0.75rem'
+                            }}>
+                              Chưa ghi nhận
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
                           {vs.notes ? (
                             <span style={{ 
                               color: '#059669', 
@@ -896,19 +1027,7 @@ export default function StaffVitalSignsPage() {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem' }}>
-                          <span style={{ 
-                            color: '#7c3aed', 
-                            fontWeight: 500,
-                            padding: '0.25rem 0.5rem',
-                            background: '#faf5ff',
-                            borderRadius: '0.375rem',
-                            border: '1px solid #e9d5ff',
-                            fontSize: '0.75rem'
-                          }}>
-                            {vs.recordedBy ? (staffMap[vs.recordedBy] || 'Unknown') : 'N/A'}
-                          </span>
-                        </td>
+
                       </tr>
                     ))}
                   </tbody>

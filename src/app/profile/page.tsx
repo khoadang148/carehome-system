@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { residentAPI, userAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, userAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 
 // Helper function to get full avatar URL
@@ -278,14 +278,17 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user?.role === 'family' && user?.id) {
       setLoading(true);
+      console.log('Profile - Fetching residents for family member:', user.id);
       residentAPI.getByFamilyMemberId(user.id)
         .then((data) => {
+          console.log('Profile - Residents data:', data);
           const arr = Array.isArray(data) ? data : [data];
           setResidents(arr);
           setSelectedResidentId(arr.length > 0 ? arr[0]._id : "");
           setError('');
         })
         .catch((err) => {
+          console.error('Profile - Error fetching residents:', err);
           setError('Không tìm thấy thông tin người thân hoặc lỗi kết nối API.');
           setResidents([]);
         })
@@ -302,25 +305,44 @@ export default function ProfilePage() {
       return;
     }
     setRoomLoading(true);
-            // Đảm bảo selectedResidentId là string
-        const residentId = typeof selectedResidentId === 'object' && (selectedResidentId as any)?._id 
-          ? (selectedResidentId as any)._id 
-          : selectedResidentId;
-        carePlansAPI.getByResidentId(residentId)
+    // Đảm bảo selectedResidentId là string
+    const residentId = typeof selectedResidentId === 'object' && (selectedResidentId as any)?._id 
+      ? (selectedResidentId as any)._id 
+      : selectedResidentId;
+    
+    console.log('Profile - Fetching room for residentId:', residentId);
+    
+    carePlanAssignmentsAPI.getByResidentId(residentId)
       .then((assignments: any[]) => {
+        console.log('Profile - Care plan assignments:', assignments);
+        // Tìm assignment có assigned_room_id
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
         const roomId = assignment?.assigned_room_id;
-        if (roomId) {
-          return roomsAPI.getById(roomId)
+        console.log('Profile - Found assignment:', assignment);
+        console.log('Profile - Room ID:', roomId);
+        
+        // Đảm bảo roomId là string, không phải object
+        const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+        console.log('Profile - Room ID string:', roomIdString);
+        
+        if (roomIdString) {
+          return roomsAPI.getById(roomIdString)
             .then((room: any) => {
+              console.log('Profile - Room data:', room);
               setRoomNumber(room?.room_number || 'Chưa cập nhật');
             })
-            .catch(() => setRoomNumber('Chưa cập nhật'));
+            .catch((error) => {
+              console.error('Profile - Error fetching room:', error);
+              setRoomNumber('Chưa cập nhật');
+            });
         } else {
           setRoomNumber('Chưa cập nhật');
         }
       })
-      .catch(() => setRoomNumber('Chưa cập nhật'))
+      .catch((error) => {
+        console.error('Profile - Error fetching care plans:', error);
+        setRoomNumber('Chưa cập nhật');
+      })
       .finally(() => setRoomLoading(false));
   }, [selectedResidentId]);
 
@@ -789,14 +811,14 @@ export default function ProfilePage() {
                             color: '#111827',
                             fontWeight: 500
                           }}>
-                            {selectedResident.fullName || 'Chưa được phân công'}
+                            {selectedResident.full_name || selectedResident.fullName || 'Chưa được phân công'}
                           </div>
                           <div style={{
                             fontSize: '0.75rem',
                             color: '#6b7280',
                             marginTop: '0.25rem'
                           }}>
-                            Phòng {selectedResident.room || 'Chưa cập nhật'} • {selectedResident.date_of_birth ? (() => {
+                            Phòng {roomLoading ? 'Đang tải...' : roomNumber} • {selectedResident.date_of_birth ? (() => {
                                 const dob = new Date(selectedResident.date_of_birth);
                                 if (!isNaN(dob.getTime())) {
                                   const today = new Date();

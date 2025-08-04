@@ -38,6 +38,7 @@ export default function NewStaffAssignmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Check permissions
   useEffect(() => {
@@ -45,6 +46,24 @@ export default function NewStaffAssignmentPage() {
       router.push('/');
     }
   }, [user, loading, router]);
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.date-picker-container')) {
+        setShowDatePicker(false);
+      }
+    };
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDatePicker]);
 
   // Load data
   useEffect(() => {
@@ -380,6 +399,31 @@ export default function NewStaffAssignmentPage() {
   const selectedResidents = residents.filter(resident => 
     formData.resident_ids.includes(resident._id)
   );
+
+  // Utility functions for date formatting
+  const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatDateForInput = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
+
+  const parseDateFromDisplay = (displayDate: string) => {
+    if (!displayDate) return '';
+    const parts = displayDate.split('/');
+    if (parts.length !== 3) return '';
+    const [day, month, year] = parts;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return date.toISOString().split('T')[0];
+  };
 
   // Check if form is valid
   const isFormValid = () => {
@@ -838,17 +882,67 @@ export default function NewStaffAssignmentPage() {
                   </div>
 
                   {/* End Date */}
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6">
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 date-picker-container">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       Ngày kết thúc phân công
                     </label>
-                    <input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                      min={new Date().toISOString().split('T')[0]} // Không cho chọn ngày quá khứ
-                      className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:outline-none transition-all duration-200 text-lg"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formatDateForDisplay(formData.end_date)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow only numbers and slashes
+                          if (value === '' || /^\d{0,2}\/?\d{0,2}\/?\d{0,4}$/.test(value)) {
+                            // Auto-format as user types
+                            let formatted = value.replace(/\D/g, '');
+                            if (formatted.length >= 2) {
+                              formatted = formatted.slice(0, 2) + '/' + formatted.slice(2);
+                            }
+                            if (formatted.length >= 5) {
+                              formatted = formatted.slice(0, 5) + '/' + formatted.slice(5);
+                            }
+                            formatted = formatted.slice(0, 10);
+                            
+                            // Only update if it's a valid date format
+                            if (formatted.length === 10 && /^\d{2}\/\d{2}\/\d{4}$/.test(formatted)) {
+                              const parsedDate = parseDateFromDisplay(formatted);
+                              if (parsedDate) {
+                                setFormData({ ...formData, end_date: parsedDate });
+                              }
+                            }
+                          }
+                        }}
+                        placeholder="dd/mm/yyyy"
+                        className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:outline-none transition-all duration-200 text-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDatePicker(!showDatePicker)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    {/* Date Picker Dropdown */}
+                    {showDatePicker && (
+                      <div className="absolute z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
+                        <input
+                          type="date"
+                          value={formData.end_date}
+                          onChange={(e) => {
+                            setFormData({ ...formData, end_date: e.target.value });
+                            setShowDatePicker(false);
+                          }}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                    )}
+                    
                     <p className="text-sm text-gray-500 mt-2 flex items-center">
                       <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

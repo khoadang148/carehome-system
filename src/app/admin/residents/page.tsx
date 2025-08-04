@@ -31,6 +31,9 @@ export default function ResidentsPage() {
   const [residentToDelete, setResidentToDelete] = useState<number | null>(null);
   const [carePlanOptions, setCarePlanOptions] = useState<any[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [modalType, setModalType] = useState<'success' | 'error'>('success');
   
 
   
@@ -141,16 +144,33 @@ export default function ResidentsPage() {
     setShowDeleteModal(true);
   };
   
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (residentToDelete !== null) {
-      const updatedResidents = residentsData.filter(resident => resident.id !== residentToDelete);
-      setResidentsData(updatedResidents);
-      
-      // Save to localStorage after deleting
-      // localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents)); // This line is removed as per the edit hint
-      
-      setShowDeleteModal(false);
-      setResidentToDelete(null);
+      try {
+        // Gọi API để xóa resident trên backend
+        await residentAPI.delete(residentToDelete.toString());
+        
+        // Cập nhật state frontend sau khi xóa thành công
+        const updatedResidents = residentsData.filter(resident => resident.id !== residentToDelete);
+        setResidentsData(updatedResidents);
+        
+        setShowDeleteModal(false);
+        setResidentToDelete(null);
+        
+        // Hiển thị modal thông báo xóa thành công
+        setSuccessMessage('Đã xóa thông tin người cao tuổi thành công! Tài khoản gia đình vẫn được giữ nguyên.');
+        setModalType('success');
+        setShowSuccessModal(true);
+      } catch (error) {
+        console.error('Error deleting resident:', error);
+        setShowDeleteModal(false);
+        setResidentToDelete(null);
+        
+        // Hiển thị modal thông báo lỗi
+        setSuccessMessage('Có lỗi xảy ra khi xóa người cao tuổi. Vui lòng thử lại.');
+        setModalType('error');
+        setShowSuccessModal(true);
+      }
     }
   };
   
@@ -688,10 +708,10 @@ export default function ResidentsPage() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
           }}>
             <h3 style={{fontSize: '1.25rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#111827'}}>
-              Xác nhận xóa người cao tuổi
+              Xác nhận xóa thông tin người cao tuổi
             </h3>
             <p style={{margin: '0 0 1.5rem 0', color: '#6b7280'}}>
-              Bạn có chắc chắn muốn xóa người cao tuổituổi này? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa thông tin người cao tuổi này? Hành động này sẽ chỉ xóa thông tin resident mà không ảnh hưởng đến tài khoản gia đình. Hành động này không thể hoàn tác.
             </p>
             <div style={{display: 'flex', justifyContent: 'flex-end', gap: '1rem'}}>
               <button
@@ -723,6 +743,91 @@ export default function ResidentsPage() {
                 Xóa
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '50%',
+              background: modalType === 'success' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem'
+            }}>
+              {modalType === 'success' ? (
+                <svg style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              )}
+            </div>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              margin: '0 0 0.5rem 0',
+              color: '#1f2937'
+            }}>
+              {modalType === 'success' ? 'Thành công' : 'Lỗi'}
+            </h3>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: '0 0 1.5rem 0',
+              lineHeight: '1.5'
+            }}>
+              {successMessage}
+            </p>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+              }}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

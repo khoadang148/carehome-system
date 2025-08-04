@@ -433,7 +433,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     }}>
                       <UserIcon style={{ width: '1rem', height: '1rem' }} />
                       <span>Tuổi:</span>
-                      <span>{resident.age}</span>
+                      <span>{resident.age} tuổi</span>
                     </span>
                     {/* Phòng */}
                     <span style={{

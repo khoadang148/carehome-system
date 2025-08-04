@@ -74,12 +74,12 @@ export default function ResidentSuccessPage() {
           localStorage.removeItem('newResidentAccount');
         } else {
           // Nếu không có thông tin, chuyển về trang residents
-          router.push('/residents');
+          router.push('/admin/residents');
         }
       }
     } else {
       // Nếu không có thông tin, chuyển về trang residents
-      router.push('/residents');
+      router.push('/admin/residents');
     }
   }, [searchParams, router]);
 
@@ -175,7 +175,7 @@ export default function ResidentSuccessPage() {
           padding: '1.5rem',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
         }}>
-          <Link href="/residents" style={{
+          <Link href="/admin/residents" style={{
             marginRight: '1rem', 
             color: '#22c55e',
             display: 'flex',
@@ -668,7 +668,7 @@ export default function ResidentSuccessPage() {
           flexWrap: 'wrap'
         }}>
           <Link
-            href="/residents"
+            href="/admin/residents"
             style={{
               padding: '0.75rem 2rem',
               background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',

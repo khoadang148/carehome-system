@@ -171,6 +171,9 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
 
   // Thêm state cho upload ảnh
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalType, setModalType] = useState<'success' | 'error'>('success');
 
   useEffect(() => {
     // Fetch resident từ API thật
@@ -209,7 +212,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         allergies: Array.isArray(residentData.allergies) ? residentData.allergies.join(', ') : (residentData.allergies || ''),
         notes: residentData.notes || '',
         avatar: residentData.avatar || '',
-        family_member_id: residentData.family_member_id || '',
+        family_member_id: typeof residentData.family_member_id === 'object' && (residentData.family_member_id as any)?._id ? (residentData.family_member_id as any)._id : (residentData.family_member_id || ''),
         relationship: residentData.relationship || '',
       });
       setMedications(Array.isArray(residentData.current_medications) ? residentData.current_medications : []);
@@ -228,6 +231,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       }
       // Map dữ liệu form sang request body API chuẩn
       const body = {
+        _id: residentId, // Thêm ID vào payload
         full_name: data.full_name,
         date_of_birth: convertToApiDate(data.date_of_birth),
         gender: data.gender,
@@ -243,7 +247,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         care_level: data.care_level,
         status: data.status,
         avatar: data.avatar,
-        family_member_id: data.family_member_id,
+        family_member_id: typeof data.family_member_id === 'object' && (data.family_member_id as any)?._id ? (data.family_member_id as any)._id : data.family_member_id,
         relationship: data.relationship,
       };
       await residentAPI.update(residentId, body);
@@ -253,7 +257,9 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       }, 2000);
     } catch (error) {
       console.error('Error updating resident:', error);
-      alert('Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
+      setModalMessage('Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
+      setModalType('error');
+      setShowModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -783,7 +789,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                             
                             try {
                               // Sử dụng endpoint avatar của resident
-                              const response = await apiClient.patch(`/admin/residents/${residentId}/avatar`, formData, {
+                              const response = await apiClient.patch(`/residents/${residentId}/avatar`, formData, {
                                 headers: {
                                   'Content-Type': 'multipart/form-data',
                                 },
@@ -792,7 +798,9 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                               
                               // Sau khi upload thành công, cập nhật form với tên file
                               reset({ ...getValues(), avatar: file.name });
-                              alert('Upload ảnh thành công!');
+                              setModalMessage('Upload ảnh thành công!');
+                              setModalType('success');
+                              setShowModal(true);
                               
                               // Refresh lại dữ liệu resident để cập nhật avatar
                               const updatedData = await residentAPI.getById(residentId);
@@ -801,10 +809,13 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                             } catch (error: any) {
                               console.error('Upload error:', error);
                               if (error.response?.status === 400) {
-                                alert('File không hợp lệ. Vui lòng chọn file ảnh khác.');
+                                setModalMessage('File không hợp lệ. Vui lòng chọn file ảnh khác.');
+                                setModalType('error');
                               } else {
-                                alert('Upload ảnh thất bại! Vui lòng thử lại.');
+                                setModalMessage('Upload ảnh thất bại! Vui lòng thử lại.');
+                                setModalType('error');
                               }
+                              setShowModal(true);
                             } finally {
                               setAvatarUploading(false);
                             }
@@ -1126,6 +1137,87 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
           </div>
         </form>
       </div>
+
+      {/* Custom Modal */}
+      {showModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '50%',
+              background: modalType === 'success' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem'
+            }}>
+              {modalType === 'success' ? (
+                <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+              ) : (
+                <ExclamationTriangleIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+              )}
+            </div>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              margin: '0 0 0.5rem 0',
+              color: '#1f2937'
+            }}>
+              {modalType === 'success' ? 'Thành công' : 'Lỗi'}
+            </h3>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: '0 0 1.5rem 0',
+              lineHeight: '1.5'
+            }}>
+              {modalMessage}
+            </p>
+            <button
+              onClick={() => setShowModal(false)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes spin {

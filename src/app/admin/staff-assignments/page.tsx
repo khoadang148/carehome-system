@@ -13,6 +13,8 @@ import {
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ArrowLeftIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAssignmentsAPI, staffAPI, residentAPI, userAPI } from '@/lib/api';
@@ -58,32 +60,56 @@ export default function StaffAssignmentsPage() {
     }
   }, [user, loading, router]);
 
-  // Load data
-  useEffect(() => {
+  // Load data function
+  const loadData = async () => {
     if (!user || user.role !== 'admin') return;
     
-    const loadData = async () => {
-      setLoadingData(true);
-      try {
-        const [assignmentsData, staffsData, residentsData] = await Promise.all([
-          staffAssignmentsAPI.getAll(),
-          staffAPI.getAll(),
-          residentAPI.getAll(),
-        ]);
-        
-        setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-        setStaffs(Array.isArray(staffsData) ? staffsData : []);
-        setResidents(Array.isArray(residentsData) ? residentsData : []);
-        setError('');
-      } catch (err) {
-        setError('Không thể tải dữ liệu. Vui lòng thử lại.');
-        console.error('Error loading data:', err);
-      } finally {
-        setLoadingData(false);
+    setLoadingData(true);
+    try {
+      const [assignmentsData, staffsData, residentsData] = await Promise.all([
+        staffAssignmentsAPI.getAll(),
+        staffAPI.getAll(),
+        residentAPI.getAll(),
+      ]);
+      
+      setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
+      setStaffs(Array.isArray(staffsData) ? staffsData : []);
+      setResidents(Array.isArray(residentsData) ? residentsData : []);
+      setError('');
+    } catch (err) {
+      setError('Không thể tải dữ liệu. Vui lòng thử lại.');
+      console.error('Error loading data:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Load data on mount and when user changes
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  // Refresh data when page becomes visible (when returning from other pages)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user && user.role === 'admin') {
+        loadData();
       }
     };
 
-    loadData();
+    const handleFocus = () => {
+      if (user && user.role === 'admin') {
+        loadData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [user]);
 
   // Group assignments by staff
@@ -384,6 +410,37 @@ export default function StaffAssignmentsPage() {
             gap: '1rem'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <Link
+                href="/admin"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  color: '#6b7280',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textDecoration: 'none',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                }}
+                title="Quay lại trang Admin"
+              >
+                <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+              </Link>
               <div style={{
                 width: '3.5rem',
                 height: '3.5rem',
@@ -418,38 +475,82 @@ export default function StaffAssignmentsPage() {
                 </p>
               </div>
             </div>
-            <Link
-              href="/admin/staff-assignments/new"
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.75rem',
-                padding: '0.75rem 1.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                textDecoration: 'none'
-              }}
-              onMouseOver={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
-              }}
-              onMouseOut={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-              }}
-            >
-              <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-              Tạo phân công mới
-            </Link>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={loadData}
+                disabled={loadingData}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: loadingData ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  opacity: loadingData ? 0.6 : 1
+                }}
+                onMouseOver={e => {
+                  if (!loadingData) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                  }
+                }}
+                onMouseOut={e => {
+                  if (!loadingData) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                  }
+                }}
+                title="Làm mới dữ liệu"
+              >
+                <ArrowPathIcon style={{ 
+                  width: '1.25rem', 
+                  height: '1.25rem',
+                  animation: loadingData ? 'spin 1s linear infinite' : 'none'
+                }} />
+                {loadingData ? 'Đang tải...' : 'Làm mới'}
+              </button>
+              <Link
+                href="/admin/staff-assignments/new"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  textDecoration: 'none'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                }}
+              >
+                <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                Tạo phân công mới
+              </Link>
+            </div>
           </div>
         </div>
 

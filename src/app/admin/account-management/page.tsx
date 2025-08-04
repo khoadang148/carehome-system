@@ -772,35 +772,7 @@ export default function AccountManagementPage() {
               </div>
             </div>
             
-            <button 
-              onClick={() => router.push('/admin/account-management/new')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                padding: '0.875rem 1.5rem',
-                borderRadius: '0.75rem',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-              }}
-            >
-              <PlusIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-              Thêm {activeTab === 'staff' ? 'tài khoản nhân viên' : 'tài khoản gia đình'}
-            </button>
+            
           </div>
         </div>
 
@@ -1031,36 +1003,7 @@ export default function AccountManagementPage() {
             alignItems: 'center',
             
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                borderRadius: '0.75rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <UserPlusIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
-              </div>
-              <div>
-                <h2 style={{ 
-                  fontSize: '1.8rem', 
-                  fontWeight: 700, 
-                  margin: 0, 
-                  color: '#059669'
-                }}>
-                  {activeTab === 'staff' ? 'Thêm tài khoản' : 'Thêm tài khoản'}
-                </h2>
-                <p style={{ 
-                  fontSize: '0.875rem', 
-                  color: '#6b7280', 
-                  margin: 0
-                }}>
-                  Tạo tài khoản {activeTab === 'staff' ? 'cho nhân viên hệ thống' : 'cho người giám hộ'}
-                </p>
-              </div>
-            </div>
+            
           </div>
 
           {/* Modal Body */}

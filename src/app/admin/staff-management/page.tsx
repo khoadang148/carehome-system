@@ -22,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAPI, userAPI } from '@/lib/api';
+import { processAvatarUrl } from '@/lib/utils/avatarUtils';
 
 export default function StaffManagementPage() {
   const { user, loading } = useAuth();
@@ -32,6 +33,7 @@ export default function StaffManagementPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -39,20 +41,8 @@ export default function StaffManagementPage() {
   const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Thêm state cho modal sửa
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingStaff, setEditingStaff] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    email: '',
-    phone: '',
-    position: '',
-    qualification: '',
-    status: 'active',
-    notes: ''
-  });
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState('');
+  // State cho việc chuyển hướng đến trang chỉnh sửa
+  const [redirectingToEdit, setRedirectingToEdit] = useState<string | null>(null);
 
 
 
@@ -85,13 +75,25 @@ export default function StaffManagementPage() {
   };
   const confirmDelete = async () => {
     if (!deleteId) return;
+    
+    // Tìm thông tin nhân viên trước khi xóa để hiển thị trong thông báo
+    const staffToDelete = staffList.find(s => s._id === deleteId);
+    const staffName = staffToDelete?.full_name || 'Nhân viên';
+    
     try {
       await staffAPI.delete(deleteId);
       setStaffList((prev) => prev.filter((s) => s._id !== deleteId));
       setShowDeleteModal(false);
       setDeleteId(null);
-    } catch {
-      setError('Xóa nhân viên thất bại.');
+      // Thông báo thành công chi tiết
+      setError(''); // Xóa lỗi cũ nếu có
+      setSuccessMessage(`✅ Đã xóa thành công nhân viên: ${staffName}`);
+      // Tự động ẩn thông báo sau 5 giây
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: any) {
+      console.error('Error deleting staff:', error);
+      setError(`❌ Không thể xóa nhân viên ${staffName}: ${error.message || 'Lỗi không xác định'}`);
+      setSuccessMessage(''); // Xóa thông báo thành công nếu có
     }
   };
   const cancelDelete = () => {
@@ -99,73 +101,20 @@ export default function StaffManagementPage() {
     setDeleteId(null);
   };
 
-  // Xử lý sửa nhân viên
-  const handleEdit = (staff: any) => {
-    setEditingStaff(staff);
-    setEditForm({
-      full_name: staff.full_name || '',
-      email: staff.email || '',
-      phone: staff.phone || '',
-      position: staff.position || '',
-      qualification: staff.qualification || '',
-      status: staff.status || 'active',
-      notes: staff.notes || ''
-    });
-    setEditError('');
-    setShowEditModal(true);
+  // Xử lý chuyển hướng đến trang chỉnh sửa
+  const handleEdit = (staffId: string) => {
+    setRedirectingToEdit(staffId);
+    router.push(`/admin/staff-management/edit/${staffId}`);
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStaff) return;
-
-    setEditLoading(true);
-    setEditError('');
-
-    try {
-      await staffAPI.update(editingStaff._id, editForm);
-      
-      // Cập nhật danh sách
-      setStaffList(prev => prev.map(staff => 
-        staff._id === editingStaff._id 
-          ? { ...staff, ...editForm }
-          : staff
-      ));
-      
-      setShowEditModal(false);
-      setEditingStaff(null);
-      setEditForm({
-        full_name: '',
-        email: '',
-        phone: '',
-        position: '',
-        qualification: '',
-        status: 'active',
-        notes: ''
-      });
-    } catch (err: any) {
-      setEditError(err?.message || 'Có lỗi xảy ra khi cập nhật thông tin nhân viên');
-    } finally {
-      setEditLoading(false);
+  // Handle redirect for non-admin users
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'admin')) {
+      router.replace('/');
     }
-  };
+  }, [user, loading, router]);
 
-  const cancelEdit = () => {
-    setShowEditModal(false);
-    setEditingStaff(null);
-    setEditForm({
-      full_name: '',
-      email: '',
-      phone: '',
-      position: '',
-      qualification: '',
-      status: 'active',
-      notes: ''
-    });
-    setEditError('');
-  };
-
-  // Xử lý redirect trực tiếp trong render thay vì useEffect
+  // Show loading state
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #e0e7ff 0%, #f1f5f9 100%)' }}>
@@ -174,12 +123,16 @@ export default function StaffManagementPage() {
       </div>
     );
   }
+
+  // Show nothing while redirecting or if not admin
   if (!user || user.role !== 'admin') {
-    if (typeof window !== 'undefined') {
-      router.replace('/');
-    }
     return null;
   }
+
+  // Get staff to delete for modal
+  const staffToDelete = staffList.find(s => s._id === deleteId);
+  const staffName = staffToDelete?.full_name || 'Nhân viên';
+  const staffEmail = staffToDelete?.email || '';
 
   return (
     <div style={{
@@ -218,6 +171,63 @@ export default function StaffManagementPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)',
           backdropFilter: 'blur(10px)'
         }}>
+          {/* Error and Success Messages */}
+          {(error || successMessage) && (
+            <div style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              borderRadius: '0.75rem',
+              border: '1px solid',
+              ...(error ? {
+                backgroundColor: '#fef2f2',
+                borderColor: '#fecaca',
+                color: '#dc2626'
+              } : {
+                backgroundColor: '#f0fdf4',
+                borderColor: '#bbf7d0',
+                color: '#16a34a'
+              })
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {error ? (
+                    <>
+                      <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                      <span style={{ fontWeight: 600 }}>Lỗi:</span>
+                      <span>{error}</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                      <span style={{ fontWeight: 600 }}>Thành công:</span>
+                      <span>{successMessage}</span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    setError('');
+                    setSuccessMessage('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.25rem',
+                    borderRadius: '0.25rem',
+                    color: 'inherit',
+                    opacity: 0.7,
+                    transition: 'opacity 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                  onMouseOut={e => e.currentTarget.style.opacity = '0.7'}
+                >
+                  <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -260,39 +270,38 @@ export default function StaffManagementPage() {
                 </p>
               </div>
             </div>
-            <div>
-              <Link href="/admin/staff-management/add">
-                <button style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.75rem',
-                  padding: '0.75rem 1.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                }}
-                >
-                  <PlusCircleIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-                  Thêm nhân viên
-                </button>
-              </Link>
-            </div>
+            
+            <Link
+              href="/admin/staff-management/add"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                borderRadius: '0.75rem',
+                textDecoration: 'none',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                marginLeft: 'auto'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+              }}
+            >
+              <PlusCircleIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+              Thêm nhân viên
+            </Link>
+            
             
           </div>
         </div>
@@ -456,7 +465,7 @@ export default function StaffManagementPage() {
                         }}>
                           {staff.avatar ? (
                             <img 
-                              src={userAPI.getAvatarUrl(staff.avatar)} 
+                              src={processAvatarUrl(staff.avatar)} 
                               alt={staff.full_name} 
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               onError={(e) => {
@@ -509,7 +518,7 @@ export default function StaffManagementPage() {
                           <EyeIcon style={{ width: '1rem', height: '1rem' }} />
                         </button>
                         <button
-                          onClick={() => handleEdit(staff)}
+                          onClick={() => handleEdit(staff._id)}
                           title="Sửa thông tin"
                           style={{
                             padding: '0.5rem',
@@ -564,34 +573,69 @@ export default function StaffManagementPage() {
         </div>
         {/* Modal xác nhận xóa */}
         {showDeleteModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(10px)'
-          }}>
             <div style={{
-              background: 'white',
-              borderRadius: '1rem',
-              padding: '2rem',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              backdropFilter: 'blur(10px)'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 1rem 0', color: '#111827' }}>
-                Xác nhận xóa nhân viên
-              </h3>
-              <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280' }}>
-                Bạn có chắc chắn muốn xóa nhân viên này? Hành động này không thể hoàn tác.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <div style={{
+                background: 'white',
+                borderRadius: '1rem',
+                padding: '2rem',
+                maxWidth: '450px',
+                width: '90%',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{
+                    width: '3rem',
+                    height: '3rem',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <TrashIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+                  </div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#111827' }}>
+                    Xác nhận xóa nhân viên
+                  </h3>
+                </div>
+                
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.75rem',
+                  padding: '1rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <p style={{ margin: '0 0 0.5rem 0', color: '#dc2626', fontWeight: 600 }}>
+                    Bạn sắp xóa nhân viên:
+                  </p>
+                  <p style={{ margin: '0 0 0.25rem 0', color: '#374151', fontWeight: 500 }}>
+                    <strong>Tên:</strong> {staffName}
+                  </p>
+                  {staffEmail && (
+                    <p style={{ margin: 0, color: '#6b7280' }}>
+                      <strong>Email:</strong> {staffEmail}
+                    </p>
+                  )}
+                </div>
+                
+                                <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                  ⚠️ <strong>Lưu ý:</strong> Hành động này sẽ xóa vĩnh viễn tài khoản và tất cả dữ liệu liên quan. Không thể hoàn tác!
+                </p>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                 <button
                   onClick={cancelDelete}
                   style={{
@@ -720,7 +764,7 @@ export default function StaffManagementPage() {
                     }}>
                       {selectedStaff.avatar ? (
                         <img 
-                          src={userAPI.getAvatarUrl(selectedStaff.avatar)} 
+                          src={processAvatarUrl(selectedStaff.avatar)} 
                           alt={selectedStaff.full_name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {
@@ -877,355 +921,7 @@ export default function StaffManagementPage() {
           </div>
         )}
 
-        {/* Modal sửa nhân viên */}
-        {showEditModal && editingStaff && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15,23,42,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(12px)',
-            padding: '1rem'
-          }}>
-            <div style={{
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1.5rem',
-              padding: '2rem',
-              maxWidth: '600px',
-              width: '90%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 32px 80px -12px rgba(15,23,42,0.3), 0 0 0 1px rgba(226,232,240,0.5)',
-              position: 'relative',
-              border: '1px solid rgba(226,232,240,0.5)'
-            }}>
-              {/* Header */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '1.5rem',
-                paddingBottom: '1rem',
-                borderBottom: '1px solid rgba(226,232,240,0.6)'
-              }}>
-                <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  margin: 0
-                }}>
-                  Sửa thông tin nhân viên
-                </h2>
-                <button
-                  onClick={cancelEdit}
-                  style={{
-                    background: 'linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    padding: '0.5rem',
-                    boxShadow: '0 4px 12px rgba(100,116,139,0.15)',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={e => { 
-                    e.currentTarget.style.background = 'linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%)';
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseOut={e => { 
-                    e.currentTarget.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%)';
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-                </button>
-              </div>
 
-              {/* Form */}
-              <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {editError && (
-                  <div style={{
-                    background: 'rgba(239,68,68,0.1)',
-                    border: '1px solid rgba(239,68,68,0.2)',
-                    borderRadius: '0.5rem',
-                    padding: '0.75rem',
-                    color: '#dc2626',
-                    fontSize: '0.875rem'
-                  }}>
-                    {editError}
-                  </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Họ và tên <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.full_name}
-                      onChange={e => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem',
-                        background: 'white'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Email <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={editForm.email}
-                      onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem',
-                        background: 'white'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Số điện thoại
-                    </label>
-                    <input
-                      type="tel"
-                      value={editForm.phone}
-                      onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem',
-                        background: 'white'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Vị trí
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.position}
-                      onChange={e => setEditForm(prev => ({ ...prev, position: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem',
-                        background: 'white'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Bằng cấp
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.qualification}
-                      onChange={e => setEditForm(prev => ({ ...prev, qualification: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem',
-                        background: 'white'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Trạng thái
-                    </label>
-                    <select
-                      value={editForm.status}
-                      onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem',
-                        background: 'white'
-                      }}
-                    >
-                      <option value="active">Đang làm việc</option>
-                      <option value="inactive">Nghỉ việc</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Ghi chú
-                  </label>
-                  <textarea
-                    value={editForm.notes}
-                    onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #d1d5db',
-                      fontSize: '0.875rem',
-                      background: 'white',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                {/* Action buttons */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '1rem',
-                  marginTop: '1rem',
-                  paddingTop: '1rem',
-                  borderTop: '1px solid rgba(226,232,240,0.6)'
-                }}>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #d1d5db',
-                      background: 'white',
-                      color: '#6b7280',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.background = '#f9fafb';
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.background = 'white';
-                    }}
-                  >
-                    Hủy bỏ
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={editLoading}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '0.5rem',
-                      border: 'none',
-                      background: editLoading ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      cursor: editLoading ? 'not-allowed' : 'pointer',
-                      fontWeight: 600,
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                    onMouseOver={e => {
-                      if (!editLoading) {
-                        e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                      }
-                    }}
-                    onMouseOut={e => {
-                      if (!editLoading) {
-                        e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                      }
-                    }}
-                  >
-                    {editLoading ? (
-                      <>
-                        <div style={{
-                          width: '1rem',
-                          height: '1rem',
-                          border: '2px solid transparent',
-                          borderTop: '2px solid white',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} />
-                        Đang cập nhật...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
-                        Cập nhật
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

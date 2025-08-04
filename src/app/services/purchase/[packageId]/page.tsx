@@ -272,7 +272,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     }
   };
 
-  // Khi chọn cư dân, tự động set giới tính phòng
+  // Khi chọn cư dân, tự động set giới tính phòng và kiểm tra phòng hiện tại
   useEffect(() => {
     const selectedResidentObj = residents.find(r => r.id === selectedResident);
     if (selectedResidentObj?.gender) {
@@ -281,7 +281,12 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
         preferred_room_gender: selectedResidentObj.gender
       }));
     }
-  }, [selectedResident, residents]);
+    
+    // Kiểm tra xem resident đã có phòng chưa
+    if (selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa cập nhật') {
+      console.log(`✅ Resident ${selectedResidentObj?.name} đã có phòng: ${roomNumbers[selectedResident]}`);
+    }
+  }, [selectedResident, residents, roomNumbers]);
 
   useEffect(() => {
     if (!user) return;
@@ -579,43 +584,41 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       errors.selectedResident = 'Vui lòng chọn người cần chăm sóc';
     }
     
-    // Start date validation with business rules
+    // Start date validation - allow any future date including today
     if (!startDate) {
       errors.startDate = 'Vui lòng chọn ngày bắt đầu dịch vụ';
     } else {
       const selectedDate = new Date(startDate);
+      selectedDate.setHours(0, 0, 0, 0); // Reset time to start of day
       const today = new Date();
-      const minDate = new Date();
-      minDate.setDate(today.getDate() + 3);
-      const maxDate = new Date();
-      maxDate.setDate(today.getDate() + 365); // Max 1 year in advance
+      today.setHours(0, 0, 0, 0); // Reset time to start of day
       
-      if (selectedDate < minDate) {
-        errors.startDate = 'Ngày bắt đầu dịch vụ phải sau ít nhất 3 ngày làm việc từ hôm nay';
-      } else if (selectedDate > maxDate) {
-        errors.startDate = 'Không thể đăng ký trước quá 1 năm';
-      }
-      
-      // Check for weekends (assuming service doesn't start on weekends)
-      const dayOfWeek = selectedDate.getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        errors.startDate = 'Dịch vụ không bắt đầu vào cuối tuần. Vui lòng chọn ngày trong tuần';
+      if (selectedDate < today) {
+        errors.startDate = 'Ngày bắt đầu dịch vụ không được là ngày trong quá khứ';
       }
     }
     
-    // Emergency contact validation
-    if (!emergencyContact.trim()) {
-      errors.emergencyContact = 'Vui lòng nhập tên người liên hệ khẩn cấp';
-    } else if (!validateEmergencyContact(emergencyContact)) {
-      errors.emergencyContact = 'Tên người liên hệ chỉ được chứa chữ cái và khoảng trắng (tối thiểu 2 ký tự)';
+    // End date validation (optional but must be after start date if provided)
+    if (endDate) {
+      const endDateObj = new Date(endDate);
+      const startDateObj = startDate ? new Date(startDate) : null;
+      
+      if (startDateObj && endDateObj <= startDateObj) {
+        errors.endDate = 'Ngày kết thúc phải sau ngày bắt đầu';
+      }
+      
+      // End date should not be more than 2 years from start date
+      if (startDateObj) {
+        const maxEndDate = new Date(startDateObj);
+        maxEndDate.setFullYear(maxEndDate.getFullYear() + 2);
+        
+        if (endDateObj > maxEndDate) {
+          errors.endDate = 'Ngày kết thúc không được quá 2 năm từ ngày bắt đầu';
+        }
+      }
     }
     
-    // Emergency phone validation
-    if (!emergencyPhone.trim()) {
-      errors.emergencyPhone = 'Vui lòng nhập số điện thoại người liên hệ khẩn cấp';
-    } else if (!validatePhoneNumber(emergencyPhone)) {
-      errors.emergencyPhone = 'Số điện thoại không hợp lệ. Định dạng: 0xxxxxxxxx hoặc +84xxxxxxxxx';
-    }
+
     
 
     
@@ -638,6 +641,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       errors.medicalNotes = 'Đối với người trên 85 tuổi, vui lòng cung cấp thông tin y tế để chăm sóc tốt nhất';
     }
     
+    console.log('Validation errors:', errors);
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -715,8 +719,14 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     setShowConfirmation(true);
   };
 
+  // Kiểm tra xem resident đã có phòng chưa
+  const selectedResidentObj = residents.find(r => r.id === selectedResident);
+  const hasExistingRoom = selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa cập nhật';
+  
   // Thêm kiểm tra trước khi gửi đăng ký
-  const canSubmit = selectedResident && selectedPackage && roomType && selectedRoomId && selectedBedId && startDate;
+  const canSubmit = selectedResident && selectedPackage && startDate && 
+    (selectedPackage?.category === 'supplementary' || 
+     (selectedPackage?.category === 'main' && (hasExistingRoom || (roomType && selectedRoomId && selectedBedId))));
 
   
 
@@ -804,7 +814,6 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
 
   
 
-  const selectedResidentObj = residents.find(r => r.id === selectedResident);
   const residentGender = selectedResidentObj?.gender || '';
   const filteredRooms = rooms.filter(r =>
     r.room_type === roomType &&
@@ -1282,8 +1291,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
               </button>
               <button 
                 onClick={() => {
-                  // Nếu là gói bổ sung, bỏ qua các bước chọn phòng
-                  if (selectedPackage?.category === 'supplementary') {
+                  // Nếu là gói bổ sung hoặc resident đã có phòng, bỏ qua các bước chọn phòng
+                  if (selectedPackage?.category === 'supplementary' || hasExistingRoom) {
                     setStep(6); // Chuyển thẳng đến bước thông tin bổ sung
                   } else {
                     setStep(3);
@@ -1735,7 +1744,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
               }}>
                 Cung cấp thêm thông tin để chúng tôi phục vụ tốt hơn
               </p>
-              {selectedPackage?.category === 'supplementary' && (
+              {(selectedPackage?.category === 'supplementary' || hasExistingRoom) && (
                 <div style={{
                   background: '#f0f9ff',
                   borderRadius: 12,
@@ -1744,7 +1753,11 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   border: '1px solid #0ea5e9'
                 }}>
                   <div style={{ fontSize: '1rem', color: '#0369a1', textAlign: 'center' }}>
-                    🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì cư dân đã có phòng từ gói chính
+                    {selectedPackage?.category === 'supplementary' ? (
+                      <>🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì cư dân đã có phòng từ gói chính</>
+                    ) : (
+                      <>🏠 <strong>Đã có phòng:</strong> Cư dân đã được phân bổ phòng {roomNumbers[selectedResident]} nên bỏ qua bước chọn phòng</>
+                    )}
                   </div>
                 </div>
               )}
@@ -1769,13 +1782,96 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 </label>
             <DatePicker
               selected={startDate ? new Date(startDate) : null}
-              onChange={date => setStartDate(date ? date.toISOString().slice(0, 10) : '')}
+              onChange={date => {
+                const newStartDate = date ? date.toISOString().slice(0, 10) : '';
+                setStartDate(newStartDate);
+                // Clear validation errors when user changes the date
+                if (validationErrors.startDate) {
+                  setValidationErrors(prev => ({ ...prev, startDate: '' }));
+                }
+                // If end date exists and is now invalid, clear it
+                if (endDate && newStartDate && new Date(endDate) <= new Date(newStartDate)) {
+                  setEndDate('');
+                  setValidationErrors(prev => ({ ...prev, endDate: '' }));
+                }
+              }}
               dateFormat="dd/MM/yyyy"
               placeholderText="dd/mm/yyyy"
-              minDate={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)}
-              maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)}
-                  className="date-picker-custom"
+              filterDate={(date) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const selectedDate = new Date(date);
+                selectedDate.setHours(0, 0, 0, 0);
+                return selectedDate >= today;
+              }}
+                  className={`date-picker-custom ${validationErrors.startDate ? 'error' : ''}`}
                 />
+                {validationErrors.startDate && (
+                  <p style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#ef4444', 
+                    marginTop: '0.25rem'
+                  }}>
+                    {validationErrors.startDate}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block',
+                  fontWeight: 600, 
+                  fontSize: '1rem',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Ngày kết thúc dịch vụ:
+                </label>
+            <DatePicker
+              selected={endDate ? new Date(endDate) : null}
+              onChange={date => {
+                const newEndDate = date ? date.toISOString().slice(0, 10) : '';
+                setEndDate(newEndDate);
+                // Clear validation errors when user changes the date
+                if (validationErrors.endDate) {
+                  setValidationErrors(prev => ({ ...prev, endDate: '' }));
+                }
+              }}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="dd/mm/yyyy (tùy chọn)"
+              filterDate={(date) => {
+                const selectedDate = new Date(date);
+                selectedDate.setHours(0, 0, 0, 0);
+                if (startDate) {
+                  const startDateObj = new Date(startDate);
+                  startDateObj.setHours(0, 0, 0, 0);
+                  return selectedDate > startDateObj;
+                } else {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  return selectedDate >= today;
+                }
+              }}
+                  className={`date-picker-custom ${validationErrors.endDate ? 'error' : ''}`}
+                />
+                {validationErrors.endDate ? (
+                  <p style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#ef4444', 
+                    marginTop: '0.25rem'
+                  }}>
+                    {validationErrors.endDate}
+                  </p>
+                ) : (
+                  <p style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Để trống nếu không muốn đặt ngày kết thúc cụ thể. Dịch vụ sẽ kéo dài cho đến khi bạn hủy.
+                  </p>
+                )}
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
@@ -1856,6 +1952,26 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
               </div>
             </div>
 
+            {/* Hiển thị validation errors */}
+            {Object.keys(validationErrors).length > 0 && (
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '0.5rem',
+                marginBottom: '1rem',
+                color: '#dc2626',
+                fontSize: '0.875rem'
+              }}>
+                <strong>Vui lòng sửa các lỗi sau:</strong>
+                <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.5rem' }}>
+                  {Object.entries(validationErrors).map(([field, error]) => (
+                    <li key={field}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
@@ -1866,8 +1982,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
             }}>
               <button 
                 onClick={() => {
-                  // Nếu là gói bổ sung, quay lại step 1 thay vì step 5
-                  if (selectedPackage?.category === 'supplementary') {
+                  // Nếu là gói bổ sung hoặc đã có phòng, quay lại step 1 thay vì step 5
+                  if (selectedPackage?.category === 'supplementary' || hasExistingRoom) {
                     setStep(1);
                   } else {
                     setStep(5);
@@ -1888,7 +2004,19 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 Quay lại
               </button>
               <button 
-                onClick={() => setStep(7)} 
+                onClick={() => {
+                  // Validate form before proceeding
+                  console.log('Current validation errors:', validationErrors);
+                  console.log('Start date:', startDate);
+                  console.log('End date:', endDate);
+                  console.log('Emergency contact:', emergencyContact);
+                  console.log('Emergency phone:', emergencyPhone);
+                  if (validateRegistration()) {
+                    setStep(7);
+                  } else {
+                    console.log('Validation failed. Errors:', validationErrors);
+                  }
+                }} 
                 style={{ 
                   background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                   color: '#fff',
@@ -1902,7 +2030,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   transition: 'all 0.3s ease',
                   minWidth: '160px'
                 }}
-                disabled={!startDate}
+                disabled={!startDate || Object.keys(validationErrors).length > 0}
               >
                 Tiếp tục
               </button>
@@ -1958,12 +2086,23 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
               }}>
                 <div><b style={{ color: '#374151' }}>Người thụ hưởng:</b> {residents.find(r => r.id === selectedResident)?.name}</div>
                 <div><b style={{ color: '#374151' }}>Gói dịch vụ:</b> {selectedPackage?.plan_name}</div>
+                <div><b style={{ color: '#374151' }}>Ngày bắt đầu:</b> {startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
+                <div><b style={{ color: '#374151' }}>Ngày kết thúc:</b> {endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Không có (kéo dài vô thời hạn)'}</div>
                                  {selectedPackage?.category === 'main' && (
                    <>
-                     <div><b style={{ color: '#374151' }}>Loại phòng:</b> {roomTypeName}</div>
-                     <div><b style={{ color: '#374151' }}>Giới tính phòng:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
-                     <div><b style={{ color: '#374151' }}>Phòng:</b> {selectedRoomObj?.room_number}</div>
-                     <div><b style={{ color: '#374151' }}>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
+                     {hasExistingRoom ? (
+                       <>
+                         <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {roomNumbers[selectedResident]}</div>
+                         <div><b style={{ color: '#374151' }}>Ghi chú:</b> Sử dụng phòng hiện có</div>
+                       </>
+                     ) : (
+                       <>
+                         <div><b style={{ color: '#374151' }}>Loại phòng:</b> {roomTypeName}</div>
+                         <div><b style={{ color: '#374151' }}>Giới tính phòng:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
+                         <div><b style={{ color: '#374151' }}>Phòng:</b> {selectedRoomObj?.room_number}</div>
+                         <div><b style={{ color: '#374151' }}>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
+                       </>
+                     )}
                    </>
                  )}
                 <div><b style={{ color: '#374151' }}>Yêu cầu đặc biệt:</b> {familyPreferences.special_requests || 'Không có'}</div>
@@ -1986,7 +2125,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                      fontSize: '1.2rem',
                      fontWeight: 700
                    }}>
-                     {((selectedPackage?.category === 'main' ? roomMonthlyCost : 0) + (selectedPackage?.monthly_price || 0)).toLocaleString()} đ
+                     {((selectedPackage?.category === 'main' && !hasExistingRoom ? roomMonthlyCost : 0) + (selectedPackage?.monthly_price || 0)).toLocaleString()} đ
                    </span>
                 </div>
               </div>
@@ -2218,6 +2357,22 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
         onConfirm={confirmModal.onConfirm}
         onCancel={confirmModal.onCancel}
       />
+
+      <style jsx>{`
+        .date-picker-custom.error {
+          border: 2px solid #ef4444 !important;
+          border-radius: 12px !important;
+        }
+        
+        .date-picker-custom {
+          border: 2px solid #d1d5db;
+          border-radius: 12px;
+          padding: 1rem;
+          width: 100%;
+          font-size: 1rem;
+          background: white;
+        }
+      `}</style>
     </div>
     </div>
   );

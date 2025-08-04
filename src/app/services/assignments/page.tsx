@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { residentAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI, userAPI } from '@/lib/api';
+import { residentAPI, carePlansAPI, carePlanAssignmentsAPI, userAPI } from '@/lib/api';
 import { ClipboardDocumentCheckIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 
@@ -14,7 +14,6 @@ export default function ServiceAssignmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,22 +36,8 @@ export default function ServiceAssignmentsPage() {
               ? (r._id as any)._id 
               : r._id;
             const data = await carePlansAPI.getByResidentId(residentId);
-              // Lấy số phòng giống resident page
-              const assignment = Array.isArray(data) ? data.find((a: any) => a.assigned_room_id) : null;
-              const roomId = assignment?.assigned_room_id?._id || assignment?.assigned_room_id;
-              if (roomId) {
-                try {
-                  const room = await roomsAPI.getById(roomId);
-                  setRoomNumbers(prev => ({ ...prev, [r._id]: room?.room_number || 'Chưa cập nhật' }));
-                } catch {
-                  setRoomNumbers(prev => ({ ...prev, [r._id]: 'Chưa cập nhật' }));
-                }
-              } else {
-                setRoomNumbers(prev => ({ ...prev, [r._id]: 'Chưa cập nhật' }));
-              }
               return (Array.isArray(data) ? data : []).map((a: any) => ({ ...a, resident: r }));
             } catch {
-              setRoomNumbers(prev => ({ ...prev, [r._id]: 'Chưa cập nhật' }));
               return [];
             }
           })
@@ -265,23 +250,21 @@ export default function ServiceAssignmentsPage() {
             ) : error ? (
               <div style={{ padding: '3rem', textAlign: 'center', color: 'red' }}>{error}</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{
                     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
                     borderBottom: '1px solid #e5e7eb'
                   }}>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Người cao tuổi</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Phòng</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Gói dịch vụ</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Trạng thái</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Ngày bắt đầu</th>
-                    <th style={{ padding: '1rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>Thao tác</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151', width: '25%' }}>Người cao tuổi</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151', width: '45%' }}>Gói dịch vụ</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: '#374151', width: '15%' }}>Trạng thái</th>
+                    <th style={{ padding: '1rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: 600, color: '#374151', width: '15%' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAssignments.length === 0 ? (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32 }}>Không có dữ liệu đăng ký dịch vụ nào.</td></tr>
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 32 }}>Không có dữ liệu đăng ký dịch vụ nào.</td></tr>
                   ) : (
                     filteredAssignments.map((a, idx) => (
                       <tr key={a._id + '-' + idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
@@ -316,7 +299,6 @@ export default function ServiceAssignmentsPage() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>{roomNumbers[a.resident?._id] || ''}</td>
                         <td style={{ padding: '1rem' }}>
                           {Array.isArray(a.care_plan_ids)
                             ? a.care_plan_ids.map((cp: any) => cp.description || cp.plan_name || cp.name || 'N/A').join(', ')
@@ -340,7 +322,6 @@ export default function ServiceAssignmentsPage() {
                             );
                           })()}
                         </td>
-                        <td style={{ padding: '1rem' }}>{a.start_date ? new Date(a.start_date).toLocaleDateString('vi-VN') : ''}</td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                             <button
