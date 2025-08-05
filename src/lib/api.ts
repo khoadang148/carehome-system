@@ -1955,6 +1955,18 @@ export const carePlanAssignmentsAPI = {
       throw error;
     }
   },
+
+  removePackage: async (id: string, packageId: string) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/${id}/remove-package`, {
+        packageId
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error removing package ${packageId} from assignment ${id}:`, error);
+      throw error;
+    }
+  },
 };
 
 export const billsAPI = {

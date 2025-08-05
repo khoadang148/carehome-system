@@ -15,6 +15,9 @@ export default function ServiceAssignmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showPackageSelectModal, setShowPackageSelectModal] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'expired'>('all');
   
   // Pagination state
@@ -107,20 +110,71 @@ export default function ServiceAssignmentsPage() {
   };
 
   // Handle delete
-  const handleDelete = (assignmentId: string) => {
-    setDeleteConfirmId(assignmentId);
+  const handleDelete = (assignment: any) => {
+    // Chỉ admin mới được xóa
+    if (user?.role !== 'admin') {
+      alert('Bạn không có quyền thực hiện thao tác này.');
+      return;
+    }
+
+    const carePlanCount = Array.isArray(assignment.care_plan_ids) ? assignment.care_plan_ids.length : 0;
+    
+    if (carePlanCount > 1) {
+      // Nếu có nhiều gói, hiện modal chọn gói
+      setSelectedAssignment(assignment);
+      setShowPackageSelectModal(true);
+    } else {
+      // Nếu chỉ có 1 gói, hiện modal xác nhận xóa toàn bộ
+      setDeleteConfirmId(assignment._id);
+    }
   };
 
   // Handle delete confirmation
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmId) return;
 
+    // Chỉ admin mới được xóa
+    if (user?.role !== 'admin') {
+      alert('Bạn không có quyền thực hiện thao tác này.');
+      setDeleteConfirmId(null);
+      return;
+    }
+
     try {
       await carePlanAssignmentsAPI.delete(deleteConfirmId);
+      setDeleteConfirmId(null);
+      setShowSuccessModal(true);
       // Refresh data
-      window.location.reload();
+      loadData();
     } catch (error: any) {
       alert('Không thể xóa đăng ký dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
+    }
+  };
+
+  // Handle delete specific package
+  const handleDeletePackage = async (packageId: string) => {
+    if (!selectedAssignment) return;
+
+    // Chỉ admin mới được xóa
+    if (user?.role !== 'admin') {
+      alert('Bạn không có quyền thực hiện thao tác này.');
+      setShowPackageSelectModal(false);
+      setSelectedAssignment(null);
+      return;
+    }
+
+    try {
+      // Sử dụng API mới để xóa gói riêng lẻ
+      await carePlanAssignmentsAPI.removePackage(selectedAssignment._id, packageId);
+
+      setShowPackageSelectModal(false);
+      setSelectedAssignment(null);
+      setShowSuccessModal(true);
+      // Refresh data
+      loadData();
+    } catch (error: any) {
+      console.error('Error deleting package:', error);
+      alert('Không thể xóa gói dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
     }
   };
 
@@ -237,7 +291,7 @@ export default function ServiceAssignmentsPage() {
               WebkitTextFillColor: 'transparent',
               letterSpacing: '-0.025em'
             }}>
-              Danh sách cư dân đã đăng ký dịch vụ
+              Danh sách người cao tuổi đã đăng ký dịch vụ
             </h1>
           </div>
           <p style={{
@@ -511,9 +565,9 @@ export default function ServiceAssignmentsPage() {
                               </svg>
                             </button>
                             {user?.role === 'admin' && (
-                              <button
-                                title="Xóa"
-                                onClick={() => handleDelete(a._id)}
+                                                          <button
+                              title="Xóa"
+                              onClick={() => handleDelete(a)}
                                 style={{
                                   padding: '0.5rem',
                                   borderRadius: '0.375rem',
@@ -649,7 +703,7 @@ export default function ServiceAssignmentsPage() {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmId && (
+      {deleteConfirmId && user?.role === 'admin' && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -711,6 +765,197 @@ export default function ServiceAssignmentsPage() {
           </div>
         </div>
       )}
+
+      {/* Success Modal */}
+      {showSuccessModal && user?.role === 'admin' && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem auto',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'white' }}>
+                <polyline points="20,6 9,17 4,12"></polyline>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#111827' }}>
+              Xóa thành công!
+            </h3>
+            <p style={{ color: '#6b7280', margin: '0 0 1.5rem 0', lineHeight: '1.5' }}>
+              Đăng ký dịch vụ đã được xóa khỏi hệ thống.
+            </p>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              style={{
+                padding: '0.75rem 2rem',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Package Selection Modal */}
+      {showPackageSelectModal && selectedAssignment && user?.role === 'admin' && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'white' }}>
+                  <path d="M3 6h18"/>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0, color: '#111827' }}>
+                  Chọn gói dịch vụ để xóa
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>
+                  Cư dân: {selectedAssignment.resident?.full_name || selectedAssignment.resident?.name || 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: '#6b7280', margin: '0 0 1rem 0', lineHeight: '1.5' }}>
+                Vui lòng chọn gói dịch vụ bạn muốn xóa khỏi đăng ký này:
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {Array.isArray(selectedAssignment.care_plan_ids) && selectedAssignment.care_plan_ids.map((cp: any, index: number) => (
+                  <div key={cp._id} style={{
+                    padding: '1rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    background: '#f9fafb',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.borderColor = '#ef4444'}
+                  onMouseOut={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                  onClick={() => handleDeletePackage(cp._id)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{
+                        width: '1.5rem',
+                        height: '1.5rem',
+                        borderRadius: '50%',
+                        border: '2px solid #ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#fef2f2'
+                      }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#ef4444' }}>
+                          <path d="M3 6h18"/>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>
+                          {cp.plan_name || cp.name || 'N/A'}
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>
+                          {cp.description || 'Không có mô tả'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowPackageSelectModal(false);
+                  setSelectedAssignment(null);
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 500
+                }}
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
