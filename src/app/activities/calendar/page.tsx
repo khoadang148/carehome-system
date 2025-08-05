@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 // Mock activities data
 const activitiesData = [
@@ -66,8 +67,8 @@ export default function ActivityCalendarPage() {
   const [activities, setActivities] = useState(activitiesData);
   
   useEffect(() => {
-    // Load activities from localStorage
-    const savedActivities = localStorage.getItem('nurseryHomeActivities');
+    // Load activities from clientStorage
+    const savedActivities = clientStorage.getItem('nurseryHomeActivities');
     if (savedActivities) {
       setActivities(JSON.parse(savedActivities));
     }

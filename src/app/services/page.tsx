@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { clientStorage } from '@/lib/utils/clientStorage';
 import { 
   BuildingLibraryIcon,
   DocumentPlusIcon,
@@ -297,7 +298,7 @@ export default function ServicesPage() {
 
   const loadPendingPackages = () => {
     try {
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
         const pending = residents
@@ -354,7 +355,7 @@ export default function ServicesPage() {
   // Handle approve/reject service packages
   const handleApprovePackage = (registrationId: string) => {
     try {
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
         const updatedResidents = (residents as any[]).map((r: any) => {
@@ -372,7 +373,7 @@ export default function ServicesPage() {
           return r;
         });
         
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+        clientStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
         loadPendingPackages(); // Reload pending packages
         alert('✅ Đã duyệt gói dịch vụ thành công!');
       }
@@ -384,7 +385,7 @@ export default function ServicesPage() {
 
   const handleRejectPackage = (registrationId: string) => {
     try {
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
         const updatedResidents = (residents as any[]).map((r: any) => {
@@ -403,7 +404,7 @@ export default function ServicesPage() {
           return r;
         });
         
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
+        clientStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
         loadPendingPackages(); // Reload pending packages
         alert('❌ Đã từ chối gói dịch vụ!');
       }
@@ -485,8 +486,8 @@ export default function ServicesPage() {
         return [];
       }
       
-      // Fallback to localStorage for other roles
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      // Fallback to Storage for other roles
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
         const residentsWithPackages = residents.filter((r: any) => r.carePackage);

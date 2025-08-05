@@ -11,6 +11,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format, parse, parseISO } from 'date-fns';
 import ConfirmModal from '@/components/shared/ConfirmModal';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 export default function PurchaseServicePage({ params }: { params: Promise<{ packageId: string }> }) {
   const router = useRouter();
@@ -546,9 +547,9 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
         id: Date.now()
       };
       
-      const existingHistory = JSON.parse(localStorage.getItem('registrationHistory') || '[]');
+      const existingHistory = JSON.parse(clientStorage.getItem('registrationHistory') || '[]');
       const updatedHistory = [historyItem, ...existingHistory.slice(0, 9)]; // Giữ 10 đăng ký gần nhất
-      localStorage.setItem('registrationHistory', JSON.stringify(updatedHistory));
+      clientStorage.setItem('registrationHistory', JSON.stringify(updatedHistory));
       console.log('✅ Đã lưu vào lịch sử đăng ký');
     } catch (error) {
       console.log('Không thể lưu lịch sử:', error);
@@ -567,9 +568,9 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     };
     
     try {
-      const existingRatings = JSON.parse(localStorage.getItem('serviceRatings') || '[]');
+      const existingRatings = JSON.parse(clientStorage.getItem('serviceRatings') || '[]');
       existingRatings.push(ratingData);
-      localStorage.setItem('serviceRatings', JSON.stringify(existingRatings));
+      clientStorage.setItem('serviceRatings', JSON.stringify(existingRatings));
       alert(`⭐ Cảm ơn bạn đã đánh giá ${rating}/5 sao cho dịch vụ của chúng tôi!`);
     } catch (error) {
       console.log('Không thể lưu đánh giá:', error);

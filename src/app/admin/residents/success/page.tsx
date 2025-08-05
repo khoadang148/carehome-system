@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { clientStorage } from '@/lib/utils/clientStorage';
 import { 
   CheckCircleIcon, 
   UserIcon, 
@@ -33,7 +34,7 @@ export default function ResidentSuccessPage() {
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
 
   useEffect(() => {
-    // Lấy thông tin từ URL params hoặc localStorage
+    // Lấy thông tin từ URL params
     const residentName = searchParams.get('residentName');
     const username = searchParams.get('username');
     const password = searchParams.get('password');
@@ -66,12 +67,12 @@ export default function ResidentSuccessPage() {
           role
         });
       } else {
-        // Nếu không có params, thử lấy từ localStorage
-        const storedInfo = localStorage.getItem('newResidentAccount');
+        // Nếu không có param
+        const storedInfo = clientStorage.getItem('newResidentAccount');
         if (storedInfo) {
           setAccountInfo(JSON.parse(storedInfo));
-          // Xóa thông tin khỏi localStorage sau khi lấy
-          localStorage.removeItem('newResidentAccount');
+          
+          clientStorage.removeItem('newResidentAccount');
         } else {
           // Nếu không có thông tin, chuyển về trang residents
           router.push('/admin/residents');

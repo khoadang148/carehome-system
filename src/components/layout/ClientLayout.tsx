@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import SessionTimeoutModal from "@/components/SessionTimeoutModal";
 
@@ -13,8 +13,10 @@ interface ClientLayoutProps {
 }
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, isLoggingOut } = useAuth();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  
   const isLoginPage = pathname === "/login";
   const isPaymentSpecialPage = ["/payment/cancel", "/payment/success"].includes(pathname);
   
@@ -24,6 +26,32 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   // Hiển thị header cho tất cả các trang trừ một số trang đặc biệt
   const shouldShowHeader = pathname !== "/setup";
   const shouldShowSidebar = true;
+  
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Show loading state until mounted or during logout
+  if (!mounted || isLoggingOut) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          color: 'white',
+          fontSize: '1.125rem',
+          fontWeight: 500
+        }}>
+          {isLoggingOut ? 'Đang đăng xuất...' : 'Đang tải...'}
+        </div>
+      </div>
+    );
+  }
   
   
   // For login page, or when user is not authenticated (and not loading)

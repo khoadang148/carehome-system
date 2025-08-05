@@ -12,17 +12,23 @@ import {
   CalendarIcon,
   TrashIcon,
   UsersIcon,
-  CheckCircleIcon,
+
   XMarkIcon,
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import RoleDashboard from '@/components/RoleDashboard';
 import StaffDashboardWidgets from '@/components/staff/StaffDashboardWidgets';
+import { clientStorage } from '@/lib/utils/clientStorage';
+import SuccessModal from '@/components/SuccessModal';
 
 export default function StaffDashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined);
 
   // Chỉ cho phép staff truy cập
   useEffect(() => {
@@ -30,6 +36,16 @@ export default function StaffDashboardPage() {
       router.replace('/');
     }
   }, [user, loading, router]);
+
+  // Load success message khi đăng nhập thành công
+  useEffect(() => {
+    const msg = clientStorage.getItem('login_success');
+    if (msg) {
+      setSuccessMessage(msg);
+      setShowSuccessModal(true);
+      clientStorage.removeItem('login_success');
+    }
+  }, []);
 
   if (loading || !user) {
     return (
@@ -49,6 +65,13 @@ export default function StaffDashboardPage() {
         <StaffDashboardWidgets />
         <RoleDashboard />
       </div>
+
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        name={user?.name}
+      />
     </div>
   );
 } 

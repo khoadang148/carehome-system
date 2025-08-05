@@ -37,6 +37,17 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,
+    // Tối ưu hóa performance
+    optimizePackageImports: ['@mui/material', '@mui/icons-material', 'axios'],
+    // Tối ưu hóa bundle
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
   },
   
   // Tối ưu hóa performance

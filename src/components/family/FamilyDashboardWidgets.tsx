@@ -7,6 +7,7 @@ import {
   DocumentTextIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 interface FamilyMember {
   name: string;
@@ -58,8 +59,8 @@ export default function FamilyDashboardWidgets() {
 
   const loadFamilyData = () => {
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const currentUser = JSON.parse(clientStorage.getItem('currentUser') || '{}');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       
       if (!savedResidents) return;
 

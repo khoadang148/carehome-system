@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" className="h-full">
+    <html lang="vi" className="h-full" suppressHydrationWarning>
       <body
         className={inter.className}
         style={{
@@ -28,6 +28,7 @@ export default function RootLayout({
           display: "flex",
           flexDirection: "column",
         }}
+        suppressHydrationWarning
       >
         <AuthProvider>
           <ResidentsProvider>

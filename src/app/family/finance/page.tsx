@@ -82,7 +82,7 @@ export default function FinancePage() {
           return {
             id: resident._id,
             residentName: resident.full_name || resident.fullName || resident.name,
-            avatar: resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : '',
+            avatar: resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : '/default-avatar.svg',
             relationship: resident.relationship || resident.emergency_contact?.relationship || resident.emergencyContact?.relationship || 'Chưa rõ',
             payments,
             totalPaid: payments.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
@@ -273,7 +273,7 @@ export default function FinancePage() {
                 options={familyFinancialData.map((r, idx) => ({
                   value: idx,
                   label: r.residentName || 'Chưa rõ',
-                  avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '',
+                  avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '/default-avatar.svg',
                   roomNumber: r.room || 'Chưa cập nhật',
                   relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
                 }))}
@@ -282,7 +282,7 @@ export default function FinancePage() {
                                   return r ? {
                   value: selectedResident,
                   label: r.residentName || 'Chưa rõ',
-                  avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '',
+                  avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '/default-avatar.svg',
                   roomNumber: r.room || 'Chưa cập nhật',
                   relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
                 } : null;
@@ -830,28 +830,14 @@ interface ResidentOption {
 
 const formatOptionLabel = (option: ResidentOption) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-    {option.avatar && option.avatar.trim() !== '' ? (
-      <img
-        src={option.avatar}
-        alt={option.label}
-        style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', background: '#f3f4f6' }}
-      />
-    ) : (
-      <div style={{ 
-        width: 48, 
-        height: 48, 
-        borderRadius: '50%', 
-        background: '#f3f4f6',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#9ca3af',
-        fontWeight: 600,
-        fontSize: '1.125rem'
-      }}>
-        {option.label.charAt(0).toUpperCase()}
-      </div>
-    )}
+    <img
+      src={option.avatar && option.avatar.trim() !== '' ? option.avatar : '/default-avatar.svg'}
+      alt={option.label}
+      style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', background: '#f3f4f6' }}
+      onError={(e) => {
+        e.currentTarget.src = '/default-avatar.svg';
+      }}
+    />
     <div>
       <div style={{ fontWeight: 700, fontSize: 20 }}>{option.label}</div>
     </div>

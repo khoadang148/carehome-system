@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import { staffAPI } from "@/lib/api";
 import { residentAPI } from "@/lib/api";
 import { userAPI, photosAPI } from "@/lib/api";
+import { clientStorage } from "@/lib/utils/clientStorage";
 
 export default function FamilyPhotosPage() {
   const router = useRouter();
@@ -21,13 +22,24 @@ export default function FamilyPhotosPage() {
 
 
 
+
+
   useEffect(() => {
+    staffAPI.getAll().then(data => {
+      setStaffList(Array.isArray(data) ? data : []);
+    }).catch(() => setStaffList([]));
+  }, []);
+
+  // Load photos sau khi staffList đã được load
+  useEffect(() => {
+    if (!user) return;
+    
     if (!user) {
       setLoading(false);
       setError("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
       return;
     }
-    const accessToken = localStorage.getItem("access_token");
+    const accessToken = clientStorage.getItem("access_token");
     if (!accessToken) {
       setLoading(false);
       setError("Không tìm thấy access token. Vui lòng đăng nhập lại.");
@@ -35,31 +47,34 @@ export default function FamilyPhotosPage() {
     }
     setLoading(true);
     setError(null);
-    const familyId = user.id;
-    photosAPI.getAll({ family_member_id: familyId })
-      .then(async data => {
-        const mapped = await Promise.all(Array.isArray(data) ? data.map(async item => {
+    
+    // Sử dụng API helper để lấy tất cả photos của family member
+    photosAPI.getAll({ family_member_id: user.id })
+      .then(async (allPhotosData) => {
+        
+        // Map photos data
+        const mapped = await Promise.all(allPhotosData.map(async item => {
           let senderName = item.uploadedByName;
           let senderPosition = '';
           
           if (item.uploaded_by) {
             if (typeof item.uploaded_by === 'object' && item.uploaded_by.full_name) {
-            senderName = item.uploaded_by.full_name;
-            senderPosition = item.uploaded_by.position || '';
+              senderName = item.uploaded_by.full_name;
+              senderPosition = item.uploaded_by.position || '';
             } else if (typeof item.uploaded_by === 'string' && item.uploaded_by.length === 24) {
-            try {
-              const userInfo = await userAPI.getById(item.uploaded_by);
-              if (userInfo && userInfo.full_name) {
-                senderName = userInfo.full_name;
-                senderPosition = userInfo.position || '';
-              }
-            } catch (e) { 
+              try {
+                const userInfo = await userAPI.getById(item.uploaded_by);
+                if (userInfo && userInfo.full_name) {
+                  senderName = userInfo.full_name;
+                  senderPosition = userInfo.position || '';
+                }
+              } catch (e) { 
                 console.log('Error fetching user info:', e);
               }
             }
           }
           
-          if (!senderName && item.uploadedBy && staffList.length > 0) {
+          if (!senderName && item.uploadedBy) {
             const staff = staffList.find(s => String(s._id) === String(item.uploadedBy));
             senderName = staff ? (staff.fullName || staff.name || staff.username || staff.email) : undefined;
             senderPosition = staff ? (staff.position || '') : '';
@@ -76,24 +91,23 @@ export default function FamilyPhotosPage() {
               : (item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : ""),
             uploadedByName: senderName,
             uploadedByPosition: senderPosition,
-            residentId: item.resident_id,
+            residentId: typeof item.resident_id === 'object' ? item.resident_id._id : item.resident_id,
           };
           return result;
-        }) : []);
+        }));
+        
         setAllPhotos(mapped);
+        if (mapped.length === 0) {
+          setError("Chưa có ảnh nào được chia sẻ cho người thân của bạn.");
+        }
         setLoading(false);
       })
       .catch(err => {
-        setError(err.message || "Lỗi không xác định");
+        console.error('Error fetching photos:', err);
+        setError("Không thể tải danh sách ảnh. Có thể bạn không có quyền xem hoặc chưa có ảnh nào được chia sẻ.");
         setLoading(false);
       });
   }, [user, staffList]);
-
-  useEffect(() => {
-    staffAPI.getAll().then(data => {
-      setStaffList(Array.isArray(data) ? data : []);
-    }).catch(() => setStaffList([]));
-  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -114,7 +128,9 @@ export default function FamilyPhotosPage() {
         photo.caption.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (photo.uploadedBy && photo.uploadedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
         photo.date.includes(searchTerm);
-      const matchResident = selectedResidentId === 'all' || String(photo.residentId) === String(selectedResidentId) || String(photo.resident_id) === String(selectedResidentId);
+      const matchResident =
+        selectedResidentId === 'all' ||
+        String(photo.residentId) === String(selectedResidentId);
       return matchSearch && matchResident;
     }),
     [allPhotos, searchTerm, selectedResidentId]
@@ -147,7 +163,7 @@ export default function FamilyPhotosPage() {
 
   const downloadPhoto = async (url: string, name: string) => {
     try {
-      const accessToken = localStorage.getItem("access_token");
+      const accessToken = clientStorage.getItem("access_token");
       const response = await fetch(url, {
         headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
       });

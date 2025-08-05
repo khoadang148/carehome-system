@@ -8,6 +8,7 @@ import {
   UserIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 
 interface Resident {
@@ -31,7 +32,7 @@ export default function StaffOverviewPanel() {
 
   const loadResidents = () => {
     try {
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residentsData = JSON.parse(savedResidents);
         setResidents(residentsData.map((r: any) => ({
@@ -408,10 +409,10 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
 
     setIsSubmitting(true);
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(clientStorage.getItem('currentUser') || '{}');
       const staffName = currentUser.name || 'Nhân viên';
       
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
       const residentIndex = residents.findIndex((r: any) => r.id === residentId);
@@ -444,7 +445,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
         };
         
         residents[residentIndex].careNotes.unshift(newNote);
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
+        clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
       }
       
       // Thông báo kết quả chi tiết

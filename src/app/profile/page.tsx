@@ -5,7 +5,6 @@ import {
   UserCircleIcon,
   PhoneIcon,
   EnvelopeIcon,
-  MapPinIcon,
   CalendarIcon,
   BriefcaseIcon,
   ArrowLeftIcon,
@@ -18,49 +17,22 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { residentAPI, userAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
+import { residentAPI, userAPI, carePlanAssignmentsAPI, roomsAPI } from '@/lib/api';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 
 // Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return undefined;
-  
-  // If it's already a full URL, return as is
   if (avatarPath.startsWith('http')) return avatarPath;
-  
-  // If it's a base64 data URL, return as is
   if (avatarPath.startsWith('data:')) return avatarPath;
-  
-  // Convert relative path to full URL
   return userAPI.getAvatarUrl(avatarPath);
 };
-
-// Family members data (matching family page)
-const familyMembers = [
-  { 
-    id: 1, 
-    name: 'Nguyễn Văn Nam', 
-    room: 'A01', 
-    age: 78,
-    relationship: 'Cha',
-    status: 'Ổn định'
-  },
-  { 
-    id: 2, 
-    name: 'Lê Thị Hoa', 
-    room: 'A02', 
-    age: 75,
-    relationship: 'Mẹ',
-    status: 'Khá'
-  }
-];
-
-
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useAuth();
-  // --- Thay familyMembers thành residents động từ API ---
+  
+  // State management
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -73,38 +45,20 @@ export default function ProfilePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
   const [roomLoading, setRoomLoading] = useState(false);
-  
-  // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Static profile data
-  // const profileData = { ... } // Xoá hoặc comment dòng này
   const [userData, setUserData] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState('');
 
-  useEffect(() => {
-    if (user) {
-      setProfileLoading(true);
-      userAPI.getAuthProfile()
-        .then(data => {
-          setUserData(data);
-          setProfileError('');
-          if (data.avatar) setAvatarImage(data.avatar);
-        })
-        .catch(() => setProfileError('Không lấy được thông tin tài khoản'))
-        .finally(() => setProfileLoading(false));
-    }
-  }, [user]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // File validation
+  // File validation
   const validateFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB (giảm xuống để phù hợp với backend)
+    const maxSize = 5 * 1024 * 1024; // 5MB
 
     if (!allowedTypes.includes(file.type)) {
       return 'Chỉ hỗ trợ file ảnh định dạng JPG, PNG, WEBP';
@@ -117,7 +71,7 @@ export default function ProfilePage() {
     return null;
   };
 
-    // Handle file selection
+  // Handle file selection
   const handleFileSelect = (file: File) => {
     const error = validateFile(file);
     if (error) {
@@ -128,11 +82,9 @@ export default function ProfilePage() {
     setUploadError(null);
     setSelectedFile(file);
     
-    // Create preview URL
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
-      console.log('Image loaded:', result?.substring(0, 50) + '...');
       setPreviewUrl(result);
     };
     reader.readAsDataURL(file);
@@ -187,45 +139,26 @@ export default function ProfilePage() {
     
     if (selectedFile && user?.id) {
       try {
-        // Tạo FormData để gửi file
         const formData = new FormData();
         formData.append('avatar', selectedFile, selectedFile.name);
         
-        // Debug: Kiểm tra FormData
-        console.log('Selected file:', selectedFile);
-        console.log('File name:', selectedFile.name);
-        console.log('File type:', selectedFile.type);
-        console.log('File size:', selectedFile.size);
-        console.log('FormData entries:');
-        for (let [key, value] of formData.entries()) {
-          console.log(key, value);
-        }
-        
-        // Gọi API upload avatar với FormData
         const response = await userAPI.updateAvatar(user.id, formData);
-        console.log('Avatar upload response:', response);
         
-        // Cập nhật avatar image với đường dẫn mới từ response
         if (response.avatar) {
           setAvatarImage(response.avatar);
         }
         
-        // Cập nhật userData nếu có
         if (userData) {
           setUserData((prev: any) => ({ ...prev, avatar: response.avatar }));
         }
         
-        // Hoàn thành progress
         setUploadProgress(100);
-        
-        // Hiển thị thông báo thành công
         setSuccessMessage('✅ Cập nhật ảnh đại diện thành công!');
         setShowSuccessModal(true);
       } catch (err: any) {
         console.error('Avatar upload error:', err);
         let errorMessage = 'Lỗi khi cập nhật ảnh đại diện.';
         
-        // Xử lý các loại lỗi cụ thể
         if (err.response?.status === 403) {
           errorMessage = 'Tài khoản của bạn không có quyền thay đổi ảnh đại diện. Vui lòng liên hệ quản trị viên.';
         } else if (err.response?.status === 400) {
@@ -247,8 +180,6 @@ export default function ProfilePage() {
     setIsUploading(false);
     setShowUploadModal(false);
     resetUploadState();
-    
-    console.log('Avatar uploaded successfully:', selectedFile?.name);
   };
 
   // Reset upload state
@@ -274,14 +205,41 @@ export default function ProfilePage() {
     resetUploadState();
   };
 
-  // Lấy residents động theo user.id nếu là family
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth: string) => {
+    const dob = new Date(dateOfBirth);
+    if (isNaN(dob.getTime())) return '-- tuổi';
+    
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age + ' tuổi';
+  };
+
+  // Fetch user profile data
+  useEffect(() => {
+    if (user) {
+      setProfileLoading(true);
+      userAPI.getAuthProfile()
+        .then(data => {
+          setUserData(data);
+          setProfileError('');
+          if (data.avatar) setAvatarImage(data.avatar);
+        })
+        .catch(() => setProfileError('Không lấy được thông tin tài khoản'))
+        .finally(() => setProfileLoading(false));
+    }
+  }, [user]);
+
+  // Fetch residents for family members
   useEffect(() => {
     if (user?.role === 'family' && user?.id) {
       setLoading(true);
-      console.log('Profile - Fetching residents for family member:', user.id);
       residentAPI.getByFamilyMemberId(user.id)
         .then((data) => {
-          console.log('Profile - Residents data:', data);
           const arr = Array.isArray(data) ? data : [data];
           setResidents(arr);
           setSelectedResidentId(arr.length > 0 ? arr[0]._id : "");
@@ -296,199 +254,93 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  // Lấy resident đang chọn
+  // Get selected resident
   const selectedResident = residents.find(r => r._id === selectedResidentId);
 
+  // Fetch room information for selected resident
   useEffect(() => {
     if (!selectedResidentId) {
       setRoomNumber('Chưa cập nhật');
       return;
     }
+    
     setRoomLoading(true);
-    // Đảm bảo selectedResidentId là string
     const residentId = typeof selectedResidentId === 'object' && (selectedResidentId as any)?._id 
       ? (selectedResidentId as any)._id 
       : selectedResidentId;
     
-    console.log('Profile - Fetching room for residentId:', residentId);
-    
     carePlanAssignmentsAPI.getByResidentId(residentId)
       .then((assignments: any[]) => {
-        console.log('Profile - Care plan assignments:', assignments);
-        // Tìm assignment có assigned_room_id
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
         const roomId = assignment?.assigned_room_id;
-        console.log('Profile - Found assignment:', assignment);
-        console.log('Profile - Room ID:', roomId);
-        
-        // Đảm bảo roomId là string, không phải object
         const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-        console.log('Profile - Room ID string:', roomIdString);
         
         if (roomIdString) {
           return roomsAPI.getById(roomIdString)
             .then((room: any) => {
-              console.log('Profile - Room data:', room);
               setRoomNumber(room?.room_number || 'Chưa cập nhật');
             })
-            .catch((error) => {
-              console.error('Profile - Error fetching room:', error);
+            .catch(() => {
               setRoomNumber('Chưa cập nhật');
             });
         } else {
           setRoomNumber('Chưa cập nhật');
         }
       })
-      .catch((error) => {
-        console.error('Profile - Error fetching care plans:', error);
+      .catch(() => {
         setRoomNumber('Chưa cập nhật');
       })
       .finally(() => setRoomLoading(false));
   }, [selectedResidentId]);
 
-
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#f8fafc',
-      padding: '1.5rem 1rem'
-    }}>
-      <div style={{
-        maxWidth: '800px',
-        margin: '0 auto'
-      }}>
-       <button
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Back Button */}
+        <button
           onClick={() => router.push('/')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            background: 'white',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            marginBottom: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-          }}
+          className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer mb-6 shadow-sm hover:bg-gray-50 transition-colors"
         >
-          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          <ArrowLeftIcon className="w-4 h-4" />
           Quay lại
         </button>
 
-        <div style={{
-  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-  borderRadius: '1.5rem',
-  padding: '2rem',
-  marginBottom: '2rem',
-  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-  border: '1px solid rgba(255, 255, 255, 0.2)',
-  backdropFilter: 'blur(10px)'
-}}>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-  <div style={{
-      width: '3rem',
-      height: '3rem',
-      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-      borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-      justifyContent: 'center',
-      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
-  }}>
-      <UserIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
-    </div>
-    <div>
-      <h1 style={{
-        fontSize: '1.8rem',
-        fontWeight: '800',
-        color: '#4f46e5',
-        margin: '0',
-        letterSpacing: '-0.025em',
-        lineHeight: '1.2'
-      }}>
-        Hồ sơ cá nhân
-      </h1>
-      <p style={{
-        fontSize: '0.9rem',
-        color: '#64748b',
-        margin: '0.75rem 0 0 0',
-        fontWeight: '500',
-        letterSpacing: '0.01em'
-      }}>
-        Thông tin tài khoản và cài đặt cá nhân
-      </p>
-    </div>
-  </div>
-</div>
+        {/* Header */}
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
+          <div className="flex items-center gap-4 mb-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+              <UserIcon className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-indigo-600 leading-tight">
+                Hồ sơ cá nhân
+              </h1>
+              <p className="text-gray-600 mt-3 font-medium">
+                Thông tin tài khoản và cài đặt cá nhân
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Profile Card */}
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e5e7eb'
-        }}>
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
           {/* Avatar & Basic Info */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1.5rem',
-            marginBottom: '2rem',
-            flexWrap: 'wrap'
-          }}>
-            <div style={{
-              position: 'relative',
-              flexShrink: 0
-          }}>
-                          <div style={{
-                width: '5rem',
-                height: '5rem',
-                borderRadius: '1rem',
-                backgroundImage: !avatarImage ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : undefined,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '1.5rem',
-                fontWeight: 700,
-                border: avatarImage ? '2px solid #e5e7eb' : 'none',
-                overflow: 'hidden',
-                position: 'relative'
-              }}>
+          <div className="flex items-center gap-6 mb-8 flex-wrap">
+            <div className="relative flex-shrink-0">
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold border-2 overflow-hidden relative ${
+                !avatarImage ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white' : 'border-gray-200'
+              }`}>
                 {avatarImage && getAvatarUrl(avatarImage) ? (
                   <img 
                     src={getAvatarUrl(avatarImage)!}
                     alt="Avatar"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center',
-                      borderRadius: '1rem'
-                    }}
+                    className="w-full h-full object-cover"
                   />
                 ) : (
                   userData?.full_name?.substring(0, 2).toUpperCase() || 'ND'
                 )}
                 {isUploading && (
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '1rem',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    zIndex: 10
-                  }}>
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-2xl text-white text-xs font-medium z-10">
                     Đang tải...
                   </div>
                 )}
@@ -498,488 +350,220 @@ export default function ProfilePage() {
               <button
                 onClick={openUploadModal}
                 disabled={isUploading}
-                style={{
-                  position: 'absolute',
-                  bottom: '-0.25rem',
-                  right: '-0.25rem',
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  background: '#6366f1',
-                  border: '3px solid white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: isUploading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
-                  transition: 'all 0.2s',
-                  opacity: isUploading ? 0.6 : 1
-                }}
-                onMouseOver={(e) => !isUploading && (e.currentTarget.style.transform = 'scale(1.1)')}
-                onMouseOut={(e) => !isUploading && (e.currentTarget.style.transform = 'scale(1)')}
+                className={`absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-indigo-500 border-3 border-white flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110 ${
+                  isUploading ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
                 title="Thay đổi ảnh đại diện"
               >
-                <CameraIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                <CameraIcon className="w-5 h-5 text-white" />
               </button>
-              </div>
-              
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 600,
-                color: '#111827',
-                margin: '0'
-              }}>
+            </div>
+            
+            <div className="flex-1 min-w-[200px]">
+              <h2 className="text-xl font-semibold text-gray-900">
                 {userData?.full_name || ''}
               </h2>
             </div>
           </div>
 
-          {/* Nếu là admin chỉ hiển thị 4 trường */}
+          {/* Admin Profile */}
           {userData?.role === 'admin' ? (
-            <div style={{
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr', 
-              gap: '1.25rem', 
-              maxWidth: 600,
-              margin: '0 auto'
-            }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl mx-auto">
               <div>
-                <label style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '0.25rem',
-                  display: 'block'
-                }}>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                   Họ tên
                 </label>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827',
-                  fontWeight: 600
-                }}>
-                  <UserIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                <div className="flex items-center gap-2 text-sm text-gray-900 font-semibold">
+                  <UserIcon className="w-3 h-3 text-gray-400" />
                   {userData.full_name}
                 </div>
               </div>
               <div>
-                <label style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '0.25rem',
-                  display: 'block'
-                }}>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                   Email
                 </label>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827',
-                  fontWeight: 600
-                }}>
-                  <EnvelopeIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                <div className="flex items-center gap-2 text-sm text-gray-900 font-semibold">
+                  <EnvelopeIcon className="w-3 h-3 text-gray-400" />
                   {userData.email}
                 </div>
               </div>
               <div>
-                <label style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '0.25rem',
-                  display: 'block'
-                }}>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                   Số điện thoại
                 </label>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827',
-                  fontWeight: 600
-                }}>
-                  <PhoneIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                <div className="flex items-center gap-2 text-sm text-gray-900 font-semibold">
+                  <PhoneIcon className="w-3 h-3 text-gray-400" />
                   {userData.phone}
                 </div>
               </div>
               <div>
-                <label style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '0.25rem',
-                  display: 'block'
-                }}>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                   Username
                 </label>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#111827',
-                  fontWeight: 600
-                }}>
-                  <UserCircleIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                <div className="flex items-center gap-2 text-sm text-gray-900 font-semibold">
+                  <UserCircleIcon className="w-3 h-3 text-gray-400" />
                   {userData.username}
                 </div>
               </div>
             </div>
           ) : (
-            
-            <>
-          {/* Information Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '1.5rem'
-          }}>
-            {/* Contact Info */}
-            <div>
-            <h3 style={{
-                fontSize: '1rem',
-              fontWeight: 600,
-                color: '#374151',
-                margin: '0 0 1rem 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-                <EnvelopeIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
-              Thông tin liên hệ
-            </h3>
-
-              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Contact Info */}
               <div>
-                <label style={{
-                    fontSize: '0.75rem',
-                  fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginBottom: '0.25rem',
-                    display: 'block'
-                }}>
-                  Email
-                </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#111827'
-                    }}>
-                      <EnvelopeIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                <h3 className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <EnvelopeIcon className="w-4 h-4 text-indigo-500" />
+                  Thông tin liên hệ
+                </h3>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
+                      Email
+                    </label>
+                                      <div className="flex items-center gap-2 text-sm text-gray-900">
+                    <EnvelopeIcon className="w-3 h-3 text-gray-400" />
                     {userData?.email}
                   </div>
-              </div>
+                  </div>
 
-              <div>
-                <label style={{
-                    fontSize: '0.75rem',
-                  fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginBottom: '0.25rem',
-                    display: 'block'
-                }}>
-                  Số điện thoại
-                </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#111827'
-                    }}>
-                      <PhoneIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
+                      Số điện thoại
+                    </label>
+                                      <div className="flex items-center gap-2 text-sm text-gray-900">
+                    <PhoneIcon className="w-3 h-3 text-gray-400" />
                     {userData?.phone}
                   </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
+                      Địa chỉ
+                    </label>
+                    <div className="flex items-center gap-2 text-sm text-gray-900">
+                      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {userData?.address || 'Chưa cập nhật'}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-
-
-             
-              </div>
-            </div>
-
-            {/* Role-specific Info */}
-            <div>
-              <h3 style={{
-                fontSize: '1rem',
-                fontWeight: 600,
-                color: '#374151',
-                margin: '0 0 1rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                {user && user.role === 'family' ? (
-                  <>
-                    <UserCircleIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
-                    Thông tin người thân
-                  </>
-                ) : (
-                  <>
-                    <BriefcaseIcon style={{width: '1.125rem', height: '1.125rem', color: '#6366f1'}} />
-                    Thông tin công việc
-                  </>
-                )}
-              </h3>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
-                {user && user.role === 'family' ? (
-                  <>
+              {/* Role-specific Info */}
+              <div>
+                <h3 className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  {user?.role === 'family' ? (
+                    <>
+                      <UserCircleIcon className="w-4 h-4 text-indigo-500" />
+                      Thông tin người thân
+                    </>
+                  ) : (
+                    <>
+                      <BriefcaseIcon className="w-4 h-4 text-indigo-500" />
+                      Thông tin công việc
+                    </>
+                  )}
+                </h3>
+                
+                <div className="space-y-3">
+                  {user?.role === 'family' ? (
                     <div>
-                      <label style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem',
-                        display: 'block'
-                      }}>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                         Người thân được chăm sóc
                       </label>
                       {loading ? (
-                        <div>Đang tải thông tin người thân...</div>
+                        <div className="text-sm text-gray-600">Đang tải thông tin người thân...</div>
                       ) : error ? (
-                        <div style={{color: 'red'}}>{error}</div>
+                        <div className="text-sm text-red-600">{error}</div>
                       ) : residents.length > 1 ? (
                         <div>
                           <select
                             value={selectedResidentId}
                             onChange={e => setSelectedResidentId(e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem',
-                              borderRadius: '0.375rem',
-                              border: '1px solid #d1d5db',
-                              fontSize: '0.875rem',
-                              backgroundColor: 'white',
-                              marginBottom: '0.5rem'
-                            }}
+                            className="w-full p-2 rounded-md border border-gray-300 text-sm bg-white mb-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           >
                             {residents.map(member => (
                               <option key={member._id} value={member._id}>
-                                     {member.full_name}
+                                {member.full_name}
                               </option>
                             ))}
                           </select>
                           {selectedResident && (
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: '#6b7280'
-                            }}>
-                              Phòng {roomLoading ? 'Đang tải...' : roomNumber} • {selectedResident.date_of_birth ? (() => {
-                                const dob = new Date(selectedResident.date_of_birth);
-                                if (!isNaN(dob.getTime())) {
-                                  const today = new Date();
-                                  let age = today.getFullYear() - dob.getFullYear();
-                                  const m = today.getMonth() - dob.getMonth();
-                                  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-                                    age--;
-                                  }
-                                  return age + ' tuổi';
-                                }
-                                return '-- tuổi';
-                              })() : '-- tuổi'}
+                            <div className="text-xs text-gray-500">
+                              Phòng {roomLoading ? 'Đang tải...' : roomNumber} • {calculateAge(selectedResident.date_of_birth)}
                             </div>
                           )}
                         </div>
                       ) : residents.length === 1 && selectedResident ? (
                         <div>
-                          <div style={{
-                            fontSize: '0.875rem',
-                            color: '#111827',
-                            fontWeight: 500
-                          }}>
+                          <div className="text-sm text-gray-900 font-medium">
                             {selectedResident.full_name || selectedResident.fullName || 'Chưa được phân công'}
                           </div>
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280',
-                            marginTop: '0.25rem'
-                          }}>
-                            Phòng {roomLoading ? 'Đang tải...' : roomNumber} • {selectedResident.date_of_birth ? (() => {
-                                const dob = new Date(selectedResident.date_of_birth);
-                                if (!isNaN(dob.getTime())) {
-                                  const today = new Date();
-                                  let age = today.getFullYear() - dob.getFullYear();
-                                  const m = today.getMonth() - dob.getMonth();
-                                  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-                                    age--;
-                                  }
-                                  return age + ' tuổi';
-                                }
-                                return '-- tuổi';
-                              })() : '-- tuổi'}
+                          <div className="text-xs text-gray-500 mt-1">
+                            Phòng {roomLoading ? 'Đang tải...' : roomNumber} • {calculateAge(selectedResident.date_of_birth)}
                           </div>
                         </div>
                       ) : (
-                        <div>Không có dữ liệu người thân.</div>
+                        <div className="text-sm text-gray-600">Không có dữ liệu người thân.</div>
                       )}
                     </div>
-                  </>
-                ) : (
-                  // Chỉ hiển thị thông tin công việc cho role khác family
-                  <>
-                    
-
-                    <div>
-                      <label style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem',
-                        display: 'block'
-                      }}>
-                        Chức vụ
-                      </label>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem',
-                        color: '#111827'
-                      }}>
-                        <UserIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                        {userData?.position || 'Chưa cập nhật'}
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
+                          Chức vụ
+                        </label>
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          <UserIcon className="w-3 h-3 text-gray-400" />
+                          {userData?.position || 'Chưa cập nhật'}
+                        </div>
                       </div>
-                    </div>
 
-
-                    <div>
-                      <label style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem',
-                        display: 'block'
-                      }}>
-                        Ngày bắt đầu làm việc
-                      </label>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem',
-                        color: '#111827'
-                      }}>
-                        <CalendarIcon style={{width: '0.875rem', height: '0.875rem', color: '#9ca3af'}} />
-                        {userData?.join_date ? new Date(userData.join_date).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
+                          Ngày bắt đầu làm việc
+                        </label>
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          <CalendarIcon className="w-3 h-3 text-gray-400" />
+                          {userData?.join_date ? new Date(userData.join_date).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <label style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.25rem',
-                        display: 'block'
-                      }}>
-                        Trạng thái
-                      </label>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem',
-                        color: '#111827'
-                      }}>
-                        <div style={{
-                          width: '0.5rem',
-                          height: '0.5rem',
-                          borderRadius: '50%',
-                          backgroundColor: userData?.status === 'active' ? '#10b981' : '#ef4444'
-                        }} />
-                        {userData?.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ việc'}
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
+                          Trạng thái
+                        </label>
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          <div className={`w-2 h-2 rounded-full ${
+                            userData?.status === 'active' ? 'bg-green-500' : 'bg-red-500'
+                          }`} />
+                          {userData?.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ việc'}
+                        </div>
                       </div>
-                    </div>
-
-                   
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-            </>
           )}
         </div>
 
         {/* Upload Modal */}
         {showUploadModal && (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}>
-            <div style={{
-              background: 'white',
-              borderRadius: '1rem',
-              padding: '2rem',
-              maxWidth: '500px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-            }}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-auto shadow-2xl">
               {/* Modal Header */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem'
-              }}>
-                <h3 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: 0
-                }}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">
                   Thay đổi ảnh đại diện
                 </h3>
                 <button
                   onClick={closeUploadModal}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0.5rem',
-                    borderRadius: '0.5rem',
-                    color: '#6b7280'
-                  }}
+                  className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
                 >
-                  <XMarkIcon style={{ width: '1.5rem', height: '1.5rem' }} />
+                  <XMarkIcon className="w-6 h-6" />
                 </button>
               </div>
 
@@ -990,37 +574,20 @@ export default function ProfilePage() {
                   onDragLeave={handleDragOut}
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
-                  style={{
-                    border: `2px dashed ${dragActive ? '#6366f1' : '#d1d5db'}`,
-                    borderRadius: '0.75rem',
-                    padding: '3rem 1.5rem',
-                    textAlign: 'center',
-                    backgroundColor: dragActive ? '#f0f0ff' : '#f9fafb',
-                    transition: 'all 0.2s',
-                    cursor: 'pointer',
-                    marginBottom: '1rem'
-                  }}
+                  className={`border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer mb-4 ${
+                    dragActive 
+                      ? 'border-indigo-500 bg-indigo-50' 
+                      : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                  }`}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <ArrowUpTrayIcon style={{
-                    width: '3rem',
-                    height: '3rem',
-                    color: dragActive ? '#6366f1' : '#9ca3af',
-                    margin: '0 auto 1rem'
-                  }} />
-                  <p style={{
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    margin: '0 0 0.5rem 0'
-                  }}>
+                  <ArrowUpTrayIcon className={`w-12 h-12 mx-auto mb-4 ${
+                    dragActive ? 'text-indigo-500' : 'text-gray-400'
+                  }`} />
+                  <p className="text-base font-medium text-gray-700 mb-2">
                     {dragActive ? 'Thả file ảnh vào đây' : 'Kéo thả ảnh hoặc click để chọn'}
                   </p>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    margin: 0
-                  }}>
+                  <p className="text-sm text-gray-500">
                     Hỗ trợ JPG, PNG, WEBP (tối đa 5MB)
                   </p>
                   
@@ -1029,70 +596,35 @@ export default function ProfilePage() {
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/webp"
                     onChange={handleFileInputChange}
-                    style={{ display: 'none' }}
+                    className="hidden"
                   />
                 </div>
               )}
 
               {/* Preview Area */}
               {previewUrl && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h4 style={{
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    margin: '0 0 1rem 0'
-                  }}>
+                <div className="mb-6">
+                  <h4 className="text-base font-medium text-gray-700 mb-4">
                     Xem trước
                   </h4>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    padding: '1rem',
-                                         backgroundColor: '#f9fafb',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{
-                      width: '4rem',
-                      height: '4rem',
-                      borderRadius: '50%',
-                                           backgroundImage: `url(${previewUrl})`,
-                     backgroundSize: 'cover',
-                     backgroundPosition: 'center center',
-                     backgroundRepeat: 'no-repeat',
-                      border: '2px solid #e5e7eb'
-                    }} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                        color: '#111827',
-                        margin: '0 0 0.25rem 0'
-                      }}>
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div 
+                      className="w-16 h-16 rounded-full border-2 border-gray-200 bg-cover bg-center bg-no-repeat"
+                      style={{ backgroundImage: `url(${previewUrl})` }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 mb-1">
                         {selectedFile?.name}
                       </p>
-                      <p style={{
-                        fontSize: '0.75rem',
-                        color: '#6b7280',
-                        margin: 0
-                      }}>
+                      <p className="text-xs text-gray-500">
                         {selectedFile && (selectedFile.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
                     <button
                       onClick={resetUploadState}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0.5rem',
-                        borderRadius: '0.375rem',
-                        color: '#ef4444'
-                      }}
+                      className="p-2 rounded-md text-red-500 hover:bg-red-50 transition-colors"
                     >
-                      <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                      <XMarkIcon className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1100,18 +632,9 @@ export default function ProfilePage() {
 
               {/* Error Message */}
               {uploadError && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1rem',
-                                     backgroundColor: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '0.5rem',
-                  marginBottom: '1rem'
-                }}>
-                  <ExclamationTriangleIcon style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} />
-                  <span style={{ fontSize: '0.875rem', color: '#dc2626' }}>
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+                  <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
+                  <span className="text-sm text-red-700">
                     {uploadError}
                   </span>
                 </div>
@@ -1119,91 +642,52 @@ export default function ProfilePage() {
 
               {/* Upload Progress */}
               {isUploading && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                <div className="mb-6">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-700">
                       Đang tải lên...
                     </span>
-                    <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                    <span className="text-sm text-gray-700">
                       {uploadProgress}%
                     </span>
                   </div>
-                  <div style={{
-                    width: '100%',
-                    height: '0.5rem',
-                                         backgroundColor: '#e5e7eb',
-                    borderRadius: '0.25rem',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      width: `${uploadProgress}%`,
-                      height: '100%',
-                                             backgroundImage: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-                      transition: 'width 0.3s ease'
-                    }} />
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
                   </div>
                 </div>
               )}
 
               {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: '0.75rem',
-                justifyContent: 'flex-end'
-              }}>
+              <div className="flex gap-3 justify-end">
                 <button
                   onClick={closeUploadModal}
                   disabled={isUploading}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '0.5rem',
-                                       border: '1px solid #d1d5db',
-                   backgroundColor: 'white',
-                   color: '#374151',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    cursor: isUploading ? 'not-allowed' : 'pointer',
-                    opacity: isUploading ? 0.6 : 1
-                  }}
+                  className={`px-6 py-3 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium transition-colors ${
+                    isUploading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'
+                  }`}
                 >
                   Hủy
                 </button>
                 <button
                   onClick={uploadAvatar}
                   disabled={!selectedFile || isUploading}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    backgroundColor: (!selectedFile || isUploading) ? '#9ca3af' : '#6366f1',
-                    color: 'white',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    cursor: (!selectedFile || isUploading) ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
+                  className={`px-6 py-3 rounded-lg border-none text-white text-sm font-medium flex items-center gap-2 transition-colors ${
+                    !selectedFile || isUploading 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-indigo-500 hover:bg-indigo-600'
+                  }`}
                 >
                   {isUploading ? (
                     <>
-                      <div style={{
-                        width: '1rem',
-                        height: '1rem',
-                        border: '2px solid white',
-                        borderTop: '2px solid transparent',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                      }} />
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Đang tải...
                     </>
                   ) : (
                     <>
-                      <CheckIcon style={{ width: '1rem', height: '1rem' }} />
+                      <CheckIcon className="w-4 h-4" />
                       Xác nhận
                     </>
                   )}

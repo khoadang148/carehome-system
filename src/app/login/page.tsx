@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, startTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { LOGIN_REDIRECT_DELAY } from '@/lib/constants/app';
+import { clientStorage, getParsedItem } from '@/lib/utils/clientStorage';
+import { usePageTransition } from '@/lib/utils/pageTransition';
 import { 
   LockClosedIcon, 
   EnvelopeIcon, 
@@ -69,6 +71,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/';
   const { login, user, loading } = useAuth();
+  const { startTransition: startPageTransition } = usePageTransition();
 
   // Preload các trang đích để tăng tốc độ chuyển trang
   useEffect(() => {
@@ -126,11 +129,11 @@ export default function LoginPage() {
     }
   }, [email, password, router, returnUrl]);
 
-  // Khôi phục lỗi và thông báo thành công từ localStorage nếu có
+  // Khôi phục lỗi và thông báo thành công từ  nếu có
   useEffect(() => {
-    const savedError = localStorage.getItem('login_error');
-    const savedSuccess = localStorage.getItem('login_success');
-    const savedAttempts = localStorage.getItem('login_attempts');
+    const savedError = clientStorage.getItem('login_error');
+    const savedSuccess = clientStorage.getItem('login_success');
+    const savedAttempts = clientStorage.getItem('login_attempts');
     
     // Reset redirect flag khi component mount hoặc khi user thay đổi
     setShouldRedirect(false);
@@ -153,7 +156,7 @@ export default function LoginPage() {
       }
     } else if (user) {
       // Nếu user đã đăng nhập, chỉ xóa thông báo lỗi, giữ thông báo thành công
-      localStorage.removeItem('login_error');
+      clientStorage.removeItem('login_error');
       setError('');
       setLoginAttempts(0);
       // Không xóa thông báo thành công để user có thể thấy
@@ -188,22 +191,22 @@ export default function LoginPage() {
     setRandomValues({ quantumParticles, bubbles });
   }, []);
 
-  // Wrapper function để lưu lỗi vào localStorage
+  
   const setErrorWithStorage = (errorMessage: string) => {
     setError(errorMessage);
     setMessageDisplayed(true);
     // Không xóa thông báo thành công ngay lập tức
     if (errorMessage) {
-      localStorage.setItem('login_error', errorMessage);
+      clientStorage.setItem('login_error', errorMessage);
       // Tăng số lần thử đăng nhập sai
       const newAttempts = loginAttempts + 1;
       setLoginAttempts(newAttempts);
-      localStorage.setItem('login_attempts', newAttempts.toString());
+      clientStorage.setItem('login_attempts', newAttempts.toString());
     } else {
-      localStorage.removeItem('login_error');
+      clientStorage.removeItem('login_error');
       // Reset số lần thử khi đăng nhập thành công
       setLoginAttempts(0);
-      localStorage.removeItem('login_attempts');
+      clientStorage.removeItem('login_attempts');
     }
   };
 
@@ -213,9 +216,9 @@ export default function LoginPage() {
     setMessageDisplayed(true);
     // Không xóa lỗi ngay lập tức khi có thông báo thành công
     if (successMessage) {
-      localStorage.setItem('login_success', successMessage);
+      clientStorage.setItem('login_success', successMessage);
     } else {
-      localStorage.removeItem('login_success');
+      clientStorage.removeItem('login_success');
     }
   };
 
@@ -250,9 +253,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     setSessionDebug({
-      access_token: localStorage.getItem('access_token'),
-      user: localStorage.getItem('user'),
-      session_start: localStorage.getItem('session_start'),
+      access_token: clientStorage.getItem('access_token'),
+      user: clientStorage.getItem('user'),
+      session_start: clientStorage.getItem('session_start'),
     });
   }, [user, loading]);
 
@@ -261,12 +264,12 @@ export default function LoginPage() {
     if (!user && !loading) {
       // Chỉ xóa thông báo thành công khi user đã logout thực sự
       // Không xóa khi component mount lần đầu
-      const hasLoggedOut = localStorage.getItem('has_logged_out');
+      const hasLoggedOut = clientStorage.getItem('has_logged_out');
       if (hasLoggedOut) {
-        localStorage.removeItem('login_success');
+        clientStorage.removeItem('login_success');
         setSuccess('');
         setMessageDisplayed(false);
-        localStorage.removeItem('has_logged_out');
+        clientStorage.removeItem('has_logged_out');
       }
     }
   }, [user, loading]);
@@ -275,8 +278,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (messageDisplayed && !error && !success) {
       // Nếu thông báo đã hiển thị nhưng bị mất, khôi phục lại
-      const savedError = localStorage.getItem('login_error');
-      const savedSuccess = localStorage.getItem('login_success');
+      const savedError = clientStorage.getItem('login_error');
+      const savedSuccess = clientStorage.getItem('login_success');
       
       if (savedError) {
         setError(savedError);
@@ -293,7 +296,7 @@ export default function LoginPage() {
     
     // Xóa lỗi khi bắt đầu đăng nhập lại
     setError('');
-    localStorage.removeItem('login_error');
+    clientStorage.removeItem('login_error');
     
     // Validation cơ bản
     if (!email.trim() || !password.trim()) {
@@ -305,9 +308,9 @@ export default function LoginPage() {
     console.log('✅ Starting login process...');
     setIsLoading(true);
 
-    // Tạo timeout promise để tránh chờ quá lâu
+    // Tạo timeout promise để tránh chờ quá lâu (tăng lên 12 giây để phù hợp với retry logic)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 5000);
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 12000);
     });
 
     try {
@@ -321,21 +324,40 @@ export default function LoginPage() {
       if (typedUser) {
         console.log('✅ Login successful - redirecting...');
         setError('');
-        localStorage.removeItem('login_error');
+        clientStorage.removeItem('login_error');
         setUserName(typedUser.name);
-        // Lưu thông báo thành công vào localStorage
-        localStorage.setItem('login_success', `Chào mừng bạn quay lại, ${typedUser.name || 'bạn'}!`);
-        // Chuyển trang ngay lập tức
+        
+        clientStorage.setItem('login_success', `Chào mừng bạn quay lại, ${typedUser.name || 'bạn'}!`);
+        
+        // Show loading state during transition
+        setIsLoading(true);
+        
+        // Chuyển trang ngay lập tức với loading state và monitoring
+        const redirectTo = (url: string) => {
+          // Start page transition monitoring
+          const transitionId = startPageTransition(url, typedUser.role);
+          
+          // Store transition ID for completion tracking
+          sessionStorage.setItem('current_transition_id', transitionId);
+          
+          // Preload trang đích để tăng tốc độ
+          router.prefetch(url);
+          // Sử dụng startTransition để tối ưu hóa việc chuyển trang
+          startTransition(() => {
+            router.push(url);
+          });
+        };
+
         if (typedUser.role === 'family') {
-          router.push('/family');
+          redirectTo('/family');
         } else if (typedUser.role === 'admin') {
-          router.push('/admin');
+          redirectTo('/admin');
         } else if (typedUser.role === 'staff') {
-          router.push('/staff');
+          redirectTo('/staff');
         } else if (returnUrl && returnUrl !== '/login') {
-          router.push(returnUrl);
+          redirectTo(returnUrl);
         } else {
-          router.push('/');
+          redirectTo('/');
         }
       }
       // Không cần else, vì nếu không thành công sẽ vào catch
@@ -344,7 +366,7 @@ export default function LoginPage() {
       setIsLoading(false);
       setShouldRedirect(false);
       setSuccess('');
-      localStorage.removeItem('login_success');
+      clientStorage.removeItem('login_success');
 
       if (err.response?.status === 401) {
         setErrorWithStorage('Email hoặc mật khẩu không đúng');

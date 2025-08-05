@@ -6,7 +6,9 @@ import { useForm } from 'react-hook-form';
 import { 
   ArrowLeftIcon,
   HeartIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  UserIcon,
+  LightBulbIcon
 } from '@heroicons/react/24/outline';
 import { careNotesAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -16,6 +18,7 @@ interface CareNoteData {
   residentId: string;
   residentName: string;
   noteContent: string;
+  recommendations: string;
   priority: string;
   category: string;
   staffName: string;
@@ -23,30 +26,14 @@ interface CareNoteData {
   time: string;
 }
 
-const priorityOptions = [
-  { value: 'Thông tin', label: 'Thông tin' },
-  { value: 'Quan trọng', label: 'Quan trọng' },
-  { value: 'Khẩn cấp', label: 'Khẩn cấp' }
-];
-
-const categoryOptions = [
-  { value: 'Sức khỏe', label: 'Sức khỏe', icon: '🏥' },
-  { value: 'Ăn uống', label: 'Ăn uống', icon: '🍽️' },
-  { value: 'Sinh hoạt', label: 'Sinh hoạt', icon: '🏃‍♂️' },
-  { value: 'Tâm lý', label: 'Tâm lý', icon: '😊' },
-  { value: 'Thuốc men', label: 'Thuốc men', icon: '💊' },
-  { value: 'Gia đình', label: 'Gia đình', icon: '👨‍👩‍👧‍👦' },
-  { value: 'Khác', label: 'Khác', icon: '📝' }
-];
-
 const quickNoteTemplates = [
-  'Ăn uống bình thường, tinh thần tốt',
-  'Tham gia hoạt động nhóm tích cực',
-  'Ngủ đầy đủ, không có vấn đề gì',
-  'Cần theo dõi thêm về tình trạng sức khỏe',
-  'Gia đình đến thăm, người cao tuổi rất vui',
-  'Uống thuốc đầy đủ theo đơn',
-  'Có biểu hiện không thoải mái, cần chú ý'
+  { text: 'Ăn uống bình thường, tinh thần tốt', icon: '😊' },
+  { text: 'Tham gia hoạt động nhóm tích cực', icon: '🎯' },
+  { text: 'Ngủ đầy đủ, không có vấn đề gì', icon: '😴' },
+  { text: 'Cần theo dõi thêm về tình trạng sức khỏe', icon: '👁️' },
+  { text: 'Gia đình đến thăm, người cao tuổi rất vui', icon: '❤️' },
+  { text: 'Uống thuốc đầy đủ theo đơn', icon: '💊' },
+  { text: 'Có biểu hiện không thoải mái, cần chú ý', icon: '⚠️' }
 ];
 
 export default function NewCareNotePage() {
@@ -78,7 +65,8 @@ export default function NewCareNotePage() {
       staffName: 'Nhân viên hiện tại',
       date: new Date().toISOString().split('T')[0],
       time: new Date().toTimeString().slice(0, 5),
-      noteContent: ''
+      noteContent: '',
+      recommendations: ''
     }
   });
 
@@ -92,7 +80,7 @@ export default function NewCareNotePage() {
       const payload = {
         assessment_type: data.category || 'Đánh giá tổng quát',
         notes: data.noteContent,
-        recommendations: '',
+        recommendations: data.recommendations,
         date: dateTimeISO,
         resident_id: String(data.residentId),
         conducted_by: String(user?.id),
@@ -116,214 +104,95 @@ export default function NewCareNotePage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      padding: '2rem'
-    }}>
-      <div style={{
-        maxWidth: '800px',
-        margin: '0 auto'
-      }}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            marginBottom: '1rem'
-          }}>
+        <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 mb-6 shadow-xl border border-white/40">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => router.back()}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '2.5rem',
-                height: '2.5rem',
-                background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.75rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-              }}
+              className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-slate-500 to-slate-600 text-white border-none rounded-2xl cursor-pointer transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 shadow-lg hover:from-slate-600 hover:to-slate-700"
             >
-              <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+              <ArrowLeftIcon className="w-6 h-6" />
             </button>
             
-            <div style={{
-              width: '3.5rem',
-              height: '3.5rem',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              borderRadius: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-            }}>
-              <HeartIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/30">
+              <HeartIcon className="w-7 h-7 text-white" />
             </div>
             
-            <div>
-              <h1 style={{
-                fontSize: '1.875rem',
-                fontWeight: 700,
-                margin: 0,
-                color: '#1e293b',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}>
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 Thêm ghi chú mới
               </h1>
-              <p style={{
-                fontSize: '1rem',
-                color: '#64748b',
-                margin: '0.25rem 0 0 0',
-                fontWeight: 500
-              }}>
-                {searchParams?.get('residentName') || 'Chọn người cao tuổi'}
-              </p>
+              <p className="text-slate-600 mt-1 text-sm">Ghi lại thông tin chăm sóc quan trọng</p>
             </div>
           </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            marginBottom: '2rem'
-          }}>
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-xl border border-white/40 mb-6">
             {/* Basic Info */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '1.5rem',
-              marginBottom: '2rem'
-            }}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-blue-500" />
                   Tên người cao tuổi *
                 </label>
-                <input
-                  {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    backgroundColor: '#f9fafb'
-                  }}
-                  placeholder="Nhập tên người cao tuổi"
-                />
+                                 <input
+                   {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
+                   className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none bg-gray-100/80 cursor-not-allowed transition-all duration-300 shadow-sm"
+                   placeholder="Nhập tên người cao tuổi"
+                   readOnly
+                 />
                 {errors.residentName && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                    <span className="w-1 h-1 bg-red-500 rounded-full"></span>
                     {errors.residentName.message}
                   </p>
                 )}
               </div>
 
-              {/* Thay thế input staffName bằng hiển thị thông tin nhân viên */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-green-500" />
                   Nhân viên ghi chú
                 </label>
-                <div style={{
-                  padding: '0.75rem',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  backgroundColor: '#f9fafb',
-                  color: '#2563eb',
-                  fontWeight: 600
-                }}>
+                <div className="px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 font-semibold shadow-sm">
                   {staffName}
                 </div>
               </div>
             </div>
 
             {/* Quick Templates */}
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{
-                fontSize: '1rem',
-                fontWeight: 600,
-                color: '#1e293b',
-                marginBottom: '1rem'
-              }}>
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <LightBulbIcon className="w-6 h-6 text-amber-500" />
                 Mẫu ghi chú nhanh
               </h3>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '0.5rem'
-              }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {quickNoteTemplates.map((template, index) => (
                   <button
                     key={index}
                     type="button"
-                    onClick={() => insertTemplate(template)}
-                    style={{
-                      padding: '0.5rem 0.75rem',
-                      background: '#f1f5f9',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      color: '#475569',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.2s ease'
-                    }}
+                    onClick={() => insertTemplate(template.text)}
+                    className="p-4 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl text-sm text-slate-700 cursor-pointer text-left transition-all duration-300 hover:from-slate-100 hover:to-slate-200 hover:border-slate-300 hover:shadow-lg hover:scale-105 active:scale-95 group"
                   >
-                    {template}
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl group-hover:scale-110 transition-transform duration-300">
+                        {template.icon}
+                      </span>
+                      <span className="leading-relaxed">{template.text}</span>
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Note Content */}
-            <div style={{ marginBottom: '2rem' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
+            <div className="mb-8">
+              <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <LightBulbIcon className="w-5 h-5 text-blue-500" />
                 Nội dung ghi chú *
               </label>
               <textarea
@@ -332,87 +201,79 @@ export default function NewCareNotePage() {
                   minLength: { value: 10, message: 'Ghi chú phải có ít nhất 10 ký tự' }
                 })}
                 rows={6}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  outline: 'none',
-                  resize: 'vertical'
-                }}
+                className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none resize-y focus:border-blue-500 focus:bg-white transition-all duration-300 shadow-sm hover:shadow-md"
                 placeholder="Nhập chi tiết về tình trạng, hoạt động, và quan sát của người cao tuổi..."
               />
               {errors.noteContent && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-red-500 rounded-full"></span>
                   {errors.noteContent.message}
                 </p>
               )}
-              <p style={{ 
-                fontSize: '0.75rem', 
-                color: '#6b7280', 
-                marginTop: '0.5rem' 
-              }}>
-                {watchedValues.noteContent?.length || 0} ký tự
-              </p>
+              <div className="flex justify-between items-center mt-3">
+                <p className="text-xs text-gray-500">
+                  {watchedValues.noteContent?.length || 0} ký tự
+                </p>
+                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                    style={{ width: `${Math.min((watchedValues.noteContent?.length || 0) / 2, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recommendations */}
+            <div className="mb-8">
+              <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <LightBulbIcon className="w-5 h-5 text-amber-500" />
+                Khuyến nghị
+              </label>
+              <textarea
+                {...register('recommendations')}
+                rows={4}
+                className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none resize-y focus:border-amber-500 focus:bg-white transition-all duration-300 shadow-sm hover:shadow-md"
+                placeholder="Nhập các khuyến nghị, hướng dẫn hoặc kế hoạch chăm sóc tiếp theo..."
+              />
+              <div className="flex justify-between items-center mt-3">
+                <p className="text-xs text-gray-500">
+                  {watchedValues.recommendations?.length || 0} ký tự
+                </p>
+                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-300"
+                    style={{ width: `${Math.min((watchedValues.recommendations?.length || 0) / 2, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
             </div>
 
             {/* Submit Button */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '1rem'
-            }}>
+            <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => router.back()}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
+                className="px-8 py-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white border-none rounded-2xl text-sm font-semibold cursor-pointer transition-all duration-300 hover:from-gray-600 hover:to-gray-700 hover:scale-105 hover:shadow-lg active:scale-95 shadow-md order-2 sm:order-1"
               >
                 Hủy
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1.5rem',
-                  background: isSubmitting 
-                    ? '#9ca3af' 
-                    : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer'
-                }}
+                className={`flex items-center justify-center gap-3 px-8 py-4 text-white border-none rounded-2xl text-sm font-semibold transition-all duration-300 shadow-lg order-1 sm:order-2 ${
+                  isSubmitting 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-600 cursor-pointer hover:from-blue-600 hover:via-purple-600 hover:to-indigo-700 hover:scale-105 hover:shadow-xl active:scale-95'
+                }`}
               >
                 {isSubmitting ? (
                   <>
-                    <div style={{
-                      width: '1rem',
-                      height: '1rem',
-                      border: '2px solid transparent',
-                      borderTop: '2px solid white',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }} />
+                    <div className="w-5 h-5 border-2 border-transparent border-t-white rounded-full animate-spin" />
                     Đang lưu...
                   </>
                 ) : (
                   <>
-                    <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                    <CheckCircleIcon className="w-5 h-5" />
                     Lưu ghi chú
                   </>
                 )}
@@ -423,54 +284,46 @@ export default function NewCareNotePage() {
 
         {/* Success Modal */}
         {showSuccess && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div style={{
-              background: 'white',
-              borderRadius: '1rem',
-              padding: '2rem',
-              maxWidth: '400px',
-              textAlign: 'center'
-            }}>
-              <CheckCircleIcon style={{
-                width: '4rem',
-                height: '4rem',
-                color: '#3b82f6',
-                margin: '0 auto 1rem'
-              }} />
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: 600,
-                color: '#1e293b',
-                marginBottom: '0.5rem'
-              }}>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-md animate-fadeIn">
+            <div className="bg-white rounded-3xl p-8 max-w-md text-center shadow-2xl animate-slideUp border border-white/20">
+              <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <CheckCircleIcon className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-3">
                 Đã lưu ghi chú thành công!
               </h3>
-              <p style={{
-                color: '#64748b',
-                marginBottom: '1rem'
-              }}>
-                Ghi chú đã được thêm vào hồ sơ chăm sóc.
+              <p className="text-slate-600 mb-6 leading-relaxed">
+                Ghi chú đã được thêm vào hồ sơ chăm sóc và sẽ được chuyển hướng về trang danh sách.
               </p>
+              <div className="w-16 h-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full mx-auto"></div>
             </div>
           </div>
         )}
       </div>
 
       <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+          from { 
+            opacity: 0; 
+            transform: translateY(30px) scale(0.95); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.4s ease-out;
+        }
+        
+        .animate-slideUp {
+          animation: slideUp 0.4s ease-out;
         }
       `}</style>
     </div>

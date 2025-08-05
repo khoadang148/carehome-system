@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { XMarkIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 interface CareNotesModalProps {
   residentId: number;
@@ -20,7 +21,7 @@ export default function CareNotesModal({ residentId, residentName, onClose, onCo
     setIsSubmitting(true);
     
     try {
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
         const residentIndex = residents.findIndex((r: any) => r.id === residentId);
@@ -40,7 +41,7 @@ export default function CareNotesModal({ residentId, residentName, onClose, onCo
           };
           
           residents[residentIndex].careNotes.unshift(newNote);
-          localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
+          clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
         }
       }
       

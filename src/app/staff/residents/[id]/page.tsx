@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeftIcon, 
-  PencilIcon,
   UserIcon,
   HeartIcon,
   PhoneIcon,
@@ -25,8 +24,6 @@ import { careNotesAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
-import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
-
 
 export default function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -35,7 +32,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
-  const [carePlans, setCarePlans] = useState<any[]>([]);
   const [vitalSigns, setVitalSigns] = useState<any>(null);
   const [vitalLoading, setVitalLoading] = useState(true);
   const [careNotes, setCareNotes] = useState<any[]>([]);
@@ -115,8 +111,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           setBedNumber('Chưa cập nhật');
         }
         setBedLoading(false);
-        // Fetch care plans (nếu cần cho mục đích khác)
-        setCarePlans([]); // Không dùng carePlans cũ nữa cho phần này
         // Fetch vital signs
         setVitalLoading(true);
         const vitalData = await vitalSignsAPI.getByResidentId(residentId);
@@ -150,30 +144,10 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   // Show loading state while fetching data
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            width: '3rem',
-            height: '3rem',
-            borderRadius: '50%',
-            border: '3px solid #f3f4f6',
-            borderTop: '3px solid #3b82f6',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1rem'
-          }} />
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-8 shadow-lg text-center">
+          <div className="w-12 h-12 rounded-full border-3 border-gray-200 border-t-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-500 m-0">
             Đang tải thông tin người cao tuổi...
           </p>
         </div>
@@ -184,58 +158,20 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   // If resident is not found
   if (!resident) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '3rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center',
-          maxWidth: '400px'
-        }}>
-          <ExclamationCircleIcon style={{
-            width: '3rem',
-            height: '3rem',
-            color: '#f59e0b',
-            margin: '0 auto 1rem'
-          }} />
-          <h2 style={{
-            fontSize: '1.25rem',
-            fontWeight: 600,
-            color: '#1f2937',
-            margin: '0 0 0.5rem 0'
-          }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-12 shadow-lg text-center max-w-md">
+          <ExclamationCircleIcon className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
             Không tìm thấy người cao tuổi
           </h2>
-          <p style={{
-            fontSize: '0.875rem',
-            color: '#6b7280',
-            margin: '0 0 1.5rem 0'
-          }}>
+          <p className="text-sm text-gray-500 mb-6">
             người cao tuổi này có thể đã bị xóa hoặc không tồn tại
           </p>
           <Link
             href="/residents"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              color: 'white',
-              borderRadius: '0.5rem',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500
-            }}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium no-underline"
           >
-            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+            <ArrowLeftIcon className="w-4 h-4" />
             Quay lại danh sách
           </Link>
         </div>
@@ -246,28 +182,17 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   // Helper function to render care level with appropriate color
   const renderCareLevel = (level: string) => {
     const colors = {
-      'Cơ bản': { bg: '#dbeafe', text: '#1d4ed8', border: '#3b82f6' },
-      'Nâng cao': { bg: '#dcfce7', text: '#166534', border: '#10b981' },
-      'Cao cấp': { bg: '#f3e8ff', text: '#7c3aed', border: '#8b5cf6' },
-      'Đặc biệt': { bg: '#fef3c7', text: '#d97706', border: '#f59e0b' }
+      'Cơ bản': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+      'Nâng cao': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
+      'Cao cấp': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
+      'Đặc biệt': { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' }
     };
     
     const color = colors[level as keyof typeof colors] || colors['Cơ bản'];
       
     return (
-      <span style={{
-        display: 'inline-flex', 
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.5rem 1rem', 
-        fontSize: '0.875rem', 
-        fontWeight: 600, 
-        borderRadius: '0.75rem',
-        backgroundColor: color.bg,
-        color: color.text,
-        border: `1px solid ${color.border}20`
-      }}>
-        <ShieldCheckIcon style={{ width: '1rem', height: '1rem' }} />
+      <span className={`inline-flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-xl ${color.bg} ${color.text} border ${color.border}`}>
+        <ShieldCheckIcon className="w-4 h-4" />
         {level}
       </span>
     );
@@ -278,12 +203,12 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     switch (status?.toLowerCase()) {
       case 'active':
       case 'đang chăm sóc':
-        return { bg: '#dcfce7', text: '#166534', icon: CheckCircleIcon };
+        return { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon };
       case 'discharged':
       case 'đã xuất viện':
-        return { bg: '#fef3c7', text: '#d97706', icon: ExclamationCircleIcon };
+        return { bg: 'bg-amber-100', text: 'text-amber-800', icon: ExclamationCircleIcon };
       default:
-        return { bg: '#dbeafe', text: '#1d4ed8', icon: CheckCircleIcon };
+        return { bg: 'bg-blue-100', text: 'text-blue-800', icon: CheckCircleIcon };
     }
   };
 
@@ -298,75 +223,26 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   ];
   
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      padding: '2rem 1rem'
-    }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto'
-      }}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 px-4 py-8">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20">
+          <div className="flex items-center gap-4 mb-6">
             <Link
               href="/staff/residents"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '2.5rem',
-                height: '2.5rem',
-                background: 'rgba(59, 130, 246, 0.1)',
-                borderRadius: '0.75rem',
-                color: '#3b82f6',
-                textDecoration: 'none',
-                transition: 'all 0.2s ease'
-              }}
+              className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-xl text-blue-600 no-underline transition-all duration-200 hover:bg-blue-200"
             >
-              <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-          </Link>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1.5rem',
-                marginBottom: '1rem'
-              }}>
+              <ArrowLeftIcon className="w-5 h-5" />
+            </Link>
+            <div className="flex-1">
+              <div className="flex items-center gap-6 mb-4">
                 {/* Avatar */}
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  border: '3px solid #e5e7eb',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  flexShrink: 0
-                }}>
+                <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-gray-200 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
                   {resident.avatar ? (
                     <img
                       src={userAPI.getAvatarUrl(resident.avatar)}
                       alt={`Avatar của ${resident.name}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const parent = e.currentTarget.parentElement;
@@ -379,7 +255,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     <img
                       src="/default-avatar.svg"
                       alt="Default avatar"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const parent = e.currentTarget.parentElement;
@@ -392,134 +268,67 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 </div>
                 
                 {/* Thông tin cơ bản */}
-                <div style={{ flex: 1 }}>
-                                     <div style={{ marginBottom: '0.5rem' }}>
-                     <span style={{
-                       fontSize: '0.875rem',
-                       fontWeight: 500,
-                       color: '#64748b',
-                       display: 'block',
-                       marginBottom: '0.25rem'
-                     }}>
-                       Tên người cao tuổi:
-                     </span>
-                     <h1 style={{
-                       fontSize: '1.875rem',
-                       fontWeight: 700,
-                       margin: 0,
-                       color: '#1e293b'
-                     }}>
-                       {resident.name}
-                     </h1>
-                   </div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    marginTop: '0.5rem',
-                    flexWrap: 'wrap'
-                  }}>
+                <div className="flex-1">
+                  <div className="mb-2">
+                    <span className="text-sm font-medium text-slate-600 block mb-1">
+                      Tên người cao tuổi:
+                    </span>
+                    <h1 className="text-3xl font-bold m-0 text-slate-800">
+                      {resident.name}
+                    </h1>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 flex-wrap">
                     {/* Tuổi */}
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '1rem',
-                      color: '#64748b',
-                      background: '#f3f4f6',
-                      borderRadius: '0.5rem',
-                      padding: '0.25rem 0.75rem',
-                      fontWeight: 500
-                    }}>
-                      <UserIcon style={{ width: '1rem', height: '1rem' }} />
+                    <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
+                      <UserIcon className="w-4 h-4" />
                       <span>Tuổi:</span>
                       <span>{resident.age} tuổi</span>
                     </span>
                     {/* Phòng */}
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '1rem',
-                      color: '#64748b',
-                      background: '#f3f4f6',
-                      borderRadius: '0.5rem',
-                      padding: '0.25rem 0.75rem',
-                      fontWeight: 500
-                    }}>
-                      <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                    <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
+                      <CalendarIcon className="w-4 h-4" />
                       <span>Phòng:</span>
                       <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
                     </span>
                     {/* Giường */}
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '1rem',
-                      color: '#64748b',
-                      background: '#f3f4f6',
-                      borderRadius: '0.5rem',
-                      padding: '0.25rem 0.75rem',
-                      fontWeight: 500
-                    }}>
-                      <CalendarIcon style={{ width: '1rem', height: '1rem' }} />
+                    <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
+                      <CalendarIcon className="w-4 h-4" />
                       <span>Giường:</span>
                       <span>{bedLoading ? 'Đang tải...' : bedNumber}</span>
                     </span>
                     
                     {/* Trạng thái sức khỏe */}
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                      color: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '#166534' : '#92400e',
-                      border: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? '1px solid #86efac' : '1px solid #fbbf24',
-                      marginLeft: '0.5rem'
-                    }}>
-                      <div style={{width: '0.5rem', height: '0.5rem', background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
+                    <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ml-2 ${
+                      !vitalSigns || vitalSigns?.notes === 'Ổn định' 
+                        ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300' 
+                        : 'bg-gradient-to-r from-amber-100 to-amber-200 text-amber-800 border border-amber-300'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full mr-2 ${
+                        !vitalSigns || vitalSigns?.notes === 'Ổn định' 
+                          ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600'
+                      }`}></div>
                       Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-       
-      </div>
-      
+          </div>
+          
           {/* Tabs Navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem',
-            borderTop: '1px solid #e2e8f0',
-            paddingTop: '1.5rem'
-          }}>
+          <div className="flex gap-2 border-t border-slate-200 pt-6">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  background: activeTab === tab.id ? 
-                    'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' :
-                    'rgba(248, 250, 252, 0.8)',
-                  color: activeTab === tab.id ? 'white' : '#64748b',
-                  border: `1px solid ${activeTab === tab.id ? '#3b82f6' : '#e2e8f0'}`,
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  activeTab === tab.id 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border border-blue-600' 
+                    : 'bg-slate-50/80 text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
               >
-                <tab.icon style={{ width: '1rem', height: '1rem' }} />
+                <tab.icon className="w-4 h-4" />
                 {tab.label}
               </button>
             ))}
@@ -527,163 +336,74 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         </div>
         
         {/* Content */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 shadow-lg border border-white/20">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '1.5rem'
-            }}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Personal Information Card */}
-              <div style={{
-                background: 'rgba(59, 130, 246, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(59, 130, 246, 0.2)'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  marginBottom: '1rem'
-                }}>
-                  <div style={{
-                    width: '2rem',
-                    height: '2rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    borderRadius: '0.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <UserIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
-              </div>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    margin: 0,
-                    color: '#1e293b'
-                  }}>
-                Thông tin cá nhân
-              </h3>
+              <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200/50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <UserIcon className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="text-base font-semibold m-0 text-slate-800">
+                    Thông tin cá nhân
+                  </h3>
                 </div>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div className="grid gap-3">
                   <div>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
+                    <p className="text-xs font-medium text-slate-600 mb-1">
                       Ngày sinh
                     </p>
-                    <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                    <p className="text-sm text-slate-800 m-0 font-medium">
                       {resident.date_of_birth ? formatDateDDMMYYYY(resident.date_of_birth) : 'Chưa cập nhật'}
                     </p>
                   </div>
-                <div>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 mb-1">
                       Giới tính
                     </p>
-                    <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                    <p className="text-sm text-slate-800 m-0 font-medium">
                       {resident.gender === 'male' ? 'Nam' : resident.gender === 'female' ? 'Nữ' : 'Khác'}
                     </p>
-                </div>
-                <div>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
-                    Ngày nhập viện
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 mb-1">
+                      Ngày nhập viện
                     </p>
-                    <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                    <p className="text-sm text-slate-800 m-0 font-medium">
                       {resident.admission_date ? formatDateDDMMYYYY(resident.admission_date) : 'Chưa cập nhật'}
                     </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
               {/* Care Plans Card */}
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  marginBottom: '1rem'
-                }}>
-                  <div style={{
-                    width: '2rem',
-                    height: '2rem',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    borderRadius: '0.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <ShieldCheckIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+              <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                    <ShieldCheckIcon className="w-4 h-4 text-white" />
                   </div>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    margin: 0,
-                    color: '#1e293b'
-                  }}>
+                  <h3 className="text-base font-semibold m-0 text-slate-800">
                     Gói dịch vụ đang sử dụng
                   </h3>
                 </div>
                 {/* Render danh sách gói dịch vụ từ carePlanAssignments */}
                 {carePlanAssignments.length > 0 && carePlanAssignments[0].care_plan_ids && carePlanAssignments[0].care_plan_ids.length > 0 ? (
-                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  <div className="grid gap-3">
                     {carePlanAssignments[0].care_plan_ids.map((plan: any, idx: number) => (
                       <Link
                         key={plan._id || idx}
                         href={`/staff/residents/${residentId}/services/${carePlanAssignments[0]._id}`}
-                        style={{
-                          background: 'rgba(255,255,255,0.8)',
-                          borderRadius: '0.5rem',
-                          padding: '1rem',
-                          border: '1px solid #d1fae5',
-                          marginBottom: '0.5rem',
-                          textDecoration: 'none',
-                          transition: 'all 0.2s ease',
-                          cursor: 'pointer',
-                          display: 'block'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
-                          e.currentTarget.style.borderColor = '#10b981';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
-                          e.currentTarget.style.borderColor = '#d1fae5';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
+                        className="bg-white/80 rounded-lg p-4 border border-green-200 mb-2 no-underline transition-all duration-200 cursor-pointer block hover:bg-white/95 hover:border-green-500 hover:-translate-y-0.5 hover:shadow-md"
                       >
-                        <div style={{ 
-                          fontWeight: 600, 
-                          fontSize: '1rem', 
-                          color: '#059669',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}>
+                        <div className="font-semibold text-base text-green-700 flex items-center justify-between">
                           <span>{plan.plan_name || 'Gói dịch vụ'}</span>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#10b981',
-                            fontWeight: 500
-                          }}>
+                          <span className="text-xs text-green-500 font-medium">
                             Xem chi tiết →
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
+                        <div className="text-sm text-gray-700 mb-2">
                           Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
                         </div>
                       </Link>
@@ -691,23 +411,12 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                 ) : (
                   <div>
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>
+                    <p className="text-sm text-slate-600 mb-4">
                       Chưa đăng ký gói dịch vụ nào
                     </p>
                     <Link
                       href="/services"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem 1rem',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                        textDecoration: 'none'
-                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg text-sm font-medium no-underline"
                     >
                       Xem các gói dịch vụ
                     </Link>
@@ -719,59 +428,27 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Medical Tab */}
           {activeTab === 'medical' && (
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
+            <div className="grid gap-6">
               {/* Medical Conditions */}
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(239, 68, 68, 0.2)'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  marginBottom: '1rem'
-                }}>
-                  <div style={{
-                    width: '2rem',
-                    height: '2rem',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    borderRadius: '0.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <HeartIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+              <div className="bg-red-50/50 rounded-2xl p-6 border border-red-200/50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                    <HeartIcon className="w-4 h-4 text-white" />
                   </div>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    margin: 0,
-                    color: '#1e293b'
-                  }}>
+                  <h3 className="text-base font-semibold m-0 text-slate-800">
                     Tình trạng sức khỏe
                   </h3>
                 </div>
                 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '1rem'
-                }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {resident.medical_history ? (
-                    <div style={{
-                      padding: '0.75rem',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      borderRadius: '0.5rem',
-                      border: '1px solid rgba(239, 68, 68, 0.1)'
-                    }}>
-                      <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                    <div className="p-3 bg-white/80 rounded-lg border border-red-200/50">
+                      <p className="text-sm text-slate-800 m-0 font-medium">
                         {resident.medical_history}
                       </p>
                     </div>
                   ) : (
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+                    <p className="text-sm text-slate-600 m-0">
                       Không có tình trạng sức khỏe đặc biệt
                     </p>
                   )}
@@ -779,41 +456,22 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               </div>
 
               {/* Medications */}
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: '0 0 1rem 0',
-                  color: '#1e293b'
-                }}>
+              <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
+                <h3 className="text-base font-semibold mb-4 text-slate-800">
                   Thuốc đang sử dụng
                 </h3>
                 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '1rem'
-                }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {(resident.current_medications || []).length > 0 ? (
                     (resident.current_medications || []).map((med: any, index: number) => (
-                      <div key={index} style={{
-                        padding: '0.75rem',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        borderRadius: '0.5rem',
-                        border: '1px solid rgba(16, 185, 129, 0.1)'
-                      }}>
-                        <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                      <div key={index} className="p-3 bg-white/80 rounded-lg border border-green-200/50">
+                        <p className="text-sm text-slate-800 m-0 font-medium">
                           {med.medication_name} - {med.dosage} - {med.frequency}
                         </p>
                       </div>
                     ))
                   ) : (
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+                    <p className="text-sm text-slate-600 m-0">
                       Không có thuốc đang sử dụng
                     </p>
                   )}
@@ -821,42 +479,20 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               </div>
 
               {/* Allergies */}
-              <div style={{
-                background: 'rgba(245, 158, 11, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(245, 158, 11, 0.2)'
-              }}>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: '0 0 1rem 0',
-                  color: '#1e293b'
-                }}>
+              <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200/50">
+                <h3 className="text-base font-semibold mb-4 text-slate-800">
                   Dị ứng
                 </h3>
                 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '0.75rem'
-                }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {(resident.allergies || []).length > 0 ? (
                     (resident.allergies || []).map((allergy: string, index: number) => (
-                      <div key={index} style={{
-                        padding: '0.5rem 0.75rem',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        borderRadius: '0.5rem',
-                        border: '1px solid rgba(245, 158, 11, 0.2)',
-                        fontSize: '0.875rem',
-                        color: '#1e293b',
-                        fontWeight: 500
-                      }}>
+                      <div key={index} className="px-3 py-2 bg-white/80 rounded-lg border border-amber-200/50 text-sm text-slate-800 font-medium">
                         {allergy}
                       </div>
                     ))
                   ) : (
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+                    <p className="text-sm text-slate-600 m-0">
                       Không có dị ứng đã biết
                     </p>
                   )}
@@ -867,59 +503,32 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Contact Tab */}
           {activeTab === 'contact' && (
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.05)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              border: '1px solid rgba(16, 185, 129, 0.2)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{
-                  width: '2rem',
-                  height: '2rem',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <PhoneIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+            <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                  <PhoneIcon className="w-4 h-4 text-white" />
                 </div>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: 0,
-                  color: '#1e293b'
-                }}>
+                <h3 className="text-base font-semibold m-0 text-slate-800">
                   Thông tin liên hệ khẩn cấp
                 </h3>
               </div>
               
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                gap: '1.5rem'
-              }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.5rem 0' }}>
+                  <p className="text-xs font-medium text-slate-600 mb-2">
                     Người liên hệ khẩn cấp
                   </p>
-                  <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
+                  <p className="text-lg text-slate-800 m-0 font-semibold">
                     {resident.emergencyContact && typeof resident.emergencyContact === 'object'
                       ? `${resident.emergencyContact.name || ''}${resident.emergencyContact.relationship ? ' (' + resident.emergencyContact.relationship + ')' : ''}`
                       : (resident.emergencyContact || 'Chưa cập nhật')}
                   </p>
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.5rem 0' }}>
+                  <p className="text-xs font-medium text-slate-600 mb-2">
                     Số điện thoại liên hệ
                   </p>
-                  <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
+                  <p className="text-lg text-slate-800 m-0 font-semibold">
                     {resident.emergencyContact?.phone || 'Chưa cập nhật'}
                   </p>
                 </div>
@@ -929,67 +538,35 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Notes Tab */}
           {activeTab === 'notes' && (
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
+            <div className="grid gap-6">
               {/* Care Notes */}
-              <div style={{
-                background: 'rgba(245, 158, 11, 0.05)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                border: '1px solid rgba(245, 158, 11, 0.2)'
-              }}>
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  margin: '0 0 1rem 0',
-                  color: '#1e293b'
-                }}>
+              <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200/50">
+                <h3 className="text-base font-semibold mb-4 text-slate-800">
                   Ghi chú chăm sóc
                 </h3>
                 <CareNotesDisplay
                   careNotes={careNotes}
                   isStaff={user?.role === 'staff'}
                 />
-          </div>
+              </div>
           
               {/* Personal Notes */}
               {resident.personalNotes && (
-                <div style={{
-                  background: 'rgba(59, 130, 246, 0.05)',
-                  borderRadius: '1rem',
-                  padding: '1.5rem',
-                  border: '1px solid rgba(59, 130, 246, 0.2)'
-                }}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    margin: '0 0 1rem 0',
-                    color: '#1e293b'
-                  }}>
+                <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200/50">
+                  <h3 className="text-base font-semibold mb-4 text-slate-800">
                     Ghi chú cá nhân
-            </h3>
-                  <div style={{
-                    padding: '1rem',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    borderRadius: '0.5rem',
-                    border: '1px solid rgba(59, 130, 246, 0.1)'
-                  }}>
-                    <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, lineHeight: '1.6' }}>
+                  </h3>
+                  <div className="p-4 bg-white/80 rounded-lg border border-blue-200/50">
+                    <p className="text-sm text-slate-800 m-0 leading-relaxed">
                       {resident.personalNotes}
                     </p>
                   </div>
                 </div>
               )}
-          </div>
+            </div>
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 } 

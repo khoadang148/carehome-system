@@ -1,19 +1,17 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import { 
   clearSessionData, 
   isSessionValid, 
-  initializeSession, 
-  SESSION_TIMEOUT 
+  initializeSession 
 } from '@/lib/utils/session';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
-// Define user role type
 export type UserRole = 'admin' | 'staff' | 'family';
 
-// Define user interface
 export interface User {
   id: string;
   name: string;
@@ -28,39 +26,38 @@ export interface User {
   updatedAt?: string;
 }
 
-// Define auth context interface
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => void;
   loading: boolean;
+  isLoggingOut: boolean;
   refreshUser: () => Promise<void>;
 }
 
-// Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
 
-  // Check for stored user data and token on initial load
   useEffect(() => {
     const checkUserSession = () => {
-      // Kiểm tra session validity
-      const isValid = isSessionValid();
+      // Skip session check if logging out
+      if (isLoggingOut) {
+        return;
+      }
       
-      if (!isValid) {
+      if (!isSessionValid()) {
         clearSessionData();
         setUser(null);
         setLoading(false);
         return;
       }
 
-      // Lấy user data từ localStorage hoặc sessionStorage
-      const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
-      
+      const storedUser = clientStorage.getItem('user');
       if (storedUser) {
         try {
           const userData = JSON.parse(storedUser);
@@ -75,15 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
     
-    // Use requestAnimationFrame to ensure DOM is ready and avoid hydration issues
-    const frameId = requestAnimationFrame(() => {
-      checkUserSession();
-    });
-    
-    return () => cancelAnimationFrame(frameId);
-  }, []);
+    // Tối ưu: Kiểm tra session ngay lập tức thay vì setTimeout
+    checkUserSession();
+  }, [isLoggingOut]);
 
-  // Login function: only allow family role
   const login = async (email: string, password: string) => {
     try {
       const response = await authAPI.login(email, password);
@@ -91,22 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userProfile = response.user;
         const userRole = userProfile.role;
         
-        // Cho phép family, staff, admin
         if (userRole === 'family' || userRole === 'staff' || userRole === 'admin') {
           const userObj = {
             id: userProfile.id,
-            name: userProfile.fullName || userProfile.username || userProfile.email,
+            name: userProfile.full_name || userProfile.fullName || userProfile.username || userProfile.email,
             email: userProfile.email,
             role: userRole,
           };
           
-          // Initialize session with new data
           initializeSession(response.access_token, userObj);
-          
-          // Set user state ngay lập tức
           setUser(userObj);
-          
-          // Trả về userObj thay vì true
           return userObj;
         } else {
           throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
@@ -114,30 +100,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return null;
     } catch (error) {
-      // Không set user state khi có lỗi để tránh gây reload
-      // setUser(null); // Xóa dòng này
       throw error;
     }
   };
 
-  // Logout function
-  const logout = async () => {
+  const logout = () => {
+    // Set logout flag to prevent unnecessary operations
+    setIsLoggingOut(true);
+    
+    // Clear session data immediately
     clearSessionData();
     setUser(null);
-    // Đánh dấu user đã logout thực sự
-    localStorage.setItem('has_logged_out', 'true');
-    // Xóa thông báo đăng nhập thành công khi logout
-    localStorage.removeItem('login_success');
-    localStorage.removeItem('login_error');
-    localStorage.removeItem('login_attempts');
+    
+    // Clear additional storage items
+    clientStorage.setItem('has_logged_out', 'true');
+    clientStorage.removeItem('login_success');
+    clientStorage.removeItem('login_error');
+    clientStorage.removeItem('login_attempts');
+    
+    // Redirect immediately
     router.push('/login');
+    
+    // Call logout API in background (don't block the redirect)
+    setTimeout(() => {
+      authAPI.logout().catch(error => {
+        console.warn('Logout API call failed:', error);
+      }).finally(() => {
+        setIsLoggingOut(false);
+      });
+    }, 100);
   };
 
-  // Dummy refreshUser for compatibility
   const refreshUser = async () => {};
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isLoggingOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -149,6 +146,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
-
-// No useRequireAuth here, each role should have its own login page/component 
+} 

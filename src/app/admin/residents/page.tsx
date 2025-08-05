@@ -19,6 +19,7 @@ import { carePlansAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { userAPI } from "@/lib/api";
+import Avatar from '@/components/Avatar';
 
 
 export default function ResidentsPage() {
@@ -462,47 +463,14 @@ export default function ResidentsPage() {
                   >
                     <td style={{padding: '1rem'}}>
                       <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                        <div style={{
-                          width: '2.5rem',
-                          height: '2.5rem',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '0.875rem',
-                          overflow: 'hidden'
-                        }}>
-                          {resident.avatar ? (
-                            <img
-                              src={userAPI.getAvatarUrl(resident.avatar)}
-                              alt={resident.name}
-                              style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  parent.textContent = resident.name.charAt(0).toUpperCase();
-                                }
-                              }}
-                            />
-                          ) : (
-                            <img
-                              src="/default-avatar.svg"
-                              alt="Default avatar"
-                              style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  parent.textContent = resident.name.charAt(0).toUpperCase();
-                                }
-                              }}
-                            />
-                          )}
-                        </div>
+                        <Avatar
+                          src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : undefined}
+                          alt={resident.name}
+                          size="small"
+                          className="w-10 h-10"
+                          showInitials={true}
+                          name={resident.name}
+                        />
                         <div>
                           <p style={{
                             fontSize: '0.875rem',

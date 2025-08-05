@@ -15,10 +15,9 @@ import {
   HandRaisedIcon
 } from '@heroicons/react/24/solid';
 
-import { validateVitalSigns } from '@/lib/utils/vital-signs-utils';
 import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts';
-import { ToastContainer, toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Error Modal Component
@@ -30,76 +29,26 @@ const ErrorModal = ({ isOpen, onClose, errors }: {
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '1rem',
-        padding: '2rem',
-        maxWidth: '500px',
-        width: '90%',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #e5e7eb'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          marginBottom: '1.5rem'
-        }}>
-          <div style={{
-            background: '#fee2e2',
-            borderRadius: '50%',
-            padding: '0.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <ExclamationTriangleIcon style={{ width: '1.5rem', height: '1.5rem', color: '#ef4444' }} />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-8 max-w-lg w-11/12 shadow-2xl border border-gray-200">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="bg-red-100 rounded-full p-3 flex items-center justify-center">
+            <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
           </div>
-          <h2 style={{
-            fontSize: '1.25rem',
-            fontWeight: 600,
-            color: '#991b1b',
-            margin: 0
-          }}>
+          <h2 className="text-xl font-semibold text-red-800 m-0">
             Có lỗi xảy ra
           </h2>
         </div>
         
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className="mb-6">
           {Object.keys(errors).length > 0 && (
             <>
-              <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              <p className="text-gray-600 mb-4">
                 Vui lòng kiểm tra và sửa các lỗi sau:
               </p>
-              <ul style={{ 
-                listStyle: 'none', 
-                padding: 0, 
-                margin: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}>
+              <ul className="space-y-2">
                 {Object.entries(errors).map(([field, message]) => (
-                  <li key={field} style={{
-                    padding: '0.75rem',
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '0.5rem',
-                    color: '#991b1b',
-                    fontSize: '0.875rem'
-                  }}>
+                  <li key={field} className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
                     {field === 'general' ? (
                       <span>{message}</span>
                     ) : (
@@ -112,50 +61,24 @@ const ErrorModal = ({ isOpen, onClose, errors }: {
           )}
           
           {errors.general && (
-            <div style={{
-              padding: '1rem',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '0.5rem',
-              color: '#991b1b',
-              fontSize: '0.875rem'
-            }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontWeight: 600 }}>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+              <p className="font-semibold mb-2 m-0">
                 Lỗi hệ thống:
               </p>
-              <p style={{ margin: 0 }}>
+              <p className="m-0">
                 {errors.general}
               </p>
-              <p style={{ 
-                margin: '0.5rem 0 0 0', 
-                fontSize: '0.75rem', 
-                color: '#6b7280',
-                fontStyle: 'italic'
-              }}>
+              <p className="text-xs text-gray-500 italic mt-2 mb-0">
                 Nếu lỗi vẫn tiếp tục, vui lòng liên hệ admin hoặc thử lại sau.
               </p>
             </div>
           )}
         </div>
         
-        <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '1rem'
-        }}>
+        <div className="flex justify-end gap-4">
           <button
             onClick={onClose}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
+            className="px-6 py-3 bg-red-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all hover:bg-red-600"
           >
             Đóng
           </button>
@@ -224,16 +147,11 @@ export default function AddVitalSignsPage() {
         let mapped: any[] = [];
         
         if (user?.role === 'staff') {
-          // Staff chỉ thấy residents được phân công
           const data = await staffAssignmentsAPI.getMyAssignments();
           const assignmentsData = Array.isArray(data) ? data : [];
           
-          // Debug: Log assignments data
-          console.log('Raw assignments data:', assignmentsData);
-          
-          // Map API data về đúng format UI và chỉ lấy những assignment active
           mapped = assignmentsData
-            .filter((assignment: any) => assignment.status === 'active') // Chỉ lấy active assignments
+            .filter((assignment: any) => assignment.status === 'active')
             .map((assignment: any) => {
               const resident = assignment.resident_id;
               
@@ -246,7 +164,6 @@ export default function AddVitalSignsPage() {
               };
             });
         } else if (user?.role === 'admin') {
-          // Admin thấy tất cả residents
           const data = await residentAPI.getAll();
           const residentsData = Array.isArray(data) ? data : [];
           
@@ -259,13 +176,12 @@ export default function AddVitalSignsPage() {
         
         setResidents(mapped);
         
-        // Lấy số phòng cho từng resident
+        // Get room numbers for each resident
         mapped.forEach(async (resident: any) => {
           try {
             const assignments = await carePlansAPI.getByResidentId(resident.id);
             const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
             const roomId = assignment?.assigned_room_id;
-            // Đảm bảo roomId là string, không phải object
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
@@ -359,14 +275,6 @@ export default function AddVitalSignsPage() {
       }
     }
     
-    // Respiratory rate validation (5-60 breaths/min) - if provided
-    if (data.respiratoryRate !== undefined && data.respiratoryRate !== null && !isNaN(Number(data.respiratoryRate))) {
-      const rr = Number(data.respiratoryRate);
-      if (rr < 5 || rr > 60) {
-        errors.respiratoryRate = 'Nhịp thở phải từ 5 đến 60 lần/phút';
-      }
-    }
-    
     // Notes validation - if provided, should not be too long
     if (data.notes && data.notes.trim() !== '') {
       if (data.notes.trim().length > 500) {
@@ -388,8 +296,6 @@ export default function AddVitalSignsPage() {
         return newErrors;
       });
     }
-    
-
   };
 
   // Update transformToApiFormat to use correct API field names (snake_case)
@@ -419,14 +325,8 @@ export default function AddVitalSignsPage() {
     let errorMessage = 'Có lỗi xảy ra khi thêm chỉ số sức khỏe';
     const fieldErrors: { [key: string]: string } = {};
 
-    console.log('=== ERROR PARSING ===');
-    console.log('Error object:', error);
-    console.log('Error response:', error.response);
-    console.log('Error message:', error.message);
-
     if (error.response?.data) {
       const data = error.response.data;
-      console.log('Response data:', data);
       
       // Handle validation errors from backend first
       if (data.error && typeof data.error === 'string') {
@@ -556,9 +456,6 @@ export default function AddVitalSignsPage() {
       }
     }
 
-    console.log('Parsed error message:', errorMessage);
-    console.log('Parsed field errors:', fieldErrors);
-
     return { errorMessage, fieldErrors };
   };
 
@@ -566,12 +463,8 @@ export default function AddVitalSignsPage() {
     e.preventDefault();
     
     // Validate form
-    console.log('=== VALIDATION DEBUG ===');
-    console.log('Form data:', formData);
     const errors = validateForm(formData);
-    console.log('Validation errors:', errors);
     if (Object.keys(errors).length > 0) {
-      console.log('Validation errors found:', errors);
       setValidationErrors(errors);
       return;
     }
@@ -625,26 +518,14 @@ export default function AddVitalSignsPage() {
     }
     
     if (Object.keys(requiredErrors).length > 0) {
-      console.log('Required errors found:', requiredErrors);
       setValidationErrors(requiredErrors);
       return;
     }
-    // if (!formData.bloodPressure) {
-    //   setValidationErrors({ bloodPressure: 'Vui lòng nhập huyết áp' });
-    //   return;
-    // }
 
     setIsSubmitting(true);
     setValidationErrors({});
     try {
-      console.log('=== SUBMIT DEBUG ===');
-      console.log('Form data:', formData);
-      console.log('Form data residentId:', formData.residentId);
-      console.log('Form data type:', typeof formData.residentId);
-      
       const apiData = transformToApiFormat(formData);
-      console.log('API data:', apiData);
-      console.log('API data resident_id:', apiData.resident_id);
       
       await vitalSignsAPI.create(apiData);
       
@@ -669,19 +550,12 @@ export default function AddVitalSignsPage() {
       }, 1500);
       
     } catch (error: any) {
-      console.log('=== CATCH ERROR ===');
-      console.log('Error caught:', error);
-      
       // Parse the error to get detailed information
       const { errorMessage, fieldErrors } = parseApiError(error);
-      console.log('After parsing - errorMessage:', errorMessage);
-      console.log('After parsing - fieldErrors:', fieldErrors);
       
       if (Object.keys(fieldErrors).length > 0) {
-        console.log('Setting field errors inline:', fieldErrors);
         setValidationErrors(fieldErrors);
       } else {
-        console.log('Setting general error in modal:', errorMessage);
         // Show modal for general errors only
         setModalErrors({ general: errorMessage });
         setShowErrorModal(true);
@@ -695,21 +569,8 @@ export default function AddVitalSignsPage() {
   // Loading state
   if (loadingData) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          width: '3rem',
-          height: '3rem',
-          border: '3px solid #e5e7eb',
-          borderTop: '3px solid #3b82f6',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -721,148 +582,29 @@ export default function AddVitalSignsPage() {
         onClose={() => setShowErrorModal(false)}
         errors={modalErrors}
       />
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          
-          .form-input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            outline: none;
-            transition: all 0.2s ease;
-            background: white;
-          }
-          
-          .form-input:focus {
-            border-color: #ef4444;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
-          
-          .form-input.error {
-            border-color: #ef4444 !important;
-            border-width: 2px !important;
-            background-color: #fef2f2 !important;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
-          
-          .form-select {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            outline: none;
-            transition: all 0.2s ease;
-            background: white;
-            cursor: pointer;
-          }
-          
-          .form-select:focus {
-            border-color: #ef4444;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
-          
-          .form-select.error {
-            border-color: #ef4444 !important;
-            border-width: 2px !important;
-            background-color: #fef2f2 !important;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
-          
-          .form-textarea {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            outline: none;
-            transition: all 0.2s ease;
-            background: white;
-            resize: vertical;
-            min-height: 100px;
-          }
-          
-          .form-textarea:focus {
-            border-color: #ef4444;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
-          
-          .form-textarea.error {
-            border-color: #ef4444 !important;
-            border-width: 2px !important;
-            background-color: #fef2f2 !important;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-          }
-        `
-      }} />
       
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        padding: '2rem'
-      }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-8">
+        <div className="max-w-4xl mx-auto">
           {/* Back Button */}
           <button
             onClick={() => router.push('/staff/vital-signs')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1rem',
-              background: 'white',
-              color: '#374151',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
+            className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer mb-4 shadow-sm hover:bg-gray-50 transition-colors"
           >
-            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+            <ArrowLeftIcon className="w-4 h-4" />
             Quay lại
           </button>
 
           {/* Header */}
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '2rem',
-            marginBottom: '2rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                borderRadius: '1rem',
-                padding: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-              }}>
-                <HeartIconSolid style={{ width: '2rem', height: '2rem', color: 'white' }} />
+          <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
+            <div className="flex items-center gap-4">
+              <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-4 flex items-center justify-center shadow-lg">
+                <HeartIconSolid className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 style={{
-                  fontSize: '1.875rem',
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  margin: '0 0 0.5rem 0'
-                }}>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent mb-2">
                   Thêm Chỉ Số Sức Khỏe Mới
                 </h1>
-                <p style={{ color: '#6b7280', margin: 0 }}>
+                <p className="text-gray-500">
                   Ghi nhận các thông số sinh lý quan trọng của người cao tuổi
                 </p>
               </div>
@@ -871,56 +613,35 @@ export default function AddVitalSignsPage() {
 
           {/* Success Banner */}
           {submitSuccess && (
-            <div style={{
-              background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-              border: '1px solid #10b981',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              marginBottom: '2rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
-            }}>
-              <CheckCircleIcon style={{ width: '2rem', height: '2rem', color: '#10b981' }} />
+            <div className="bg-gradient-to-r from-green-100 to-green-200 border border-green-500 rounded-2xl p-6 mb-8 flex items-center gap-4 shadow-lg">
+              <CheckCircleIcon className="w-8 h-8 text-green-600" />
               <div>
-                <h3 style={{ color: '#065f46', fontWeight: 600, margin: '0 0 0.25rem 0' }}>
+                <h3 className="text-green-800 font-semibold mb-1">
                   Thêm chỉ số sức khỏe thành công!
                 </h3>
-                <p style={{ color: '#047857', margin: 0 }}>
+                <p className="text-green-700">
                   Dữ liệu đã được lưu vào hệ thống. Đang chuyển về trang danh sách...
                 </p>
               </div>
             </div>
           )}
 
-
-
           {/* Form */}
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '2rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div className="bg-white rounded-2xl p-8 shadow-lg">
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gap: '2rem' }}>
+              <div className="space-y-8">
                 {/* Resident Selection */}
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <UserIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem' }} />
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <UserIcon className="w-4 h-4 inline mr-2" />
                     Người cao tuổi *
                   </label>
                   <select
                     value={formData.residentId}
                     onChange={(e) => handleInputChange('residentId', e.target.value)}
-                    className={`form-select ${validationErrors.residentId ? 'error' : ''}`}
+                    className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                      validationErrors.residentId ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                    }`}
                     disabled={residents.length === 0}
                   >
                     <option value="">
@@ -938,294 +659,198 @@ export default function AddVitalSignsPage() {
                     ))}
                   </select>
                   {validationErrors.residentId && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
+                    <p className="text-red-500 text-sm mt-2 font-medium">
                       {validationErrors.residentId}
                     </p>
                   )}
-
                 </div>
 
                 {/* Vital Signs Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Blood Pressure */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <HeartIconSolid style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#dc2626' }} />
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <HeartIconSolid className="w-4 h-4 inline mr-2 text-red-600" />
                       Huyết áp (mmHg) *
                     </label>
-                                      <input
-                    type="text"
-                    value={formData.bloodPressure}
-                    onChange={(e) => handleInputChange('bloodPressure', e.target.value)}
-                    placeholder="Ví dụ: 120/80"
-                    className={`form-input ${validationErrors.bloodPressure ? 'error' : ''}`}
-                  />
-                  {validationErrors.bloodPressure && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
-                      {validationErrors.bloodPressure}
-                    </p>
-                  )}
+                    <input
+                      type="text"
+                      value={formData.bloodPressure}
+                      onChange={(e) => handleInputChange('bloodPressure', e.target.value)}
+                      placeholder="Ví dụ: 120/80"
+                      className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                        validationErrors.bloodPressure ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                      }`}
+                    />
+                    {validationErrors.bloodPressure && (
+                      <p className="text-red-500 text-sm mt-2 font-medium">
+                        {validationErrors.bloodPressure}
+                      </p>
+                    )}
                   </div>
 
                   {/* Heart Rate */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <HeartIconSolid style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#059669' }} />
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <HeartIconSolid className="w-4 h-4 inline mr-2 text-green-600" />
                       Nhịp tim (bpm) *
                     </label>
-                                      <input
-                    type="number"
-                    value={formData.heartRate || ''}
-                    onChange={(e) => handleInputChange('heartRate', e.target.value ? Number(e.target.value) : undefined)}
-                    placeholder="60-100"
-                    min="30"
-                    max="200"
-                    className={`form-input ${validationErrors.heartRate ? 'error' : ''}`}
-                  />
-                  {validationErrors.heartRate && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
-                      {validationErrors.heartRate}
-                    </p>
-                  )}
+                    <input
+                      type="number"
+                      value={formData.heartRate || ''}
+                      onChange={(e) => handleInputChange('heartRate', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="60-100"
+                      min="30"
+                      max="200"
+                      className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                        validationErrors.heartRate ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                      }`}
+                    />
+                    {validationErrors.heartRate && (
+                      <p className="text-red-500 text-sm mt-2 font-medium">
+                        {validationErrors.heartRate}
+                      </p>
+                    )}
                   </div>
 
                   {/* Temperature */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <FireIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#ea580c' }} />
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <FireIcon className="w-4 h-4 inline mr-2 text-orange-600" />
                       Nhiệt độ (°C) *
                     </label>
-                                      <input
-                    type="number"
-                    value={formData.temperature || ''}
-                    onChange={(e) => handleInputChange('temperature', e.target.value ? Number(e.target.value) : undefined)}
-                    placeholder="36.5-37.5"
-                    min="30"
-                    max="45"
-                    step="0.1"
-                    className={`form-input ${validationErrors.temperature ? 'error' : ''}`}
-                  />
-                  {validationErrors.temperature && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
-                      {validationErrors.temperature}
-                    </p>
-                  )}
+                    <input
+                      type="number"
+                      value={formData.temperature || ''}
+                      onChange={(e) => handleInputChange('temperature', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="36.5-37.5"
+                      min="30"
+                      max="45"
+                      step="0.1"
+                      className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                        validationErrors.temperature ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                      }`}
+                    />
+                    {validationErrors.temperature && (
+                      <p className="text-red-500 text-sm mt-2 font-medium">
+                        {validationErrors.temperature}
+                      </p>
+                    )}
                   </div>
 
                   {/* Oxygen Saturation */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <CloudIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#2563eb' }} />
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <CloudIcon className="w-4 h-4 inline mr-2 text-blue-600" />
                       SpO2 (%) *
                     </label>
-                                      <input
-                    type="number"
-                    value={formData.oxygenSaturation || ''}
-                    onChange={(e) => handleInputChange('oxygenSaturation', e.target.value ? Number(e.target.value) : undefined)}
-                    placeholder="95-100"
-                    min="70"
-                    max="100"
-                    className={`form-input ${validationErrors.oxygenSaturation ? 'error' : ''}`}
-                  />
-                  {validationErrors.oxygenSaturation && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
-                      {validationErrors.oxygenSaturation}
-                    </p>
-                  )}
+                    <input
+                      type="number"
+                      value={formData.oxygenSaturation || ''}
+                      onChange={(e) => handleInputChange('oxygenSaturation', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="95-100"
+                      min="70"
+                      max="100"
+                      className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                        validationErrors.oxygenSaturation ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                      }`}
+                    />
+                    {validationErrors.oxygenSaturation && (
+                      <p className="text-red-500 text-sm mt-2 font-medium">
+                        {validationErrors.oxygenSaturation}
+                      </p>
+                    )}
                   </div>
 
                   {/* Respiratory Rate */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <HandRaisedIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#059669' }} />
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <HandRaisedIcon className="w-4 h-4 inline mr-2 text-green-600" />
                       Nhịp thở (lần/phút) *
                     </label>
-                                      <input
-                    type="number"
-                    value={formData.respiratoryRate || ''}
-                    onChange={(e) => handleInputChange('respiratoryRate', e.target.value ? Number(e.target.value) : undefined)}
-                    placeholder="12-20"
-                    min="5"
-                    max="60"
-                    className={`form-input ${validationErrors.respiratoryRate ? 'error' : ''}`}
-                  />
-                  {validationErrors.respiratoryRate && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
-                      {validationErrors.respiratoryRate}
-                    </p>
-                  )}
+                    <input
+                      type="number"
+                      value={formData.respiratoryRate || ''}
+                      onChange={(e) => handleInputChange('respiratoryRate', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="12-20"
+                      min="5"
+                      max="60"
+                      className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                        validationErrors.respiratoryRate ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                      }`}
+                    />
+                    {validationErrors.respiratoryRate && (
+                      <p className="text-red-500 text-sm mt-2 font-medium">
+                        {validationErrors.respiratoryRate}
+                      </p>
+                    )}
                   </div>
 
                   {/* Weight */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <ScaleIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#7c3aed' }} />
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <ScaleIcon className="w-4 h-4 inline mr-2 text-purple-600" />
                       Cân nặng (kg) *
                     </label>
-                                      <input
-                    type="number"
-                    value={formData.weight || ''}
-                    onChange={(e) => handleInputChange('weight', e.target.value ? Number(e.target.value) : undefined)}
-                    placeholder="50-80"
-                    min="20"
-                    max="200"
-                    step="0.1"
-                    className={`form-input ${validationErrors.weight ? 'error' : ''}`}
-                  />
-                  {validationErrors.weight && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
-                      {validationErrors.weight}
-                    </p>
-                  )}
+                    <input
+                      type="number"
+                      value={formData.weight || ''}
+                      onChange={(e) => handleInputChange('weight', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="50-80"
+                      min="20"
+                      max="200"
+                      step="0.1"
+                      className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
+                        validationErrors.weight ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                      }`}
+                    />
+                    {validationErrors.weight && (
+                      <p className="text-red-500 text-sm mt-2 font-medium">
+                        {validationErrors.weight}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Notes */}
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <BeakerIcon style={{ width: '1rem', height: '1rem', display: 'inline', marginRight: '0.5rem', color: '#059669' }} />
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    <BeakerIcon className="w-4 h-4 inline mr-2 text-green-600" />
                     Ghi chú *
                   </label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => handleInputChange('notes', e.target.value)}
                     placeholder="Ghi chú thêm về tình trạng sức khỏe..."
-                    className={`form-textarea ${validationErrors.notes ? 'error' : ''}`}
+                    className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 resize-vertical min-h-[100px] ${
+                      validationErrors.notes ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
+                    }`}
                     rows={4}
                   />
                   {validationErrors.notes && (
-                    <p style={{ 
-                      color: '#ef4444', 
-                      fontSize: '0.875rem', 
-                      marginTop: '0.5rem', 
-                      fontWeight: 500,
-                      marginBottom: 0
-                    }}>
+                    <p className="text-red-500 text-sm mt-2 font-medium">
                       {validationErrors.notes}
                     </p>
                   )}
                 </div>
 
                 {/* Submit Button */}
-                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <div className="flex gap-4 justify-end">
                   <button
                     type="button"
                     onClick={() => router.push('/staff/vital-signs')}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: 'white',
-                      color: '#374151',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer transition-all hover:bg-gray-50"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting || submitSuccess}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: isSubmitting || submitSuccess 
-                        ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: isSubmitting || submitSuccess ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s ease',
-                      opacity: isSubmitting || submitSuccess ? 0.6 : 1
-                    }}
+                    className={`px-6 py-3 text-white border-none rounded-lg text-sm font-semibold transition-all ${
+                      isSubmitting || submitSuccess
+                        ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-red-500 to-red-600 hover:shadow-lg hover:scale-105'
+                    }`}
                   >
                     {isSubmitting ? 'Đang lưu...' : submitSuccess ? 'Đã lưu!' : 'Lưu chỉ số'}
                   </button>

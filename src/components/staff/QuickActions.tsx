@@ -10,6 +10,7 @@ import {
   DocumentTextIcon,
   ClipboardIcon
 } from '@heroicons/react/24/outline';
+import { clientStorage, getParsedItem, setParsedItem } from '@/lib/utils/clientStorage';
 
 
 interface QuickActionsProps {
@@ -206,12 +207,12 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
 
     setIsSubmitting(true);
     try {
-      // Get current user from localStorage or context
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      // Get current user from  or context
+      const currentUser = JSON.parse(clientStorage.getItem('currentUser') || '{}');
       const staffName = currentUser.name || 'Nhân viên';
       
       // Get existing residents data
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
       // Find and update the resident
@@ -230,7 +231,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
         };
         
         residents[residentIndex].careNotes.unshift(newNote);
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
+        clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
       }
       
       onComplete();
@@ -365,7 +366,7 @@ function MedicationModal({ residentId, residentName, onClose, onComplete }: {
     
     try {
       // Get existing residents data
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
       // Find and update the resident
@@ -394,7 +395,7 @@ function MedicationModal({ residentId, residentName, onClose, onComplete }: {
         }
         residents[residentIndex].medications.push(`${formData.name} ${formData.dosage}`);
         
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
+        clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
       }
       
       onComplete();
@@ -628,7 +629,7 @@ function AppointmentModal({ residentId, residentName, onClose, onComplete }: {
     
     try {
       // Get existing residents data
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
       // Find and update the resident
@@ -650,7 +651,7 @@ function AppointmentModal({ residentId, residentName, onClose, onComplete }: {
         };
         
         residents[residentIndex].appointments.push(newAppointment);
-        localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
+        clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
       }
       
       onComplete();
@@ -887,7 +888,7 @@ function MedicationListModal({ residentId, residentName, onClose, onComplete }: 
 
   useEffect(() => {
     // Load medications for this resident
-    const savedResidents = localStorage.getItem('nurseryHomeResidents');
+    const savedResidents = clientStorage.getItem('nurseryHomeResidents');
     if (savedResidents) {
       const residents = JSON.parse(savedResidents);
       const resident = residents.find((r: any) => r.id === residentId);
@@ -900,7 +901,7 @@ function MedicationListModal({ residentId, residentName, onClose, onComplete }: 
 
   const markAsTaken = async (medicationId: number) => {
     try {
-      const savedResidents = localStorage.getItem('nurseryHomeResidents');
+      const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       if (savedResidents) {
         const residents = JSON.parse(savedResidents);
         const residentIndex = residents.findIndex((r: any) => r.id === residentId);
@@ -909,7 +910,7 @@ function MedicationListModal({ residentId, residentName, onClose, onComplete }: 
           const medIndex = residents[residentIndex].medications_detail.findIndex((med: any) => med.id === medicationId);
           if (medIndex !== -1) {
             residents[residentIndex].medications_detail[medIndex].lastAdministered = new Date().toLocaleString('vi-VN');
-            localStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
+            clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
             
             // Update local state
             setMedications(prev => prev.map(med => 

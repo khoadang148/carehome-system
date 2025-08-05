@@ -1,25 +1,15 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   MagnifyingGlassIcon, 
-  FunnelIcon, 
-  PlusCircleIcon, 
-  PencilIcon, 
-  EyeIcon, 
-  TrashIcon,
   UserGroupIcon,
-  PhotoIcon,
-  ArrowLeftIcon,
-  UserIcon,
-  CalendarIcon,
-  MapPinIcon,
-  PhoneIcon
+  EyeIcon
 } from '@heroicons/react/24/outline';
 import { staffAssignmentsAPI, carePlansAPI, roomsAPI, userAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import Avatar from '@/components/Avatar';
 
 interface Resident {
   _id: string;
@@ -151,13 +141,11 @@ export default function StaffResidentsPage() {
     router.push(`/staff/residents/${residentId}`);
   };
 
-
-
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-        <p style={{ marginLeft: 16, color: '#6366f1', fontWeight: 600 }}>Đang tải...</p>
+        <p className="ml-4 text-indigo-600 font-semibold">Đang tải...</p>
       </div>
     );
   }
@@ -165,82 +153,23 @@ export default function StaffResidentsPage() {
   if (user.role !== 'staff') return null;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
-    }}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
       {/* Background decorations */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(245, 158, 11, 0.03) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none'
-      }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(102,126,234,0.05)_0%,transparent_50%),radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.05)_0%,transparent_50%),radial-gradient(circle_at_40%_40%,rgba(245,158,11,0.03)_0%,transparent_50%)] pointer-events-none" />
       
-      <div style={{
-        maxWidth: '1400px', 
-        margin: '0 auto', 
-        padding: '2rem 1.5rem',
-        position: 'relative',
-        zIndex: 1
-      }}>
+      <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
         {/* Header Section */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              
-              <div style={{
-                width: '3.5rem',
-                height: '3.5rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
-              }}>
-                <UserGroupIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <UserGroupIcon className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 style={{
-                  fontSize: '2rem', 
-                  fontWeight: 700, 
-                  margin: 0,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.025em'
-                }}>
+                <h1 className="text-3xl font-bold m-0 bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent tracking-tight">
                   Danh sách cư dân được phân công
                 </h1>
-                <p style={{
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: 500
-                }}>
+                <p className="text-base text-slate-600 mt-1 font-medium">
                   Tổng số: {residentsData.length} cư dân đang được phân công cho bạn
                 </p>
               </div>
@@ -249,71 +178,28 @@ export default function StaffResidentsPage() {
         </div>
 
         {/* Search and Filter Section */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem',
-            alignItems: 'end'
-          }}>
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-md border border-white/20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
             {/* Search Input */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Tìm kiếm
               </label>
-              <div style={{position: 'relative'}}>
+              <div className="relative">
                 <input
                   type="text"
                   placeholder="Tìm theo tên hoặc phòng..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem 0.75rem 2.5rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem',
-                    background: 'white'
-                  }}
+                  className="w-full px-4 py-3 pl-10 rounded-lg border border-gray-300 text-sm bg-white"
                 />
-                <MagnifyingGlassIcon style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '1rem',
-                  height: '1rem',
-                  color: '#9ca3af'
-                }} />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               </div>
             </div>
 
             {/* Results Count */}
-            <div style={{
-              background: 'rgba(102, 126, 234, 0.1)',
-              padding: '0.75rem 1rem',
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(102, 126, 234, 0.2)'
-            }}>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#667eea',
-                margin: 0,
-                fontWeight: 600
-              }}>
+            <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+              <p className="text-sm text-indigo-600 m-0 font-semibold">
                 Hiển thị: {filteredResidents.length} cư dân
               </p>
             </div>
@@ -322,108 +208,45 @@ export default function StaffResidentsPage() {
 
         {/* Error Message */}
         {error && (
-          <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#dc2626',
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            marginBottom: '2rem'
-          }}>
+          <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-8">
             {error}
           </div>
         )}
 
         {/* Loading */}
         {loadingData && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '4rem 2rem'
-          }}>
+          <div className="flex justify-center items-center py-16 px-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            <p style={{ marginLeft: '1rem', color: '#6b7280' }}>Đang tải danh sách cư dân...</p>
+            <p className="ml-4 text-gray-500">Đang tải danh sách cư dân...</p>
           </div>
         )}
 
         {/* Residents Table */}
         {!loadingData && (
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            overflow: 'hidden',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <div style={{overflowX: 'auto'}}>
-              <table style={{width: '100%', borderCollapse: 'collapse'}}>
+          <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl overflow-hidden shadow-md border border-white/20">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{
-                    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                  <tr className="bg-gradient-to-br from-slate-50 to-slate-200 border-b border-gray-200">
+                    <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Cư dân
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                    <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Phòng
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                    <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Tuổi
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                    <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Giới tính
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                    <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Liên hệ khẩn cấp
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                    <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Trạng thái
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'center',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
+                    <th className="p-4 text-center text-sm font-semibold text-gray-700">
                       Thao tác
                     </th>
                   </tr>
@@ -432,207 +255,89 @@ export default function StaffResidentsPage() {
                   {filteredResidents.map((resident, index) => (
                     <tr 
                       key={resident.id}
-                      style={{
-                        borderBottom: index < filteredResidents.length - 1 ? '1px solid #f3f4f6' : 'none',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.05)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
+                      className={`border-b border-gray-100 transition-all duration-200 hover:bg-indigo-50/50 ${
+                        index < filteredResidents.length - 1 ? 'border-b border-gray-100' : ''
+                      }`}
                     >
-                      <td style={{padding: '1rem'}}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                          <div style={{
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontWeight: 600,
-                            fontSize: '0.875rem',
-                            overflow: 'hidden'
-                          }}>
-                            {resident.avatar ? (
-                              <img
-                                src={userAPI.getAvatarUrl(resident.avatar)}
-                                alt={resident.name}
-                                style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  const parent = e.currentTarget.parentElement;
-                                  if (parent) {
-                                    parent.textContent = resident.name.charAt(0).toUpperCase();
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <img
-                                src="/default-avatar.svg"
-                                alt="Default avatar"
-                                style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  const parent = e.currentTarget.parentElement;
-                                  if (parent) {
-                                    parent.textContent = resident.name.charAt(0).toUpperCase();
-                                  }
-                                }}
-                              />
-                            )}
-                          </div>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : undefined}
+                            alt={resident.name}
+                            size="small"
+                            className="w-10 h-10"
+                            showInitials={true}
+                            name={resident.name}
+                          />
                           <div>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              color: '#111827',
-                              margin: 0
-                            }}>
+                            <p className="text-sm font-semibold text-gray-900 m-0">
                               {resident.name}
                             </p>
-                            <p style={{
-                              fontSize: '0.75rem',
-                              color: '#6b7280',
-                              margin: 0
-                            }}>
+                            <p className="text-xs text-gray-500 m-0">
                               ID: {resident.id}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td style={{padding: '1rem'}}>
-                        <span style={{
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          color: '#10b981',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
+                      <td className="p-4">
+                        <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-xs font-semibold">
                           {roomNumbers[resident.id] || 'Đang tải...'}
                         </span>
                       </td>
-                      <td style={{padding: '1rem'}}>
-                        <span style={{
-                          fontSize: '0.875rem',
-                          color: '#374151',
-                          fontWeight: 500
-                        }}>
+                      <td className="p-4">
+                        <span className="text-sm text-gray-700 font-medium">
                           {resident.age} tuổi
                         </span>
                       </td>
-                      <td style={{padding: '1rem'}}>
-                        <span style={{
-                          fontSize: '0.875rem',
-                          color: '#374151',
-                          fontWeight: 500
-                        }}>
+                      <td className="p-4">
+                        <span className="text-sm text-gray-700 font-medium">
                           {resident.gender === 'male' ? 'Nam' : resident.gender === 'female' ? 'Nữ' : 'Khác'}
                         </span>
                       </td>
-                      <td style={{padding: '1rem'}}>
+                      <td className="p-4">
                         <div>
-                          <p style={{
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            color: '#111827',
-                            margin: 0
-                          }}>
+                          <p className="text-sm font-semibold text-gray-900 m-0">
                             {resident.emergencyContact}
                           </p>
-                          <p style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280',
-                            margin: 0
-                          }}>
+                          <p className="text-xs text-gray-500 m-0">
                             {resident.contactPhone}
                           </p>
                         </div>
                       </td>
-                      <td style={{padding: '1rem'}}>
-                        <span style={{
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          color: '#10b981',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
+                      <td className="p-4">
+                        <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-xs font-semibold">
                           Đang quản lý
                         </span>
                         {resident.endDate && (
-                          <p style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280',
-                            margin: '0.25rem 0 0 0'
-                          }}>
+                          <p className="text-xs text-gray-500 mt-1 m-0">
                             Hết hạn: {new Date(resident.endDate).toLocaleDateString('vi-VN')}
                           </p>
                         )}
                       </td>
-                      <td style={{padding: '1rem'}}>
-                         <div style={{
-                           display: 'flex',
-                           justifyContent: 'center',
-                           gap: '0.5rem'
-                         }}>
-                           <button
-                             onClick={() => handleViewResident(resident.id)}
-                             title="Xem thông tin chi tiết cư dân"
-                             style={{
-                               padding: '0.5rem',
-                               borderRadius: '0.375rem',
-                               border: 'none',
-                               background: 'rgba(59, 130, 246, 0.1)',
-                               color: '#3b82f6',
-                               cursor: 'pointer',
-                               transition: 'all 0.2s ease'
-                             }}
-                             onMouseOver={(e) => {
-                               e.currentTarget.style.background = '#3b82f6';
-                               e.currentTarget.style.color = 'white';
-                             }}
-                             onMouseOut={(e) => {
-                               e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
-                               e.currentTarget.style.color = '#3b82f6';
-                             }}
-                           >
-                             <EyeIcon style={{width: '1rem', height: '1rem'}} />
-                           </button>
-                         </div>
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
+                      <td className="p-4">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => handleViewResident(resident.id)}
+                            title="Xem thông tin chi tiết cư dân"
+                            className="p-2 rounded-md border-none bg-blue-100 text-blue-600 cursor-pointer transition-all duration-200 hover:bg-blue-600 hover:text-white"
+                          >
+                            <EyeIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
 
             {filteredResidents.length === 0 && (
-              <div style={{
-                padding: '3rem',
-                textAlign: 'center',
-                color: '#6b7280'
-              }}>
-                <UserGroupIcon style={{
-                  width: '3rem',
-                  height: '3rem',
-                  margin: '0 auto 1rem',
-                  color: '#d1d5db'
-                }} />
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  margin: '0 0 0.5rem 0',
-                  color: '#374151'
-                }}>
+              <div className="p-12 text-center text-gray-500">
+                <UserGroupIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-semibold mb-2 text-gray-700">
                   {searchTerm ? 'Không tìm thấy cư dân' : 'Chưa có cư dân nào được phân công'}
                 </h3>
-                <p style={{margin: 0, fontSize: '0.875rem'}}>
+                <p className="m-0 text-sm">
                   {searchTerm ? 'Thử thay đổi tiêu chí tìm kiếm' : 'Admin sẽ phân công cư dân cho bạn sớm'}
                 </p>
               </div>

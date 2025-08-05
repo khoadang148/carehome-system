@@ -9,6 +9,7 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
+import { formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
 
 interface VitalSigns {
   date: string;
@@ -341,14 +342,14 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
             color: '#9ca3af',
             margin: 0
           }}>
-            {new Date(`${latestVitals.date}`).toLocaleString('vi-VN')}
+            {formatDateDDMMYYYYWithTimezone(latestVitals.date)} {formatTimeWithTimezone(latestVitals.date)}
           </p>
         </div>
         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.5rem 0' }}>
           {latestVitals.notes}
         </p>
         <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>
-          Đo lúc: {new Date(`${latestVitals.date}`).toLocaleString('vi-VN')}
+          Đo lúc: {formatDateDDMMYYYYWithTimezone(latestVitals.date)} {formatTimeWithTimezone(latestVitals.date)}
         </p>
       </div>
 
@@ -466,7 +467,7 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
                   <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    {new Date(vital.date).toLocaleString('vi-VN')}
+                    {formatDateDDMMYYYYWithTimezone(vital.date)} {formatTimeWithTimezone(vital.date)}
                   </span>
                   <span style={{
                     display: 'inline-block',

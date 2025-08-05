@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { formatDateDDMMYYYY } from '@/lib/utils/validation';
+import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone } from '@/lib/utils/validation';
 
 interface VitalSigns {
   id: string;
@@ -511,7 +511,7 @@ export default function VitalsPage() {
                   }}
                   onClick={() => setSelectedVital(vital)}>
                     <td style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
-                      {formatDateDDMMYYYY(vital.date)}
+                      {formatDateDDMMYYYYWithTimezone(vital.date)}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <span style={{

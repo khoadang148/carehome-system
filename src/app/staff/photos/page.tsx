@@ -388,11 +388,11 @@ export default function PhotoUploadPage() {
                 <PhotoIcon style={{width: '2.5rem', height: '2.5rem', color: 'white'}} />
                 <div>
                   <h1 style={{fontSize: '1.8rem', fontWeight: 700, margin: 0}}>
-                     Đăng ảnh của người cao tuổi
-                  </h1>
+                Đăng ảnh của người cao tuổi
+              </h1>
                   <p style={{fontSize: '0.9rem', margin: '0.5rem 0 0 0', opacity: 0.9}}>
-                    Ghi lại những khoảnh khắc đáng nhớ và chia sẻ với gia đình
-                  </p>
+                Ghi lại những khoảnh khắc đáng nhớ và chia sẻ với gia đình
+              </p>
                 </div>
               </div>
             </div>
@@ -625,7 +625,7 @@ export default function PhotoUploadPage() {
               transition: 'all 0.2s ease',
               background: validationErrors.files ? '#fef2f2' : 'white'
             }}
-            onClick={() => document.getElementById('fileInput')?.click()}
+              onClick={() => document.getElementById('fileInput')?.click()}
             onMouseOver={(e) => {
                                 e.currentTarget.style.borderColor = validationErrors.files ? '#ef4444' : '#22c55e';
                               e.currentTarget.style.background = validationErrors.files ? '#fef2f2' : 'rgba(34, 197, 94, 0.05)';

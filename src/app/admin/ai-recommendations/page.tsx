@@ -1008,35 +1008,38 @@ export default function AIRecommendationsPage() {
                       </div>
                     )}
 
-                    {/* Detailed Description */}
-                    {safeRec.detailedDescription && safeRec.detailedDescription !== 'Mô tả chi tiết về hoạt động này.' && (
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <h4 style={{
+                    {/* Activity Description */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <h4 style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        marginBottom: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <EyeIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
+                        Mô tả hoạt động
+                      </h4>
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '0.5rem',
+                        padding: '0.75rem',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <p style={{
                           fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#64748b',
-                          marginBottom: '0.5rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
+                          color: '#334155',
+                          margin: 0,
+                          lineHeight: '1.5'
                         }}>
-                          <EyeIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
-                          Mô tả hoạt động
-                        </h4>
-                        <div style={{
-                          background: '#f8fafc',
-                          borderRadius: '0.5rem',
-                          padding: '0.75rem',
-                          border: '1px solid #e2e8f0'
-                        }}>
-                          <p style={{
-                            fontSize: '0.875rem',
-                            color: '#334155',
-                            margin: 0,
-                            lineHeight: '1.5'
-                          }}>
-                            {(() => {
-                              // Tạo mô tả ngắn gọn và chuyên nghiệp từ detailedDescription
+                          {(() => {
+                            // Ưu tiên sử dụng detailedDescription nếu có và hợp lệ
+                            if (safeRec.detailedDescription && 
+                                safeRec.detailedDescription !== 'Mô tả chi tiết về hoạt động này.' && 
+                                safeRec.detailedDescription.length >= 20) {
+                              
                               let cleanDescription = safeRec.detailedDescription;
                               
                               // Loại bỏ các phần thông tin đã có ở các trường khác
@@ -1060,9 +1063,9 @@ export default function AIRecommendationsPage() {
                               cleanDescription = cleanDescription.replace(/^[,\s]+/, '');
                               cleanDescription = cleanDescription.replace(/[,\s]+$/, '');
                               
-                              // Nếu mô tả quá ngắn hoặc không có ý nghĩa, tạo mô tả mặc định
+                              // Nếu mô tả quá ngắn sau khi làm sạch, sử dụng mô tả mặc định
                               if (!cleanDescription || cleanDescription.length < 20) {
-                                return `Hoạt động ${safeRec.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần một cách an toàn và hiệu quả.`;
+                                return `Hoạt động ${safeRec.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần một cách an toàn và hiệu quả. Hoạt động này có độ khó ${safeRec.difficulty.toLowerCase()} và thời lượng ${safeRec.duration}.`;
                               }
                               
                               // Giới hạn độ dài
@@ -1071,44 +1074,14 @@ export default function AIRecommendationsPage() {
                               }
                               
                               return cleanDescription;
-                            })()}
-                          </p>
-                        </div>
+                            }
+                            
+                            // Mô tả mặc định khi không có detailedDescription hoặc không hợp lệ
+                            return `Hoạt động ${safeRec.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần một cách an toàn và hiệu quả. Hoạt động này có độ khó ${safeRec.difficulty.toLowerCase()} và thời lượng ${safeRec.duration}.`;
+                          })()}
+                        </p>
                       </div>
-                    )}
-
-                    {/* Default Description when no detailed description */}
-                    {(!safeRec.detailedDescription || safeRec.detailedDescription === 'Mô tả chi tiết về hoạt động này.' || safeRec.detailedDescription.length < 20) && (
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <h4 style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#64748b',
-                          marginBottom: '0.5rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}>
-                          <EyeIcon style={{ width: '1rem', height: '1rem', color: '#64748b' }} />
-                          Mô tả hoạt động
-                        </h4>
-                        <div style={{
-                          background: '#f8fafc',
-                          borderRadius: '0.5rem',
-                          padding: '0.75rem',
-                          border: '1px solid #e2e8f0'
-                        }}>
-                          <p style={{
-                            fontSize: '0.875rem',
-                            color: '#334155',
-                            margin: 0,
-                            lineHeight: '1.5'
-                          }}>
-                            Hoạt động {safeRec.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần một cách an toàn và hiệu quả. Hoạt động này có độ khó {safeRec.difficulty.toLowerCase()} và thời lượng {safeRec.duration}.
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    </div>
 
                     {/* Benefits */}
                     {safeRec.benefits && safeRec.benefits.length > 0 && (

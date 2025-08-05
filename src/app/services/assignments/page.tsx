@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { residentAPI, carePlansAPI, carePlanAssignmentsAPI, userAPI } from '@/lib/api';
-import { ClipboardDocumentCheckIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
-
+import { ClipboardDocumentCheckIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import Avatar from '@/components/Avatar';
 
 export default function ServiceAssignmentsPage() {
   const router = useRouter();
@@ -15,6 +15,12 @@ export default function ServiceAssignmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'expired'>('all');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -22,41 +28,73 @@ export default function ServiceAssignmentsPage() {
       router.push('/');
       return;
     }
+    loadData();
+  }, [user, router]);
+
+  const loadData = async () => {
     setLoading(true);
     setError(null);
-    residentAPI.getAll()
-      .then(async (resList) => {
-        setResidents(resList);
-        // Lấy assignment cho từng resident song song
-        const allAssignments = await Promise.all(
-          resList.map(async (r: any) => {
-            try {
-              // Đảm bảo r._id là string
+    try {
+      const resList = await residentAPI.getAll();
+      setResidents(resList);
+      
+      // Lấy assignment cho từng resident song song với giới hạn
+      const allAssignments = await Promise.all(
+        resList.map(async (r: any) => {
+          try {
             const residentId = typeof r._id === 'object' && (r._id as any)?._id 
               ? (r._id as any)._id 
               : r._id;
             const data = await carePlansAPI.getByResidentId(residentId);
-              return (Array.isArray(data) ? data : []).map((a: any) => ({ ...a, resident: r }));
-            } catch {
-              return [];
-            }
-          })
-        );
-        setAssignments(allAssignments.flat());
-      })
-      .catch(() => setError('Không thể tải danh sách cư dân hoặc đăng ký dịch vụ.'))
-      .finally(() => setLoading(false));
-  }, [user, router]);
+            return (Array.isArray(data) ? data : []).map((a: any) => ({ ...a, resident: r }));
+          } catch {
+            return [];
+          }
+        })
+      );
+      setAssignments(allAssignments.flat());
+      setTotalItems(allAssignments.flat().length);
+    } catch (error) {
+      setError('Không thể tải danh sách cư dân hoặc đăng ký dịch vụ.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Filter theo search term
+  // Filter theo search term và tab
   const filteredAssignments = assignments.filter(a => {
     const residentName = a.resident?.full_name || a.resident?.name || '';
     const planNames = Array.isArray(a.care_plan_ids) ? a.care_plan_ids.map((cp: any) => cp.plan_name).join(', ') : '';
-    return (
+    const matchesSearch = (
       residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       planNames.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    if (!matchesSearch) return false;
+
+    // Filter theo tab
+    const isExpired = a.end_date && new Date(a.end_date) < new Date();
+    
+    switch (activeTab) {
+      case 'active':
+        return !isExpired;
+      case 'expired':
+        return isExpired;
+      default:
+        return true; // 'all' tab
+    }
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredAssignments.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedAssignments = filteredAssignments.slice(startIndex, endIndex);
+
+  // Reset to first page when search or tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeTab]);
 
   // Handle view details
   const handleViewDetails = (assignmentId: string) => {
@@ -86,10 +124,13 @@ export default function ServiceAssignmentsPage() {
     }
   };
 
-
-
-  // Get status text and color
-  const getStatusInfo = (status: string) => {
+  // Get status text and color based on assignment end date
+  const getStatusInfo = (status: string, endDate?: string, carePlanIds?: any[]) => {
+    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
+    if (endDate && new Date(endDate) < new Date()) {
+      return { text: 'Đã hết hạn', color: '#ef4444' };
+    }
+    
     const statusMap: { [key: string]: { text: string; color: string } } = {
       'consulting': { text: 'Đang tư vấn', color: '#f59e0b' },
       'packages_selected': { text: 'Đã chọn gói', color: '#3b82f6' },
@@ -98,7 +139,8 @@ export default function ServiceAssignmentsPage() {
       'active': { text: 'Đang sử dụng', color: '#059669' },
       'completed': { text: 'Đã hoàn thành', color: '#6b7280' },
       'cancelled': { text: 'Đã hủy', color: '#ef4444' },
-      'paused': { text: 'Tạm dừng', color: '#f97316' }
+      'paused': { text: 'Tạm dừng', color: '#f97316' },
+      'expired': { text: 'Đã hết hạn', color: '#ef4444' }
     };
     return statusMap[status] || { text: status, color: '#6b7280' };
   };
@@ -204,10 +246,11 @@ export default function ServiceAssignmentsPage() {
             margin: '0.25rem 0 0 0',
             fontWeight: 500
           }}>
-            Tổng số đăng ký: {filteredAssignments.length}
+            Tổng số đăng ký: {filteredAssignments.length} | Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length}
           </p>
         </div>
-        {/* Search Section */}
+        
+        {/* Tab Navigation */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -216,7 +259,7 @@ export default function ServiceAssignmentsPage() {
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="Tìm theo tên cư dân hoặc gói dịch vụ..."
@@ -232,10 +275,94 @@ export default function ServiceAssignmentsPage() {
               }}
             />
             <span style={{ color: '#667eea', fontWeight: 600 }}>
-              Hiển thị: {filteredAssignments.length} đăng ký
+              Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length} đăng ký
             </span>
+            
+            {/* Page Size Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Hiển thị:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>mục/trang</span>
+            </div>
+          </div>
+          
+          {/* Tab Buttons */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setActiveTab('all')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: activeTab === 'all' 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  : '#f3f4f6',
+                color: activeTab === 'all' ? 'white' : '#6b7280'
+              }}
+            >
+              Tất cả ({assignments.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('active')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: activeTab === 'active' 
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' 
+                  : '#f3f4f6',
+                color: activeTab === 'active' ? 'white' : '#6b7280'
+              }}
+            >
+              Còn hạn ({assignments.filter(a => !(a.end_date && new Date(a.end_date) < new Date())).length})
+            </button>
+            <button
+              onClick={() => setActiveTab('expired')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: activeTab === 'expired' 
+                  ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                  : '#f3f4f6',
+                color: activeTab === 'expired' ? 'white' : '#6b7280'
+              }}
+            >
+              Hết hạn ({assignments.filter(a => a.end_date && new Date(a.end_date) < new Date()).length})
+            </button>
           </div>
         </div>
+        
         {/* Table Section */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -263,32 +390,21 @@ export default function ServiceAssignmentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAssignments.length === 0 ? (
+                  {paginatedAssignments.length === 0 ? (
                     <tr><td colSpan={4} style={{ textAlign: 'center', padding: 32 }}>Không có dữ liệu đăng ký dịch vụ nào.</td></tr>
                   ) : (
-                    filteredAssignments.map((a, idx) => (
+                    paginatedAssignments.map((a, idx) => (
                       <tr key={a._id + '-' + idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{
-                              width: '2.5rem',
-                              height: '2.5rem',
-                              borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                              fontWeight: 600,
-                              fontSize: '0.875rem',
-                              overflow: 'hidden'
-                            }}>
-                              {a.resident?.avatar ? (
-                                <img src={userAPI.getAvatarUrl(a.resident.avatar)} alt={a.resident.full_name || a.resident.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                (a.resident?.full_name || a.resident?.name || '').charAt(0)
-                              )}
-                            </div>
+                            <Avatar
+                              src={a.resident?.avatar ? userAPI.getAvatarUrl(a.resident.avatar) : undefined}
+                              alt={a.resident?.full_name || a.resident?.name || 'Avatar'}
+                              size="small"
+                              className="w-10 h-10"
+                              showInitials={true}
+                              name={a.resident?.full_name || a.resident?.name || ''}
+                            />
                             <div>
                               <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>
                                 {a.resident?.full_name || a.resident?.name || ''}
@@ -300,13 +416,33 @@ export default function ServiceAssignmentsPage() {
                           </div>
                         </td>
                         <td style={{ padding: '1rem' }}>
-                          {Array.isArray(a.care_plan_ids)
-                            ? a.care_plan_ids.map((cp: any) => cp.description || cp.plan_name || cp.name || 'N/A').join(', ')
-                            : 'N/A'}
+                          {Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              {a.care_plan_ids.map((cp: any, index: number) => (
+                                <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                  <span style={{ 
+                                    color: activeTab === 'expired' ? '#ef4444' : '#059669', 
+                                    fontSize: '0.75rem', 
+                                    marginTop: '0.125rem',
+                                    fontWeight: 'bold'
+                                  }}>•</span>
+                                  <span style={{ 
+                                    fontSize: '0.875rem', 
+                                    color: '#374151', 
+                                    lineHeight: '1.4'
+                                  }}>
+                                    {cp.description || cp.plan_name || cp.name || 'N/A'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>N/A</span>
+                          )}
                         </td>
                         <td style={{ padding: '1rem' }}>
                           {(() => {
-                            const statusInfo = getStatusInfo(a.status);
+                            const statusInfo = getStatusInfo(a.status, a.end_date, a.care_plan_ids);
                             return (
                               <span style={{
                                 padding: '0.25rem 0.75rem',
@@ -373,7 +509,6 @@ export default function ServiceAssignmentsPage() {
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                               </svg>
-                              
                             </button>
                             {user?.role === 'admin' && (
                               <button
@@ -403,7 +538,6 @@ export default function ServiceAssignmentsPage() {
                                   <line x1="10" y1="11" x2="10" y2="17"/>
                                   <line x1="14" y1="11" x2="14" y2="17"/>
                                 </svg>
-                                
                               </button>
                             )}
                           </div>
@@ -416,6 +550,102 @@ export default function ServiceAssignmentsPage() {
             )}
           </div>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            marginTop: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              Hiển thị {startIndex + 1} - {Math.min(endIndex, filteredAssignments.length)} trong tổng số {filteredAssignments.length} đăng ký
+            </div>
+            
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                  color: currentPage === 1 ? '#9ca3af' : '#374151',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                <ChevronLeftIcon style={{ width: '1rem', height: '1rem' }} />
+                Trước
+              </button>
+              
+              {/* Page Numbers */}
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #d1d5db',
+                        backgroundColor: currentPage === pageNum ? '#667eea' : 'white',
+                        color: currentPage === pageNum ? 'white' : '#374151',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: currentPage === pageNum ? 600 : 500
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                  color: currentPage === totalPages ? '#9ca3af' : '#374151',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                Sau
+                <ChevronRightIcon style={{ width: '1rem', height: '1rem' }} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

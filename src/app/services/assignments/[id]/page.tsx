@@ -140,30 +140,32 @@ export default function CarePlanAssignmentDetailPage() {
     }).format(amount);
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string, endDate?: string) => {
+    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
+    if (endDate && new Date(endDate) < new Date()) {
+      return 'Đã hết hạn';
+    }
+    
     const statusMap: { [key: string]: string } = {
-      'consulting': 'Đang tư vấn',
-      'packages_selected': 'Đã chọn gói',
-      'room_assigned': 'Đã phân phòng',
-      'payment_completed': 'Đã thanh toán',
-      'active': 'Đang hoạt động',
-      'completed': 'Đã hoàn thành',
+      'active': 'Đang sử dụng',
       'cancelled': 'Đã hủy',
-      'paused': 'Tạm dừng'
+      'paused': 'Tạm dừng',
+      'expired': 'Đã hết hạn'
     };
     return statusMap[status] || status;
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, endDate?: string) => {
+    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
+    if (endDate && new Date(endDate) < new Date()) {
+      return '#ef4444'; // Màu đỏ cho trạng thái hết hạn
+    }
+    
     const colorMap: { [key: string]: string } = {
-      'consulting': '#f59e0b',
-      'packages_selected': '#3b82f6',
-      'room_assigned': '#8b5cf6',
-      'payment_completed': '#10b981',
       'active': '#059669',
-      'completed': '#6b7280',
       'cancelled': '#ef4444',
-      'paused': '#f97316'
+      'paused': '#f97316',
+      'expired': '#ef4444'
     };
     return colorMap[status] || '#6b7280';
   };
@@ -450,7 +452,7 @@ export default function CarePlanAssignmentDetailPage() {
                     }}>
                       <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
                   <span>Trạng thái:</span>
-                      <span style={{ color: getStatusColor(assignment?.status), fontWeight: 600 }}>{getStatusText(assignment?.status)}</span>
+                      <span style={{ color: getStatusColor(assignment?.status, assignment?.end_date), fontWeight: 600 }}>{getStatusText(assignment?.status, assignment?.end_date)}</span>
                     </span>
                   </div>
                 </div>

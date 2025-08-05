@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { residentAPI, staffAPI, billsAPI, carePlansAPI } from '@/lib/api';
+import { residentAPI, staffAPI, billsAPI, carePlansAPI, roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -34,6 +34,8 @@ export default function NewBillPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [residents, setResidents] = useState<any[]>([]);
+  const [filteredResidents, setFilteredResidents] = useState<any[]>([]);
+  const [residentSearchTerm, setResidentSearchTerm] = useState('');
   const [resident_id, setResidentId] = useState('');
   const [loadingResidents, setLoadingResidents] = useState(false);
   const [staffs, setStaffs] = useState<any[]>([]);
@@ -51,13 +53,65 @@ export default function NewBillPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // Fetch residents, staffs on mount
+
+
+  // Fetch residents with room information
   useEffect(() => {
     setLoadingResidents(true);
-    residentAPI.getAll()
-      .then(data => setResidents(data))
-      .catch(() => setResidents([]))
-      .finally(() => setLoadingResidents(false));
+    
+    const fetchResidentsWithRooms = async () => {
+      try {
+        const residentsData = await residentAPI.getAll();
+        
+        // Fetch room information for each resident
+        const residentsWithRooms = await Promise.all(
+          residentsData.map(async (resident: any) => {
+            try {
+              // Get care plan assignments for this resident
+              const assignments = await carePlansAPI.getByResidentId(resident._id);
+              const activeAssignment = Array.isArray(assignments) 
+                ? assignments.find((a: any) => a.status === 'active' && a.assigned_room_id)
+                : null;
+              
+              let roomNumber = 'Chưa phân phòng';
+              
+              if (activeAssignment?.assigned_room_id) {
+                const roomId = typeof activeAssignment.assigned_room_id === 'object' 
+                  ? activeAssignment.assigned_room_id._id 
+                  : activeAssignment.assigned_room_id;
+                
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  roomNumber = room?.room_number || 'Chưa phân phòng';
+                }
+              }
+              
+              return {
+                ...resident,
+                room_number: roomNumber
+              };
+            } catch (error) {
+              console.error(`Error fetching room for resident ${resident._id}:`, error);
+              return {
+                ...resident,
+                room_number: 'Chưa phân phòng'
+              };
+            }
+          })
+        );
+        
+        setResidents(residentsWithRooms);
+        setFilteredResidents(residentsWithRooms);
+      } catch (error) {
+        console.error('Error fetching residents:', error);
+        setResidents([]);
+        setFilteredResidents([]);
+      } finally {
+        setLoadingResidents(false);
+      }
+    };
+    
+    fetchResidentsWithRooms();
     
     staffAPI.getAll().then(setStaffs);
     
@@ -67,12 +121,48 @@ export default function NewBillPage() {
     }
   }, [user]);
 
+  // Filter residents based on search term
+  useEffect(() => {
+    if (!residentSearchTerm.trim()) {
+      setFilteredResidents(residents);
+      return;
+    }
+
+    const searchTerm = residentSearchTerm.toLowerCase();
+    const filtered = residents.filter(r => 
+      r?.full_name?.toLowerCase().includes(searchTerm) ||
+      r?.room_number?.toString().includes(searchTerm) ||
+      r?.room?.room_number?.toString().includes(searchTerm) ||
+      r?.phone?.includes(searchTerm)
+    );
+    setFilteredResidents(filtered);
+  }, [residentSearchTerm, residents]);
+
   // Fetch care plan assignments when resident changes
   useEffect(() => {
     if (resident_id) {
       setLoadingAssignments(true);
       carePlansAPI.getByResidentId(resident_id)
-        .then(data => setCarePlanAssignments(Array.isArray(data) ? data : []))
+        .then(data => {
+          const assignments = Array.isArray(data) ? data : [];
+          // Lọc chỉ những assignment còn hạn (active và chưa hết hạn)
+          const activeAssignments = assignments.filter((assignment: any) => {
+            // Kiểm tra status phải là 'active'
+            if (assignment.status !== 'active') return false;
+            
+            // Kiểm tra end_date phải còn trong tương lai
+            if (assignment.end_date) {
+              const endDate = new Date(assignment.end_date);
+              const now = new Date();
+              return endDate > now;
+            }
+            
+            // Nếu không có end_date, coi như còn hạn
+            return true;
+          });
+          
+          setCarePlanAssignments(activeAssignments);
+        })
         .catch(() => setCarePlanAssignments([]))
         .finally(() => setLoadingAssignments(false));
       setCarePlanAssignmentId('');
@@ -129,10 +219,24 @@ export default function NewBillPage() {
 
     if (!care_plan_assignment_id) {
       errors.care_plan_assignment_id = 'Vui lòng chọn gói chăm sóc';
+    } else {
+      // Kiểm tra thêm xem gói chăm sóc có còn hạn không
+      const selectedAssignment = carePlanAssignments.find((a: any) => a._id === care_plan_assignment_id);
+      if (selectedAssignment) {
+        if (selectedAssignment.status !== 'active') {
+          errors.care_plan_assignment_id = 'Gói chăm sóc không còn hoạt động';
+        } else if (selectedAssignment.end_date) {
+          const endDate = new Date(selectedAssignment.end_date);
+          const now = new Date();
+          if (endDate <= now) {
+            errors.care_plan_assignment_id = 'Gói chăm sóc đã hết hạn';
+          }
+        }
+      }
     }
 
     if (!staff_id) {
-      errors.staff_id = 'Vui lòng chọn nhân viên';
+      errors.staff_id = 'Không thể xác định nhân viên hiện tại';
     }
 
     if (!amount || Number(amount) <= 0) {
@@ -276,24 +380,65 @@ export default function NewBillPage() {
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       Cư dân <span className="text-red-500">*</span>
                     </label>
-                    <select 
-                      value={resident_id} 
-                      onChange={e => {
-                        setResidentId(e.target.value);
-                        setValidationErrors(prev => ({ ...prev, resident_id: undefined }));
-                      }} 
-                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                        validationErrors.resident_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      <option value="">Chọn cư dân</option>
-                      {residents.length === 0 && !loadingResidents && (
-                        <option value="" disabled>Không có cư dân nào</option>
-                      )}
-                      {residents.map(r => (
-                        <option key={r?._id} value={r?._id}>{r?.full_name}</option>
-                      ))}
-                    </select>
+                    
+                    {/* Search Input */}
+                    <div className="relative mb-2">
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm cư dân theo tên hoặc số phòng..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        value={residentSearchTerm}
+                        onChange={(e) => {
+                          const searchTerm = e.target.value;
+                          setResidentSearchTerm(searchTerm);
+                        }}
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Resident Selection */}
+                    <div className="relative">
+                      <select 
+                        value={resident_id} 
+                        onChange={e => {
+                          setResidentId(e.target.value);
+                          setValidationErrors(prev => ({ ...prev, resident_id: undefined }));
+                          // Reset search when resident is selected
+                          if (e.target.value) {
+                            setResidentSearchTerm('');
+                          }
+                        }} 
+                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                          validationErrors.resident_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        <option value="">Chọn cư dân</option>
+                        {residents.length === 0 && !loadingResidents && (
+                          <option value="" disabled>Không có cư dân nào</option>
+                        )}
+                        {(filteredResidents.length > 0 ? filteredResidents : residents).map(r => {
+                          const roomInfo = r?.room_number || r?.room?.room_number || 'Chưa phân phòng';
+                          return (
+                            <option key={r?._id} value={r?._id}>
+                              {r?.full_name} - Phòng {roomInfo}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      
+                      {/* Resident Count Info */}
+                      <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Hiển thị: {filteredResidents.length > 0 ? filteredResidents.length : residents.length} / {residents.length} cư dân
+                      </div>
+                    </div>
+                    
                     {validationErrors.resident_id && (
                       <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
                         <ExclamationTriangleIcon className="w-4 h-4" />
@@ -306,27 +451,23 @@ export default function NewBillPage() {
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       Nhân viên tạo <span className="text-red-500">*</span>
                     </label>
-                    <select 
-                      value={staff_id} 
-                      onChange={e => {
-                        setStaffId(e.target.value);
-                        setValidationErrors(prev => ({ ...prev, staff_id: undefined }));
-                      }} 
-                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                        validationErrors.staff_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      <option value="">Chọn nhân viên</option>
-                      {staffs.map(s => (
-                        <option key={s?._id} value={s?._id}>{s?.full_name}</option>
-                      ))}
-                    </select>
-                    {validationErrors.staff_id && (
-                      <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
-                        <ExclamationTriangleIcon className="w-4 h-4" />
-                        {validationErrors.staff_id}
-                      </p>
-                    )}
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        value={staffs.find(s => s?._id === staff_id)?.full_name || user?.name || 'Đang tải...'} 
+                        readOnly 
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        placeholder="Tự động chọn nhân viên hiện tại"
+                      />
+
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                        <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                      </div>
+                    </div>
+                    <p className="text-gray-600 text-sm mt-1 flex items-center gap-1">
+                      <UserIcon className="w-4 h-4" />
+                      Tự động chọn tài khoản đang đăng nhập
+                    </p>
                   </div>
                 </div>
               </div>
@@ -355,18 +496,40 @@ export default function NewBillPage() {
                       } ${(!resident_id || loadingAssignments) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     >
                       <option value="">{loadingAssignments ? 'Đang tải...' : 'Chọn gói chăm sóc'}</option>
-                      {carePlanAssignments.map(cp => (
-                        <option key={cp?._id} value={cp?._id}>
-                          {cp?.care_plan_ids && cp.care_plan_ids[0]?.plan_name ? cp.care_plan_ids[0].plan_name : 'Gói chăm sóc'}
-                          {cp?.total_monthly_cost ? ` - ${Number(cp.total_monthly_cost).toLocaleString('vi-VN')} đ/tháng` : ''}
-                        </option>
-                      ))}
+                      {carePlanAssignments.length === 0 && !loadingAssignments && (
+                        <option value="" disabled>Không có gói chăm sóc còn hạn</option>
+                      )}
+                      {carePlanAssignments.map(cp => {
+                        const planName = cp?.care_plan_ids && cp.care_plan_ids[0]?.plan_name ? cp.care_plan_ids[0].plan_name : 'Gói chăm sóc';
+                        const cost = cp?.total_monthly_cost ? ` - ${Number(cp.total_monthly_cost).toLocaleString('vi-VN')} đ/tháng` : '';
+                        const endDate = cp?.end_date ? new Date(cp.end_date) : null;
+                        const endDateStr = endDate ? ` (Hết hạn: ${endDate.toLocaleDateString('vi-VN')})` : '';
+                        
+                        return (
+                          <option key={cp?._id} value={cp?._id}>
+                            {planName}{cost}{endDateStr}
+                          </option>
+                        );
+                      })}
                     </select>
                     {validationErrors.care_plan_assignment_id && (
                       <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
                         <ExclamationTriangleIcon className="w-4 h-4" />
                         {validationErrors.care_plan_assignment_id}
                       </p>
+                    )}
+                    {carePlanAssignments.length === 0 && !loadingAssignments && resident_id && (
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <ExclamationTriangleIcon className="w-4 h-4 text-amber-600" />
+                          <p className="text-amber-800 text-sm font-medium">
+                            Không có gói chăm sóc còn hạn cho cư dân này
+                          </p>
+                        </div>
+                        <p className="text-amber-700 text-xs mt-1">
+                          Chỉ có thể tạo hóa đơn cho các gói dịch vụ đang hoạt động và chưa hết hạn.
+                        </p>
+                      </div>
                     )}
                   </div>
 
@@ -504,7 +667,7 @@ export default function NewBillPage() {
                 </button>
                 <button 
                   type="submit" 
-                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments}
+                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || carePlanAssignments.length === 0 || !staff_id}
                   className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
                 >
                   {loading ? (

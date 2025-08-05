@@ -1,38 +1,29 @@
-// Session timeout in milliseconds (2 hours)
-export const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
+import { clientStorage } from './clientStorage';
 
-// Warning time before session expires (10 minutes)
+export const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
 export const WARNING_TIME = 10 * 60 * 1000;
 
-/**
- * Clear all session data
- */
 export function clearSessionData() {
-  // Clear sessionStorage
-  sessionStorage.clear();
+  if (typeof window !== 'undefined') {
+    sessionStorage.clear();
+  }
   
-  // Clear localStorage (in case there's any old data)
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('user');
-  localStorage.removeItem('session_start');
+  clientStorage.removeItem('access_token');
+  clientStorage.removeItem('user');
+  clientStorage.removeItem('session_start');
+  clientStorage.removeItem('login_success');
+  clientStorage.removeItem('login_error');
+  clientStorage.removeItem('login_attempts');
   
-  // Clear login-related data
-  localStorage.removeItem('login_success');
-  localStorage.removeItem('login_error');
-  localStorage.removeItem('login_attempts');
-  
-  // Clear cookies
-  document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  if (typeof document !== 'undefined') {
+    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  }
 }
 
-/**
- * Check if session is valid
- */
 export function isSessionValid(): boolean {
-  // Chỉ sử dụng localStorage để nhất quán với interceptor
-  const token = localStorage.getItem('access_token');
-  const user = localStorage.getItem('user');
-  const sessionStart = localStorage.getItem('session_start');
+  const token = clientStorage.getItem('access_token');
+  const user = clientStorage.getItem('user');
+  const sessionStart = clientStorage.getItem('session_start');
   
   if (!token || !user || !sessionStart) {
     return false;
@@ -45,12 +36,8 @@ export function isSessionValid(): boolean {
   return elapsed < SESSION_TIMEOUT;
 }
 
-/**
- * Get remaining session time in milliseconds
- */
 export function getRemainingSessionTime(): number {
-  // Chỉ sử dụng localStorage để nhất quán
-  const sessionStart = localStorage.getItem('session_start');
+  const sessionStart = clientStorage.getItem('session_start');
   if (!sessionStart) {
     return 0;
   }
@@ -62,23 +49,23 @@ export function getRemainingSessionTime(): number {
   return Math.max(0, SESSION_TIMEOUT - elapsed);
 }
 
-/**
- * Extend session by updating session start time
- */
 export function extendSession() {
   const currentTime = Date.now().toString();
-  // Chỉ cập nhật localStorage để nhất quán
-  localStorage.setItem('session_start', currentTime);
+  clientStorage.setItem('session_start', currentTime);
 }
 
-/**
- * Initialize session with token and user data
- */
 export function initializeSession(token: string, userData: any) {
   const currentTime = Date.now().toString();
   
-  // Chỉ lưu vào localStorage để nhất quán với interceptor
-  localStorage.setItem('access_token', token);
-  localStorage.setItem('user', JSON.stringify(userData));
-  localStorage.setItem('session_start', currentTime);
+  // Sử dụng Promise.all để lưu đồng thời tất cả dữ liệu
+  const storageOperations = [
+    clientStorage.setItem('access_token', token),
+    clientStorage.setItem('user', JSON.stringify(userData)),
+    clientStorage.setItem('session_start', currentTime)
+  ];
+  
+  // Thực hiện tất cả operations đồng thời
+  Promise.all(storageOperations).catch(error => {
+    console.error('Error initializing session:', error);
+  });
 } 

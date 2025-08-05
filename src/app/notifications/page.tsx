@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
+import { clientStorage, getParsedItem, setParsedItem } from '@/lib/utils/clientStorage';
 
 // Mock notifications data
 const mockNotifications = [
@@ -112,12 +113,10 @@ const mockNotifications = [
   }
 ];
 
-// Lấy notifications từ localStorage nếu có, nếu không thì dùng mockNotifications
+// Lấy notifications từ Storage nếu có, nếu không thì dùng mockNotifications
 const getInitialNotifications = () => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('notifications');
-    if (saved) return JSON.parse(saved);
-  }
+  const saved = clientStorage.getItem('notifications');
+  if (saved) return JSON.parse(saved);
   return mockNotifications;
 };
 
@@ -130,9 +129,9 @@ export default function NotificationsPage() {
   const [selectedPriority, setSelectedPriority] = useState('all');
   const [showReadFilter, setShowReadFilter] = useState('all');
 
-  // Lưu notifications vào localStorage mỗi khi thay đổi
+  // Lưu notifications vào Storage mỗi khi thay đổi
   useEffect(() => {
-    localStorage.setItem('notifications', JSON.stringify(notifications));
+    setParsedItem('notifications', notifications);
   }, [notifications]);
 
   // Theme configurations for different roles

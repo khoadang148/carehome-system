@@ -16,7 +16,6 @@ export function useSessionTimeout() {
 
   useEffect(() => {
     if (!user) {
-      // Clear timeouts if user is not logged in
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -29,16 +28,13 @@ export function useSessionTimeout() {
       return;
     }
 
-    // Get remaining session time
     const remainingTime = getRemainingSessionTime();
     
     if (remainingTime <= 0) {
-      // Session has already expired
       logout();
       return;
     }
 
-    // Set warning timeout
     if (remainingTime > WARNING_TIME) {
       const warningTime = remainingTime - WARNING_TIME;
       warningTimeoutRef.current = setTimeout(() => {
@@ -46,17 +42,14 @@ export function useSessionTimeout() {
         setRemainingTime(WARNING_TIME);
       }, warningTime);
     } else {
-      // Show warning immediately if less than warning time remains
       setShowWarning(true);
       setRemainingTime(remainingTime);
     }
 
-    // Set timeout for session expiration
     timeoutRef.current = setTimeout(() => {
       logout();
     }, remainingTime);
 
-    // Cleanup function
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -69,7 +62,6 @@ export function useSessionTimeout() {
     };
   }, [user, logout]);
 
-  // Reset session timer on user activity
   useEffect(() => {
     if (!user) return;
 
@@ -77,10 +69,8 @@ export function useSessionTimeout() {
       const remainingTime = getRemainingSessionTime();
       
       if (remainingTime > 0) {
-        // Extend session
         extendSessionUtil();
         
-        // Clear existing timeouts
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
@@ -88,10 +78,8 @@ export function useSessionTimeout() {
           clearTimeout(warningTimeoutRef.current);
         }
 
-        // Hide warning if it was showing
         setShowWarning(false);
 
-        // Set new timeouts
         const newRemainingTime = SESSION_TIMEOUT;
         const warningTime = newRemainingTime - WARNING_TIME;
 
@@ -106,7 +94,6 @@ export function useSessionTimeout() {
       }
     };
 
-    // Reset timer on user activity
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     
     events.forEach(event => {
@@ -121,10 +108,8 @@ export function useSessionTimeout() {
   }, [user, logout]);
 
   const extendSession = () => {
-    // Extend session using utility function
     extendSessionUtil();
     
-    // Clear existing timeouts
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -132,10 +117,8 @@ export function useSessionTimeout() {
       clearTimeout(warningTimeoutRef.current);
     }
 
-    // Hide warning
     setShowWarning(false);
 
-    // Set new timeouts
     const newRemainingTime = SESSION_TIMEOUT;
     const warningTime = newRemainingTime - WARNING_TIME;
 
@@ -157,6 +140,6 @@ export function useSessionTimeout() {
     showWarning,
     remainingTime,
     extendSession,
-    handleLogout
+    handleLogout,
   };
 } 

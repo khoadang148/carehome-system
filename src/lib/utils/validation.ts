@@ -594,4 +594,85 @@ export const formatDateDDMMYYYY = (date: Date | string | null | undefined): stri
   } catch (error) {
     return '';
   }
+};
+
+/**
+ * Format ngày theo định dạng dd/mm/yyyy với điều chỉnh múi giờ GMT+7
+ * Sử dụng để đồng bộ với cách xử lý thời gian của trang staff
+ * @param date - Date object hoặc string
+ * @returns string - ngày theo định dạng dd/mm/yyyy
+ */
+export const formatDateDDMMYYYYWithTimezone = (date: Date | string | null | undefined): string => {
+  if (!date) return '';
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return '';
+    
+    // Subtract 7 hours to compensate for backend GMT+7 adjustment (same as staff page)
+    const adjustedDate = new Date(dateObj.getTime() - 7 * 60 * 60 * 1000);
+    
+    const day = String(adjustedDate.getDate()).padStart(2, '0');
+    const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+    const year = adjustedDate.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.warn('Error processing date with timezone:', error);
+    return formatDateDDMMYYYY(date);
+  }
+};
+
+/**
+ * Format thời gian theo định dạng HH:mm với điều chỉnh múi giờ GMT+7
+ * Sử dụng để đồng bộ với cách xử lý thời gian của trang staff
+ * @param date - Date object hoặc string
+ * @returns string - thời gian theo định dạng HH:mm
+ */
+export const formatTimeWithTimezone = (date: Date | string | null | undefined): string => {
+  if (!date) return '';
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return '';
+    
+    // Subtract 7 hours to compensate for backend GMT+7 adjustment (same as staff page)
+    const adjustedDate = new Date(dateObj.getTime() - 7 * 60 * 60 * 1000);
+    
+    return adjustedDate.toLocaleTimeString('vi-VN', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+  } catch (error) {
+    console.warn('Error processing time with timezone:', error);
+    return '';
+  }
+};
+
+/**
+ * Lấy ngày theo định dạng YYYY-MM-DD với điều chỉnh múi giờ GMT+7
+ * Sử dụng để so sánh ngày tháng một cách nhất quán
+ * @param date - Date object hoặc string
+ * @returns string - ngày theo định dạng YYYY-MM-DD
+ */
+export const getDateYYYYMMDDWithTimezone = (date: Date | string | null | undefined): string => {
+  if (!date) return '';
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return '';
+    
+    // Subtract 7 hours to compensate for backend GMT+7 adjustment (same as staff page)
+    const adjustedDate = new Date(dateObj.getTime() - 7 * 60 * 60 * 1000);
+    
+    const day = String(adjustedDate.getDate()).padStart(2, '0');
+    const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+    const year = adjustedDate.getFullYear();
+    
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.warn('Error processing date for comparison:', error);
+    return '';
+  }
 }; 

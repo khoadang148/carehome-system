@@ -199,177 +199,76 @@ export default function SettingsPage() {
     }
   };
 
-
-
   return (
     <>
-      {/* Nút quay lại sticky trên cùng, sát mép trái */}
-      <div
-        style={{
-          top: 0,
-          left: 0,
-          zIndex: 50,
-          background: '#f8fafc',
-          padding: '1.5rem 0 0 1.5rem'
-        }}
-      >
+      {/* Back Button - Sticky at top */}
+      <div className="sticky top-0 left-0 z-50 bg-gray-50 pt-6 pl-6">
         <button
           onClick={() => router.push('/')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            background: 'white',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-          }}
+          className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer shadow-sm hover:bg-gray-50 transition-colors"
         >
-          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          <ArrowLeftIcon className="w-4 h-4" />
           Quay lại
         </button>
       </div>
-      {/* Nội dung chính */}
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#f8fafc',
-          padding: '0 1rem 1.5rem 1rem'
-        }}
-      >
-        <div style={{ maxWidth:'600px', margin:'0 auto' }}>
+
+      {/* Main Content */}
+      <div className="min-h-screen bg-gray-50 px-4 pb-6">
+        <div className="max-w-2xl mx-auto">
           {/* Header Section */}
-          <div style={{ 
-            background:'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius:'1.5rem',
-            padding:'2rem',
-            marginBottom:'2rem',
-            boxShadow:'0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)', 
-            border:'1px solid rgba(255, 255, 255, 0.2)', 
-            backdropFilter:'blur(10px)', 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-              <div style={{
-                width: '3rem',
-                height: '3rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
-              }}>
-                <CogIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
+                <CogIcon className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 style={{ 
-                  fontSize:'1.8rem',
-                  fontWeight:'800',
-                  color:'#1e40af',
-                  margin:'0',
-                  letterSpacing:'-0.025em',
-                  lineHeight:'1.2'
-                }}>
+                <h1 className="text-3xl font-bold text-blue-800 leading-tight">
                   Cài đặt hệ thống
                 </h1>
-                <p style={{ 
-                  fontSize:'0.9rem',
-                  color:'#64748b',
-                  margin:'0.75rem 0 0 0',
-                  fontWeight:'500',
-                  letterSpacing:'0.01em'
-                }}>
+                <p className="text-gray-600 mt-3 font-medium">
                   Quản lý và thay đổi mật khẩu truy cập
                 </p>
               </div>
             </div>
           </div>
 
-
-
-          {/* Password Change */}
-          <div style={{
-            background: 'white',
-            borderRadius: '0.5rem',
-            padding: '1.5rem',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-            border: '1px solid #e5e7eb',
-            marginBottom: '1rem'
-          }}>
-            <h3 style={{
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              color: '#111827',
-              margin: '0 0 1rem 0'
-            }}>
+          {/* Password Change Section */}
+          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Đổi mật khẩu
             </h3>
             
-            <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+            <div className="space-y-4">
               {/* Current Password */}
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mật khẩu hiện tại
                 </label>
-                <div style={{position: 'relative'}}>
+                <div className="relative">
                   <input
                     type={showCurrentPassword ? 'text' : 'password'}
                     value={currentPassword}
                     onChange={(e) => handleCurrentPasswordChange(e.target.value)}
                     placeholder="Nhập mật khẩu hiện tại"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      paddingRight: '2.5rem',
-                      borderRadius: '0.375rem',
-                      border: `1px solid ${errors.currentPassword ? '#ef4444' : '#d1d5db'}`,
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      background: '#ffffff'
-                    }}
+                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${
+                      errors.currentPassword ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-none border-none cursor-pointer"
                   >
                     {showCurrentPassword ? 
-                      <EyeSlashIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} /> :
-                      <EyeIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
+                      <EyeSlashIcon className="w-4 h-4 text-gray-500" /> :
+                      <EyeIcon className="w-4 h-4 text-gray-500" />
                     }
                   </button>
                 </div>
                 {errors.currentPassword && (
-                  <div style={{
-                    marginTop: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#ef4444',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}>
-                    <ExclamationTriangleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                  <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
                     {errors.currentPassword}
                   </div>
                 )}
@@ -377,95 +276,59 @@ export default function SettingsPage() {
 
               {/* New Password */}
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mật khẩu mới
                 </label>
-                <div style={{position: 'relative'}}>
+                <div className="relative">
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => handleNewPasswordChange(e.target.value)}
                     placeholder="Nhập mật khẩu mới"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      paddingRight: '2.5rem',
-                      borderRadius: '0.375rem',
-                      border: `1px solid ${errors.newPassword ? '#ef4444' : '#d1d5db'}`,
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      background: '#ffffff'
-                    }}
+                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${
+                      errors.newPassword ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-none border-none cursor-pointer"
                   >
                     {showNewPassword ? 
-                      <EyeSlashIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} /> :
-                      <EyeIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
+                      <EyeSlashIcon className="w-4 h-4 text-gray-500" /> :
+                      <EyeIcon className="w-4 h-4 text-gray-500" />
                     }
                   </button>
                 </div>
                 
                 {/* Password Strength Indicator */}
                 {newPassword && (
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.25rem'
-                    }}>
-                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Độ mạnh mật khẩu:</span>
-                      <span style={{ fontSize: '0.75rem', color: passwordStrength.color, fontWeight: 500 }}>
+                  <div className="mt-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-500">Độ mạnh mật khẩu:</span>
+                      <span 
+                        className="text-xs font-medium"
+                        style={{ color: passwordStrength.color }}
+                      >
                         {passwordStrength.feedback}
                       </span>
                     </div>
-                    <div style={{
-                      width: '100%',
-                      height: '0.25rem',
-                      background: '#e5e7eb',
-                      borderRadius: '9999px',
-                      overflow: 'hidden'
-                    }}>
-                      <div style={{
-                        width: `${(passwordStrength.score / 5) * 100}%`,
-                        height: '100%',
-                        background: passwordStrength.color,
-                        transition: 'width 0.3s ease, background 0.3s ease'
-                      }} />
+                    <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full transition-all duration-300"
+                        style={{
+                          width: `${(passwordStrength.score / 5) * 100}%`,
+                          backgroundColor: passwordStrength.color
+                        }}
+                      />
                     </div>
                   </div>
                 )}
                 
                 {errors.newPassword && (
-                  <div style={{
-                    marginTop: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#ef4444',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}>
-                    <ExclamationTriangleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                  <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
                     {errors.newPassword}
                   </div>
                 )}
@@ -473,86 +336,44 @@ export default function SettingsPage() {
 
               {/* Confirm Password */}
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Xác nhận mật khẩu mới
                 </label>
-                <div style={{position: 'relative'}}>
+                <div className="relative">
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                     placeholder="Nhập lại mật khẩu mới"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      paddingRight: '2.5rem',
-                      borderRadius: '0.375rem',
-                      border: `1px solid ${errors.confirmPassword ? '#ef4444' : '#d1d5db'}`,
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      background: '#ffffff'
-                    }}
+                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${
+                      errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-none border-none cursor-pointer"
                   >
                     {showConfirmPassword ? 
-                      <EyeSlashIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} /> :
-                      <EyeIcon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
+                      <EyeSlashIcon className="w-4 h-4 text-gray-500" /> :
+                      <EyeIcon className="w-4 h-4 text-gray-500" />
                     }
                   </button>
                 </div>
                 {errors.confirmPassword && (
-                  <div style={{
-                    marginTop: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#ef4444',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}>
-                    <ExclamationTriangleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                  <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
                     {errors.confirmPassword}
                   </div>
                 )}
               </div>
 
               {/* Submit Button */}
-              <div style={{ 
-                borderTop: '1px solid #f3f4f6', 
-                paddingTop: '1rem',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                alignItems: 'center'
-              }}>
+              <div className="border-t border-gray-100 pt-4 flex justify-end gap-4 items-center">
                 {passwordSuccess && (
-                  <div style={{
-                    color: '#16a34a',
-                    fontSize: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <CheckCircleIcon style={{width: '1rem', height: '1rem'}} />
+                  <div className="text-green-700 text-sm flex items-center gap-2">
+                    <CheckCircleIcon className="w-4 h-4" />
                     Đổi mật khẩu thành công!
                   </div>
                 )}
@@ -560,46 +381,20 @@ export default function SettingsPage() {
                 <button
                   onClick={handleChangePassword}
                   disabled={isSubmitting || !currentPassword || !newPassword || !confirmPassword}
-                  style={{
-                    background: isSubmitting || !currentPassword || !newPassword || !confirmPassword ? '#9ca3af' : '#059669',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    padding: '0.75rem 1.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: isSubmitting || !currentPassword || !newPassword || !confirmPassword ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSubmitting && currentPassword && newPassword && confirmPassword) {
-                      e.currentTarget.style.background = '#047857';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSubmitting && currentPassword && newPassword && confirmPassword) {
-                      e.currentTarget.style.background = '#059669';
-                    }
-                  }}
+                  className={`px-6 py-3 rounded-lg border-none text-white text-sm font-semibold flex items-center gap-2 transition-colors ${
+                    isSubmitting || !currentPassword || !newPassword || !confirmPassword
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                 >
                   {isSubmitting ? (
                     <>
-                      <div style={{
-                        width: '1rem',
-                        height: '1rem',
-                        border: '2px solid transparent',
-                        borderTop: '2px solid white',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                      }} />
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Đang xử lý...
                     </>
                   ) : (
                     <>
-                      <ShieldCheckIcon style={{width: '1rem', height: '1rem'}} />
+                      <ShieldCheckIcon className="w-4 h-4" />
                       Đổi mật khẩu
                     </>
                   )}
@@ -607,13 +402,13 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-
-          
         </div>
       </div>
-      {/* Cuối cùng, thêm modal vào JSX */}
+
+      {/* Notification Modal */}
       <NotificationModal
         open={modalOpen}
+        title={modalType === 'success' ? 'Thành công' : 'Lỗi'}
         type={modalType}
         message={modalMessage}
         onClose={() => setModalOpen(false)}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { ArrowLeftIcon, UserPlusIcon, BriefcaseIcon, PhoneIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 type StaffFormData = {
   firstName: string;
@@ -78,7 +79,7 @@ export default function AddStaffPage() {
     
     try {
       // Get existing staff data
-      const existingStaff = localStorage.getItem('nurseryHomeStaff');
+      const existingStaff = clientStorage.getItem('nurseryHomeStaff');
       const staffList = existingStaff ? JSON.parse(existingStaff) : [];
       
       // Generate new ID
@@ -113,8 +114,8 @@ export default function AddStaffPage() {
       // Add to staff list
       staffList.push(newStaff);
       
-      // Save to localStorage
-      localStorage.setItem('nurseryHomeStaff', JSON.stringify(staffList));
+      // Save toStorage
+      clientStorage.setItem('nurseryHomeStaff', JSON.stringify(staffList));
       
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));

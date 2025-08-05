@@ -1,27 +1,57 @@
 import axios from 'axios';
-// XÓA: import { getCookie, setCookie, deleteCookie } from 'cookies-next';
+import { clientStorage } from './utils/clientStorage';
 
-// Base API URL for local Swagger backend
 const API_BASE_URL = 'http://localhost:8000';
 
-// Create axios instance with default config
+// Tạo client riêng cho login với timeout ngắn hơn
+const loginClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+  timeout: 8000, // Giảm timeout xuống 8 giây cho login
+});
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 15000, // Tăng timeout lên 15 giây cho tất cả requests
+  timeout: 15000,
 });
 
-// Utility function to check if user is authenticated
+const logoutClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+  timeout: 3000,
+});
+
+logoutClient.interceptors.request.use(
+  (config) => {
+    const token = clientStorage.getItem('access_token');
+    
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const isAuthenticated = () => {
-  if (typeof window === 'undefined') return false;
-  const token = localStorage.getItem('access_token');
+  const token = clientStorage.getItem('access_token');
   return !!token;
 };
 
-// Utility function to handle API errors
 const handleApiError = (error: any, context: string) => {
   if (error.response) {
     const { status, data } = error.response;
@@ -46,20 +76,13 @@ const handleApiError = (error: any, context: string) => {
   }
 };
 
-// Add request interceptor to include auth token
 apiClient.interceptors.request.use(
   (config) => {
-    // Lấy token từ localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const token = clientStorage.getItem('access_token');
     
     if (token) {
-      // Đảm bảo headers object tồn tại
       config.headers = config.headers || {};
-      
-      // Thêm token vào header
       config.headers['Authorization'] = `Bearer ${token}`;
-      
-      // Debug log để kiểm tra token
       console.log('Request with token:', config.url, token.substring(0, 20) + '...');
     } else {
       console.warn('No token found for request:', config.url);
@@ -72,17 +95,16 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle auth errors
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     // Nếu gặp 401 thì chỉ logout, không thử refresh
     if (error.response?.status === 401) {
       console.error('401 Unauthorized - Redirecting to login');
+      clientStorage.removeItem('access_token');
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
+        window.location.href = '/login';
       }
-      window.location.href = '/login';
       return Promise.reject(error);
     }
     
@@ -91,8 +113,8 @@ apiClient.interceptors.response.use(
       console.error('403 Forbidden - Access denied:', {
         url: error.config?.url,
         method: error.config?.method,
-        hasToken: !!localStorage.getItem('access_token'),
-        tokenPreview: localStorage.getItem('access_token')?.substring(0, 20) + '...'
+              hasToken: !!clientStorage.getItem('access_token'),
+      tokenPreview: clientStorage.getItem('access_token')?.substring(0, 20) + '...'
       });
     }
 
@@ -100,7 +122,6 @@ apiClient.interceptors.response.use(
   }
 );
 
-// API endpoints based on Swagger documentation
 const endpoints = {
   // Auth endpoints
   auth: {
@@ -157,25 +178,47 @@ const endpoints = {
 
 export const authAPI = {
   login: async (email: string, password: string) => {
-    try {
-      const response = await apiClient.post('/auth/login', {
-        email,
-        password,
-      });
-      
-      const { access_token } = response.data;
-      console.log('Login successful, setting token:', access_token);
-      
-      // Lưu token vào localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', access_token);
+    const maxRetries = 2;
+    let lastError: any;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Login attempt ${attempt + 1}/${maxRetries + 1}`);
+        
+        const response = await loginClient.post('/auth/login', {
+          email,
+          password,
+        });
+        
+        const { access_token } = response.data;
+        console.log('Login successful, setting token:', access_token);
+        
+        // Lưu token vào localStorage
+        if (typeof window !== 'undefined') {
+          clientStorage.setItem('access_token', access_token);
+        }
+        return response.data;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`Login attempt ${attempt + 1} failed:`, error);
+        
+        // Nếu là lỗi 401 (sai thông tin đăng nhập), không retry
+        if (error.response?.status === 401) {
+          break;
+        }
+        
+        // Nếu là lỗi network và còn retry, chờ một chút rồi thử lại
+        if (attempt < maxRetries && (error.code === 'ECONNABORTED' || error.message.includes('timeout'))) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
+          continue;
+        }
+        
+        break;
       }
-      return response.data;
-    } catch (error) {
-      console.error('Login failed:', error);
-      const errorMessage = handleApiError(error, 'Login');
-      throw new Error(errorMessage);
     }
+    
+    const errorMessage = handleApiError(lastError, 'Login');
+    throw new Error(errorMessage);
   },
 
   register: async (userData: any) => {
@@ -200,15 +243,20 @@ export const authAPI = {
 
   logout: async () => {
     try {
-      const response = await apiClient.post(endpoints.auth.logout);
+      const response = await logoutClient.post(endpoints.auth.logout);
       // Xóa token khỏi localStorage
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
+        clientStorage.removeItem('access_token');
       }
       return response.data;
     } catch (error) {
-      const errorMessage = handleApiError(error, 'Logout');
-      throw new Error(errorMessage);
+      // Không throw error để không block logout process
+      console.warn('Logout API call failed:', error);
+      // Vẫn xóa token local
+      if (typeof window !== 'undefined') {
+        clientStorage.removeItem('access_token');
+      }
+      return { message: 'Logged out locally', success: true };
     }
   },
 
@@ -482,8 +530,21 @@ export const staffAPI = {
         return [];
       }
       
-      // Sử dụng endpoint /users/by-role với filter role=staff
-      console.log('Fetching staff with params:', { role: 'staff', ...params });
+      // Kiểm tra role của user
+      const user = JSON.parse(clientStorage.getItem('user') || '{}');
+      if (user.role === 'family') {
+        // Family sử dụng endpoint /users và filter ở frontend
+        console.log('Family user - fetching all users');
+        const response = await apiClient.get('/users', { params });
+        // Filter chỉ lấy staff ở frontend
+        const allUsers = response.data;
+        const staffUsers = allUsers.filter((user: any) => user.role === 'staff');
+        console.log('Filtered staff users:', staffUsers);
+        return staffUsers;
+      }
+      
+      // Admin và Staff sử dụng endpoint /users/by-role
+      console.log('Admin/Staff user - fetching staff with params:', { role: 'staff', ...params });
       const response = await apiClient.get('/users/by-role', { 
         params: { 
           role: 'staff',
@@ -1517,21 +1578,85 @@ export const vitalSignsAPI = {
 export const photosAPI = {
   getAll: async (params?: any) => {
     try {
+      // Kiểm tra authentication trước khi gọi API
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated, redirecting to login');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return [];
+      }
+      
+      console.log('Fetching photos with params:', params);
+      
+      // Kiểm tra role của user
+      const user = JSON.parse(clientStorage.getItem('user') || '{}');
+      
+      // Nếu có family_member_id và user là family, sử dụng endpoint chính
+      if (params?.family_member_id && user.role === 'family') {
+        console.log('Family user - using main endpoint with family_member_id');
+        const response = await apiClient.get('/resident-photos', { 
+          params: { family_member_id: params.family_member_id } 
+        });
+        console.log('Photos API response (family):', response.data);
+        return response.data;
+      }
+      
+      // Nếu có family_member_id nhưng không phải family, thử lấy photos theo resident
+      if (params?.family_member_id) {
+        try {
+          // Đầu tiên lấy danh sách residents của family member
+          const residents = await residentAPI.getByFamilyMemberId(params.family_member_id);
+          const residentIds = Array.isArray(residents) ? residents.map(r => r._id) : [residents._id];
+          
+          // Lấy photos cho từng resident
+          const allPhotos: any[] = [];
+          for (const residentId of residentIds) {
+            try {
+              const response = await apiClient.get(`/resident-photos/by-resident/${residentId}`);
+              if (response.data && Array.isArray(response.data)) {
+                allPhotos.push(...response.data);
+              }
+            } catch (residentError) {
+              console.warn(`Error fetching photos for resident ${residentId}:`, residentError);
+            }
+          }
+          
+          console.log('Photos API response (by resident):', allPhotos);
+          return allPhotos;
+        } catch (residentError) {
+          console.warn('Error fetching photos by resident, falling back to general endpoint:', residentError);
+        }
+      }
+      
+      // Fallback: gọi endpoint chung
       const response = await apiClient.get('/resident-photos', { params });
+      console.log('Photos API response (general):', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching photos:', error);
-      throw error;
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
     }
   },
 
   getById: async (id: string) => {
     try {
+      // Kiểm tra authentication trước khi gọi API
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated, redirecting to login');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return null;
+      }
+      
       const response = await apiClient.get(`/resident-photos/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching photo with ID ${id}:`, error);
-      throw error;
+      // Trả về null thay vì throw error để tránh crash app
+      return null;
     }
   },
 
@@ -1562,6 +1687,26 @@ export const photosAPI = {
     if (!file_path) return '';
     const cleanPath = file_path.replace(/\\/g, '/').replace(/"/g, '');
     return `${API_BASE_URL}/${cleanPath}`;
+  },
+
+  getByResidentId: async (residentId: string) => {
+    try {
+      // Kiểm tra authentication trước khi gọi API
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated, redirecting to login');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return [];
+      }
+      
+      const response = await apiClient.get(`/resident-photos/by-resident/${residentId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching photos for resident ${residentId}:`, error);
+      // Trả về mảng rỗng thay vì throw error để tránh crash app
+      return [];
+    }
   },
 };
 
@@ -1787,11 +1932,12 @@ export const carePlanAssignmentsAPI = {
     }
   },
 
-  renew: async (id: string, newEndDate: string, newStartDate?: string) => {
+  renew: async (id: string, newEndDate: string, newStartDate?: string, selectedCarePlanIds?: string[]) => {
     try {
       const response = await apiClient.patch(`/care-plan-assignments/${id}/renew`, {
         newEndDate,
-        ...(newStartDate && { newStartDate })
+        ...(newStartDate && { newStartDate }),
+        ...(selectedCarePlanIds && { selectedCarePlanIds })
       });
       return response.data;
     } catch (error) {

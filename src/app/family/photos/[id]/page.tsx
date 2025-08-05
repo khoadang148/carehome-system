@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownTrayIcon, XMarkIcon, CalendarIcon, UserIcon, HomeIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/contexts/auth-context";
-import { photosAPI, userAPI } from "@/lib/api";
+import { photosAPI, userAPI, residentAPI } from "@/lib/api";
+import { clientStorage } from "@/lib/utils/clientStorage";
 
 export default function PhotoDetailPage() {
   const router = useRouter();
@@ -24,17 +25,30 @@ export default function PhotoDetailPage() {
 
     const loadPhotos = async () => {
       try {
-        const accessToken = localStorage.getItem("access_token");
+        const accessToken = clientStorage.getItem("access_token");
         if (!accessToken) {
           setError("Không tìm thấy access token. Vui lòng đăng nhập lại.");
           return;
         }
 
         const familyId = user.id;
-        const data = await photosAPI.getAll({ family_member_id: familyId });
         
-        if (Array.isArray(data)) {
-          const mapped = await Promise.all(data.map(async (item: any) => {
+        // Sử dụng endpoint chính cho family
+        let allPhotosData: any[] = [];
+        try {
+          const photos = await photosAPI.getAll({ family_member_id: familyId });
+          if (photos && Array.isArray(photos)) {
+            allPhotosData = photos;
+          }
+        } catch (error) {
+          console.warn('Error fetching photos for family:', error);
+          setError("Không thể tải danh sách ảnh. Có thể bạn không có quyền xem hoặc chưa có ảnh nào được chia sẻ.");
+          setLoading(false);
+          return;
+        }
+        
+        if (allPhotosData.length > 0) {
+          const mapped = await Promise.all(allPhotosData.map(async (item: any) => {
             let senderName = item.uploadedByName;
             let senderPosition = '';
             
@@ -80,8 +94,10 @@ export default function PhotoDetailPage() {
             setPhoto(mapped[photoIndex]);
             setCurrentIndex(photoIndex);
           } else {
-            setError("Không tìm thấy ảnh");
+            setError("Không tìm thấy ảnh này. Có thể ảnh đã bị xóa, chưa được chia sẻ hoặc bạn không có quyền xem.");
           }
+        } else {
+          setError("Chưa có ảnh nào được chia sẻ cho người thân của bạn hoặc bạn không có quyền xem.");
         }
         
         setLoading(false);
@@ -113,7 +129,7 @@ export default function PhotoDetailPage() {
 
   const downloadPhoto = async (url: string, name: string) => {
     try {
-      const accessToken = localStorage.getItem("access_token");
+      const accessToken = clientStorage.getItem("access_token");
       const response = await fetch(url, {
         headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
       });
@@ -168,10 +184,16 @@ export default function PhotoDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <PhotoIcon className="w-8 h-8 text-red-500" />
+            {error ? (
+              <XMarkIcon className="w-8 h-8 text-red-500" />
+            ) : (
+              <PhotoIcon className="w-8 h-8 text-red-500" />
+            )}
           </div>
-          <h2 className="text-xl font-semibold text-slate-800 mb-2">Không tìm thấy ảnh</h2>
-          <p className="text-slate-600 mb-6">{error || "Ảnh này không tồn tại hoặc đã bị xóa."}</p>
+          <h2 className="text-xl font-semibold text-slate-800 mb-2">
+            {error ? "Lỗi tải ảnh" : "Không tìm thấy ảnh"}
+          </h2>
+          <p className="text-slate-600 mb-6">{error || "Ảnh này không tồn tại, đã bị xóa hoặc bạn không có quyền xem."}</p>
           <button
             onClick={() => router.push('/family/photos')}
             className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200 flex items-center gap-2 mx-auto"

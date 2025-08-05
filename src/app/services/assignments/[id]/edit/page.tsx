@@ -33,6 +33,8 @@ export default function EditCarePlanAssignmentPage() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [selectedCarePlans, setSelectedCarePlans] = useState<string[]>([]);
+  const [carePlanDetails, setCarePlanDetails] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchAssignment = async () => {
@@ -40,11 +42,54 @@ export default function EditCarePlanAssignmentPage() {
         setLoading(true);
         const data = await carePlanAssignmentsAPI.getById(assignmentId);
         setAssignment(data);
+        
+        // Lấy chi tiết các gói dịch vụ
+        if (data.care_plan_ids && Array.isArray(data.care_plan_ids)) {
+          setCarePlanDetails(data.care_plan_ids);
+        }
+        
+        // Kiểm tra nếu assignment đã hết hạn thì tự động cập nhật trạng thái trên backend
+        const isExpired = isAssignmentExpired(data.end_date);
+        
+        console.log('Assignment data:', data);
+        console.log('End date:', data.end_date);
+        console.log('Is expired:', isExpired);
+        console.log('Original status:', data.status);
+        
+        if (isExpired && data.status !== 'paused') {
+          // Tự động cập nhật trạng thái thành 'paused' trên backend
+          try {
+            console.log('Auto-updating expired assignment status to paused...');
+            await carePlanAssignmentsAPI.updateStatus(assignmentId, 'paused');
+            console.log('Successfully updated assignment status to paused');
+            // Cập nhật lại data sau khi đã update
+            const updatedData = await carePlanAssignmentsAPI.getById(assignmentId);
+            setAssignment(updatedData);
+            // Sử dụng updatedData thay vì data
+            setStatus(updatedData.status || '');
+            if (updatedData.care_plan_ids && Array.isArray(updatedData.care_plan_ids)) {
+              setCarePlanDetails(updatedData.care_plan_ids);
+              const allPlanIds = updatedData.care_plan_ids?.map((plan: any) => plan._id || plan.id) || [];
+              setSelectedCarePlans(allPlanIds);
+            }
+            return; // Thoát khỏi function vì đã xử lý xong
+          } catch (error) {
+            console.error('Failed to auto-update assignment status:', error);
+          }
+        }
+        
+        // Lấy chi tiết các gói dịch vụ
+        if (data.care_plan_ids && Array.isArray(data.care_plan_ids)) {
+          setCarePlanDetails(data.care_plan_ids);
+        }
+        
+        // Set trạng thái hiện tại
         setStatus(data.status || '');
         
-        // Kiểm tra nếu đã hết hạn thì tự động chuyển sang tạm dừng
-        if (data.end_date && new Date(data.end_date) < new Date()) {
-          setStatus('paused');
+        // Nếu đã hết hạn, tự động chọn tất cả gói để gia hạn
+        if (isExpired) {
+          const allPlanIds = data.care_plan_ids?.map((plan: any) => plan._id || plan.id) || [];
+          setSelectedCarePlans(allPlanIds);
         }
       } catch (err: any) {
         setError(err.response?.data?.message || 'Không thể tải thông tin phân công');
@@ -62,8 +107,9 @@ export default function EditCarePlanAssignmentPage() {
   const handleStatusChange = (newStatus: string) => {
     setStatus(newStatus);
     
-    // Nếu chọn "đang sử dụng" và trước đó là "tạm dừng" hoặc đã hết hạn, hiển thị date picker
-    if (newStatus === 'active' && (assignment?.status === 'paused' || isExpired)) {
+    // Nếu chọn "đang sử dụng" và assignment đã hết hạn, hiển thị date picker để gia hạn
+    const isExpired = isAssignmentExpired(assignment?.end_date);
+    if (newStatus === 'active' && assignment?.status === 'paused' && isExpired && selectedCarePlans.length > 0) {
       setShowDatePicker(true);
       // Set default start date to today
       const today = new Date().toISOString().split('T')[0];
@@ -78,6 +124,15 @@ export default function EditCarePlanAssignmentPage() {
     }
   };
 
+  // Xử lý khi chọn/bỏ chọn gói dịch vụ
+  const handleCarePlanSelection = (planId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedCarePlans(prev => [...prev, planId]);
+    } else {
+      setSelectedCarePlans(prev => prev.filter(id => id !== planId));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -86,8 +141,13 @@ export default function EditCarePlanAssignmentPage() {
       return;
     }
 
-        // Kiểm tra nếu chọn "đang sử dụng" và hiển thị date picker thì phải có cả ngày bắt đầu và kết thúc
-    if (status === 'active' && showDatePicker) {
+        // Kiểm tra nếu chọn "đang sử dụng" và assignment đã hết hạn thì phải có cả ngày bắt đầu và kết thúc
+    const isExpired = isAssignmentExpired(assignment?.end_date);
+    if (status === 'active' && assignment?.status === 'paused' && isExpired) {
+      if (selectedCarePlans.length === 0) {
+        setError('Vui lòng chọn ít nhất một gói dịch vụ để gia hạn');
+        return;
+      }
       if (!startDate) {
         setError('Vui lòng chọn ngày bắt đầu mới');
         return;
@@ -122,18 +182,20 @@ export default function EditCarePlanAssignmentPage() {
       setError(null);
       
       // Nếu đang gia hạn dịch vụ (từ paused sang active với ngày kết thúc mới)
-      if (status === 'active' && (assignment?.status === 'paused' || isExpired) && endDate) {
-        await carePlanAssignmentsAPI.renew(assignmentId, endDate, startDate);
+      const isExpired = isAssignmentExpired(assignment?.end_date);
+      if (status === 'active' && assignment?.status === 'paused' && isExpired && endDate) {
+        // Gia hạn assignment đã hết hạn
+        await carePlanAssignmentsAPI.renew(assignmentId, endDate, startDate, selectedCarePlans);
       } else {
         // Cập nhật trạng thái thông thường
-      const updateData: any = { status };
-      
-      // Nếu có ngày kết thúc mới, thêm vào dữ liệu cập nhật
-      if (endDate) {
-        updateData.endDate = endDate;
-      }
-      
-      await carePlanAssignmentsAPI.update(assignmentId, updateData);
+        const updateData: any = { status };
+        
+        // Nếu có ngày kết thúc mới, thêm vào dữ liệu cập nhật
+        if (endDate) {
+          updateData.endDate = endDate;
+        }
+        
+        await carePlanAssignmentsAPI.update(assignmentId, updateData);
       }
       
       router.push(`/services/assignments/${assignmentId}`);
@@ -148,7 +210,12 @@ export default function EditCarePlanAssignmentPage() {
     router.push(`/services/assignments/${assignmentId}`);
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string, endDate?: string) => {
+    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
+    if (endDate && new Date(endDate) < new Date()) {
+      return 'Đã hết hạn';
+    }
+    
     const statusMap: { [key: string]: string } = {
       'consulting': 'Đang tư vấn',
       'packages_selected': 'Đã chọn gói',
@@ -157,12 +224,18 @@ export default function EditCarePlanAssignmentPage() {
       'active': 'Đang hoạt động',
       'completed': 'Đã hoàn thành',
       'cancelled': 'Đã hủy',
-      'paused': 'Tạm dừng'
+      'paused': 'Tạm dừng',
+      'expired': 'Đã hết hạn'
     };
     return statusMap[status] || status;
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, endDate?: string) => {
+    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
+    if (endDate && new Date(endDate) < new Date()) {
+      return '#ef4444'; // Màu đỏ cho trạng thái hết hạn
+    }
+    
     const colorMap: { [key: string]: string } = {
       'consulting': '#f59e0b',
       'packages_selected': '#3b82f6',
@@ -171,7 +244,8 @@ export default function EditCarePlanAssignmentPage() {
       'active': '#059669',
       'completed': '#6b7280',
       'cancelled': '#ef4444',
-      'paused': '#f97316'
+      'paused': '#f97316',
+      'expired': '#ef4444'
     };
     return colorMap[status] || '#6b7280';
   };
@@ -184,7 +258,12 @@ export default function EditCarePlanAssignmentPage() {
     return `${day}/${month}/${year}`;
   };
 
-  const isExpired = assignment?.end_date && new Date(assignment.end_date) < new Date();
+  // Helper function để kiểm tra assignment có hết hạn không
+  const isAssignmentExpired = (endDate?: string): boolean => {
+    if (!endDate) return false;
+    const endDateObj = new Date(endDate);
+    return !isNaN(endDateObj.getTime()) && endDateObj < new Date();
+  };
 
   if (loading) {
     return (
@@ -439,10 +518,10 @@ export default function EditCarePlanAssignmentPage() {
                    <p style={{
                      fontSize: '1.125rem',
                      fontWeight: 700,
-                color: getStatusColor(assignment.status),
+                color: getStatusColor(assignment.status, assignment.end_date),
                      margin: 0
               }}>
-                {getStatusText(assignment.status)}
+                {getStatusText(assignment.status, assignment.end_date)}
                    </p>
                  </div>
                  
@@ -493,11 +572,11 @@ export default function EditCarePlanAssignmentPage() {
                    <p style={{
                      fontSize: '1.125rem',
                      fontWeight: 700,
-                     color: isExpired ? '#ef4444' : '#059669',
+                     color: isAssignmentExpired(assignment?.end_date) ? '#ef4444' : '#059669',
                      margin: 0
                    }}>
                      {assignment.end_date ? formatDate(assignment.end_date) : 'Không có thời hạn'}
-                     {isExpired && ' (Đã hết hạn)'}
+                     {isAssignmentExpired(assignment?.end_date) && ' (Đã hết hạn)'}
                    </p>
                  </div>
             </div>
@@ -600,8 +679,119 @@ export default function EditCarePlanAssignmentPage() {
             </select>
           </div>
 
+          {/* Danh sách gói dịch vụ để chọn gia hạn */}
+          {status === 'paused' && carePlanDetails.length > 0 && isAssignmentExpired(assignment?.end_date) && (
+            <div style={{
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              borderRadius: '1rem',
+              padding: '1.5rem',
+              marginBottom: '2rem',
+              border: '1px solid #fbbf24'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <div style={{
+                  width: '2rem',
+                  height: '2rem',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CheckCircleIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                </div>
+                <div>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    color: '#92400e',
+                    margin: 0
+                  }}>
+                    Chọn gói dịch vụ để gia hạn
+                  </h4>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    color: '#a16207',
+                    margin: '0.25rem 0 0 0'
+                  }}>
+                    Chọn các gói dịch vụ cần gia hạn (tất cả gói được chọn sẵn nếu assignment đã hết hạn)
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gap: '0.75rem'
+              }}>
+                {carePlanDetails.map((plan: any, index: number) => {
+                  const planId = plan._id || plan.id;
+                  const isExpired = assignment?.end_date && new Date(assignment.end_date) < new Date();
+                  const isSelected = selectedCarePlans.includes(planId);
+                  
+                  return (
+                    <div key={index} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255, 255, 255, 0.8)',
+                      borderRadius: '0.5rem',
+                      border: `1px solid ${isSelected ? '#22c55e' : '#fbbf24'}`,
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <input
+                        type="checkbox"
+                        id={`plan-${planId}`}
+                        checked={isSelected}
+                        onChange={(e) => handleCarePlanSelection(planId, e.target.checked)}
+                        style={{
+                          width: '1rem',
+                          height: '1rem',
+                          accentColor: '#22c55e'
+                        }}
+                      />
+                      <label
+                        htmlFor={`plan-${planId}`}
+                        style={{
+                          flex: 1,
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          fontWeight: 500
+                        }}
+                      >
+                        <div style={{ marginBottom: '0.25rem' }}>
+                          {plan.plan_name || plan.name || plan.description || 'Gói dịch vụ'}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: isExpired ? '#ef4444' : '#059669',
+                          fontWeight: 600
+                        }}>
+                          {assignment?.end_date ? (
+                            <>
+                              Kết thúc: {formatDate(assignment.end_date)}
+                              {isExpired && ' (Đã hết hạn)'}
+                            </>
+                          ) : (
+                            'Không có thời hạn'
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Date picker cho gia hạn */}
-            {(showDatePicker || (status === 'active' && isExpired)) && (
+            {(showDatePicker || (status === 'active' && assignment?.status === 'paused' && isAssignmentExpired(assignment?.end_date) && selectedCarePlans.length > 0)) && (
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                 borderRadius: '1rem',
@@ -890,7 +1080,7 @@ export default function EditCarePlanAssignmentPage() {
                    fontSize: '0.75rem',
                    color: '#15803d'
             }}>
-                   <strong>Thông tin gia hạn:</strong> Chu kỳ dịch vụ mới sẽ bắt đầu từ {startDate ? formatDate(startDate) : 'ngày bạn chọn'} và kết thúc vào {endDate ? formatDate(endDate) : 'ngày kết thúc mới'}.
+                   <strong>Thông tin gia hạn:</strong> {selectedCarePlans.length} gói dịch vụ được chọn sẽ được gia hạn từ {startDate ? formatDate(startDate) : 'ngày bạn chọn'} đến {endDate ? formatDate(endDate) : 'ngày kết thúc mới'}.
                  </div>
             </div>
           )}
@@ -925,16 +1115,24 @@ export default function EditCarePlanAssignmentPage() {
             </button>
             <button
               type="submit"
-                disabled={saving || !status || (status === 'active' && (showDatePicker || isExpired) && (!startDate || !endDate))}
+                disabled={saving || !status || (status === 'active' && isAssignmentExpired(assignment?.end_date) && (!startDate || !endDate))}
               style={{
                   padding: '0.875rem 1.75rem',
-                  background: saving || !status || (status === 'active' && (showDatePicker || isExpired) && (!startDate || !endDate)) 
+                  background: saving || !status || (status === 'active' && (() => {
+                    const endDate = assignment?.end_date;
+                    const endDateObj = endDate ? new Date(endDate) : null;
+                    return endDateObj && endDateObj < new Date();
+                  })() && (!startDate || !endDate)) 
                     ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' 
                     : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                 color: 'white',
                 border: 'none',
                   borderRadius: '0.75rem',
-                  cursor: saving || !status || (status === 'active' && (showDatePicker || isExpired) && (!startDate || !endDate)) ? 'not-allowed' : 'pointer',
+                  cursor: saving || !status || (status === 'active' && (() => {
+                    const endDate = assignment?.end_date;
+                    const endDateObj = endDate ? new Date(endDate) : null;
+                    return endDateObj && endDateObj < new Date();
+                  })() && (!startDate || !endDate)) ? 'not-allowed' : 'pointer',
                 fontSize: '0.875rem',
                   fontWeight: 600,
                 display: 'flex',

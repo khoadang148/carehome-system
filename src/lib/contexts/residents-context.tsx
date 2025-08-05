@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { residentAPI, carePlansAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
+import { residentAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from './auth-context';
 
 // Define types for resident data
