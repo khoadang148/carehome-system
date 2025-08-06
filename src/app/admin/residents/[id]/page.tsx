@@ -20,6 +20,7 @@ import { carePlansAPI } from '@/lib/api';
 import { vitalSignsAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { bedsAPI } from '@/lib/api';
+import { bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { careNotesAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
@@ -72,19 +73,46 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           ...data
         };
         setResident(mapped);
-        // Lấy số phòng giống trang staff
+        // Lấy số phòng từ bed assignments
         setRoomLoading(true);
         try {
-          const assignments = await carePlansAPI.getByResidentId(residentId);
-          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-          const roomId = assignment?.assigned_room_id;
-          // Đảm bảo roomId là string, không phải object
-          const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-          if (roomIdString) {
-            const room = await roomsAPI.getById(roomIdString);
-            setRoomNumber(room?.room_number || 'Chưa cập nhật');
-          } else {
-            setRoomNumber('Chưa cập nhật');
+          // Ưu tiên sử dụng bedAssignmentsAPI
+          try {
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+            const bedAssignment = Array.isArray(bedAssignments) ? 
+              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+            
+            if (bedAssignment?.bed_id?.room_id) {
+              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                setRoomNumber(bedAssignment.bed_id.room_id.room_number);
+              } else {
+                // Nếu chỉ có _id, fetch thêm thông tin
+                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                } else {
+                  throw new Error('No room ID found');
+                }
+              }
+            } else {
+              throw new Error('No bed assignment found');
+            }
+          } catch (bedError) {
+            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
+            // Fallback về carePlansAPI
+            const assignments = await carePlansAPI.getByResidentId(residentId);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+            // Đảm bảo roomId là string, không phải object
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
+              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+            } else {
+              setRoomNumber('Chưa cập nhật');
+            }
           }
         } catch {
           setRoomNumber('Chưa cập nhật');
@@ -93,25 +121,56 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         // Fetch care plan assignments (gói dịch vụ đang sử dụng)
         const assignments = await carePlansAPI.getByResidentId(residentId);
         setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
-        // Lấy số giường nếu có assigned_bed_id
+        // Lấy số giường từ bed assignments
         setBedLoading(true);
-        let currentAssignment: any = null;
-        if (Array.isArray(assignments)) {
-          currentAssignment = assignments.find(a =>
-            (a.resident_id?._id || a.resident_id) === residentId
-          ) || assignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
-        }
-        const assignedBedId = currentAssignment?.assigned_bed_id as any;
-        // Đảm bảo assignedBedId là string, không phải object
-        const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
-        if (bedIdString) {
+        try {
+          // Ưu tiên sử dụng bedAssignmentsAPI
           try {
-            const bed = await bedsAPI.getById(bedIdString);
-            setBedNumber(bed?.bed_number || 'Chưa cập nhật');
-          } catch {
-            setBedNumber('Chưa cập nhật');
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+            const bedAssignment = Array.isArray(bedAssignments) ? 
+              bedAssignments.find((a: any) => a.bed_id) : null;
+            
+            if (bedAssignment?.bed_id) {
+              // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
+              if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
+                setBedNumber(bedAssignment.bed_id.bed_number);
+              } else {
+                // Nếu chỉ có _id, fetch thêm thông tin
+                const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
+                if (bedId) {
+                  const bed = await bedsAPI.getById(bedId);
+                  setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+                } else {
+                  throw new Error('No bed ID found');
+                }
+              }
+            } else {
+              throw new Error('No bed assignment found');
+            }
+          } catch (bedError) {
+            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
+            // Fallback về carePlansAPI
+            let currentAssignment: any = null;
+            if (Array.isArray(assignments)) {
+              currentAssignment = assignments.find(a =>
+                (a.resident_id?._id || a.resident_id) === residentId
+              ) || assignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
+            }
+            const assignedBedId = currentAssignment?.assigned_bed_id as any;
+            // Đảm bảo assignedBedId là string, không phải object
+            const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
+            if (bedIdString) {
+              try {
+                const bed = await bedsAPI.getById(bedIdString);
+                setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+              } catch {
+                setBedNumber('Chưa cập nhật');
+              }
+            } else {
+              setBedNumber('Chưa cập nhật');
+            }
           }
-        } else {
+        } catch {
           setBedNumber('Chưa cập nhật');
         }
         setBedLoading(false);

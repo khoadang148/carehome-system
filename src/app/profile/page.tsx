@@ -271,8 +271,8 @@ export default function ProfilePage() {
     
     carePlanAssignmentsAPI.getByResidentId(residentId)
       .then((assignments: any[]) => {
-        const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-        const roomId = assignment?.assigned_room_id;
+        const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+        const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
         const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
         
         if (roomIdString) {

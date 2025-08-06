@@ -7,7 +7,7 @@ import {
   UserGroupIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
-import { staffAssignmentsAPI, carePlansAPI, roomsAPI, userAPI } from '@/lib/api';
+import { staffAssignmentsAPI, carePlansAPI, roomsAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import Avatar from '@/components/Avatar';
 
@@ -96,9 +96,9 @@ export default function StaffResidentsPage() {
         // Lấy số phòng cho từng resident
         mapped.forEach(async (resident: any) => {
           try {
-            const assignments = await carePlansAPI.getByResidentId(resident.id);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-            const roomId = assignment?.assigned_room_id;
+            const assignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
             // Đảm bảo roomId là string, không phải object
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {

@@ -752,11 +752,9 @@ export default function StaffAssignmentsPage() {
                                                 {assignment.resident_id?.full_name}
                                               </span>
                                             </div>
-                                            {assignment.resident_id?.room_number && (
-                                              <div className="flex items-center">
-                                               <span className="text-sm text-gray-500">
-                                                  Phòng {assignment.resident_id.room_number}
-                                                </span>
+                                            {assignment.resident_id?.bed_id?.room_id?.room_number || assignment.resident_id?.room_number && (
+                                              <div className="text-sm text-gray-600">
+                                                Phòng {assignment.resident_id?.bed_id?.room_id?.room_number || assignment.resident_id?.room_number}
                                               </div>
                                             )}
                                           </div>

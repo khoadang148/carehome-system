@@ -179,15 +179,16 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
             console.log(`🔍 Checking resident ${resident.name} (${resident.id}):`, assignments);
             
             // Kiểm tra dựa trên assigned_room_id - nếu có phòng thì đã đăng ký gói chính
-            const hasRoomAssignment = assignments.some((a: any) => 
-              a.assigned_room_id && 
-              (a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval')
+            const hasActiveAssignment = assignments.some((a: any) => 
+              a.status === 'active' && 
+              (a.bed_id?.room_id || a.assigned_room_id) &&
+              a.packages && a.packages.length > 0
             );
             
-            console.log(`  Has room assignment: ${hasRoomAssignment}`);
+            console.log(`  Has room assignment: ${hasActiveAssignment}`);
             
             // Nếu có phòng thì chắc chắn đã đăng ký gói chính
-            if (hasRoomAssignment) {
+            if (hasActiveAssignment) {
               statusMap[resident.id] = true;
               console.log(`✅ Resident ${resident.name} has main package (has room assignment)`);
               continue;
@@ -307,8 +308,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       mapped.forEach(async (resident: any) => {
         try {
           const assignments = await carePlansAPI.getByResidentId(resident.id);
-          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-          const roomId = assignment?.assigned_room_id;
+          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+          const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
           // Đảm bảo roomId là string, không phải object
           const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
           if (roomIdString) {

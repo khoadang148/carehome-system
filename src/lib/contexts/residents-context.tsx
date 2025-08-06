@@ -90,8 +90,8 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
             console.log(`Selected assignment for resident ${resident._id}:`, activeAssignment);
             
             // Check if assignment has room information
-            if (activeAssignment?.assigned_room_id) {
-              const roomData = activeAssignment.assigned_room_id;
+            if (activeAssignment?.bed_id?.room_id) {
+              const roomData = activeAssignment.bed_id.room_id;
               
               // If roomData is already populated (has room_number), use it directly
               if (typeof roomData === 'object' && roomData?.room_number) {
@@ -110,6 +110,29 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
                   console.log(`Fetched room number: ${roomNumber}`);
                 } else {
                   console.warn(`Invalid room ID: ${roomId}`);
+                }
+              }
+            } else if (activeAssignment?.assigned_room_id) {
+              // Fallback for old API structure
+              const roomData = activeAssignment.assigned_room_id;
+              
+              // If roomData is already populated (has room_number), use it directly
+              if (typeof roomData === 'object' && roomData?.room_number) {
+                roomNumber = roomData.room_number;
+                console.log(`Found room number from populated data (fallback): ${roomNumber}`);
+              } else {
+                // If roomData is just an ID, fetch the room details
+                const roomId = typeof roomData === 'string' ? roomData : 
+                              typeof roomData === 'object' && roomData?._id ? roomData._id :
+                              String(roomData);
+                
+                if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
+                  console.log(`Fetching room details for ID (fallback): ${roomId}`);
+                  const room = await roomsAPI.getById(roomId);
+                  roomNumber = room?.room_number || 'N/A';
+                  console.log(`Fetched room number (fallback): ${roomNumber}`);
+                } else {
+                  console.warn(`Invalid room ID (fallback): ${roomId}`);
                 }
               }
             } else {

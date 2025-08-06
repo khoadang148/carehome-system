@@ -15,7 +15,7 @@ import {
   ExclamationTriangleIcon,
   HomeIcon
 } from '@heroicons/react/24/outline';
-import { carePlansAPI, residentAPI, userAPI, roomsAPI } from '@/lib/api';
+import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 
 // Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
@@ -139,21 +139,45 @@ export default function ServiceDetailsPage() {
       return;
     }
     setRoomLoading(true);
-    carePlansAPI.getByResidentId(selectedRelative._id)
+    bedAssignmentsAPI.getByResidentId(selectedRelative._id)
       .then((assignments: any[]) => {
-        // Tìm assignment có assigned_room_id
-        const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-        const roomId = assignment?.assigned_room_id;
-        // Đảm bảo roomId là string, không phải object
-        const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-        if (roomIdString) {
-          return roomsAPI.getById(roomIdString)
-            .then((room: any) => {
-              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+        // Tìm assignment có bed_id.room_id
+        const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
+        if (assignment?.bed_id?.room_id) {
+          // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+          if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
+            setRoomNumber(assignment.bed_id.room_id.room_number);
+          } else {
+            // Nếu chỉ có _id, fetch thêm thông tin
+            const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
+            if (roomId) {
+              return roomsAPI.getById(roomId)
+                .then((room: any) => {
+                  setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                })
+                .catch(() => setRoomNumber('Chưa cập nhật'));
+            } else {
+              setRoomNumber('Chưa cập nhật');
+            }
+          }
+        } else {
+          // Fallback: lấy từ care plan assignments
+          return carePlansAPI.getByResidentId(selectedRelative._id)
+            .then((careAssignments: any[]) => {
+              const careAssignment = Array.isArray(careAssignments) ? careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+              const roomId = careAssignment?.bed_id?.room_id || careAssignment?.assigned_room_id;
+              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+              if (roomIdString) {
+                return roomsAPI.getById(roomIdString)
+                  .then((room: any) => {
+                    setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                  })
+                  .catch(() => setRoomNumber('Chưa cập nhật'));
+              } else {
+                setRoomNumber('Chưa cập nhật');
+              }
             })
             .catch(() => setRoomNumber('Chưa cập nhật'));
-        } else {
-          setRoomNumber('Chưa cập nhật');
         }
       })
       .catch(() => setRoomNumber('Chưa cập nhật'))
@@ -556,7 +580,7 @@ export default function ServiceDetailsPage() {
                               <div className="bg-white rounded-lg p-3 border border-green-100">
                                 <p className="text-gray-600 text-sm mb-1">Phòng</p>
                                 <p className="text-xl font-bold text-green-600">
-                                  {residentCarePlanDetail.assigned_room_id?.room_number || 'N/A'}
+                                  {residentCarePlanDetail.bed_id?.room_id?.room_number || residentCarePlanDetail.assigned_room_id?.room_number || roomNumber || 'N/A'}
                                 </p>
                               </div>
                             </div>
@@ -564,7 +588,7 @@ export default function ServiceDetailsPage() {
                               <div className="bg-white rounded-lg p-3 border border-green-100">
                                 <p className="text-gray-600 text-sm mb-1">Giường</p>
                                 <p className="text-xl font-bold text-green-600">
-                                  {residentCarePlanDetail.assigned_bed_id?.bed_number || 'N/A'}
+                                  {residentCarePlanDetail.bed_id?.bed_number || residentCarePlanDetail.assigned_bed_id?.bed_number || 'N/A'}
                                 </p>
                               </div>
                             </div>

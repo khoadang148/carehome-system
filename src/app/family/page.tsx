@@ -30,6 +30,7 @@ import { activityParticipationsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
 import { activitiesAPI } from '@/lib/api';
 import { staffAssignmentsAPI } from '@/lib/api';
+import { bedAssignmentsAPI } from '@/lib/api';
 import SuccessModal from '@/components/SuccessModal';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { completePageTransition } from '@/lib/utils/pageTransition';
@@ -453,12 +454,18 @@ export default function FamilyPortalPage() {
           vitalSignsAPI.getByResidentId(selectedResidentId),
           vitalSignsAPI.getByResidentId(selectedResidentId), // Same API for history
           careNotesAPI.getAll({ resident_id: selectedResidentId }),
-          carePlansAPI.getByResidentId(selectedResidentId).then(assignments => {
-            const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-            const roomId = assignment?.assigned_room_id;
-            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-            if (roomIdString) {
-              return roomsAPI.getById(roomIdString);
+          bedAssignmentsAPI.getByResidentId(selectedResidentId).then(assignments => {
+            const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
+            if (assignment?.bed_id?.room_id) {
+              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+              if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
+                return { room_number: assignment.bed_id.room_id.room_number };
+              }
+              // Nếu chỉ có _id, fetch thêm thông tin
+              const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
+              if (roomId) {
+                return roomsAPI.getById(roomId);
+              }
             }
             return null;
           }),

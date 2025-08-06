@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone, getDateYYYYMMDDWithTimezone } from '@/lib/utils/validation';
-import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, userAPI } from '@/lib/api';
+import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
 
 // Helper function to ensure string values
 const ensureString = (value: any): string => {
@@ -107,9 +107,9 @@ export default function StaffVitalSignsPage() {
         // Get room numbers for each resident
         mapped.forEach(async (resident: any) => {
           try {
-            const assignments = await carePlansAPI.getByResidentId(resident.id);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-            const roomId = assignment?.assigned_room_id;
+            const assignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);

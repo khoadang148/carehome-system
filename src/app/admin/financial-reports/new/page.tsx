@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { residentAPI, staffAPI, billsAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, staffAPI, billsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -67,22 +67,51 @@ export default function NewBillPage() {
         const residentsWithRooms = await Promise.all(
           residentsData.map(async (resident: any) => {
             try {
-              // Get care plan assignments for this resident
-              const assignments = await carePlansAPI.getByResidentId(resident._id);
-              const activeAssignment = Array.isArray(assignments) 
-                ? assignments.find((a: any) => a.status === 'active' && a.assigned_room_id)
-                : null;
-              
+              // Ưu tiên sử dụng bedAssignmentsAPI để lấy thông tin phòng
               let roomNumber = 'Chưa phân phòng';
               
-              if (activeAssignment?.assigned_room_id) {
-                const roomId = typeof activeAssignment.assigned_room_id === 'object' 
-                  ? activeAssignment.assigned_room_id._id 
-                  : activeAssignment.assigned_room_id;
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
+                const bedAssignment = Array.isArray(bedAssignments) ? 
+                  bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
                 
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
-                  roomNumber = room?.room_number || 'Chưa phân phòng';
+                if (bedAssignment?.bed_id?.room_id) {
+                  // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+                  if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                    roomNumber = bedAssignment.bed_id.room_id.room_number;
+                  } else {
+                    // Nếu chỉ có _id, fetch thêm thông tin
+                    const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                    if (roomId) {
+                      const room = await roomsAPI.getById(roomId);
+                      roomNumber = room?.room_number || 'Chưa phân phòng';
+                    }
+                  }
+                } else {
+                  throw new Error('No bed assignment found');
+                }
+              } catch (bedError) {
+                console.warn(`Failed to get bed assignment for resident ${resident._id}:`, bedError);
+                // Fallback về carePlansAPI
+                try {
+                  const assignments = await carePlansAPI.getByResidentId(resident._id);
+                  const activeAssignment = Array.isArray(assignments) 
+                    ? assignments.find((a: any) => a.status === 'active' && (a.bed_id?.room_id || a.assigned_room_id))
+                    : null;
+                  
+                  if (activeAssignment?.bed_id?.room_id || activeAssignment?.assigned_room_id) {
+                    const roomId = typeof (activeAssignment.bed_id?.room_id || activeAssignment.assigned_room_id) === 'object'
+                      ? (activeAssignment.bed_id?.room_id?._id || activeAssignment.assigned_room_id?._id)
+                      : (activeAssignment.bed_id?.room_id || activeAssignment.assigned_room_id);
+                    
+                    if (roomId) {
+                      const room = await roomsAPI.getById(roomId);
+                      roomNumber = room?.room_number || 'Chưa phân phòng';
+                    }
+                  }
+                } catch (fallbackError) {
+                  console.error(`Failed to get room info for resident ${resident._id}:`, fallbackError);
+                  roomNumber = 'Chưa phân phòng';
                 }
               }
               

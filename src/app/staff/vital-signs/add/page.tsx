@@ -15,7 +15,7 @@ import {
   HandRaisedIcon
 } from '@heroicons/react/24/solid';
 
-import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI } from '@/lib/api';
+import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -179,9 +179,9 @@ export default function AddVitalSignsPage() {
         // Get room numbers for each resident
         mapped.forEach(async (resident: any) => {
           try {
-            const assignments = await carePlansAPI.getByResidentId(resident.id);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-            const roomId = assignment?.assigned_room_id;
+            const assignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);

@@ -72,8 +72,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         setRoomLoading(true);
         try {
           const assignments = await carePlansAPI.getByResidentId(residentId);
-          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.assigned_room_id) : null;
-          const roomId = assignment?.assigned_room_id;
+          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+          const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
           // Đảm bảo roomId là string, không phải object
           const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
           if (roomIdString) {

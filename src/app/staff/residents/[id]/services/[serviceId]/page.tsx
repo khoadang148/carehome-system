@@ -146,7 +146,7 @@ export default function ResidentServiceDetailPage() {
 
       try {
         // Load room information
-        const assignedRoomId = carePlanAssignment.assigned_room_id;
+        const assignedRoomId = carePlanAssignment.bed_id?.room_id || carePlanAssignment.assigned_room_id;
         const roomIdString = typeof assignedRoomId === 'object' && assignedRoomId?._id ? assignedRoomId._id : assignedRoomId;
         if (roomIdString) {
           const room = await roomsAPI.getById(roomIdString);

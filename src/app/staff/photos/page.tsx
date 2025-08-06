@@ -8,7 +8,7 @@ import {
   XMarkIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 
 export default function PhotoUploadPage() {
@@ -53,14 +53,36 @@ export default function PhotoUploadPage() {
             const resident = assignment.resident_id;
             let room_number = '';
             try {
-              const assignments = await carePlansAPI.getByResidentId(resident._id);
-              const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-              const roomId = assignment?.assigned_room_id;
-              // Đảm bảo roomId là string, không phải object
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              if (roomIdString) {
-                const room = await roomsAPI.getById(roomIdString);
-                room_number = room?.room_number || '';
+              // Ưu tiên sử dụng bedAssignmentsAPI
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
+                const bedAssignment = Array.isArray(bedAssignments) ? 
+                  bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+                
+                if (bedAssignment?.bed_id?.room_id) {
+                  if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                    room_number = bedAssignment.bed_id.room_id.room_number;
+                  } else {
+                    const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                    if (roomId) {
+                      const room = await roomsAPI.getById(roomId);
+                      room_number = room?.room_number || '';
+                    }
+                  }
+                } else {
+                  throw new Error('No bed assignment found');
+                }
+              } catch (bedError) {
+                console.warn(`Failed to get bed assignment for resident ${resident._id}:`, bedError);
+                // Fallback về carePlansAPI
+                const assignments = await carePlansAPI.getByResidentId(resident._id);
+                const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+                const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+                const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                if (roomIdString) {
+                  const room = await roomsAPI.getById(roomIdString);
+                  room_number = room?.room_number || '';
+                }
               }
             } catch {}
             return { ...resident, room_number };
@@ -73,14 +95,36 @@ export default function PhotoUploadPage() {
           const residentsWithRoom = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
             let room_number = '';
             try {
-              const assignments = await carePlansAPI.getByResidentId(resident._id);
-              const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
-              const roomId = assignment?.assigned_room_id;
-              // Đảm bảo roomId là string, không phải object
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              if (roomIdString) {
-                const room = await roomsAPI.getById(roomIdString);
-                room_number = room?.room_number || '';
+              // Ưu tiên sử dụng bedAssignmentsAPI
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
+                const bedAssignment = Array.isArray(bedAssignments) ? 
+                  bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+                
+                if (bedAssignment?.bed_id?.room_id) {
+                  if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                    room_number = bedAssignment.bed_id.room_id.room_number;
+                  } else {
+                    const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                    if (roomId) {
+                      const room = await roomsAPI.getById(roomId);
+                      room_number = room?.room_number || '';
+                    }
+                  }
+                } else {
+                  throw new Error('No bed assignment found');
+                }
+              } catch (bedError) {
+                console.warn(`Failed to get bed assignment for resident ${resident._id}:`, bedError);
+                // Fallback về carePlansAPI
+                const assignments = await carePlansAPI.getByResidentId(resident._id);
+                const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+                const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+                const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                if (roomIdString) {
+                  const room = await roomsAPI.getById(roomIdString);
+                  room_number = room?.room_number || '';
+                }
               }
             } catch {}
             return { ...resident, room_number };

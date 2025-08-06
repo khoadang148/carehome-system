@@ -11,6 +11,11 @@ interface Resident {
   full_name: string;
   date_of_birth?: string;
   room_number?: string;
+  bed_id?: {
+    room_id?: {
+      room_number?: string;
+    };
+  };
 }
 
 interface Assignment {
@@ -38,6 +43,7 @@ export default function ResidentAssignmentList({
   // Filter assignments
   const filteredAssignments = assignments.filter((assignment) => {
     return assignment.resident_id.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (assignment.resident_id.bed_id?.room_id?.room_number && assignment.resident_id.bed_id.room_id.room_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (assignment.resident_id.room_number && assignment.resident_id.room_number.toLowerCase().includes(searchTerm.toLowerCase()));
   });
 
@@ -125,8 +131,8 @@ export default function ResidentAssignmentList({
                         {assignment.resident_id.date_of_birth && (
                           <p>{calculateAge(assignment.resident_id.date_of_birth)} tuổi</p>
                         )}
-                        {assignment.resident_id.room_number && (
-                          <p>Phòng {assignment.resident_id.room_number}</p>
+                        {assignment.resident_id.bed_id?.room_id?.room_number || assignment.resident_id.room_number && (
+                          <p>Phòng {assignment.resident_id.bed_id?.room_id?.room_number || assignment.resident_id.room_number}</p>
                         )}
                       </div>
                     </div>

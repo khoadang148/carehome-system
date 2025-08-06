@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { staffAssignmentsAPI, careNotesAPI, carePlansAPI, roomsAPI, userAPI } from '@/lib/api';
+import { staffAssignmentsAPI, careNotesAPI, carePlansAPI, roomsAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
 import { 
   HeartIcon, 
   MagnifyingGlassIcon,
@@ -92,19 +92,50 @@ export default function CareNotesPage() {
         if (resident.room_number) {
           room_number = resident.room_number;
         } else {
-          // Fallback: lấy từ care plan assignments
+          // Fallback: lấy từ bed assignments
           try {
-            const carePlanAssignments = await carePlansAPI.getByResidentId(resident._id);
-            const carePlanAssignment = Array.isArray(carePlanAssignments) ? 
-              carePlanAssignments.find((a: any) => a.assigned_room_id) : null;
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
+            const bedAssignment = Array.isArray(bedAssignments) ? 
+              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
             
-            if (carePlanAssignment?.assigned_room_id) {
-              const roomId = carePlanAssignment.assigned_room_id;
-              // Đảm bảo roomId là string, không phải object
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              if (roomIdString) {
-                const room = await roomsAPI.getById(roomIdString);
-                room_number = room?.room_number || '';
+            if (bedAssignment?.bed_id?.room_id) {
+              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                room_number = bedAssignment.bed_id.room_id.room_number;
+              } else {
+                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  room_number = room?.room_number || '';
+                }
+              }
+            } else {
+              // Fallback: lấy từ care plan assignments
+              const carePlanAssignments = await carePlansAPI.getByResidentId(resident._id);
+              const carePlanAssignment = Array.isArray(carePlanAssignments) ? 
+                carePlanAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+              
+              if (carePlanAssignment?.bed_id?.room_id) {
+                // New API structure: room_id is nested in bed_id
+                const roomData = carePlanAssignment.bed_id.room_id;
+                if (typeof roomData === 'object' && roomData?.room_number) {
+                  room_number = roomData.room_number;
+                } else {
+                  const roomId = typeof roomData === 'object' && roomData?._id ? roomData._id : roomData;
+                  if (roomId) {
+                    const room = await roomsAPI.getById(roomId);
+                    room_number = room?.room_number || '';
+                  }
+                }
+              } else if (carePlanAssignment?.assigned_room_id) {
+                // Fallback for old API structure
+                const roomId = carePlanAssignment.assigned_room_id;
+                // Đảm bảo roomId là string, không phải object
+                const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                if (roomIdString) {
+                  const room = await roomsAPI.getById(roomIdString);
+                  room_number = room?.room_number || '';
+                }
               }
             }
         } catch {}
