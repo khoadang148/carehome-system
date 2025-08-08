@@ -16,6 +16,7 @@ import {
 import { residentAPI, activitiesAPI, photosAPI, staffAPI } from '@/lib/api';
 import { carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { getCompletedResidents } from '@/lib/utils/resident-status';
 
 // Update PhotoData interface to match new API
 interface PhotoData {
@@ -80,13 +81,14 @@ export default function PhotoGalleryPage() {
     fetchPhotos();
   }, [filterResident, filterActivityType, filterDateRange]);
    
-  // Load residents from API cho dropdown filter
+  // Load residents from API cho dropdown filter - chỉ lấy những resident đã hoàn tất đăng ký
   useEffect(() => {
     const fetchResidents = async () => {
       try {
-        const data = await residentAPI.getAll();
-        setResidents(Array.isArray(data) ? data : []);
+        const completedResidents = await getCompletedResidents();
+        setResidents(completedResidents);
       } catch (err) {
+        console.error('Error fetching residents:', err);
         setResidents([]);
       }
     };
@@ -158,7 +160,7 @@ export default function PhotoGalleryPage() {
                   console.log('Fetching room details for roomId:', roomId);
                   const room = await roomsAPI.getById(roomId);
                   console.log('Room details:', room);
-                  setRoomNumbers((prev) => ({ ...prev, [residentId]: room?.room_number || 'Chưa cập nhật' }));
+                  setRoomNumbers((prev) => ({ ...prev, [residentId]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
                 }
               }
             } else {
@@ -180,15 +182,15 @@ export default function PhotoGalleryPage() {
               console.log('Fetching room details for roomId:', roomIdString);
               const room = await roomsAPI.getById(roomIdString);
               console.log('Room details:', room);
-              setRoomNumbers((prev) => ({ ...prev, [residentId]: room?.room_number || 'Chưa cập nhật' }));
+              setRoomNumbers((prev) => ({ ...prev, [residentId]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
             } else {
               console.log('No room ID found, setting default');
-              setRoomNumbers((prev) => ({ ...prev, [residentId]: 'Chưa cập nhật' }));
+              setRoomNumbers((prev) => ({ ...prev, [residentId]: 'Chưa hoàn tất đăng kí' }));
             }
           }
         } catch (error) {
           console.error('Error fetching room for residentId:', residentId, error);
-          setRoomNumbers((prev) => ({ ...prev, [residentId]: 'Chưa cập nhật' }));
+          setRoomNumbers((prev) => ({ ...prev, [residentId]: 'Chưa hoàn tất đăng kí' }));
         }
       }
     };
@@ -445,7 +447,7 @@ export default function PhotoGalleryPage() {
                 <option value="">Tất cả người cao tuổi</option>
                 {residents.map((resident: any) => (
                   <option key={resident._id} value={resident._id}>
-                    {resident.full_name} {resident.room ? `- Phòng ${resident.room}` : ''}
+                    {resident.full_name} - Phòng {resident.roomNumber}
                   </option>
                 ))}
               </select>
@@ -462,7 +464,7 @@ export default function PhotoGalleryPage() {
               <span>Hiển thị {sortedPhotos.length} / {photos.length} ảnh</span>
               {user?.role !== 'family' && (
                 <button
-                  onClick={() => router.push('/residents/photos')}
+                  onClick={() => router.push('/staff/photos')}
                   style={{
                     padding: '0.5rem 1rem',
                     background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
@@ -569,7 +571,7 @@ export default function PhotoGalleryPage() {
                       {getResidentNameByResidentId(photo.resident_id)}
                     </span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Phòng:</span>
-                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{roomNumbers[(typeof photo.resident_id === 'object' && photo.resident_id && '_id' in photo.resident_id) ? (photo.resident_id as any)._id : photo.resident_id] || 'Chưa cập nhật'}</span>
+                    <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{roomNumbers[(typeof photo.resident_id === 'object' && photo.resident_id && '_id' in photo.resident_id) ? (photo.resident_id as any)._id : photo.resident_id] || 'Chưa hoàn tất đăng kí'}</span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Hoạt động:</span>
                     <span style={{fontWeight: 500, color: '#222', fontSize: '1rem'}}>{photo.activity_type}</span>
                     <span style={{fontWeight: 600, color: '#6b7280', fontSize: '0.92rem', textAlign: 'left'}}>Đăng bởi:</span>
@@ -828,7 +830,7 @@ export default function PhotoGalleryPage() {
                         fontWeight: 600,
                         color: '#1e293b'
                       }}>
-                        Phòng {roomNumbers[(typeof selectedPhoto.resident_id === 'object' && selectedPhoto.resident_id && '_id' in selectedPhoto.resident_id) ? (selectedPhoto.resident_id as any)._id : selectedPhoto.resident_id] || 'Chưa cập nhật'}
+                        Phòng {roomNumbers[(typeof selectedPhoto.resident_id === 'object' && selectedPhoto.resident_id && '_id' in selectedPhoto.resident_id) ? (selectedPhoto.resident_id as any)._id : selectedPhoto.resident_id] || 'Chưa hoàn tất đăng kí'}
                       </div>
                     </div>
 

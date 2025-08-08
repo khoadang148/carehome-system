@@ -50,9 +50,9 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
             name: apiStaff.full_name || apiStaff.name || `${apiStaff.firstName} ${apiStaff.lastName}`,
             firstName: apiStaff.firstName || apiStaff.full_name?.split(' ')[0] || '',
             lastName: apiStaff.lastName || apiStaff.full_name?.split(' ').slice(1).join(' ') || '',
-            position: apiStaff.position || 'Chưa cập nhật',
-            department: apiStaff.department || 'Chưa cập nhật',
-            shiftType: apiStaff.shiftType || apiStaff.shift_type || 'Chưa cập nhật',
+            position: apiStaff.position || 'Chưa hoàn tất đăng kí',
+            department: apiStaff.department || 'Chưa hoàn tất đăng kí',
+            shiftType: apiStaff.shiftType || apiStaff.shift_type || 'Chưa hoàn tất đăng kí',
             hireDate: apiStaff.hireDate || apiStaff.hire_date || apiStaff.created_at || '',
             dateOfBirth: apiStaff.dateOfBirth || apiStaff.date_of_birth || '',
             gender: apiStaff.gender || '',
@@ -209,7 +209,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
   // Format date function
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Chưa cập nhật';
+    if (!dateString) return 'Chưa hoàn tất đăng kí';
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('vi-VN');
@@ -220,7 +220,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
   // Calculate age function
   const calculateAge = (dateOfBirth: string) => {
-    if (!dateOfBirth) return 'Chưa cập nhật';
+    if (!dateOfBirth) return 'Chưa hoàn tất đăng kí';
     try {
       const birth = new Date(dateOfBirth);
       const today = new Date();
@@ -231,7 +231,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
       }
       return `${age} tuổi`;
     } catch {
-      return 'Chưa cập nhật';
+      return 'Chưa hoàn tất đăng kí';
     }
   };
 
@@ -326,12 +326,12 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Giới tính:</span>
                   <span style={{marginLeft: 8, color: '#64748b'}}>
-                    {staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Chưa cập nhật'}
+                    {staff.gender === 'male' ? 'Nam' : staff.gender === 'female' ? 'Nữ' : 'Chưa hoàn tất đăng kí'}
                   </span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Địa chỉ:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.address || 'Chưa cập nhật'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.address || 'Chưa hoàn tất đăng kí'}</span>
                 </div>
               </div>
             </div>
@@ -360,7 +360,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Chứng chỉ:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.certification || 'Chưa cập nhật'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.certification || 'Chưa hoàn tất đăng kí'}</span>
                 </div>
               </div>
             </div>
@@ -376,19 +376,19 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
               <div style={{display: 'grid', gap: '1.1rem'}}>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Email:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.email || 'Chưa cập nhật'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.email || 'Chưa hoàn tất đăng kí'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Số điện thoại:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.contactPhone || 'Chưa cập nhật'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.contactPhone || 'Chưa hoàn tất đăng kí'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>Liên hệ khẩn cấp:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyContact || 'Chưa cập nhật'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyContact || 'Chưa hoàn tất đăng kí'}</span>
                 </div>
                 <div>
                   <span style={{fontWeight: 600, color: '#475569'}}>SĐT khẩn cấp:</span>
-                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyPhone || 'Chưa cập nhật'}</span>
+                  <span style={{marginLeft: 8, color: '#64748b'}}>{staff.emergencyPhone || 'Chưa hoàn tất đăng kí'}</span>
                 </div>
               </div>
             </div>

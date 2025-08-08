@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { LOGIN_REDIRECT_DELAY } from '@/lib/constants/app';
 import { clientStorage, getParsedItem } from '@/lib/utils/clientStorage';
 import { usePageTransition } from '@/lib/utils/pageTransition';
+import { redirectByRole } from '@/lib/utils/roleRedirect';
+import LoginSpinner from '@/components/shared/LoginSpinner';
 import { 
   LockClosedIcon, 
   EnvelopeIcon, 
@@ -97,9 +99,8 @@ export default function LoginPage() {
       hasRedirected.current = true;
       
       const redirectTo = (url: string) => {
-        startTransition(() => {
-          router.push(url);
-        });
+        // Immediate redirect for better performance
+        router.push(url);
       };
 
       if (user.role === 'family') {
@@ -348,16 +349,11 @@ export default function LoginPage() {
           });
         };
 
-        if (typedUser.role === 'family') {
-          redirectTo('/family');
-        } else if (typedUser.role === 'admin') {
-          redirectTo('/admin');
-        } else if (typedUser.role === 'staff') {
-          redirectTo('/staff');
-        } else if (returnUrl && returnUrl !== '/login') {
+        // Use optimized role-based redirect
+        if (returnUrl && returnUrl !== '/login') {
           redirectTo(returnUrl);
         } else {
-          redirectTo('/');
+          redirectByRole(router, typedUser.role);
         }
       }
       // Không cần else, vì nếu không thành công sẽ vào catch
@@ -1717,6 +1713,9 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      
+      {/* Login Spinner */}
+      <LoginSpinner isLoading={isLoading} />
       
     </div>
   </>

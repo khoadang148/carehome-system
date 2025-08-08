@@ -185,12 +185,12 @@ export default function AddVitalSignsPage() {
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
             } else {
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
             }
           } catch {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
           }
         });
         
@@ -654,7 +654,7 @@ export default function AddVitalSignsPage() {
                     </option>
                     {residents.map(resident => (
                       <option key={resident.id} value={resident.id}>
-                        {resident.name} - Phòng {roomNumbers[resident.id] || 'Chưa cập nhật'}
+                        {resident.name} - Phòng {roomNumbers[resident.id] || 'Chưa hoàn tất đăng kí'}
                       </option>
                     ))}
                   </select>

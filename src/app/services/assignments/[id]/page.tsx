@@ -18,7 +18,7 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI, bedAssignmentsAPI, roomsAPI, bedsAPI } from '@/lib/api';
+import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 export default function CarePlanAssignmentDetailPage() {
@@ -57,6 +57,9 @@ export default function CarePlanAssignmentDetailPage() {
       const data = await carePlanAssignmentsAPI.getById(assignmentId);
       console.log('Assignment data received:', data);
       console.log('Family member ID from assignment:', data.family_member_id);
+      console.log('Assigned room ID:', data.assigned_room_id);
+      console.log('Assigned bed ID:', data.assigned_bed_id);
+      console.log('Full assignment object:', JSON.stringify(data, null, 2));
       setAssignment(data);
       
       // Fetch resident details
@@ -65,51 +68,32 @@ export default function CarePlanAssignmentDetailPage() {
           const residentData = await residentAPI.getById(data.resident_id._id);
           setResidentDetails(residentData);
           
-          // Fetch room and bed information using bedAssignmentsAPI
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(data.resident_id._id);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
-              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-            
-            if (bedAssignment?.bed_id?.room_id) {
-              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
-              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                setRoomNumber(bedAssignment.bed_id.room_id.room_number);
-                setRoomFloor(bedAssignment.bed_id.room_id.floor || '');
-                console.log(`Room ${bedAssignment.bed_id.room_id.room_number} (from bed assignments)`);
-              } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
-                  setRoomNumber(room?.room_number || 'N/A');
-                  setRoomFloor(room?.floor || '');
-                  console.log(`Room ${room?.room_number} (from bed assignments with fetch)`);
-                }
-              }
-            }
-            
-            if (bedAssignment?.bed_id) {
-              // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
-              if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
-                setBedNumber(bedAssignment.bed_id.bed_number);
-                console.log(`Bed ${bedAssignment.bed_id.bed_number} (from bed assignments)`);
-              } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
-                const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
-                if (bedId) {
-                  const bed = await bedsAPI.getById(bedId);
-                  setBedNumber(bed?.bed_number || 'Chưa phân giường');
-                  console.log(`Bed ${bed?.bed_number} (from bed assignments with fetch)`);
-                }
-              }
-            }
-          } catch (bedError) {
-            console.warn(`Failed to get bed assignment for resident ${data.resident_id._id}:`, bedError);
-            // Fallback về data từ assignment nếu bedAssignmentsAPI thất bại
-            setRoomNumber(data.bed_id?.room_id?.room_number || data.assigned_room_id?.room_number || 'N/A');
-            setRoomFloor(data.bed_id?.room_id?.floor || '');
-            setBedNumber(data.assigned_bed_id?.bed_number || 'Chưa phân giường');
+          // Lấy thông tin phòng và giường từ assignment data
+          if (data.assigned_room_id && typeof data.assigned_room_id === 'object') {
+            const room = data.assigned_room_id;
+            setRoomNumber(room.room_number || 'N/A');
+            setRoomFloor(room.floor || '');
+            console.log(`Room ${room.room_number} (from assignment data)`);
+          } else if (data.assigned_room_id) {
+            // Nếu assigned_room_id là string (ID), có nghĩa là chưa được populate
+            console.log('Assigned room ID is string, not populated:', data.assigned_room_id);
+            setRoomNumber('Chưa phân phòng');
+          } else {
+            console.log('No assigned room found in assignment data');
+            setRoomNumber('Chưa phân phòng');
+          }
+          
+          if (data.assigned_bed_id && typeof data.assigned_bed_id === 'object') {
+            const bed = data.assigned_bed_id;
+            setBedNumber(bed.bed_number || 'Chưa phân giường');
+            console.log(`Bed ${bed.bed_number} (from assignment data)`);
+          } else if (data.assigned_bed_id) {
+            // Nếu assigned_bed_id là string (ID), có nghĩa là chưa được populate
+            console.log('Assigned bed ID is string, not populated:', data.assigned_bed_id);
+            setBedNumber('Chưa phân giường');
+          } else {
+            console.log('No assigned bed found in assignment data');
+            setBedNumber('Chưa phân giường');
           }
         } catch (err) {
           console.error('Error fetching resident details:', err);
@@ -1085,8 +1069,25 @@ export default function CarePlanAssignmentDetailPage() {
                       margin: 0
                     }}>
                       {roomNumber}
-                      {roomFloor && ` (Tầng ${roomFloor})`}
+                      {roomFloor && roomNumber !== 'Chưa phân phòng' && ` (Tầng ${roomFloor})`}
                       </p>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      margin: '0.25rem 0 0 0'
+                    }}>
+                      Debug: {assignment?.assigned_room_id ? (typeof assignment.assigned_room_id === 'object' ? 'Object' : 'String ID') : 'Null'}
+                    </p>
+                    {roomNumber === 'Chưa phân phòng' && (
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#ef4444',
+                        margin: '0.25rem 0 0 0',
+                        fontStyle: 'italic'
+                      }}>
+                        Cần gán phòng cho assignment này
+                      </p>
+                    )}
                     </div>
                   </div>
                 <div style={{ textAlign: 'center' }}>
@@ -1106,11 +1107,28 @@ export default function CarePlanAssignmentDetailPage() {
                     <p style={{
                       fontSize: '1.5rem',
                       fontWeight: 700,
-                      color: '#059669',
+                      color: bedNumber === 'Chưa phân giường' ? '#ef4444' : '#059669',
                       margin: 0
                     }}>
                       {bedNumber}
                           </p>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      margin: '0.25rem 0 0 0'
+                    }}>
+                      Debug: {assignment?.assigned_bed_id ? (typeof assignment.assigned_bed_id === 'object' ? 'Object' : 'String ID') : 'Null'}
+                    </p>
+                    {bedNumber === 'Chưa phân giường' && (
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#ef4444',
+                        margin: '0.25rem 0 0 0',
+                        fontStyle: 'italic'
+                      }}>
+                        Cần gán giường cho assignment này
+                      </p>
+                    )}
                         </div>
                       </div>
                         </div>

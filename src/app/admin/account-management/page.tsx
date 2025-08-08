@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { userAPI } from '@/lib/api';
+import { userAPI, residentAPI } from '@/lib/api';
 import axios from 'axios';
 
 // Interface cho user mới
@@ -103,6 +103,10 @@ export default function AccountManagementPage() {
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
   const [resetPassword, setResetPassword] = useState('');
+  
+  // State for linked residents
+  const [linkedResidents, setLinkedResidents] = useState<any[]>([]);
+  const [loadingLinkedResidents, setLoadingLinkedResidents] = useState(false);
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState('');
   const [resetPasswordError, setResetPasswordError] = useState('');
   const [resetPasswordSuccess, setResetPasswordSuccess] = useState('');
@@ -160,6 +164,14 @@ export default function AccountManagementPage() {
     fetchAccounts();
   }, []);
 
+  // Reset linked residents when detail modal closes
+  useEffect(() => {
+    if (!showDetailModal) {
+      setLinkedResidents([]);
+      setLoadingLinkedResidents(false);
+    }
+  }, [showDetailModal]);
+
   // CRUD Functions
   const handleCreate = () => {
     setFormData(activeTab === 'staff' ? {
@@ -193,10 +205,35 @@ export default function AccountManagementPage() {
     setShowEditModal(true);
   };
 
-  const handleView = (account: User) => {
+  const handleView = async (account: User) => {
     setSelectedAccount(account);
     setShowDetailModal(true);
+    
+    // Nếu là tài khoản gia đình, lấy thông tin người cao tuổi được liên kết
+    if (account.role === 'family') {
+      setLoadingLinkedResidents(true);
+      try {
+        const residents = await residentAPI.getByFamilyMemberId(account._id);
+        setLinkedResidents(Array.isArray(residents) ? residents : [residents]);
+      } catch (error) {
+        console.error('Error fetching linked residents:', error);
+        setLinkedResidents([]);
+      } finally {
+        setLoadingLinkedResidents(false);
+      }
+    } else {
+      setLinkedResidents([]);
+    }
   };
+
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedAccount(null);
+    setLinkedResidents([]);
+    setLoadingLinkedResidents(false);
+  };
+
+
 
   const handleDelete = (account: User) => {
     setSelectedAccount(account);
@@ -1247,7 +1284,7 @@ export default function AccountManagementPage() {
                 </label>
                 <select
                   value={formData.selectedGuardianId || ''}
-                  onChange={(e) => handleGuardianSelection(e.target.value)}
+                  onChange={(e) => setFormData({...formData, selectedGuardianId: e.target.value})}
                   style={{
                     width: '100%',
                     padding: '0.875rem 1rem',
@@ -2073,9 +2110,9 @@ export default function AccountManagementPage() {
           background: 'white',
           borderRadius: '1rem',
           padding: 0,
-          width: '90%',
-          maxWidth: '600px',
-          maxHeight: '90vh',
+          width: '95%',
+          maxWidth: '900px',
+          maxHeight: '95vh',
           overflow: 'hidden',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid #e5e7eb',
@@ -2229,6 +2266,89 @@ export default function AccountManagementPage() {
                       </div>
               )}
 
+              {/* Thông tin người cao tuổi được liên kết */}
+              {isFamily && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <div style={{ 
+                    color: '#64748b', 
+                    fontWeight: 600, 
+                    fontSize: '1rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <UserIcon style={{ width: 20, height: 20 }} />
+                    Người cao tuổi được liên kết
+                  </div>
+                  
+                  {loadingLinkedResidents ? (
+                    <div style={{ 
+                      padding: '1rem', 
+                      background: '#f8fafc', 
+                      borderRadius: '0.5rem',
+                      textAlign: 'center',
+                      color: '#64748b'
+                    }}>
+                      Đang tải thông tin...
+                    </div>
+                  ) : linkedResidents.length > 0 ? (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      {linkedResidents.map((resident, index) => (
+                        <div key={resident._id || index} style={{
+                          background: '#f8fafc',
+                          borderRadius: '0.75rem',
+                          padding: '1.25rem',
+                          border: '1px solid #e2e8f0',
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '1rem'
+                        }}>
+                          <div>
+                            <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.9rem' }}>Họ và tên:</div>
+                            <div style={{ color: '#1e293b', fontWeight: 600, fontSize: '1rem' }}>
+                              {resident.full_name}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.9rem' }}>Mối quan hệ:</div>
+                            <div style={{ color: '#1e293b', fontWeight: 600 }}>
+                              {resident.relationship}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.9rem' }}>Ngày sinh:</div>
+                            <div style={{ color: '#1e293b', fontWeight: 600 }}>
+                              {resident.date_of_birth ? new Date(resident.date_of_birth).toLocaleDateString('vi-VN') : '—'}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.9rem' }}>Trạng thái:</div>
+                            <div style={{ 
+                              color: resident.status === 'active' ? '#16a34a' : '#64748b', 
+                              fontWeight: 600 
+                            }}>
+                              {resident.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      padding: '1rem', 
+                      background: '#fef2f2', 
+                      borderRadius: '0.5rem',
+                      border: '1px solid #fecaca',
+                      color: '#dc2626',
+                      textAlign: 'center'
+                    }}>
+                      Chưa có người cao tuổi nào được liên kết với tài khoản này
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Thông tin hệ thống */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
@@ -2253,7 +2373,7 @@ export default function AccountManagementPage() {
             flexShrink: 0
           }}>
             <button
-              onClick={() => setShowDetailModal(false)}
+              onClick={closeDetailModal}
               style={{
                 padding: '0.875rem 2rem',
                 background: isStaff ? 'linear-gradient(135deg, #6366f1 0%, #60a5fa 100%)' : 'linear-gradient(135deg, #f59e42 0%, #fbbf24 100%)',

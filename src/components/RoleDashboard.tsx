@@ -59,6 +59,13 @@ const ROLE_DASHBOARDS = {
         href: '/admin/room-management',
         gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
       },
+      {
+        title: 'Chỉ Số Sức Khỏe',
+        description: 'Xem và quản lý tất cả chỉ số sức khỏe của cư dân',
+        icon: HeartIcon,
+        href: '/admin/vital-signs',
+        gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      },
       /*{
         title: 'Quản lý kho',
         description: 'Quản lý thiết bị y tế, thuốc, dụng cụ',

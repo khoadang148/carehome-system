@@ -47,10 +47,17 @@ const Avatar: React.FC<AvatarProps> = ({
     return name.split(' ').map(word => word.charAt(0)).join('').toUpperCase().slice(0, 2);
   };
 
-  const hasValidAvatar = src && src.trim() !== '' && src !== 'null' && src !== 'undefined';
+  const hasValidAvatar = (avatarPath: string | null | undefined) => {
+    return avatarPath && 
+           avatarPath.trim() !== '' && 
+           avatarPath !== 'null' && 
+           avatarPath !== 'undefined';
+  };
+
+  const isValidSrc = hasValidAvatar(src);
 
   // Nếu không có avatar và muốn hiển thị chữ cái đầu
-  if (!hasValidAvatar && showInitials && name) {
+  if (!isValidSrc && showInitials && name) {
     const initials = getInitials(name);
     return (
       <div 
@@ -59,6 +66,17 @@ const Avatar: React.FC<AvatarProps> = ({
       >
         {initials || '?'}
       </div>
+    );
+  }
+
+  // Nếu không có avatar hợp lệ, hiển thị avatar mặc định
+  if (!isValidSrc) {
+    return (
+      <img
+        src={fallbackSrc}
+        alt={alt}
+        className={`${sizeClasses[size]} rounded-full object-cover border-2 border-gray-200 shadow-sm ${className}`}
+      />
     );
   }
 

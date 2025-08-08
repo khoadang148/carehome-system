@@ -243,19 +243,19 @@ export const authAPI = {
 
   logout: async () => {
     try {
-      const response = await logoutClient.post(endpoints.auth.logout);
-      // Xóa token khỏi localStorage
-      if (typeof window !== 'undefined') {
-        clientStorage.removeItem('access_token');
-      }
+      // Use AbortController to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
+      const response = await logoutClient.post(endpoints.auth.logout, {}, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       return response.data;
     } catch (error) {
-      // Không throw error để không block logout process
+      // Don't throw error to avoid blocking logout process
       console.warn('Logout API call failed:', error);
-      // Vẫn xóa token local
-      if (typeof window !== 'undefined') {
-        clientStorage.removeItem('access_token');
-      }
       return { message: 'Logged out locally', success: true };
     }
   },

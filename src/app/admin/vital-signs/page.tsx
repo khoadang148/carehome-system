@@ -37,15 +37,16 @@ const ensureString = (value: any): string => {
   return String(value || 'N/A');
 };
 
-const ITEMS_PER_PAGE = 10; // Số chỉ số sức khỏe hiển thị trên mỗi trang
+const ITEMS_PER_PAGE = 15; // Số chỉ số sức khỏe hiển thị trên mỗi trang
 
-export default function StaffVitalSignsPage() {
+export default function AdminVitalSignsPage() {
   const { user } = useAuth();
   const router = useRouter();
   
   // State management
   const [vitalSigns, setVitalSigns] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
+  const [staffAssignments, setStaffAssignments] = useState<any[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
   const [loading, setLoading] = useState(false);
   const [selectedResident, setSelectedResident] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function StaffVitalSignsPage() {
   const [selectedDateDisplay, setSelectedDateDisplay] = useState<string>('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,7 +66,7 @@ export default function StaffVitalSignsPage() {
       return;
     }
     
-    if (!user.role || !['admin', 'staff'].includes(user.role)) {
+    if (!user.role || user.role !== 'admin') {
       router.push('/');
       return;
     }
@@ -82,31 +84,11 @@ export default function StaffVitalSignsPage() {
         // Get active assignments only
         const activeAssignments = myAssignments.filter((assignment: any) => assignment.status === 'active');
         
-        console.log('Active assignments structure:', activeAssignments.map(a => ({
-          assignmentId: a._id,
-          residentId: a.resident_id,
-          residentIdType: typeof a.resident_id,
-          residentIdStructure: a.resident_id
-        })));
-        
         // Get resident details for assigned residents
         const assignedResidents = await Promise.all(
           activeAssignments.map(async (assignment: any) => {
-            // Kiểm tra xem resident_id có tồn tại không trước khi gọi API
-            let residentIdToFetch = assignment.resident_id;
-            
-            // Xử lý trường hợp resident_id là object (có _id bên trong)
-            if (assignment.resident_id && typeof assignment.resident_id === 'object' && assignment.resident_id._id) {
-              residentIdToFetch = assignment.resident_id._id;
-            }
-            
-            if (!residentIdToFetch) {
-              console.warn('Skipping resident fetch due to missing resident_id in assignment:', assignment);
-              return null;
-            }
-
             try {
-              const resident = await residentAPI.getById(residentIdToFetch);
+              const resident = await residentAPI.getById(assignment.resident_id);
               
               // Get room assignment for this resident
               let roomNumber = 'Chưa hoàn tất đăng kí';
@@ -135,23 +117,7 @@ export default function StaffVitalSignsPage() {
                 hasRoom: roomNumber !== 'Chưa hoàn tất đăng kí'
               };
             } catch (residentError) {
-              console.warn('Error fetching resident details for ID:', residentIdToFetch, residentError);
-              
-              // Fallback: sử dụng dữ liệu resident có sẵn trong assignment
-              if (assignment.resident_id && typeof assignment.resident_id === 'object') {
-                console.log('Using fallback resident data from assignment');
-                return {
-                  id: assignment.resident_id._id || assignment.resident_id,
-                  name: assignment.resident_id.full_name || '',
-                  avatar: Array.isArray(assignment.resident_id.avatar) ? assignment.resident_id.avatar[0] : assignment.resident_id.avatar || null,
-                  assignmentStatus: 'active',
-                  assignmentId: assignment._id,
-                  assignedStaff: assignment.staff_id,
-                  roomNumber: 'Chưa hoàn tất đăng kí',
-                  hasRoom: false
-                };
-              }
-              
+              console.warn('Error fetching resident details:', residentError);
               return null;
             }
           })
@@ -160,12 +126,8 @@ export default function StaffVitalSignsPage() {
         // Filter out null values and only include residents with completed registration
         const validResidents = assignedResidents.filter((resident: any) => resident && resident.hasRoom);
         
-        console.log('Loaded residents data:', {
-          totalResidents: validResidents.length,
-          sampleResident: validResidents[0],
-          allResidentIds: validResidents.map(r => r?.id).filter(Boolean)
-        });
         setResidents(validResidents);
+        setStaffAssignments(activeAssignments);
         
         // Set room numbers
         const roomNumbersMap: {[residentId: string]: string} = {};
@@ -177,6 +139,7 @@ export default function StaffVitalSignsPage() {
       } catch (err) {
         console.error('Error loading assigned residents:', err);
         setResidents([]);
+        setStaffAssignments([]);
       } finally {
         setLoading(false);
       }
@@ -214,11 +177,6 @@ export default function StaffVitalSignsPage() {
         
         // Flatten the array of arrays
         const vitalSignsData = allVitalSigns.flat();
-        console.log('Loaded vital signs data:', {
-          totalVitalSigns: vitalSignsData.length,
-          sampleVitalSign: vitalSignsData[0],
-          allResidentIds: vitalSignsData.map(vs => vs.resident_id)
-        });
         setVitalSigns(vitalSignsData);
       } catch (err) {
         console.error('Error loading vital signs:', err);
@@ -236,27 +194,13 @@ export default function StaffVitalSignsPage() {
   // Transform vital signs data for display
   const transformVitalSignsForDisplay = (vitalSignsData: any[]) => {
     return vitalSignsData.map(vs => {
-      // Debug: Log the mapping process
-      console.log('Mapping vital sign:', {
-        vsResidentId: vs.resident_id,
-        vsResidentIdType: typeof vs.resident_id,
-        availableResidentIds: residents.map(r => ({ id: r.id, name: r.name })),
-      });
-      
-      const resident = residents.find(r => {
-        const match = String(r.id) === String(vs.resident_id);
-        if (!match) {
-          console.log('No match found for resident_id:', vs.resident_id, 'vs resident.id:', r.id);
-        }
-        return match;
-      });
-      
+      const resident = residents.find(r => r.id === vs.resident_id);
       const dateTime = vs.date_time || vs.date;
       
       return {
         id: vs._id,
         residentId: vs.resident_id,
-        residentName: resident?.name || `Cư dân không tồn tại (ID: ${vs.resident_id})`,
+        residentName: resident?.name || 'Cư dân không tồn tại',
         residentAvatar: resident?.avatar,
         assignmentStatus: resident?.assignmentStatus || 'unknown',
         date: formatDateDDMMYYYYWithTimezone(dateTime),
@@ -286,17 +230,7 @@ export default function StaffVitalSignsPage() {
         const dateTime = vs.date_time || vs.date;
         if (!dateTime) return false;
         
-        // Sử dụng cùng logic timezone như khi hiển thị
         const formattedDate = getDateYYYYMMDDWithTimezone(dateTime);
-        
-        console.log('Date filtering:', {
-          originalDateTime: dateTime,
-          formattedDate: formattedDate,
-          dateFilter: dateFilter,
-          matches: formattedDate === dateFilter,
-          vsId: vs.id || vs._id
-        });
-        
         return formattedDate === dateFilter;
       });
     }
@@ -306,8 +240,6 @@ export default function StaffVitalSignsPage() {
 
   // Get filtered data
   const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, selectedDate || undefined);
-  
-
 
   // Pagination logic
   const totalPages = Math.ceil(filteredVitalSigns.length / ITEMS_PER_PAGE);
@@ -320,51 +252,39 @@ export default function StaffVitalSignsPage() {
     setCurrentPage(1);
   }, [selectedResident, selectedDate]);
 
-  // Helper function to convert dd/mm/yyyy to yyyy-mm-dd with timezone consideration
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.date-picker-container')) {
+        setShowDatePicker(false);
+      }
+    };
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDatePicker]);
+
+  // Helper function to convert dd/mm/yyyy to yyyy-mm-dd
   const convertDateToISO = (dateString: string): string => {
     if (!dateString) return '';
     const parts = dateString.split('/');
     if (parts.length !== 3) return '';
     const [day, month, year] = parts;
-    
-    // Tạo date object với timezone local
-    const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    
-    // Áp dụng cùng logic timezone như getDateYYYYMMDDWithTimezone
-    // Thêm 7 giờ để bù trừ cho việc trừ 7 giờ trong getDateYYYYMMDDWithTimezone
-    const adjustedDate = new Date(localDate.getTime() + 7 * 60 * 60 * 1000);
-    
-    // Chuyển đổi sang ISO string và lấy phần date
-    const isoDate = adjustedDate.toISOString().split('T')[0];
-    
-    console.log('Date conversion with timezone adjustment:', {
-      input: dateString,
-      localDate: localDate,
-      adjustedDate: adjustedDate,
-      isoDate: isoDate
-    });
-    
-    return isoDate;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
-  // Helper function to convert yyyy-mm-dd to dd/mm/yyyy with timezone consideration
+  // Helper function to convert yyyy-mm-dd to dd/mm/yyyy
   const convertDateToDisplay = (dateString: string): string => {
     if (!dateString) return '';
-    
-    // Tạo date object từ ISO string
-    const date = new Date(dateString + 'T00:00:00');
+    const date = new Date(dateString);
     if (isNaN(date.getTime())) return '';
-    
-    // Sử dụng formatDateDDMMYYYY để đảm bảo đồng bộ với timezone
-    const formattedDate = formatDateDDMMYYYY(date);
-    
-    console.log('Date display conversion:', {
-      input: dateString,
-      date: date,
-      formattedDate: formattedDate
-    });
-    
-    return formattedDate;
+    return formatDateDDMMYYYY(date);
   };
 
   // Calendar helper functions
@@ -395,25 +315,9 @@ export default function StaffVitalSignsPage() {
 
   const handleDateSelect = (day: number) => {
     const selectedDateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    
-    // Đảm bảo ngày được xử lý với timezone local
-    const localDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), selectedDateObj.getDate());
-    
-    // Áp dụng cùng logic timezone như getDateYYYYMMDDWithTimezone
-    // Thêm 7 giờ để bù trừ cho việc trừ 7 giờ trong getDateYYYYMMDDWithTimezone
-    const adjustedDate = new Date(localDate.getTime() + 7 * 60 * 60 * 1000);
-    const isoDate = adjustedDate.toISOString().split('T')[0];
-    
-    console.log('Calendar date selection with timezone adjustment:', {
-      selectedDateObj: selectedDateObj,
-      localDate: localDate,
-      adjustedDate: adjustedDate,
-      isoDate: isoDate,
-      displayDate: formatDateDDMMYYYY(localDate)
-    });
-    
+    const isoDate = selectedDateObj.toISOString().split('T')[0];
     setSelectedDate(isoDate);
-    setSelectedDateDisplay(formatDateDDMMYYYY(localDate));
+    setSelectedDateDisplay(formatDateDDMMYYYY(selectedDateObj));
     setShowDatePicker(false);
   };
 
@@ -424,24 +328,6 @@ export default function StaffVitalSignsPage() {
   const prevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
-
-  // Handle click outside date picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.date-picker-container')) {
-        setShowDatePicker(false);
-      }
-    };
-
-    if (showDatePicker) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showDatePicker]);
 
   // Generate page numbers for pagination
   const getPageNumbers = (): (number | string)[] => {
@@ -479,6 +365,8 @@ export default function StaffVitalSignsPage() {
     return pages;
   };
 
+
+
   // Loading state
   if (loading) {
     return (
@@ -496,7 +384,7 @@ export default function StaffVitalSignsPage() {
         <div className="max-w-7xl mx-auto">
           {/* Back Button */}
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/admin')}
             className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer mb-4 shadow-sm hover:bg-gray-50 transition-colors"
           >
             <ArrowLeftIcon className="w-4 h-4" />
@@ -512,10 +400,10 @@ export default function StaffVitalSignsPage() {
                     <HeartIconSolid className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent mb-2">
-                      Theo Dõi Các Chỉ Số Sức Khỏe
-                    </h1>
-                                         <p className="text-gray-500">
+                                         <h1 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent mb-2">
+                       Quản Lý Chỉ Số Sức Khỏe
+                     </h1>
+                     <p className="text-gray-500">
                        Xem và quản lý chỉ số sức khỏe của các cư dân được phân công
                      </p>
                   </div>
@@ -541,16 +429,7 @@ export default function StaffVitalSignsPage() {
                 
                 <button
                   onClick={() => router.push('/staff/vital-signs/add')}
-                  disabled={user?.role === 'staff' && residents.length === 0}
-                  className={`flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-xl shadow-lg transition-all ${
-                    user?.role === 'staff' && residents.length === 0
-                      ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed opacity-60'
-                      : 'bg-gradient-to-r from-red-500 to-red-600 hover:shadow-xl hover:scale-105'
-                  }`}
-                  title={user?.role === 'staff' && residents.length === 0 
-                    ? 'Bạn chưa được phân công quản lý cư dân nào' 
-                    : 'Thêm chỉ số sức khỏe mới'
-                  }
+                  className="flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-xl shadow-lg transition-all bg-gradient-to-r from-red-500 to-red-600 hover:shadow-xl hover:scale-105"
                 >
                   <PlusIcon className="w-5 h-5" />
                   Thêm chỉ số
@@ -559,188 +438,150 @@ export default function StaffVitalSignsPage() {
             </div>
           </div>
 
+
+
           {/* Filters */}
           <div className="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-sm">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-800">Bộ lọc</h3>
-              {(selectedResident || selectedDate) && (
-                <button
-                  onClick={() => {
-                    setSelectedResident(null);
-                    setSelectedDate('');
-                    setSelectedDateDisplay('');
-                  }}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                >
-                  Xóa bộ lọc
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-end">
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-end">
               {/* Resident Filter */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
-                   Lọc theo người cao tuổi
+                   Lọc theo cư dân
                 </label>
-                <select
-                  value={selectedResident || ''}
-                  onChange={(e) => setSelectedResident(e.target.value || null)}
-                  className="w-full p-4 border border-gray-300 rounded-xl text-sm outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm"
-                  disabled={residents.length === 0}
-                >
-                  <option value="">Tất cả cư dân được phân công</option>
-                  {residents.map(resident => (
-                    <option key={resident.id} value={resident.id}>
-                      {resident.name} - Phòng {roomNumbers[resident.id] || 'Chưa hoàn tất đăng kí'}
-                    </option>
-                  ))}
-                </select>
-                {residents.length === 0 && user?.role === 'staff' && (
-                  <div className="mt-4 p-4 bg-gradient-to-r from-yellow-100 to-yellow-200 border border-yellow-400 rounded-xl text-sm text-yellow-800 shadow-sm">
-                    ⚠️ Bạn chưa được phân công quản lý cư dân nào. Vui lòng liên hệ admin để được phân công.
-                  </div>
-                )}
-                {residents.length === 0 && user?.role === 'admin' && (
-                  <div className="mt-4 p-4 bg-gradient-to-r from-blue-100 to-blue-200 border border-blue-400 rounded-xl text-sm text-blue-800 shadow-sm">
-                    ℹ️ Chưa có cư dân nào trong hệ thống.
-                  </div>
-                )}
+                                 <select
+                   value={selectedResident || ''}
+                   onChange={(e) => setSelectedResident(e.target.value || null)}
+                   className="w-full p-4 border border-gray-300 rounded-xl text-sm outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm"
+                 >
+                   <option value="">Tất cả cư dân được phân công</option>
+                   {residents.map(resident => (
+                     <option key={resident.id} value={resident.id}>
+                       {resident.name} - Phòng {resident.roomNumber}
+                     </option>
+                   ))}
+                 </select>
               </div>
 
-              {/* Date Filter */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
-                  Lọc theo ngày
-                </label>
-                <div className="relative date-picker-container">
-                  <input
-                    type="text"
-                    value={selectedDateDisplay}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedDateDisplay(value);
-                      
-                      // Validate dd/mm/yyyy format
-                      const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-                      if (dateRegex.test(value)) {
-                        const isoDate = convertDateToISO(value);
-                        setSelectedDate(isoDate);
-                      }
-                    }}
-                    onFocus={() => setShowDatePicker(true)}
-                    placeholder="dd/mm/yyyy"
-                    className="w-full p-4 border border-gray-300 rounded-xl text-sm outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm text-gray-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowDatePicker(!showDatePicker)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                  
-                  {/* Calendar Popup */}
-                  {showDatePicker && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-lg z-50 p-4 min-w-[280px]">
-                      {/* Calendar Header */}
-                      <div className="flex items-center justify-between mb-4">
-                        <button
-                          onClick={prevMonth}
-                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                          </svg>
-                        </button>
-                        <h3 className="text-sm font-semibold text-gray-900">
-                          {currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
-                        </h3>
-                        <button
-                          onClick={nextMonth}
-                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      </div>
 
-                      {/* Calendar Grid */}
-                      <div className="grid grid-cols-7 gap-1">
-                        {/* Day headers */}
-                        {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
-                          <div key={day} className="w-8 h-8 flex items-center justify-center text-xs font-medium text-gray-500">
-                            {day}
-                          </div>
-                        ))}
+
+                             {/* Date Filter */}
+               <div>
+                 <label className="block text-sm font-semibold text-gray-700 mb-3 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
+                   Lọc theo ngày
+                 </label>
+                                   <div className="relative date-picker-container">
+                    <input
+                      type="text"
+                      placeholder="dd/mm/yyyy"
+                      value={selectedDateDisplay}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedDateDisplay(value);
                         
-                        {/* Empty cells for days before first day of month */}
-                        {Array.from({ length: getFirstDayOfMonth(currentMonth) }, (_, i) => (
-                          <div key={`empty-${i}`} className="w-8 h-8"></div>
-                        ))}
-                        
-                        {/* Days of month */}
-                        {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => {
-                          const day = i + 1;
-                          const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                          
-                          return (
-                            <button
-                              key={day}
-                              onClick={() => handleDateSelect(day)}
-                              className={`w-8 h-8 flex items-center justify-center text-sm rounded-lg transition-colors ${
-                                isSelectedDate(date)
-                                  ? 'bg-red-500 text-white font-semibold'
-                                  : isToday(date)
-                                  ? 'bg-red-100 text-red-600 font-semibold'
-                                  : 'hover:bg-gray-100 text-gray-700'
-                              }`}
-                            >
+                        // Validate and convert to ISO format for filtering
+                        if (value && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+                          setSelectedDate(convertDateToISO(value));
+                        } else {
+                          setSelectedDate('');
+                        }
+                      }}
+                      onFocus={() => setShowDatePicker(true)}
+                      className="w-full p-4 border border-gray-300 rounded-xl text-sm outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm text-gray-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDatePicker(!showDatePicker)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 hover:text-gray-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                    
+                    {/* Calendar Popup */}
+                    {showDatePicker && (
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-lg z-50 p-4 min-w-[280px]">
+                        {/* Calendar Header */}
+                        <div className="flex items-center justify-between mb-4">
+                          <button
+                            onClick={prevMonth}
+                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                          </button>
+                          <h3 className="text-sm font-semibold text-gray-900">
+                            {currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+                          </h3>
+                          <button
+                            onClick={nextMonth}
+                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {/* Calendar Grid */}
+                        <div className="grid grid-cols-7 gap-1">
+                          {/* Day headers */}
+                          {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
+                            <div key={day} className="w-8 h-8 flex items-center justify-center text-xs font-medium text-gray-500">
                               {day}
-                            </button>
-                          );
-                        })}
-                      </div>
+                            </div>
+                          ))}
+                          
+                          {/* Empty cells for days before first day of month */}
+                          {Array.from({ length: getFirstDayOfMonth(currentMonth) }, (_, i) => (
+                            <div key={`empty-${i}`} className="w-8 h-8"></div>
+                          ))}
+                          
+                          {/* Days of month */}
+                          {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => {
+                            const day = i + 1;
+                            const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                            
+                            return (
+                              <button
+                                key={day}
+                                onClick={() => handleDateSelect(day)}
+                                className={`w-8 h-8 flex items-center justify-center text-sm rounded-lg transition-colors ${
+                                  isSelectedDate(date)
+                                    ? 'bg-red-500 text-white font-semibold'
+                                    : isToday(date)
+                                    ? 'bg-red-100 text-red-600 font-semibold'
+                                    : 'hover:bg-gray-100 text-gray-700'
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                      {/* Today button */}
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                                                  <button
+                        {/* Today button */}
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <button
                             onClick={() => {
                               const today = new Date();
-                              
-                              // Đảm bảo sử dụng ngày local
-                              const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                              
-                              // Áp dụng cùng logic timezone như getDateYYYYMMDDWithTimezone
-                              // Thêm 7 giờ để bù trừ cho việc trừ 7 giờ trong getDateYYYYMMDDWithTimezone
-                              const adjustedToday = new Date(localToday.getTime() + 7 * 60 * 60 * 1000);
-                              const isoDate = adjustedToday.toISOString().split('T')[0];
-                              
-                              console.log('Today button clicked with timezone adjustment:', {
-                                today: today,
-                                localToday: localToday,
-                                adjustedToday: adjustedToday,
-                                isoDate: isoDate,
-                                displayDate: formatDateDDMMYYYY(localToday)
-                              });
-                              
+                              const isoDate = today.toISOString().split('T')[0];
                               setSelectedDate(isoDate);
-                              setSelectedDateDisplay(formatDateDDMMYYYY(localToday));
-                              setCurrentMonth(localToday);
+                              setSelectedDateDisplay(formatDateDDMMYYYY(today));
+                              setCurrentMonth(today);
                               setShowDatePicker(false);
                             }}
-                          className="w-full text-sm text-red-600 hover:text-red-700 font-medium py-2 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          Hôm nay
-                        </button>
+                            className="w-full text-sm text-red-600 hover:text-red-700 font-medium py-2 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            Hôm nay
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-               
-              </div>
+                    )}
+                  </div>
+                
+               </div>
             </div>
           </div>
 
@@ -778,8 +619,6 @@ export default function StaffVitalSignsPage() {
                     : 'Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe cư dân được phân công'
                   }
                 </p>
-                
-
               </div>
             ) : (
               <>
@@ -788,7 +627,7 @@ export default function StaffVitalSignsPage() {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
-                          Người cao tuổi
+                          Cư dân
                         </th>
                         <th className="px-3 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
                           Ngày giờ
@@ -822,7 +661,7 @@ export default function StaffVitalSignsPage() {
                           key={vs.id}
                           className={`border-b border-gray-100 transition-colors hover:bg-gray-50 ${
                             index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                          }`}
+                                                     }`}
                         >
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
@@ -845,9 +684,9 @@ export default function StaffVitalSignsPage() {
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="font-medium text-gray-900 truncate">
-                                  {ensureString(vs.residentName)}
-                                </div>
+                                                                 <div className="font-medium text-gray-900 truncate">
+                                   {ensureString(vs.residentName)}
+                                 </div>
                                 <div className="text-xs text-gray-500 truncate">
                                   ID: {ensureString(vs.residentId)}
                                 </div>

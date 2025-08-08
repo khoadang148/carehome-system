@@ -22,6 +22,7 @@ import { activitiesAPI } from '@/lib/api';
 import NotificationModal from '@/components/NotificationModal';
 import { residentAPI, carePlansAPI, roomsAPI, staffAssignmentsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
+import { filterOfficialResidents } from '@/lib/utils/resident-status';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -133,7 +134,11 @@ export default function AIRecommendationsPage() {
           };
         }));
         
-        setResidents(mapped);
+        // Chỉ lấy cư dân chính thức (có phòng và giường)
+        const officialResidents = await filterOfficialResidents(mapped);
+        console.log('Official residents for AI recommendations:', officialResidents);
+        
+        setResidents(officialResidents);
         setResidentsError(null);
       } catch (error) {
         console.error('Error fetching residents:', error);

@@ -980,7 +980,7 @@ function DetailRow({ label, value, badge, icon }: { label: string, value: string
           fontWeight: 500,
           lineHeight: '1.5'
         }}>
-          {value || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa cập nhật</span>}
+          {value || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa hoàn tất đăng kí</span>}
         </span>
       )}
     </div>

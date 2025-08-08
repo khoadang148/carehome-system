@@ -40,8 +40,8 @@ export default function ResidentServiceDetailPage() {
   const [carePlanAssignment, setCarePlanAssignment] = useState<any>(null);
   const [carePlanDetails, setCarePlanDetails] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
-  const [bedNumber, setBedNumber] = useState<string>('Chưa cập nhật');
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
+  const [bedNumber, setBedNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
   const [bedLoading, setBedLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
@@ -161,7 +161,7 @@ export default function ResidentServiceDetailPage() {
               const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
               if (roomId) {
                 const room = await roomsAPI.getById(roomId);
-                setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
               } else {
                 throw new Error('No room ID found');
               }
@@ -179,7 +179,7 @@ export default function ResidentServiceDetailPage() {
               const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
               if (bedId) {
                 const bed = await bedsAPI.getById(bedId);
-                setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+                setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
               } else {
                 throw new Error('No bed ID found');
               }
@@ -197,9 +197,9 @@ export default function ResidentServiceDetailPage() {
             const roomIdString = typeof assignedRoomId === 'object' && assignedRoomId?._id ? assignedRoomId._id : assignedRoomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+              setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
             } else {
-              setRoomNumber('Chưa cập nhật');
+              setRoomNumber('Chưa hoàn tất đăng kí');
             }
 
             // Load bed information from care plan assignment
@@ -207,19 +207,19 @@ export default function ResidentServiceDetailPage() {
             const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
             if (bedIdString) {
               const bed = await bedsAPI.getById(bedIdString);
-              setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+              setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
             } else {
-              setBedNumber('Chưa cập nhật');
+              setBedNumber('Chưa hoàn tất đăng kí');
             }
           } else {
-            setRoomNumber('Chưa cập nhật');
-            setBedNumber('Chưa cập nhật');
+            setRoomNumber('Chưa hoàn tất đăng kí');
+            setBedNumber('Chưa hoàn tất đăng kí');
           }
         }
       } catch (error) {
         console.error('Error loading room/bed info:', error);
-        setRoomNumber('Chưa cập nhật');
-        setBedNumber('Chưa cập nhật');
+        setRoomNumber('Chưa hoàn tất đăng kí');
+        setBedNumber('Chưa hoàn tất đăng kí');
       } finally {
         setRoomLoading(false);
         setBedLoading(false);

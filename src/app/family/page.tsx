@@ -49,9 +49,9 @@ const getAge = (dob: string) => {
 };
 
 const formatDob = (dob: string) => {
-  if (!dob) return 'Chưa cập nhật';
+  if (!dob) return 'Chưa hoàn tất đăng kí';
   const d = new Date(dob);
-  if (isNaN(d.getTime())) return 'Chưa cập nhật';
+  if (isNaN(d.getTime())) return 'Chưa hoàn tất đăng kí';
   const day: string = String(d.getDate()).padStart(2, '0');
   const month: string = String(d.getMonth() + 1).padStart(2, '0');
   const year: number = d.getFullYear();
@@ -121,7 +121,7 @@ export default function FamilyPortalPage() {
 
   // Staff and room
   const [staffList, setStaffList] = useState<any[]>([]);
-  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
   const [fetchedStaffNames, setFetchedStaffNames] = useState<{[id: string]: string}>({});
   const [assignedStaff, setAssignedStaff] = useState<any[]>([]);
@@ -493,9 +493,9 @@ export default function FamilyPortalPage() {
 
         // Handle room number
         if (roomPromise.status === 'fulfilled' && roomPromise.value) {
-          setRoomNumber(roomPromise.value?.room_number || 'Chưa cập nhật');
+          setRoomNumber(roomPromise.value?.room_number || 'Chưa hoàn tất đăng kí');
         } else {
-          setRoomNumber('Chưa cập nhật');
+          setRoomNumber('Chưa hoàn tất đăng kí');
         }
 
         // Handle assigned staff
@@ -951,7 +951,7 @@ useEffect(() => {
               </div>
               <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-2">
                 <CalendarDaysIcon className="w-4 h-4" />
-                Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa cập nhật'}
+                Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa hoàn tất đăng kí'}
               </div>
             </div>
             {/* Information Cards */}
@@ -973,7 +973,7 @@ useEffect(() => {
                     <div className="flex flex-col p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl border border-slate-300">
                       <span className="text-slate-600 font-semibold text-sm mb-1.5 uppercase tracking-wider">Giới tính</span>
                       <span className="text-slate-800 font-extrabold text-lg">
-                        {selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa cập nhật')}
+                        {selectedResident?.gender === 'male' ? 'Nam' : selectedResident?.gender === 'female' ? 'Nữ' : (selectedResident?.gender || 'Chưa hoàn tất đăng kí')}
                       </span>
                     </div>
                   </div>
@@ -983,7 +983,7 @@ useEffect(() => {
                       <span className="text-slate-800 font-extrabold text-lg">
                         {selectedResident?.date_of_birth || selectedResident?.dateOfBirth ? 
                           `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}` : 
-                          'Chưa cập nhật'
+                          'Chưa hoàn tất đăng kí'
                         }
                       </span>
                     </div>
@@ -1022,7 +1022,7 @@ useEffect(() => {
                   </div>
                 ) : (
                   <div className="text-center text-slate-500 italic p-5 bg-red-50 rounded-xl border border-dashed border-red-200">
-                    Chưa cập nhật thông tin liên hệ khẩn cấp
+                    Chưa hoàn tất đăng kí thông tin liên hệ khẩn cấp
                   </div>
                 )}
               </div>
@@ -1065,7 +1065,7 @@ useEffect(() => {
                 </div>
                 <div className="p-3 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200 text-emerald-700 font-semibold text-sm flex items-center gap-2.5 justify-center">
                   <span className="w-3 h-3 bg-emerald-500 rounded-full"></span>
-                  Tình trạng: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
+                  Tình trạng: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa hoàn tất đăng kí'}
                 </div>
               </div>
 
@@ -1128,7 +1128,7 @@ useEffect(() => {
                                   Số điện thoại
                                 </div>
                             <div className="text-sm text-slate-800 font-bold">
-                                  {staff?.phone || 'Chưa cập nhật'}
+                                  {staff?.phone || 'Chưa hoàn tất đăng kí'}
                                 </div>
                               </div>
                             </div>

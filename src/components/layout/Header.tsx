@@ -17,6 +17,7 @@ export default function Header() {
   }, []);
   
   const handleLogout = () => {
+    // Immediate logout for better UX
     logout();
   };
 

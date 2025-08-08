@@ -103,12 +103,12 @@ export default function StaffResidentsPage() {
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
             } else {
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
             }
           } catch {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
           }
         });
         

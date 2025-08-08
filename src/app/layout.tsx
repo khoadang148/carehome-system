@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ResidentsProvider } from "@/lib/contexts/residents-context";
 import { ActivitiesProvider } from "@/lib/contexts/activities-context";
 import { ToastProvider } from "@/components/ToastProvider";
+import LogoutSpinner from "@/components/shared/LogoutSpinner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,6 +36,7 @@ export default function RootLayout({
             <ActivitiesProvider>
               <ClientLayout>{children}</ClientLayout>
               <ToastProvider />
+              <LogoutSpinner />
             </ActivitiesProvider>
           </ResidentsProvider>
         </AuthProvider>

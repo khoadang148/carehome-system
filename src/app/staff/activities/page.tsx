@@ -945,99 +945,175 @@ export default function StaffActivitiesPage() {
                     e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
                   }}
                 >
-                  {/* Header */}
+                  {/* Header with Activity Name and Status */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    marginBottom: '0.75rem'
+                    marginBottom: '1rem',
+                    paddingBottom: '0.75rem',
+                    borderBottom: '1px solid #e5e7eb'
                   }}>
-                    <div style={{ flex: 1, paddingRight: '1rem' }}>
-                      <h3 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: 600,
-                        color: '#111827',
-                        margin: '0 0 0.5rem 0',
+                    <div style={{ flex: 1 }}>
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        flexWrap: 'wrap'
+                        marginBottom: '0.5rem'
                       }}>
-                        <div style={{
-                          width: '0.75rem',
-                          height: '0.75rem',
-                          borderRadius: '50%',
-                          background: categoryColor
-                        }} />
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Tên hoạt động:
+                        </span>
+                      </div>
+                      <h3 style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: '#111827',
+                        margin: '0 0 0.5rem 0',
+                        lineHeight: 1.3
+                      }}>
                         {activity.name}
+                      </h3>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Loại:
+                        </span>
                         <span style={{
                           display: 'inline-block',
-                          marginLeft: 8,
-                          padding: '2px 12px',
-                          borderRadius: 999,
-                          background: categoryColor + '22',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '9999px',
+                          background: categoryColor + '15',
                           color: categoryColor,
-                          fontWeight: 700,
-                          fontSize: '0.85em',
-                          border: `1.5px solid ${categoryColor}55`,
-                          lineHeight: 1.2,
-                          letterSpacing: '0.01em',
-                          boxShadow: '0 1px 4px 0 ' + categoryColor + '11',
-                          verticalAlign: 'middle'
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                          border: `1px solid ${categoryColor}30`
                         }}>
                           {activity.category}
                         </span>
-                      </h3>
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        gap: '0.25rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Trạng thái:
+                        </span>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: statusColor.bg,
+                          color: statusColor.text,
+                          border: `1px solid ${statusColor.border}`,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {activity.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {activity.description && (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '0.75rem',
+                      background: '#f9fafb',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #f3f4f6'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Mô tả:
+                        </span>
+                      </div>
                       <p style={{
                         fontSize: '0.875rem',
-                        color: '#6b7280',
+                        color: '#4b5563',
                         margin: 0,
-                        lineHeight: 1.4
+                        lineHeight: 1.5,
+                        fontStyle: 'italic'
                       }}>
                         {activity.description}
                       </p>
                     </div>
-                    <div style={{ flexShrink: 0 }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        background: statusColor.bg,
-                        color: statusColor.text,
-                        border: `1px solid ${statusColor.border}`,
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {activity.status}
-                      </span>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Compact Info Grid */}
+                  {/* Key Information Grid */}
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '0.75rem',
-                    marginBottom: '0.75rem',
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e2e8f0'
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '1rem',
+                    marginBottom: '1rem'
                   }}>
                     {/* Time */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#f0f9ff',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e0f2fe'
                     }}>
-                      <ClockIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#3b82f6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <ClockIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Thời gian</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{activity.startTime} - {activity.endTime} ({activity.duration} Phút)</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Thời gian:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {activity.startTime} - {activity.endTime}
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>({activity.duration} phút)</div>
                       </div>
                     </div>
                     
@@ -1045,13 +1121,28 @@ export default function StaffActivitiesPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#fef3c7',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #fde68a'
                     }}>
-                      <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <CalendarIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Ngày</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{activity.date ? new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN') : '-'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Ngày:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {activity.date ? new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN') : '-'}
+                        </div>
                       </div>
                     </div>
                     
@@ -1059,13 +1150,28 @@ export default function StaffActivitiesPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#ecfdf5',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1fae5'
                     }}>
-                      <MapPinIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#10b981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <MapPinIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Địa điểm</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{activity.location}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Địa điểm:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {activity.location}
+                        </div>
                       </div>
                     </div>
                     
@@ -1073,13 +1179,28 @@ export default function StaffActivitiesPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      background: '#fef3c7',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #fde68a'
                     }}>
-                      <UserGroupIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />
+                      <div style={{
+                        width: '2rem',
+                        height: '2rem',
+                        borderRadius: '50%',
+                        background: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <UserGroupIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Số lượng</div>
-                        <div style={{ color: '#111827', fontWeight: 600 }}>{(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng cư dân tham gia:</div>
+                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                          {(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
+                        </div>
                       </div>
                     </div>
                   </div>

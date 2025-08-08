@@ -285,7 +285,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     }
     
     // Kiểm tra xem resident đã có phòng chưa
-    if (selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa cập nhật') {
+    if (selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí') {
       console.log(`✅ Resident ${selectedResidentObj?.name} đã có phòng: ${roomNumbers[selectedResident]}`);
     }
   }, [selectedResident, residents, roomNumbers]);
@@ -314,12 +314,12 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
           const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
           if (roomIdString) {
             const room = await roomsAPI.getById(roomIdString);
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
           } else {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
           }
         } catch {
-          setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+          setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
         }
       });
     });
@@ -723,7 +723,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
 
   // Kiểm tra xem resident đã có phòng chưa
   const selectedResidentObj = residents.find(r => r.id === selectedResident);
-  const hasExistingRoom = selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa cập nhật';
+  const hasExistingRoom = selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí';
   
   // Thêm kiểm tra trước khi gửi đăng ký
   const canSubmit = selectedResident && selectedPackage && startDate && 

@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { filterOfficialResidents } from '@/lib/utils/resident-status';
 
 export default function PhotoUploadPage() {
   const { user } = useAuth();
@@ -90,9 +91,12 @@ export default function PhotoUploadPage() {
           setResidents(residentsWithRoom);
           console.log('Staff residents with room_number:', residentsWithRoom);
         } else {
-          // Nếu là admin, lấy tất cả cư dân
+          // Nếu là admin, lấy tất cả cư dân và lọc chỉ lấy cư dân chính thức
           const data = await residentAPI.getAll();
-          const residentsWithRoom = await Promise.all((Array.isArray(data) ? data : []).map(async (resident: any) => {
+          const allResidents = Array.isArray(data) ? data : [];
+          const officialResidents = await filterOfficialResidents(allResidents);
+          
+          const residentsWithRoom = await Promise.all(officialResidents.map(async (resident: any) => {
             let room_number = '';
             try {
               // Ưu tiên sử dụng bedAssignmentsAPI
@@ -130,7 +134,7 @@ export default function PhotoUploadPage() {
             return { ...resident, room_number };
           }));
           setResidents(residentsWithRoom);
-          console.log('All residents with room_number:', residentsWithRoom);
+          console.log('Official residents with room_number for photos:', residentsWithRoom);
         }
       } catch (err) {
         console.error('Error fetching residents:', err);
@@ -401,7 +405,7 @@ export default function PhotoUploadPage() {
   };
 
   const handleGoBack = () => {
-    router.push('/residents');
+    router.push('/staff/photos');
   };
 
   return (
@@ -1026,7 +1030,7 @@ export default function PhotoUploadPage() {
             <button
               onClick={() => {
                 setShowResultModal(false);
-                if (resultMessage.startsWith('✅')) router.push('/residents');
+                if (resultMessage.startsWith('✅')) router.push('/staff/photos');
               }}
               style={{
                 padding: '0.5rem 1.5rem',

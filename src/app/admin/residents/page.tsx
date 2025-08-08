@@ -73,6 +73,7 @@ export default function ResidentsPage() {
         }));
         setResidentsData(mapped);
         console.log('Mapped residents:', mapped);
+        console.log('Avatar debug:', mapped.map(r => ({ name: r.name, avatar: r.avatar })));
         // Lấy số phòng cho từng resident
         mapped.forEach(async (resident: any) => {
           try {
@@ -91,9 +92,9 @@ export default function ResidentsPage() {
                 if (roomId) {
                   const room = await roomsAPI.getById(roomId);
                   console.log(`Room for resident ${resident.id} (fetched):`, room);
-                  setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+                  setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kíkí' }));
                 } else {
-                  setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+                  setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
                 }
               }
             } else {
@@ -106,15 +107,15 @@ export default function ResidentsPage() {
               if (roomIdString) {
                 const room = await roomsAPI.getById(roomIdString);
                 console.log(`Room for resident ${resident.id} (fallback):`, room);
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa cập nhật' }));
+                setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
               } else {
                 console.log(`No room assigned for resident ${resident.id}`);
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+                setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
               }
             }
           } catch (error) {
             console.log(`Error getting room for resident ${resident.id}:`, error);
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa cập nhật' }));
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
           }
         });
 
@@ -487,12 +488,13 @@ export default function ResidentsPage() {
                     <td style={{padding: '1rem'}}>
                       <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                         <Avatar
-                          src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : undefined}
+                          src={resident.avatar}
                           alt={resident.name}
                           size="small"
                           className="w-10 h-10"
-                          showInitials={true}
+                          showInitials={false}
                           name={resident.name}
+                          fallbackSrc="/default-avatar.svg"
                         />
                         <div>
                           <p style={{

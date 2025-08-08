@@ -274,7 +274,7 @@ export default function FinancePage() {
                   value: idx,
                   label: r.residentName || 'Chưa rõ',
                   avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '/default-avatar.svg',
-                  roomNumber: r.room || 'Chưa cập nhật',
+                  roomNumber: r.room || 'Chưa hoàn tất đăng kí',
                   relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
                 }))}
                 value={(() => {
@@ -283,7 +283,7 @@ export default function FinancePage() {
                   value: selectedResident,
                   label: r.residentName || 'Chưa rõ',
                   avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '/default-avatar.svg',
-                  roomNumber: r.room || 'Chưa cập nhật',
+                  roomNumber: r.room || 'Chưa hoàn tất đăng kí',
                   relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
                 } : null;
                 })()}

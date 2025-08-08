@@ -9,6 +9,8 @@ import {
   initializeSession 
 } from '@/lib/utils/session';
 import { clientStorage } from '@/lib/utils/clientStorage';
+import { optimizedLogout } from '@/lib/utils/fastLogout';
+import { redirectByRole } from '@/lib/utils/roleRedirect';
 
 export type UserRole = 'admin' | 'staff' | 'family';
 
@@ -72,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
     
-    // Tối ưu: Kiểm tra session ngay lập tức thay vì setTimeout
+    // Immediate session check for faster loading
     checkUserSession();
   }, [isLoggingOut]);
 
@@ -91,8 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
+          // Initialize session immediately
           initializeSession(response.access_token, userObj);
           setUser(userObj);
+          
+          // Redirect based on role immediately
+          redirectByRole(router, userRole);
+          
           return userObj;
         } else {
           throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
@@ -108,26 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set logout flag to prevent unnecessary operations
     setIsLoggingOut(true);
     
-    // Clear session data immediately
-    clearSessionData();
+    // Clear user state immediately for instant UI feedback
     setUser(null);
     
-    // Clear additional storage items
-    clientStorage.setItem('has_logged_out', 'true');
-    clientStorage.removeItem('login_success');
-    clientStorage.removeItem('login_error');
-    clientStorage.removeItem('login_attempts');
+    // Use optimized logout utility for faster performance
+    optimizedLogout(router, () => authAPI.logout());
     
-    // Redirect immediately
-    router.push('/login');
-    
-    // Call logout API in background (don't block the redirect)
+    // Reset logout flag after a short delay
     setTimeout(() => {
-      authAPI.logout().catch(error => {
-        console.warn('Logout API call failed:', error);
-      }).finally(() => {
-        setIsLoggingOut(false);
-      });
+      setIsLoggingOut(false);
     }, 100);
   };
 

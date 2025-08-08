@@ -57,15 +57,10 @@ export function extendSession() {
 export function initializeSession(token: string, userData: any) {
   const currentTime = Date.now().toString();
   
-  // Sử dụng Promise.all để lưu đồng thời tất cả dữ liệu
-  const storageOperations = [
-    clientStorage.setItem('access_token', token),
-    clientStorage.setItem('user', JSON.stringify(userData)),
-    clientStorage.setItem('session_start', currentTime)
-  ];
-  
-  // Thực hiện tất cả operations đồng thời
-  Promise.all(storageOperations).catch(error => {
-    console.error('Error initializing session:', error);
-  });
+  // Store data synchronously for immediate access
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('access_token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('session_start', currentTime);
+  }
 } 

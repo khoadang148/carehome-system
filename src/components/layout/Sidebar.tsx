@@ -44,7 +44,8 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Quản lý chính",
     items: [
-      { name: 'Màn hình chính', href: '/', icon: HomeIcon, roles: ['admin','staff'], color: '#667eea' },
+      { name: 'Màn hình chính', href: '/admin', icon: HomeIcon, roles: ['admin'], color: '#667eea' },
+      { name: 'Màn hình chính', href: '/staff', icon: HomeIcon, roles: ['staff'], color: '#667eea' },
       { name: 'Người cao tuổi', href: '/admin/residents', icon: UserIcon, roles: ['admin'], color: '#10b981' },
       { name: 'Nhân viên', href: '/admin/staff-management', icon: UsersIcon, roles: ['admin'], color: '#6366f1' },
       { name: 'Quản lý người cao tuổi', href: '/staff/residents', icon: UserGroupIcon, roles: ['staff'], color: '#6366f1' },
@@ -55,7 +56,6 @@ const menuGroups: MenuGroup[] = [
     items: [
       { name: 'Ghi chú chăm sóc', href: '/staff/assessments', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
       { name: 'Đăng ảnh hoạt động', href: '/staff/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
-      
     ]
   },
   {

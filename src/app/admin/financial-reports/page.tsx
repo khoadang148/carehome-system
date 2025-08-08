@@ -11,10 +11,11 @@ import {
   EyeIcon,
   ArrowLeftIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { billsAPI } from '../../../lib/api';
+import { billsAPI, bedAssignmentsAPI } from '../../../lib/api';
 import { Dialog } from '@headlessui/react';
 
 interface FinancialRecord {
@@ -26,9 +27,35 @@ interface FinancialRecord {
   payment_method?: string;
   status: string;
   notes?: string;
-  resident_id?: string;
-  family_member_id?: string;
-  staff_id?: string;
+  resident_id?: string | {
+    _id: string;
+    full_name: string;
+  };
+  family_member_id?: string | {
+    _id: string;
+    full_name: string;
+    email: string;
+  };
+  staff_id?: string | {
+    _id: string;
+    full_name: string;
+  };
+  care_plan_assignment_id?: {
+    assigned_room_id?: {
+      room_number: string;
+      room_type: string;
+      floor: string;
+    };
+    assigned_bed_id?: {
+      bed_number: string;
+      bed_type: string;
+    };
+    care_plan_ids?: Array<{
+      plan_name: string;
+      description: string;
+      monthly_price: number;
+    }>;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -47,13 +74,36 @@ export default function FinancialReportsPage() {
   const [editError, setEditError] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [residentRooms, setResidentRooms] = useState<Record<string, string>>({});
 
   const fetchBills = useCallback(async () => {
     setLoading(true);
     try {
       const data = await billsAPI.getAll();
+      console.log('Bills data from API:', data);
       setRecords(data);
+      
+      // Fetch room information for all residents
+      const roomMap: Record<string, string> = {};
+      for (const record of data) {
+        if (record.resident_id) {
+          const residentId = typeof record.resident_id === 'object' ? record.resident_id._id : record.resident_id;
+          try {
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+            if (Array.isArray(bedAssignments) && bedAssignments.length > 0) {
+              const bedAssignment = bedAssignments[0]; // Lấy assignment đầu tiên
+              if (bedAssignment?.bed_id?.room_id?.room_number) {
+                roomMap[residentId] = bedAssignment.bed_id.room_id.room_number;
+              }
+            }
+          } catch (error) {
+            console.warn(`Error fetching room for resident ${residentId}:`, error);
+          }
+        }
+      }
+      setResidentRooms(roomMap);
     } catch (err) {
+      console.error('Error fetching bills:', err);
       // Xử lý lỗi nếu cần
     } finally {
       setLoading(false);
@@ -90,6 +140,33 @@ export default function FinancialReportsPage() {
     unpaid: { label: 'Chưa thanh toán', className: 'bg-yellow-100 text-yellow-800' },
     cancelled: { label: 'Đã hủy', className: 'bg-red-100 text-red-800' },
     processing: { label: 'Đang xử lý', className: 'bg-blue-100 text-blue-800' },
+  };
+
+  // Hàm helper để lấy thông tin resident
+  const getResidentInfo = (record: FinancialRecord) => {
+    if (typeof record.resident_id === 'object' && record.resident_id) {
+      return {
+        name: record.resident_id.full_name,
+        id: record.resident_id._id
+      };
+    }
+    return { name: 'Không xác định', id: record.resident_id || '' };
+  };
+
+  // Hàm helper để lấy thông tin phòng từ bed assignments
+  const getRoomInfo = (record: FinancialRecord) => {
+    if (record.resident_id) {
+      const residentId = typeof record.resident_id === 'object' ? record.resident_id._id : record.resident_id;
+      const roomNumber = residentRooms[residentId];
+      return roomNumber || 'Chưa phân phòng';
+    }
+    return 'Chưa phân phòng';
+  };
+
+  // Hàm helper để rút gọn tiêu đề
+  const truncateTitle = (title: string, maxLength: number = 40) => {
+    if (title.length <= maxLength) return title;
+    return title.substring(0, maxLength) + '...';
   };
 
   // Xử lý cập nhật hóa đơn
@@ -200,7 +277,7 @@ export default function FinancialReportsPage() {
           </div>
         </div>
 
-        {/* Transactions Table */}
+        {/* Transactions Table - Simplified */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-indigo-600">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -212,77 +289,83 @@ export default function FinancialReportsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-blue-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Ngày đến hạn</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Tiêu đề</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Ghi chú</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Số tiền</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Trạng thái</th>
-                 <th className="px-6 py-4 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Hành động</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Ngày đến hạn</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Người cao tuổi</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Phòng</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Tiêu đề</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Số tiền</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Trạng thái</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Hành động</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {filteredRecords.map((record) => (
-                  <tr key={record._id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(record.due_date).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div>
-                        <div className="font-medium text-gray-900">{record.title}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="text-gray-500 text-xs mt-1">
-                        {record.notes}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <span className={record.amount > 0 ? 'text-green-600' : 'text-red-600'}>
-                        {record.amount.toLocaleString('vi-VN')} VNĐ
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${
-                        statusMap[record.status]?.className || 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {statusMap[record.status]?.label || 'Không xác định'}
-                      </span>
-                    </td>
-                   <td className="px-6 py-4 whitespace-nowrap flex gap-2">
-                     {/* Chỉ hiển thị nút chỉnh sửa và xóa cho hóa đơn chưa thanh toán và chưa hủy */}
-                     {(record.status === 'pending' || record.status === 'unpaid') && (
-                       <>
-                         <button
-                           className="p-2 rounded-full hover:bg-blue-100 transition"
-                           title="Chỉnh sửa"
-                           onClick={() => { setEditBill(record); setEditReason(''); setEditError(''); }}
-                         >
-                           <PencilIcon className="w-5 h-5 text-blue-600" />
-                         </button>
-                         <button
-                           className="p-2 rounded-full hover:bg-red-100 transition"
-                           title="Xóa hóa đơn"
-                           onClick={() => { setDeleteBill(record); setDeleteReason(''); setDeleteError(''); }}
-                         >
-                           <TrashIcon className="w-5 h-5 text-red-600" />
-                         </button>
-                       </>
-                     )}
-                     {/* Hiển thị thông báo cho hóa đơn đã thanh toán */}
-                     {(record.status === 'completed' || record.status === 'paid') && (
-                       <span className="text-sm text-gray-500 italic">
-                         Đã thanh toán
-                       </span>
-                     )}
-                     {/* Hiển thị thông báo cho hóa đơn đã hủy */}
-                     {record.status === 'cancelled' && (
-                       <span className="text-sm text-gray-500 italic">
-                         Đã hủy
-                       </span>
-                     )}
-                   </td>
-                  </tr>
-                ))}
+                {filteredRecords.map((record) => {
+                  const residentInfo = getResidentInfo(record);
+                  const roomInfo = getRoomInfo(record);
+                  
+                  return (
+                    <tr key={record._id} className="hover:bg-gray-50 transition-colors duration-150">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(record.due_date).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="font-medium text-gray-900">{residentInfo.name}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="text-gray-900 font-medium">{roomInfo}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="max-w-xs">
+                          <div className="font-medium text-gray-900" title={record.title}>
+                            {truncateTitle(record.title)}
+                          </div>
+                          {record.notes && (
+                            <div className="text-xs text-gray-500 mt-1" title={record.notes}>
+                              {truncateTitle(record.notes, 30)}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                        <span className={record.amount > 0 ? 'text-green-600' : 'text-red-600'}>
+                          {record.amount.toLocaleString('vi-VN')} VNĐ
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          statusMap[record.status]?.className || 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {statusMap[record.status]?.label || 'Không xác định'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {/* Chỉ hiển thị nút chỉnh sửa và xóa cho hóa đơn chưa thanh toán và chưa hủy */}
+                        {(record.status === 'pending' || record.status === 'unpaid') && (
+                          <div className="flex gap-1">
+                            <button
+                              className="p-1 rounded hover:bg-blue-100 transition"
+                              title="Chỉnh sửa"
+                              onClick={() => { setEditBill(record); setEditReason(''); setEditError(''); }}
+                            >
+                              <PencilIcon className="w-4 h-4 text-blue-600" />
+                            </button>
+                            <button
+                              className="p-1 rounded hover:bg-red-100 transition"
+                              title="Xóa hóa đơn"
+                              onClick={() => { setDeleteBill(record); setDeleteReason(''); setDeleteError(''); }}
+                            >
+                              <TrashIcon className="w-4 h-4 text-red-600" />
+                            </button>
+                          </div>
+                        )}
+                        {/* Hiển thị dấu gạch ngang cho hóa đơn đã thanh toán hoặc hủy */}
+                        {(record.status === 'completed' || record.status === 'paid' || record.status === 'cancelled') && (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

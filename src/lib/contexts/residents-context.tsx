@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { residentAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from './auth-context';
+import { filterOfficialResidents } from '@/lib/utils/resident-status';
 
 // Define types for resident data
 export interface Resident {
@@ -51,8 +52,10 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
         console.log('Fetching residents for family member:', user.id);
         residentsData = await residentAPI.getByFamilyMemberId(user.id);
       } else {
-        // Nếu là admin hoặc staff, lấy tất cả residents
-        residentsData = await residentAPI.getAll();
+        // Nếu là admin hoặc staff, lấy tất cả residents và lọc chỉ lấy cư dân chính thức
+        const allResidents = await residentAPI.getAll();
+        residentsData = await filterOfficialResidents(allResidents);
+        console.log('Filtered official residents for admin/staff:', residentsData);
       }
       
       console.log('Raw residents data from API:', residentsData);

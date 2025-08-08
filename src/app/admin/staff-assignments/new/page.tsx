@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAssignmentsAPI, staffAPI, residentAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { filterOfficialResidents } from '@/lib/utils/resident-status';
 
 export default function NewStaffAssignmentPage() {
   const { user, loading } = useAuth();
@@ -83,16 +84,21 @@ export default function NewStaffAssignmentPage() {
         console.log('All users:', staffData);
         console.log('Staff only:', staffOnly);
         setStaffList(staffOnly);
-        setResidents(Array.isArray(residentsData) ? residentsData : []);
+        
+        // Chỉ lấy cư dân chính thức (có phòng và giường)
+        const residentsArray = Array.isArray(residentsData) ? residentsData : [];
+        const officialResidents = await filterOfficialResidents(residentsArray);
+        console.log('Official residents for staff assignments:', officialResidents);
+        setResidents(officialResidents);
+        
         setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
         
         // Debug: Log assignments data
         console.log('Loaded assignments:', assignmentsData);
         console.log('Assignments count:', Array.isArray(assignmentsData) ? assignmentsData.length : 0);
         
-        // Lấy số phòng cho từng resident
-        const residentsArray = Array.isArray(residentsData) ? residentsData : [];
-        residentsArray.forEach(async (resident: any) => {
+        // Lấy số phòng cho từng resident (sử dụng officialResidents thay vì tạo biến mới)
+        officialResidents.forEach(async (resident: any) => {
           try {
             // Đảm bảo resident._id là string
             const residentId = typeof resident._id === 'object' && (resident._id as any)?._id 
@@ -115,7 +121,7 @@ export default function NewStaffAssignmentPage() {
                   const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
                   if (roomId) {
                     const room = await roomsAPI.getById(roomId);
-                    setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa cập nhật' }));
+                    setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
                     return;
                   }
                 }
@@ -132,12 +138,12 @@ export default function NewStaffAssignmentPage() {
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa cập nhật' }));
+              setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
             } else {
-              setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa cập nhật' }));
+              setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa hoàn tất đăng kí' }));
             }
           } catch {
-            setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa cập nhật' }));
+            setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa hoàn tất đăng kí' }));
           }
         });
         
@@ -837,7 +843,7 @@ export default function NewStaffAssignmentPage() {
                                       {resident.full_name}
                                     </p>
                                     <p className={`text-sm ${isSelected ? 'text-green-700' : 'text-gray-500'}`}>
-                                      Phòng: {roomNumbers[resident._id] || 'Chưa cập nhật'}
+                                      Phòng: {roomNumbers[resident._id] || 'Chưa hoàn tất đăng kí'}
                                     </p>
                                     {formData.staff_id && getAssignmentStatus(resident._id) === 'active' && (
                                       <p className="text-xs text-red-600 font-medium mt-1">
@@ -1061,7 +1067,7 @@ export default function NewStaffAssignmentPage() {
                               <div className="w-3 h-3 bg-green-500 rounded-full mr-3 shadow-sm"></div>
                               <div>
                                 <p className="text-sm font-semibold text-green-900">{resident.full_name}</p>
-                                <p className="text-xs text-green-700">Phòng {roomNumbers[resident._id] || 'Chưa cập nhật'}</p>
+                                <p className="text-xs text-green-700">Phòng {roomNumbers[resident._id] || 'Chưa hoàn tất đăng kí'}</p>
                               </div>
                             </div>
                             <button

@@ -621,7 +621,7 @@ export default function EditStaffPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600 text-sm">Vị trí:</span>
-                    <span className="font-medium text-slate-900">{formData.position || 'Chưa cập nhật'}</span>
+                    <span className="font-medium text-slate-900">{formData.position || 'Chưa hoàn tất đăng kí'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600 text-sm">Trạng thái:</span>

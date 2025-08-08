@@ -65,10 +65,10 @@ export default function VisitHistoryPage() {
     history.forEach(item => {
       const date = item.visit_date || item.requestedDate || item.date || '';
       const time = item.visit_time || item.requestedTime || item.time || '';
-      let residentName = 'Chưa cập nhật';
+      let residentName = 'Chưa hoàn tất đăng kí';
       if (item.resident_id) {
         const found = residents.find(r => r._id === item.resident_id);
-        residentName = found?.full_name || found?.fullName || found?.name || 'Chưa cập nhật';
+        residentName = found?.full_name || found?.fullName || found?.name || 'Chưa hoàn tất đăng kí';
       }
       const key = `${date}|${time}|${item.purpose}|${item.status}`;
       const foundGroup = grouped.find(g =>

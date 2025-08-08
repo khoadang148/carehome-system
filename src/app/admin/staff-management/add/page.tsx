@@ -691,7 +691,7 @@ export default function AddStaffPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600 text-sm">Vị trí:</span>
-                    <span className="font-medium text-slate-900">{createdAccount.position || 'Chưa cập nhật'}</span>
+                    <span className="font-medium text-slate-900">{createdAccount.position || 'Chưa hoàn tất đăng kí'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600 text-sm">Trạng thái:</span>

@@ -41,7 +41,7 @@ export default function ServiceDetailsPage() {
   const [loading, setLoading] = useState(true);
   
   // Thêm state cho số phòng
-  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
 
@@ -135,7 +135,7 @@ export default function ServiceDetailsPage() {
   // Lấy số phòng khi selectedRelative thay đổi
   useEffect(() => {
     if (!selectedRelative?._id) {
-      setRoomNumber('Chưa cập nhật');
+      setRoomNumber('Chưa hoàn tất đăng kí');
       return;
     }
     setRoomLoading(true);
@@ -153,11 +153,11 @@ export default function ServiceDetailsPage() {
             if (roomId) {
               return roomsAPI.getById(roomId)
                 .then((room: any) => {
-                  setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                  setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
                 })
-                .catch(() => setRoomNumber('Chưa cập nhật'));
+                .catch(() => setRoomNumber('Chưa hoàn tất đăng kí'));
             } else {
-              setRoomNumber('Chưa cập nhật');
+              setRoomNumber('Chưa hoàn tất đăng kí');
             }
           }
         } else {
@@ -170,17 +170,17 @@ export default function ServiceDetailsPage() {
               if (roomIdString) {
                 return roomsAPI.getById(roomIdString)
                   .then((room: any) => {
-                    setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                    setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
                   })
-                  .catch(() => setRoomNumber('Chưa cập nhật'));
+                  .catch(() => setRoomNumber('Chưa hoàn tất đăng kí'));
               } else {
-                setRoomNumber('Chưa cập nhật');
+                setRoomNumber('Chưa hoàn tất đăng kí');
               }
             })
-            .catch(() => setRoomNumber('Chưa cập nhật'));
+            .catch(() => setRoomNumber('Chưa hoàn tất đăng kí'));
         }
       })
-      .catch(() => setRoomNumber('Chưa cập nhật'))
+      .catch(() => setRoomNumber('Chưa hoàn tất đăng kí'))
       .finally(() => setRoomLoading(false));
   }, [selectedRelative?._id]);
 

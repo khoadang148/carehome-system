@@ -40,10 +40,10 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [vitalSigns, setVitalSigns] = useState<any>(null);
   const [vitalLoading, setVitalLoading] = useState(true);
   const [careNotes, setCareNotes] = useState<any[]>([]);
-  const [roomNumber, setRoomNumber] = useState<string>('Chưa cập nhật');
+  const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
   const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
-  const [bedNumber, setBedNumber] = useState<string>('Chưa cập nhật');
+  const [bedNumber, setBedNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [bedLoading, setBedLoading] = useState(false);
   
   // Get residentId from params using React.use()
@@ -91,7 +91,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
                 if (roomId) {
                   const room = await roomsAPI.getById(roomId);
-                  setRoomNumber(room?.room_number || 'Chưa cập nhật');
+                  setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
                 } else {
                   throw new Error('No room ID found');
                 }
@@ -109,13 +109,13 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              setRoomNumber(room?.room_number || 'Chưa cập nhật');
+              setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
             } else {
-              setRoomNumber('Chưa cập nhật');
+              setRoomNumber('Chưa hoàn tất đăng kí');
             }
           }
         } catch {
-          setRoomNumber('Chưa cập nhật');
+          setRoomNumber('Chưa hoàn tất đăng kí');
         }
         setRoomLoading(false);
         // Fetch care plan assignments (gói dịch vụ đang sử dụng)
@@ -139,7 +139,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
                 if (bedId) {
                   const bed = await bedsAPI.getById(bedId);
-                  setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+                  setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
                 } else {
                   throw new Error('No bed ID found');
                 }
@@ -162,16 +162,16 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             if (bedIdString) {
               try {
                 const bed = await bedsAPI.getById(bedIdString);
-                setBedNumber(bed?.bed_number || 'Chưa cập nhật');
+                setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
               } catch {
-                setBedNumber('Chưa cập nhật');
+                setBedNumber('Chưa hoàn tất đăng kí');
               }
             } else {
-              setBedNumber('Chưa cập nhật');
+              setBedNumber('Chưa hoàn tất đăng kí');
             }
           }
         } catch {
-          setBedNumber('Chưa cập nhật');
+          setBedNumber('Chưa hoàn tất đăng kí');
         }
         setBedLoading(false);
         // Fetch care plans (nếu cần cho mục đích khác)
@@ -541,7 +541,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                       marginLeft: '0.5rem'
                     }}>
                       <div style={{width: '0.5rem', height: '0.5rem', background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
-                      Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
+                      Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa hoàn tất đăng kí'}
                     </span>
                   </div>
                 </div>
@@ -658,7 +658,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                       Ngày sinh
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                      {resident.date_of_birth ? formatDateDDMMYYYY(resident.date_of_birth) : 'Chưa cập nhật'}
+                      {resident.date_of_birth ? formatDateDDMMYYYY(resident.date_of_birth) : 'Chưa hoàn tất đăng kí'}
                     </p>
                   </div>
                 <div>
@@ -674,7 +674,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     Ngày nhập viện
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
-                      {resident.admission_date ? formatDateDDMMYYYY(resident.admission_date) : 'Chưa cập nhật'}
+                      {resident.admission_date ? formatDateDDMMYYYY(resident.admission_date) : 'Chưa hoàn tất đăng kí'}
                     </p>
                 </div>
               </div>
@@ -990,7 +990,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
                     {resident.emergencyContact && typeof resident.emergencyContact === 'object'
                       ? `${resident.emergencyContact.name || ''}${resident.emergencyContact.relationship ? ' (' + resident.emergencyContact.relationship + ')' : ''}`
-                      : (resident.emergencyContact || 'Chưa cập nhật')}
+                      : (resident.emergencyContact || 'Chưa hoàn tất đăng kí')}
                   </p>
                 </div>
                 <div>
@@ -998,7 +998,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     Số điện thoại liên hệ
                   </p>
                   <p style={{ fontSize: '1.125rem', color: '#1e293b', margin: 0, fontWeight: 600 }}>
-                    {resident.emergencyContact?.phone || 'Chưa cập nhật'}
+                    {resident.emergencyContact?.phone || 'Chưa hoàn tất đăng kí'}
                   </p>
                 </div>
               </div>

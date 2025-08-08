@@ -109,7 +109,7 @@ export default function EditCarePlanAssignmentPage() {
     
     // Nếu chọn "đang sử dụng" và assignment đã hết hạn, hiển thị date picker để gia hạn
     const isExpired = isAssignmentExpired(assignment?.end_date);
-    if (newStatus === 'active' && assignment?.status === 'paused' && isExpired && selectedCarePlans.length > 0) {
+    if (newStatus === 'active' && isExpired) {
       setShowDatePicker(true);
       // Set default start date to today
       const today = new Date().toISOString().split('T')[0];
@@ -141,13 +141,9 @@ export default function EditCarePlanAssignmentPage() {
       return;
     }
 
-        // Kiểm tra nếu chọn "đang sử dụng" và assignment đã hết hạn thì phải có cả ngày bắt đầu và kết thúc
+    // Kiểm tra nếu chọn "đang sử dụng" và assignment đã hết hạn thì phải có cả ngày bắt đầu và kết thúc
     const isExpired = isAssignmentExpired(assignment?.end_date);
-    if (status === 'active' && assignment?.status === 'paused' && isExpired) {
-      if (selectedCarePlans.length === 0) {
-        setError('Vui lòng chọn ít nhất một gói dịch vụ để gia hạn');
-        return;
-      }
+    if (status === 'active' && isExpired) {
       if (!startDate) {
         setError('Vui lòng chọn ngày bắt đầu mới');
         return;
@@ -181,25 +177,38 @@ export default function EditCarePlanAssignmentPage() {
       setSaving(true);
       setError(null);
       
+      console.log('Updating assignment with data:', {
+        assignmentId,
+        currentStatus: assignment?.status,
+        newStatus: status,
+        endDate,
+        startDate,
+        selectedCarePlans
+      });
+      
       // Nếu đang gia hạn dịch vụ (từ paused sang active với ngày kết thúc mới)
       const isExpired = isAssignmentExpired(assignment?.end_date);
-      if (status === 'active' && assignment?.status === 'paused' && isExpired && endDate) {
-        // Gia hạn assignment đã hết hạn
-        await carePlanAssignmentsAPI.renew(assignmentId, endDate, startDate, selectedCarePlans);
+      if (status === 'active' && isExpired && endDate) {
+        // Gia hạn assignment đã hết hạn - không gửi selectedCarePlans để cập nhật assignment hiện tại
+        console.log('Renewing expired assignment...');
+        await carePlanAssignmentsAPI.renew(assignmentId, endDate, startDate);
       } else {
         // Cập nhật trạng thái thông thường
         const updateData: any = { status };
         
         // Nếu có ngày kết thúc mới, thêm vào dữ liệu cập nhật
         if (endDate) {
-          updateData.endDate = endDate;
+          updateData.end_date = endDate;
         }
         
+        console.log('Updating assignment with data:', updateData);
         await carePlanAssignmentsAPI.update(assignmentId, updateData);
       }
       
+      console.log('Update successful, redirecting...');
       router.push(`/services/assignments/${assignmentId}`);
     } catch (err: any) {
+      console.error('Error updating assignment:', err);
       setError(err.response?.data?.message || 'Không thể cập nhật trạng thái');
     } finally {
       setSaving(false);
@@ -791,7 +800,7 @@ export default function EditCarePlanAssignmentPage() {
           )}
 
           {/* Date picker cho gia hạn */}
-            {(showDatePicker || (status === 'active' && assignment?.status === 'paused' && isAssignmentExpired(assignment?.end_date) && selectedCarePlans.length > 0)) && (
+            {(showDatePicker || (status === 'active' && isAssignmentExpired(assignment?.end_date))) && (
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                 borderRadius: '1rem',
@@ -830,7 +839,7 @@ export default function EditCarePlanAssignmentPage() {
                        color: '#16a34a',
                        margin: '0.25rem 0 0 0'
                      }}>
-                       Tạo chu kỳ dịch vụ mới từ hôm nay với ngày kết thúc mới
+                       Cập nhật chu kỳ dịch vụ hiện tại với ngày bắt đầu và kết thúc mới
                      </p>
                    </div>
                 </div>
@@ -1080,7 +1089,7 @@ export default function EditCarePlanAssignmentPage() {
                    fontSize: '0.75rem',
                    color: '#15803d'
             }}>
-                   <strong>Thông tin gia hạn:</strong> {selectedCarePlans.length} gói dịch vụ được chọn sẽ được gia hạn từ {startDate ? formatDate(startDate) : 'ngày bạn chọn'} đến {endDate ? formatDate(endDate) : 'ngày kết thúc mới'}.
+                   <strong>Thông tin gia hạn:</strong> Tất cả gói dịch vụ hiện tại sẽ được gia hạn từ {startDate ? formatDate(startDate) : 'ngày bạn chọn'} đến {endDate ? formatDate(endDate) : 'ngày kết thúc mới'}.
                  </div>
             </div>
           )}
