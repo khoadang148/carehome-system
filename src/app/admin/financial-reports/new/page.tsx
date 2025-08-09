@@ -190,7 +190,7 @@ export default function NewBillPage() {
     const errors: ValidationErrors = {};
 
     if (!resident_id) {
-      errors.resident_id = 'Vui lòng chọn cư dân';
+      errors.resident_id = 'Vui lòng chọn người cao tuổi';
     }
 
     if (!care_plan_assignment_id) {
@@ -317,7 +317,7 @@ export default function NewBillPage() {
                   </div>
                   <div>
                     <h1 className="text-3xl font-bold text-gray-800 mb-2">Tạo hóa đơn mới</h1>
-                    <p className="text-gray-600 text-base">Nhập thông tin hóa đơn cho cư dân</p>
+                    <p className="text-gray-600 text-base">Nhập thông tin hóa đơn cho người cao tuổi</p>
                   </div>
                 </div>
               </div>
@@ -354,14 +354,14 @@ export default function NewBillPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      Cư dân <span className="text-red-500">*</span>
+                      Người cao tuổi <span className="text-red-500">*</span>
                     </label>
                     
                     {/* Search Input */}
                     <div className="relative mb-2">
                       <input
                         type="text"
-                        placeholder="Tìm kiếm cư dân theo tên hoặc số phòng..."
+                        placeholder="Tìm kiếm người cao tuổi theo tên hoặc số phòng..."
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                         value={residentSearchTerm}
                         onChange={(e) => {
@@ -392,9 +392,9 @@ export default function NewBillPage() {
                           validationErrors.resident_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >
-                        <option value="">Chọn cư dân</option>
+                        <option value="">Chọn người cao tuổi</option>
                         {residents.length === 0 && !loadingResidents && (
-                          <option value="" disabled>Không có cư dân nào</option>
+                          <option value="" disabled>Không có người cao tuổi nào</option>
                         )}
                         {(filteredResidents.length > 0 ? filteredResidents : residents).map(r => {
                           const roomInfo = r?.room_number || r?.room?.room_number || 'Chưa phân phòng';
@@ -411,7 +411,7 @@ export default function NewBillPage() {
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        Hiển thị: {filteredResidents.length > 0 ? filteredResidents.length : residents.length} / {residents.length} cư dân
+                        Hiển thị: {filteredResidents.length > 0 ? filteredResidents.length : residents.length} / {residents.length} người cao tuổi
                       </div>
                     </div>
                     
@@ -499,7 +499,7 @@ export default function NewBillPage() {
                         <div className="flex items-center gap-2">
                           <ExclamationTriangleIcon className="w-4 h-4 text-amber-600" />
                           <p className="text-amber-800 text-sm font-medium">
-                            Không có gói chăm sóc còn hạn cho cư dân này
+                            Không có gói chăm sóc còn hạn cho người cao tuổi này
                           </p>
                         </div>
                         <p className="text-amber-700 text-xs mt-1">

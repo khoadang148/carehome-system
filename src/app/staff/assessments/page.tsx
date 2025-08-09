@@ -203,7 +203,7 @@ export default function CareNotesPage() {
                 Nhật ký theo dõi
               </h1>
               <p className="text-base text-slate-600 mt-1">
-                Ghi chú quan sát và chăm sóc hàng ngày cho {residents.length} cư dân đang được phân công
+                Ghi chú quan sát và chăm sóc hàng ngày cho {residents.length} người cao tuổi đang được phân công
               </p>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function CareNotesPage() {
                       </span>
                       <span className="text-gray-400">/</span>
                       <span>
-                        Tổng số <span className="font-semibold text-blue-600">{filteredResidents.length}</span> cư dân
+                        Tổng số <span className="font-semibold text-blue-600">{filteredResidents.length}</span> người cao tuổi
                       </span>
                     </div>
                     {totalPages > 1 && (
@@ -252,7 +252,7 @@ export default function CareNotesPage() {
                   </div>
                 )}
 
-                {/* Danh sách cư dân */}
+                {/* Danh sách người cao tuổi */}
                 {currentResidents.length > 0 ? (
                   currentResidents.map((resident) => {
             const notes = careNotesMap[resident.id] || [];
@@ -345,7 +345,7 @@ export default function CareNotesPage() {
                 ) : (
                   <div className="text-center py-12">
                     <div className="text-gray-500 text-lg mb-2">
-                      {searchTerm ? 'Không tìm thấy cư dân nào phù hợp' : 'Chưa có cư dân nào được phân công'}
+                      {searchTerm ? 'Không tìm thấy người cao tuổi nào phù hợp' : 'Chưa có người cao tuổi nào được phân công'}
               </div>
                     <div className="text-gray-400 text-sm">
                       {searchTerm ? 'Thử tìm kiếm với từ khóa khác' : 'Vui lòng liên hệ quản lý để được phân công'}

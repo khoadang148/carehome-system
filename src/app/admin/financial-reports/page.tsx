@@ -231,8 +231,8 @@ export default function FinancialReportsPage() {
                 <ChartBarIcon className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Quản lý hóa đơn</h1>
-                <p className="text-gray-600 text-base">Quản lý hóa đơn và thanh toán</p>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Hoá đơn</h1>
+                <p className="text-gray-600 text-base">Danh sách hóa đơn và thanh toán</p>
               </div>
             </div>
           </div>

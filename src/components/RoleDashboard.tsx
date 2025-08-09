@@ -39,41 +39,34 @@ const ROLE_DASHBOARDS = {
     description: 'Hệ thống quản lý toàn diện viện dưỡng lão',
     cards: [
       {
-        title: 'Quản lý Phân công',
-        description: 'Thiết lập và quản lý phân công nhân viên chăm sóc cho từng cư dân',
+        title: 'Quản lý phân công',
+        description: 'Thiết lập và quản lý phân công nhân viên chăm sóc cho từng người cao tuổi',
         icon: UserPlusIcon,
         href: '/admin/staff-assignments',
         gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
       },
       {
-        title: 'Lịch Thăm Viếng',
+        title: 'Lịch thăm viếng',
         description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',
         icon: CalendarDaysIcon,
         href: '/staff/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       },
       {
-        title: 'Quản lý Cơ sở Vật chất',
-        description: 'Quản lý phân bổ phòng và giường cho cư dân',
+        title: 'Quản lý phòng & giường',
+        description: 'Quản lý phân bổ phòng và giường cho người cao tuổi',
         icon: BuildingOfficeIcon,
         href: '/admin/room-management',
         gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
       },
       {
-        title: 'Chỉ Số Sức Khỏe',
-        description: 'Xem và quản lý tất cả chỉ số sức khỏe của cư dân',
+        title: 'Chỉ số sức khỏe',
+        description: 'Xem và quản lý tất cả chỉ số sức khỏe của người cao tuổi',
         icon: HeartIcon,
         href: '/admin/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       },
-      /*{
-        title: 'Quản lý kho',
-        description: 'Quản lý thiết bị y tế, thuốc, dụng cụ',
-        icon: ArchiveBoxIcon,
-        href: '/inventory',
-        gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-        stats: '150 sản phẩm'
-      }*/
+     
     ]
   },
   staff: {
@@ -89,7 +82,7 @@ const ROLE_DASHBOARDS = {
       },
       {
         title: 'Theo dõi Sức khỏe',
-        description: 'Ghi nhận và theo dõi các chỉ số sinh tồn của cư dân',
+        description: 'Ghi nhận và theo dõi các chỉ số sinh tồn của người cao tuổi',
         icon: HeartIcon,
         href: '/staff/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -101,7 +94,7 @@ const ROLE_DASHBOARDS = {
     description: 'Theo dõi và kết nối với người thân',
     cards: [
       {
-        title: 'Thông tin Cư dân',
+        title: 'Thông tin người cao tuổi',  
         description: 'Theo dõi tình trạng sức khỏe và sinh hoạt hàng ngày',
         icon: HeartIcon,
         href: '/family',

@@ -647,8 +647,8 @@ export default function AddVitalSignsPage() {
                     <option value="">
                       {residents.length === 0 
                         ? (user?.role === 'staff' 
-                            ? 'Chưa được phân công cư dân nào' 
-                            : 'Chưa có cư dân nào trong hệ thống')
+                            ? 'Chưa được phân công người cao tuổi nào' 
+                            : 'Chưa có người cao tuổi nào trong hệ thống')
                         : 'Chọn người cao tuổi'
                       }
                     </option>

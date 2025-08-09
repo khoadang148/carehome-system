@@ -103,7 +103,7 @@ export default function NewAccountPage() {
     
     // Nếu là gia đình thì phải chọn cư dân
     if (formData.role === "family" && !selectedResidentId) {
-      errors.resident = "Vui lòng chọn cư dân thuộc tài khoản gia đình này";
+      errors.resident = "Vui lòng chọn người cao tuổi thuộc tài khoản gia đình này";
     }
     
     if (Object.keys(errors).length > 0) {
@@ -355,7 +355,7 @@ export default function NewAccountPage() {
           {formData.role === "family" && (
             <>
               <div>
-                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chọn cư dân thuộc tài khoản này *</label>
+                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Chọn người cao tuổi thuộc tài khoản này *</label>
                 <select
                   value={selectedResidentId}
                   onChange={e => {
@@ -377,7 +377,7 @@ export default function NewAccountPage() {
                     transition: 'border-color 0.2s' 
                   }}
                 >
-                  <option value="">-- Chọn cư dân --</option>
+                  <option value="">-- Chọn người cao tuổi --</option>
                   {residents.map(r => (
                     <option key={r._id} value={r._id}>{r.full_name} ({formatDate(r.date_of_birth)})</option>
                   ))}

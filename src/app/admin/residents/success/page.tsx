@@ -222,7 +222,7 @@ export default function ResidentSuccessPage() {
               fontSize: '0.95rem',
               fontWeight: 500
             }}>
-              Cư dân và tài khoản đã được tạo thành công
+              Người cao tuổi và tài khoản đã được tạo thành công
             </p>
           </div>
         </div>
@@ -261,7 +261,7 @@ export default function ResidentSuccessPage() {
               margin: 0,
               opacity: 0.9
             }}>
-              Cư dân <strong>{accountInfo.residentName}</strong> đã được thêm vào hệ thống
+              Người cao tuổi <strong>{accountInfo.residentName}</strong> đã được thêm vào hệ thống
               {accountInfo.existingAccount && (
                 <span> và gán vào tài khoản gia đình hiện có</span>
               )}
@@ -641,8 +641,8 @@ export default function ResidentSuccessPage() {
                   }}>
                     {accountInfo.existingAccount ? (
                       <>
-                        <li>Cư dân đã được gán thành công vào tài khoản gia đình hiện có</li>
-                        <li>Tài khoản gia đình này có thể quản lý nhiều cư dân</li>
+                        <li>Người cao tuổi đã được gán thành công vào tài khoản gia đình hiện có</li>
+                        <li>Tài khoản gia đình này có thể quản lý nhiều người cao tuổi</li>
                         <li>Người dùng có thể đăng nhập bằng thông tin tài khoản hiện có</li>
                         <li>Liên hệ quản trị viên nếu cần hỗ trợ thêm</li>
                       </>
@@ -686,7 +686,7 @@ export default function ResidentSuccessPage() {
             }}
           >
             <UserIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-            Xem danh sách cư dân
+            Xem danh sách người cao tuổi
           </Link>
           
           <Link
@@ -707,7 +707,7 @@ export default function ResidentSuccessPage() {
             }}
           >
             <KeyIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-            Quản lý tài khoản
+            Quản lý người dùng
           </Link>
           
           <Link

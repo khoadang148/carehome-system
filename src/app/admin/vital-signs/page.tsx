@@ -53,7 +53,6 @@ export default function AdminVitalSignsPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDateDisplay, setSelectedDateDisplay] = useState<string>('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -72,72 +71,81 @@ export default function AdminVitalSignsPage() {
     }
   }, [user, router]);
 
-  // Load residents assigned to current staff
+  // Load all residents and staff assignments
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Load staff assignments for current user
-        const myAssignmentsData = await staffAssignmentsAPI.getMyAssignments();
-        const myAssignments = Array.isArray(myAssignmentsData) ? myAssignmentsData : [];
+        // Load all residents
+        const residentsData = await residentAPI.getAll();
+        const allResidents = Array.isArray(residentsData) ? residentsData : [];
         
-        // Get active assignments only
-        const activeAssignments = myAssignments.filter((assignment: any) => assignment.status === 'active');
+        // Load all staff assignments
+        const assignmentsData = await staffAssignmentsAPI.getAll();
+        const allAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
         
-        // Get resident details for assigned residents
-        const assignedResidents = await Promise.all(
-          activeAssignments.map(async (assignment: any) => {
+        // Get room assignments for all residents first
+        const residentsWithRooms = await Promise.all(
+          allResidents.map(async (resident: any) => {
             try {
-              const resident = await residentAPI.getById(assignment.resident_id);
+              const assignments = await bedAssignmentsAPI.getByResidentId(resident._id);
+              const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+              const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
               
-              // Get room assignment for this resident
               let roomNumber = 'Chưa hoàn tất đăng kí';
-              try {
-                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
-                const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-                const roomId = bedAssignment?.bed_id?.room_id || bedAssignment?.assigned_room_id;
-                const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-                
-                if (roomIdString) {
-                  const room = await roomsAPI.getById(roomIdString);
-                  roomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
-                }
-              } catch (roomError) {
-                console.warn('Error fetching room for resident:', roomError);
+              if (roomIdString) {
+                const room = await roomsAPI.getById(roomIdString);
+                roomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
               }
               
               return {
-                id: resident._id,
-                name: resident.full_name || '',
-                avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-                assignmentStatus: 'active',
-                assignmentId: assignment._id,
-                assignedStaff: assignment.staff_id,
-                roomNumber: roomNumber,
+                ...resident,
+                roomNumber,
                 hasRoom: roomNumber !== 'Chưa hoàn tất đăng kí'
               };
-            } catch (residentError) {
-              console.warn('Error fetching resident details:', residentError);
-              return null;
+            } catch {
+              return {
+                ...resident,
+                roomNumber: 'Chưa hoàn tất đăng kí',
+                hasRoom: false
+              };
             }
           })
         );
         
-        // Filter out null values and only include residents with completed registration
-        const validResidents = assignedResidents.filter((resident: any) => resident && resident.hasRoom);
+        // Filter only residents who have completed registration (have room assigned)
+        const completedResidents = residentsWithRooms.filter((resident: any) => resident.hasRoom);
         
-        setResidents(validResidents);
-        setStaffAssignments(activeAssignments);
+        // Map residents with their assignment status
+        const mappedResidents = completedResidents.map((resident: any) => {
+          const activeAssignment = allAssignments.find((assignment: any) => 
+            assignment.resident_id === resident._id && assignment.status === 'active'
+          );
+          
+          return {
+            id: resident._id,
+            name: resident.full_name || '',
+            avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+            assignmentStatus: activeAssignment ? 'active' : 'inactive',
+            assignmentId: activeAssignment?._id || null,
+            assignedStaff: activeAssignment?.staff_id || null,
+            roomNumber: resident.roomNumber,
+          };
+        });
+        
+        setResidents(mappedResidents);
+        setStaffAssignments(allAssignments);
         
         // Set room numbers
         const roomNumbersMap: {[residentId: string]: string} = {};
-        validResidents.forEach((resident: any) => {
+        mappedResidents.forEach((resident: any) => {
           roomNumbersMap[resident.id] = resident.roomNumber;
         });
         setRoomNumbers(roomNumbersMap);
         
       } catch (err) {
-        console.error('Error loading assigned residents:', err);
+        console.error('Error loading data:', err);
         setResidents([]);
         setStaffAssignments([]);
       } finally {
@@ -150,33 +158,12 @@ export default function AdminVitalSignsPage() {
     }
   }, [user]);
 
-  // Load vital signs data for assigned residents
+  // Load vital signs data
   useEffect(() => {
     const fetchVitalSigns = async () => {
       try {
-        // Get assigned resident IDs
-        const assignedResidentIds = residents.map(resident => resident.id);
-        
-        if (assignedResidentIds.length === 0) {
-          setVitalSigns([]);
-          return;
-        }
-        
-        // Fetch vital signs for assigned residents only
-        const allVitalSigns = await Promise.all(
-          assignedResidentIds.map(async (residentId) => {
-            try {
-              const data = await vitalSignsAPI.getByResidentId(residentId);
-              return Array.isArray(data) ? data : [];
-            } catch (err) {
-              console.warn(`Error loading vital signs for resident ${residentId}:`, err);
-              return [];
-            }
-          })
-        );
-        
-        // Flatten the array of arrays
-        const vitalSignsData = allVitalSigns.flat();
+        const data = await vitalSignsAPI.getAll();
+        const vitalSignsData = Array.isArray(data) ? data : [];
         setVitalSigns(vitalSignsData);
       } catch (err) {
         console.error('Error loading vital signs:', err);
@@ -184,12 +171,10 @@ export default function AdminVitalSignsPage() {
       }
     };
     
-    if (user && residents.length > 0) {
+    if (user) {
       fetchVitalSigns();
-    } else if (user && residents.length === 0) {
-      setVitalSigns([]);
     }
-  }, [user, residents]);
+  }, [user]);
 
   // Transform vital signs data for display
   const transformVitalSignsForDisplay = (vitalSignsData: any[]) => {
@@ -234,6 +219,13 @@ export default function AdminVitalSignsPage() {
         return formattedDate === dateFilter;
       });
     }
+    
+    // Sort by date (newest first)
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.date_time || a.date);
+      const dateB = new Date(b.date_time || b.date);
+      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+    });
     
     return transformVitalSignsForDisplay(filtered);
   };
@@ -285,48 +277,6 @@ export default function AdminVitalSignsPage() {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '';
     return formatDateDDMMYYYY(date);
-  };
-
-  // Calendar helper functions
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const isSameDay = (date1: Date, date2: Date) => {
-    return date1.getDate() === date2.getDate() && 
-           date1.getMonth() === date2.getMonth() && 
-           date1.getFullYear() === date2.getFullYear();
-  };
-
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return isSameDay(date, today);
-  };
-
-  const isSelectedDate = (date: Date) => {
-    if (!selectedDate) return false;
-    const selected = new Date(selectedDate);
-    return isSameDay(date, selected);
-  };
-
-  const handleDateSelect = (day: number) => {
-    const selectedDateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const isoDate = selectedDateObj.toISOString().split('T')[0];
-    setSelectedDate(isoDate);
-    setSelectedDateDisplay(formatDateDDMMYYYY(selectedDateObj));
-    setShowDatePicker(false);
-  };
-
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  };
-
-  const prevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
 
   // Generate page numbers for pagination
@@ -404,7 +354,7 @@ export default function AdminVitalSignsPage() {
                        Quản Lý Chỉ Số Sức Khỏe
                      </h1>
                      <p className="text-gray-500">
-                       Xem và quản lý chỉ số sức khỏe của các cư dân được phân công
+                       Xem và quản lý chỉ số sức khỏe của các người cao tuổi
                      </p>
                   </div>
                 </div>
@@ -414,7 +364,7 @@ export default function AdminVitalSignsPage() {
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <div className="text-center">
                     <div className="text-sm text-gray-500">
-                      Tổng chỉ số:
+                      Tổng chỉ số:   
                     </div>
                     <div className="text-2xl font-bold text-gray-800">
                       {filteredVitalSigns.length}
@@ -427,13 +377,6 @@ export default function AdminVitalSignsPage() {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => router.push('/staff/vital-signs/add')}
-                  className="flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-xl shadow-lg transition-all bg-gradient-to-r from-red-500 to-red-600 hover:shadow-xl hover:scale-105"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  Thêm chỉ số
-                </button>
               </div>
             </div>
           </div>
@@ -446,14 +389,14 @@ export default function AdminVitalSignsPage() {
               {/* Resident Filter */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
-                   Lọc theo cư dân
+                   Lọc theo người cao tuổi
                 </label>
                                  <select
                    value={selectedResident || ''}
                    onChange={(e) => setSelectedResident(e.target.value || null)}
                    className="w-full p-4 border border-gray-300 rounded-xl text-sm outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm"
                  >
-                   <option value="">Tất cả cư dân được phân công</option>
+                   <option value="">Tất cả người cao tuổi</option>
                    {residents.map(resident => (
                      <option key={resident.id} value={resident.id}>
                        {resident.name} - Phòng {resident.roomNumber}
@@ -498,85 +441,21 @@ export default function AdminVitalSignsPage() {
                       </svg>
                     </button>
                     
-                    {/* Calendar Popup */}
+                    {/* Date Picker Popup */}
                     {showDatePicker && (
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-lg z-50 p-4 min-w-[280px]">
-                        {/* Calendar Header */}
-                        <div className="flex items-center justify-between mb-4">
-                          <button
-                            onClick={prevMonth}
-                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <h3 className="text-sm font-semibold text-gray-900">
-                            {currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
-                          </h3>
-                          <button
-                            onClick={nextMonth}
-                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        </div>
-
-                        {/* Calendar Grid */}
-                        <div className="grid grid-cols-7 gap-1">
-                          {/* Day headers */}
-                          {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
-                            <div key={day} className="w-8 h-8 flex items-center justify-center text-xs font-medium text-gray-500">
-                              {day}
-                            </div>
-                          ))}
-                          
-                          {/* Empty cells for days before first day of month */}
-                          {Array.from({ length: getFirstDayOfMonth(currentMonth) }, (_, i) => (
-                            <div key={`empty-${i}`} className="w-8 h-8"></div>
-                          ))}
-                          
-                          {/* Days of month */}
-                          {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => {
-                            const day = i + 1;
-                            const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                            
-                            return (
-                              <button
-                                key={day}
-                                onClick={() => handleDateSelect(day)}
-                                className={`w-8 h-8 flex items-center justify-center text-sm rounded-lg transition-colors ${
-                                  isSelectedDate(date)
-                                    ? 'bg-red-500 text-white font-semibold'
-                                    : isToday(date)
-                                    ? 'bg-red-100 text-red-600 font-semibold'
-                                    : 'hover:bg-gray-100 text-gray-700'
-                                }`}
-                              >
-                                {day}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Today button */}
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <button
-                            onClick={() => {
-                              const today = new Date();
-                              const isoDate = today.toISOString().split('T')[0];
-                              setSelectedDate(isoDate);
-                              setSelectedDateDisplay(formatDateDDMMYYYY(today));
-                              setCurrentMonth(today);
-                              setShowDatePicker(false);
-                            }}
-                            className="w-full text-sm text-red-600 hover:text-red-700 font-medium py-2 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            Hôm nay
-                          </button>
-                        </div>
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-lg z-50">
+                        <input
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setSelectedDate(value);
+                            setSelectedDateDisplay(convertDateToDisplay(value));
+                            setShowDatePicker(false);
+                          }}
+                          className="w-full p-3 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-500"
+                          autoFocus
+                        />
                       </div>
                     )}
                   </div>
@@ -611,13 +490,10 @@ export default function AdminVitalSignsPage() {
                   <HeartIcon className="w-6 h-6 text-gray-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  {residents.length === 0 ? 'Chưa có cư dân nào được phân công' : 'Chưa có chỉ số sức khỏe nào'}
+                  Chưa có chỉ số sức khỏe nào
                 </h3>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  {residents.length === 0 
-                    ? 'Bạn chưa được phân công chăm sóc cư dân nào. Vui lòng liên hệ admin để được phân công.'
-                    : 'Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe cư dân được phân công'
-                  }
+                  Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe người cao tuổi
                 </p>
               </div>
             ) : (
@@ -627,7 +503,7 @@ export default function AdminVitalSignsPage() {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
-                          Cư dân
+                          Người cao tuổi
                         </th>
                         <th className="px-3 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
                           Ngày giờ

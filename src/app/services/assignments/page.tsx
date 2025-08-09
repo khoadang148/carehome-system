@@ -58,7 +58,7 @@ export default function ServiceAssignmentsPage() {
       setAssignments(allAssignments.flat());
       setTotalItems(allAssignments.flat().length);
     } catch (error) {
-      setError('Không thể tải danh sách cư dân hoặc đăng ký dịch vụ.');
+      setError('Không thể tải danh sách người cao tuổi hoặc đăng ký dịch vụ.');
     } finally {
       setLoading(false);
     }
@@ -316,7 +316,7 @@ export default function ServiceAssignmentsPage() {
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <input
               type="text"
-              placeholder="Tìm theo tên cư dân hoặc gói dịch vụ..."
+              placeholder="Tìm theo tên người cao tuổi hoặc gói dịch vụ..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
@@ -849,7 +849,7 @@ export default function ServiceAssignmentsPage() {
                   Chọn gói dịch vụ để xóa
                 </h3>
                 <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>
-                  Cư dân: {selectedAssignment.resident?.full_name || selectedAssignment.resident?.name || 'N/A'}
+                  Người cao tuổi: {selectedAssignment.resident?.full_name || selectedAssignment.resident?.name || 'N/A'}
                 </p>
               </div>
             </div>

@@ -722,7 +722,7 @@ export default function AccountManagementPage() {
                     letterSpacing: '-0.025em',
                     textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
                   }}>
-                    Quản lý tài khoản
+                    Quản lý người dùng
                   </h1>
                   <p style={{
                     fontSize: '1.125rem',
@@ -838,7 +838,7 @@ export default function AccountManagementPage() {
                     gap: '0.5rem'
                   }}>
                     <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                    Tài khoản Nhân viên ({staffUsers.filter(user => 
+                    Tài khoản nhân viên ({staffUsers.filter(user => 
                       (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     ).length} tài khoản)
@@ -863,7 +863,7 @@ export default function AccountManagementPage() {
                     gap: '0.5rem'
                   }}>
                     <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                    Tài khoản Gia đình ({familyAccounts.filter(account => 
+                    Tài khoản gia đình ({familyAccounts.filter(account => 
                       (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))

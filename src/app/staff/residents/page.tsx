@@ -115,7 +115,7 @@ export default function StaffResidentsPage() {
         setError('');
       } catch (err) {
         console.error('Error loading assignments:', err);
-        setError('Không thể tải danh sách cư dân được phân công.');
+        setError('Không thể tải danh sách người cao tuổi được phân công.');
         setResidentsData([]);
       } finally {
         setLoadingData(false);
@@ -167,10 +167,10 @@ export default function StaffResidentsPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold m-0 bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent tracking-tight">
-                  Danh sách cư dân được phân công
+                  Danh sách người cao tuổi được phân công
                 </h1>
                 <p className="text-base text-slate-600 mt-1 font-medium">
-                  Tổng số: {residentsData.length} cư dân đang được phân công cho bạn
+                  Tổng số: {residentsData.length} người cao tuổi đang được phân công cho bạn
                 </p>
               </div>
             </div>
@@ -200,7 +200,7 @@ export default function StaffResidentsPage() {
             {/* Results Count */}
             <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
               <p className="text-sm text-indigo-600 m-0 font-semibold">
-                Hiển thị: {filteredResidents.length} cư dân
+                Hiển thị: {filteredResidents.length} người cao tuổi
               </p>
             </div>
           </div>
@@ -217,7 +217,7 @@ export default function StaffResidentsPage() {
         {loadingData && (
           <div className="flex justify-center items-center py-16 px-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            <p className="ml-4 text-gray-500">Đang tải danh sách cư dân...</p>
+            <p className="ml-4 text-gray-500">Đang tải danh sách người cao tuổi...</p>
           </div>
         )}
 
@@ -229,7 +229,7 @@ export default function StaffResidentsPage() {
                 <thead>
                   <tr className="bg-gradient-to-br from-slate-50 to-slate-200 border-b border-gray-200">
                     <th className="p-4 text-left text-sm font-semibold text-gray-700">
-                      Cư dân
+                      Người cao tuổi
                     </th>
                     <th className="p-4 text-left text-sm font-semibold text-gray-700">
                       Phòng
@@ -318,7 +318,7 @@ export default function StaffResidentsPage() {
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => handleViewResident(resident.id)}
-                            title="Xem thông tin chi tiết cư dân"
+                            title="Xem thông tin chi tiết người cao tuổi"
                             className="p-2 rounded-md border-none bg-blue-100 text-blue-600 cursor-pointer transition-all duration-200 hover:bg-blue-600 hover:text-white"
                           >
                             <EyeIcon className="w-4 h-4" />
@@ -335,10 +335,10 @@ export default function StaffResidentsPage() {
               <div className="p-12 text-center text-gray-500">
                 <UserGroupIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <h3 className="text-lg font-semibold mb-2 text-gray-700">
-                  {searchTerm ? 'Không tìm thấy cư dân' : 'Chưa có cư dân nào được phân công'}
+                  {searchTerm ? 'Không tìm thấy người cao tuổi' : 'Chưa có người cao tuổi nào được phân công'}
                 </h3>
                 <p className="m-0 text-sm">
-                  {searchTerm ? 'Thử thay đổi tiêu chí tìm kiếm' : 'Admin sẽ phân công cư dân cho bạn sớm'}
+                  {searchTerm ? 'Thử thay đổi tiêu chí tìm kiếm' : 'Admin sẽ phân công người cao tuổi cho bạn sớm'}
                 </p>
               </div>
             )}

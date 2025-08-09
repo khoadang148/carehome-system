@@ -297,7 +297,7 @@ export default function PhotoUploadPage() {
       console.log('residentObj:', residentObj);
       
       if (!residentObj) {
-        setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin cư dân'}));
+        setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người cao tuổi'}));
         setIsUploading(false);
         return;
       }

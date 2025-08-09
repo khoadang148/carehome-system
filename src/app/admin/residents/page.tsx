@@ -279,7 +279,7 @@ export default function ResidentsPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Quản lý Người cao tuổi
+                  Quản lý người cao tuổi
                 </h1>
                 <p style={{
                   fontSize: '1rem',

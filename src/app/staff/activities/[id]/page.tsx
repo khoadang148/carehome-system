@@ -405,7 +405,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     if (invalidEvaluations.length > 0) {
       showNotification(
         'Thiếu thông tin',
-        `Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`,
+        `Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} người cao tuổi đã chọn "Không tham gia".`,
         'warning'
       );
       return;
@@ -722,8 +722,8 @@ const activityResidents: ActivityResident[] = Object.values(
     
     if (isAlreadyParticipating) {
       showNotification(
-        'Cư dân đã tham gia',
-        'Cư dân này đã được thêm vào hoạt động này rồi.',
+        'Người cao tuổi đã tham gia',
+        'Người cao tuổi này đã được thêm vào hoạt động này rồi.',
         'warning'
       );
       return;
@@ -749,8 +749,8 @@ const activityResidents: ActivityResident[] = Object.values(
       setSelectedResidentId(null);
       
       showNotification(
-        'Thêm cư dân thành công',
-        'Cư dân đã được thêm vào hoạt động thành công!',
+        'Thêm người cao tuổi thành công',
+        'Người cao tuổi đã được thêm vào hoạt động thành công!',
         'success'
       );
       
@@ -771,7 +771,7 @@ const activityResidents: ActivityResident[] = Object.values(
       );
     } catch (err: any) {
       console.error('Error adding resident:', err);
-      let errorMessage = 'Không thể thêm cư dân vào hoạt động. Vui lòng thử lại.';
+      let errorMessage = 'Không thể thêm người cao tuổi vào hoạt động. Vui lòng thử lại.';
       
       if (err.response?.data?.message) {
         errorMessage = `Lỗi: ${err.response.data.message}`;
@@ -779,7 +779,7 @@ const activityResidents: ActivityResident[] = Object.values(
         errorMessage = `Lỗi: ${err.message}`;
       }
       
-      showNotification('Lỗi thêm cư dân', errorMessage, 'error');
+      showNotification('Lỗi thêm người cao tuổi', errorMessage, 'error');
     } finally {
       setAddingResident(false);
     }
@@ -816,7 +816,7 @@ const activityResidents: ActivityResident[] = Object.values(
             color: '#374151',
             marginBottom: '0.5rem'
           }}>
-            {loading ? 'Đang tải thông tin hoạt động...' : 'Đang tải danh sách cư dân...'}
+            {loading ? 'Đang tải thông tin hoạt động...' : 'Đang tải danh sách người cao tuổi...'}
           </h3>
           <p style={{
             fontSize: '0.875rem',
@@ -1390,7 +1390,7 @@ const activityResidents: ActivityResident[] = Object.values(
                         if (participationCount >= activity.capacity) {
                           showNotification(
                             'Đã đạt sức chứa tối đa',
-                            `Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`,
+                            `Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm người cao tuổi.`,
                             'warning'
                           );
                           return;
@@ -1520,7 +1520,7 @@ const activityResidents: ActivityResident[] = Object.values(
                     }} />
                     <input
                       type="text"
-                      placeholder="Tìm kiếm cư dân theo tên hoặc phòng..."
+                      placeholder="Tìm kiếm người cao tuổi theo tên hoặc phòng..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       style={{
@@ -1661,7 +1661,7 @@ const activityResidents: ActivityResident[] = Object.values(
                   })}
                   {filteredResidents.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                      {residentsFromEvaluations.length === 0 ? 'Chưa có đánh giá tham gia nào cho hoạt động này.' : 'Không tìm thấy cư dân nào phù hợp với từ khóa tìm kiếm.'}
+                      {residentsFromEvaluations.length === 0 ? 'Chưa có đánh giá tham gia nào cho hoạt động này.' : 'Không tìm thấy người cao tuổi nào phù hợp với từ khóa tìm kiếm.'}
                     </div>
                   )}
                 </div>
@@ -1726,7 +1726,7 @@ const activityResidents: ActivityResident[] = Object.values(
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
                   <thead>
                     <tr style={{ background: '#f1f5f9' }}>
-                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên cư dân</th>
+                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên người cao tuổi</th>
                       <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Tham gia</th>
                       <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Lý do (nếu vắng)</th>
                       <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Ngày đánh giá</th>
@@ -1783,13 +1783,13 @@ const activityResidents: ActivityResident[] = Object.values(
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
           <div className="fixed inset-0 bg-black opacity-30" />
           <Dialog.Panel className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
-            <Dialog.Title className="text-lg font-bold mb-4">Chọn cư dân để thêm vào hoạt động</Dialog.Title>
+            <Dialog.Title className="text-lg font-bold mb-4">Chọn người cao tuổi để thêm vào hoạt động</Dialog.Title>
             <select
               value={selectedResidentId || ''}
               onChange={e => setSelectedResidentId(e.target.value)}
               className="w-full border rounded px-3 py-2 mb-4"
             >
-              <option value="">-- Chọn cư dân --</option>
+              <option value="">-- Chọn người cao tuổi --</option>
               {residentsNotJoined.map((r: any) => (
                 <option key={r.id} value={r.id}>{r.name} ({r.age} tuổi, {r.gender === 'male' ? 'Nam' : r.gender === 'female' ? 'Nữ' : 'Khác'})</option>
               ))}

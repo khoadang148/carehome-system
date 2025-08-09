@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAssignmentsAPI, staffAPI, residentAPI, userAPI } from '@/lib/api';
+import { processAvatarUrl } from '@/lib/utils/avatarUtils';
 
 export default function StaffAssignmentsPage() {
   const { user, loading } = useAuth();
@@ -75,6 +76,40 @@ export default function StaffAssignmentsPage() {
       setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
       setStaffs(Array.isArray(staffsData) ? staffsData : []);
       setResidents(Array.isArray(residentsData) ? residentsData : []);
+      console.log('Loaded data:', { 
+        assignments: assignmentsData, 
+        staffs: staffsData, 
+        residents: residentsData 
+      });
+      
+      // Debug: Kiểm tra staff data có avatar không
+      if (Array.isArray(staffsData)) {
+        console.log('Staff data sample:', staffsData.slice(0, 2).map(staff => ({
+          id: staff._id,
+          name: staff.full_name,
+          avatar: staff.avatar,
+          hasAvatar: !!staff.avatar
+        })));
+      }
+      
+      // Debug: Kiểm tra assignment data có populate staff avatar không
+      if (Array.isArray(assignmentsData)) {
+        console.log('Assignment data sample:', assignmentsData.slice(0, 2).map(assignment => ({
+          id: assignment._id,
+          staff: {
+            id: assignment.staff_id?._id || assignment.staff_id,
+            name: assignment.staff_id?.full_name,
+            avatar: assignment.staff_id?.avatar,
+            hasAvatar: !!assignment.staff_id?.avatar
+          },
+          resident: {
+            id: assignment.resident_id?._id || assignment.resident_id,
+            name: assignment.resident_id?.full_name,
+            avatar: assignment.resident_id?.avatar,
+            hasAvatar: !!assignment.resident_id?.avatar
+          }
+        })));
+      }
       setError('');
     } catch (err) {
       setError('Không thể tải dữ liệu. Vui lòng thử lại.');
@@ -301,7 +336,16 @@ export default function StaffAssignmentsPage() {
 
   // Get staff info
   const getStaffInfo = (staffId: string) => {
-    return staffs.find(staff => staff._id === staffId);
+    const staff = staffs.find(staff => staff._id === staffId);
+    if (staff) {
+      console.log('Staff info:', { 
+        id: staffId, 
+        name: staff.full_name, 
+        avatar: staff.avatar,
+        processedAvatarUrl: staff.avatar ? processAvatarUrl(staff.avatar) : 'No avatar'
+      });
+    }
+    return staff;
   };
 
   // Check if assignment is expiring soon (within 7 days)
@@ -471,8 +515,8 @@ export default function StaffAssignmentsPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Quản lý tất cả phân công giữa nhân viên và cư dân
-                </p>
+                  Quản lý tất cả phân công giữa nhân viên và người cao tuổi
+               </p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -656,23 +700,33 @@ export default function StaffAssignmentsPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-4 shadow-lg overflow-hidden">
-                              {staff?.avatar ? (
-                                <img
-                                  src={userAPI.getAvatarUrl(staff.avatar)}
-                                  alt={staff.full_name}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.currentTarget as HTMLElement;
-                                    target.style.display = 'none';
-                                    const nextSibling = target.nextElementSibling as HTMLElement;
-                                    if (nextSibling) {
-                                      nextSibling.style.display = 'flex';
-                                    }
-                                  }}
-                                />
-                              ) : null}
-                              <span className="text-white font-bold text-lg" style={{ display: staff?.avatar ? 'none' : 'flex' }}>
-                                {staff?.full_name?.split(' ').map((n: string) => n[0]).join('') || 'NV'}
+                              {(() => {
+                                // Thử lấy avatar từ assignment data trước, nếu không có thì dùng staff data
+                                const staffAvatar = staffAssignments[0]?.staff_id?.avatar || staff?.avatar;
+                                const staffName = staffAssignments[0]?.staff_id?.full_name || staff?.full_name;
+                                
+                                if (staffAvatar) {
+                                  return (
+                                    <img
+                                      src={processAvatarUrl(staffAvatar)}
+                                      alt={staffName}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const nextSibling = e.currentTarget.nextElementSibling as HTMLElement;
+                                        if (nextSibling) {
+                                          nextSibling.style.display = 'flex';
+                                        }
+                                      }}
+                                    />
+                                  );
+                                }
+                                return null;
+                              })()}
+                              <span className="text-white font-bold text-lg" style={{ 
+                                display: (staffAssignments[0]?.staff_id?.avatar || staff?.avatar) ? 'none' : 'flex' 
+                              }}>
+                                {(staffAssignments[0]?.staff_id?.full_name || staff?.full_name)?.split(' ').map((n: string) => n[0]).join('') || 'NV'}
                               </span>
                             </div>
                             <div className="flex items-center space-x-6">
@@ -704,7 +758,7 @@ export default function StaffAssignmentsPage() {
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    Cư dân
+                                    Người cao tuổi
                                   </th>
                                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     Ngày phân công
@@ -728,13 +782,12 @@ export default function StaffAssignmentsPage() {
                                         <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-md overflow-hidden">
                                           {assignment.resident_id?.avatar ? (
                                             <img
-                                              src={userAPI.getAvatarUrl(assignment.resident_id.avatar)}
+                                              src={processAvatarUrl(assignment.resident_id.avatar)}
                                               alt={assignment.resident_id.full_name}
                                               className="w-full h-full object-cover"
                                               onError={(e) => {
-                                                const target = e.currentTarget as HTMLElement;
-                                                target.style.display = 'none';
-                                                const nextSibling = target.nextElementSibling as HTMLElement;
+                                                e.currentTarget.style.display = 'none';
+                                                const nextSibling = e.currentTarget.nextElementSibling as HTMLElement;
                                                 if (nextSibling) {
                                                   nextSibling.style.display = 'flex';
                                                 }
@@ -847,7 +900,7 @@ export default function StaffAssignmentsPage() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">Cư dân:</span>
+                      <span className="text-sm font-medium text-gray-600">Người cao tuổi:</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {selectedAssignment.resident_id?.full_name || 'N/A'}
                       </span>
@@ -1027,7 +1080,7 @@ export default function StaffAssignmentsPage() {
                   {successData.assignment && (
                     <>
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Cư dân:</span>
+                        <span className="text-gray-600">Người cao tuổi:</span>
                         <span className="font-semibold text-gray-900">
                           {successData.assignment.resident_id?.full_name || 'N/A'}
                         </span>

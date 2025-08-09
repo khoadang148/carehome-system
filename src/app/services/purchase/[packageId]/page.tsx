@@ -1004,15 +1004,15 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                     border: '1px solid #f59e0b'
                   }}>
                     <div style={{ fontSize: '0.9rem', color: '#92400e' }}>
-                      💡 <strong>Lưu ý:</strong> Chỉ hiển thị những cư dân chưa đăng ký gói chính
+                      💡 <strong>Lưu ý:</strong> Chỉ hiển thị những người cao tuổi chưa đăng ký gói chính
                       {!loadingAssignments && (
                         <span style={{ marginLeft: '0.5rem' }}>
-                          ({getFilteredResidents().length}/{residents.length} cư dân)
+                          ({getFilteredResidents().length}/{residents.length} người cao tuổi)
                         </span>
                       )}
                       {getFilteredResidents().length > 4 && (
                         <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                          📜 Có thể cuộn xuống để xem thêm cư dân
+                                CCó thể cuộn xuống để xem thêm người cao tuổi
                         </div>
                       )}
                     </div>
@@ -1756,9 +1756,9 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 }}>
                   <div style={{ fontSize: '1rem', color: '#0369a1', textAlign: 'center' }}>
                     {selectedPackage?.category === 'supplementary' ? (
-                      <>🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì cư dân đã có phòng từ gói chính</>
+                      <>🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì người cao tuổi đã có phòng từ gói chính</>
                     ) : (
-                      <>🏠 <strong>Đã có phòng:</strong> Cư dân đã được phân bổ phòng {roomNumbers[selectedResident]} nên bỏ qua bước chọn phòng</>
+                      <>🏠 <strong>Đã có phòng:</strong> Người cao tuổi đã được phân bổ phòng {roomNumbers[selectedResident]} nên bỏ qua bước chọn phòng</>
                     )}
                   </div>
                 </div>

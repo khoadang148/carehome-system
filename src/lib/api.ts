@@ -367,7 +367,9 @@ export const userAPI = {
     if (!avatarPath) return '';
     if (avatarPath.startsWith('http')) return avatarPath;
     const cleanPath = avatarPath.replace(/^\\+|^\/+/g, '').replace(/\\/g, '/');
-    return `${API_BASE_URL}/${cleanPath}`;
+    const fullUrl = `${API_BASE_URL}/${cleanPath}`;
+    console.log('Avatar URL:', { original: avatarPath, cleaned: cleanPath, full: fullUrl });
+    return fullUrl;
   },
   activate: async (id: string) => {
     try {

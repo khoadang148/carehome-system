@@ -346,7 +346,7 @@ export default function StaffAssignmentDetailPage() {
                   </div>
                   Danh sách phân công
                 </h3>
-                <p className="text-sm text-gray-500 mt-2">Quản lý tất cả cư dân được phân công cho nhân viên này</p>
+                <p className="text-sm text-gray-500 mt-2">Quản lý tất cả người cao tuổi được phân công cho nhân viên này</p>
               </div>
               
               {assignments.length === 0 ? (
@@ -390,14 +390,14 @@ export default function StaffAssignmentDetailPage() {
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Cư dân
+                    Người cao tuổi
                   </label>
                   <select
                     value={formData.resident_id}
                     onChange={(e) => setFormData({ ...formData, resident_id: e.target.value })}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:outline-none transition-all duration-200"
                   >
-                    <option value="">Chọn cư dân</option>
+                    <option value="">Chọn người cao tuổi</option>
                     {residents
                       .filter(resident => {
                         // Ẩn những resident đã được phân công cho staff khác (trừ cư dân hiện tại đang chỉnh sửa)
@@ -485,14 +485,14 @@ export default function StaffAssignmentDetailPage() {
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Cư dân <span className="text-red-500">*</span>
+                    Người cao tuổi <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={formData.resident_id}
                     onChange={(e) => setFormData({ ...formData, resident_id: e.target.value })}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 focus:outline-none transition-all duration-200"
                   >
-                    <option value="">Chọn cư dân</option>
+                    <option value="">Chọn người cao tuổi</option>
                     {residents
                       .filter(resident => {
                         // Ẩn những resident đã được phân công cho bất kỳ staff nào
@@ -634,7 +634,7 @@ export default function StaffAssignmentDetailPage() {
                   {successData.assignment && (
                     <>
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Cư dân:</span>
+                        <span className="text-gray-600">Người cao tuổi:</span>
                         <span className="font-semibold text-gray-900">
                           {successData.assignment.resident_id?.full_name || 'N/A'}
                         </span>

@@ -332,7 +332,7 @@ export default function StaffActivitiesPage() {
       setEvaluationResidents(filteredResidents);
       setEvaluationModalOpen(true);
     } catch (err) {
-      alert('Không thể tải danh sách cư dân tham gia hoạt động này.');
+      alert('Không thể tải danh sách người cao tuổi tham gia hoạt động này.');
     }
   };
 
@@ -1197,7 +1197,7 @@ export default function StaffActivitiesPage() {
                         <UserGroupIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng cư dân tham gia:</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng người cao tuổi tham gia:</div>
                         <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
                           {(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
                         </div>

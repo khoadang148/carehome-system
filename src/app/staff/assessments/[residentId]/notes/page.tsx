@@ -333,7 +333,7 @@ export default function ResidentNotesPage() {
                                      {searchTerm ? 'Không tìm thấy ghi chú nào phù hợp' : 'Chưa có ghi chú nào'}
                 </div>
                 <div className="text-gray-400 text-base mb-6">
-                  {searchTerm ? 'Thử tìm kiếm với từ khóa khác' : 'Bắt đầu thêm ghi chú đầu tiên cho cư dân này'}
+                  {searchTerm ? 'Thử tìm kiếm với từ khóa khác' : 'Bắt đầu thêm ghi chú đầu tiên cho người cao tuổi này'}
                 </div>
                 {!searchTerm && (
                   <button

@@ -256,7 +256,7 @@ export default function StaffVitalSignsPage() {
       return {
         id: vs._id,
         residentId: vs.resident_id,
-        residentName: resident?.name || `Cư dân không tồn tại (ID: ${vs.resident_id})`,
+        residentName: resident?.name || `Người cao tuổi không tồn tại (ID: ${vs.resident_id})`,
         residentAvatar: resident?.avatar,
         assignmentStatus: resident?.assignmentStatus || 'unknown',
         date: formatDateDDMMYYYYWithTimezone(dateTime),
@@ -300,6 +300,13 @@ export default function StaffVitalSignsPage() {
         return formattedDate === dateFilter;
       });
     }
+    
+    // Sort by date (newest first)
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.date_time || a.date);
+      const dateB = new Date(b.date_time || b.date);
+      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+    });
     
     return transformVitalSignsForDisplay(filtered);
   };
@@ -516,7 +523,7 @@ export default function StaffVitalSignsPage() {
                       Theo Dõi Các Chỉ Số Sức Khỏe
                     </h1>
                                          <p className="text-gray-500">
-                       Xem và quản lý chỉ số sức khỏe của các cư dân được phân công
+                       Xem và quản lý chỉ số sức khỏe của các người cao tuổi được phân công
                      </p>
                   </div>
                 </div>
@@ -548,7 +555,7 @@ export default function StaffVitalSignsPage() {
                       : 'bg-gradient-to-r from-red-500 to-red-600 hover:shadow-xl hover:scale-105'
                   }`}
                   title={user?.role === 'staff' && residents.length === 0 
-                    ? 'Bạn chưa được phân công quản lý cư dân nào' 
+                    ? 'Bạn chưa được phân công quản lý người cao tuổi nào' 
                     : 'Thêm chỉ số sức khỏe mới'
                   }
                 >
@@ -588,7 +595,7 @@ export default function StaffVitalSignsPage() {
                   className="w-full p-4 border border-gray-300 rounded-xl text-sm outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm"
                   disabled={residents.length === 0}
                 >
-                  <option value="">Tất cả cư dân được phân công</option>
+                  <option value="">Tất cả người cao tuổi được phân công</option>
                   {residents.map(resident => (
                     <option key={resident.id} value={resident.id}>
                       {resident.name} - Phòng {roomNumbers[resident.id] || 'Chưa hoàn tất đăng kí'}
@@ -597,12 +604,12 @@ export default function StaffVitalSignsPage() {
                 </select>
                 {residents.length === 0 && user?.role === 'staff' && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-yellow-100 to-yellow-200 border border-yellow-400 rounded-xl text-sm text-yellow-800 shadow-sm">
-                    ⚠️ Bạn chưa được phân công quản lý cư dân nào. Vui lòng liên hệ admin để được phân công.
+                    ⚠️ Bạn chưa được phân công quản lý người cao tuổi nào. Vui lòng liên hệ admin để được phân công.
                   </div>
                 )}
                 {residents.length === 0 && user?.role === 'admin' && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-blue-100 to-blue-200 border border-blue-400 rounded-xl text-sm text-blue-800 shadow-sm">
-                    ℹ️ Chưa có cư dân nào trong hệ thống.
+                    ℹ️ Chưa có người cao tuổi nào trong hệ thống.
                   </div>
                 )}
               </div>
@@ -770,12 +777,13 @@ export default function StaffVitalSignsPage() {
                   <HeartIcon className="w-6 h-6 text-gray-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  {residents.length === 0 ? 'Chưa có cư dân nào được phân công' : 'Chưa có chỉ số sức khỏe nào'}
+                  {residents.length === 0 ? 'Chưa có người cao tuổi nào được phân công' : 'Chưa có chỉ số sức khỏe nào'}
                 </h3>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   {residents.length === 0 
-                    ? 'Bạn chưa được phân công chăm sóc cư dân nào. Vui lòng liên hệ admin để được phân công.'
-                    : 'Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe cư dân được phân công'
+                    
+                ? 'Bạn chưa được phân công chăm sóc người cao tuổi nào. Vui lòng liên hệ admin để được phân công.'
+                    : 'Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe người cao tuổi được phân công'
                   }
                 </p>
                 

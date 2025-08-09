@@ -529,7 +529,7 @@ export default function RoomManagementPage() {
               <th style={thStyle}>Số giường</th>
               <th style={thStyle}>Loại giường</th>
               <th style={thStyle}>Trạng thái</th>
-              <th style={thStyle}>Cư dân đang ở</th>
+              <th style={thStyle}>Người cao tuổi đang ở</th>
             </tr>
           </thead>
           <tbody>
