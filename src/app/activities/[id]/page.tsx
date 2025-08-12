@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
 import React, { useState, useEffect, use } from 'react';
@@ -93,9 +94,20 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       try {
         // Lấy danh sách staff thật từ API
         const users = await staffAPI.getAll();
-        // Chỉ lấy staff có _id hợp lệ
+        // Chỉ lấy staff có _id hợp lệ và loại bỏ duplicate
         const staff = users.filter((u: any) => u.role === 'staff' && typeof u._id === 'string' && u._id.length === 24);
-        setStaffList(staff.map((u: any) => ({ id: u._id, name: u.full_name, role: u.role })));
+        
+        // Loại bỏ duplicate dựa trên _id
+        const uniqueStaff = Array.from(
+          new Map(staff.map((u: any) => [u._id, u])).values()
+        );
+        
+        setStaffList(uniqueStaff.map((u: any) => ({ 
+          id: u._id, 
+          name: u.full_name, 
+          role: u.role,
+          position: u.position || 'Nhân viên' // Lấy chức vụ thực tế, fallback về 'Nhân viên'
+        })));
       } catch (error) {
         console.error('Error fetching staff list:', error);
       }
@@ -173,47 +185,38 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           return participationActivityId === activity.id;
         });
         
-        // Lấy danh sách tất cả nhân viên được phân công cho hoạt động này
-        const staffIds = new Set();
-        const assignedStaffs: any[] = [];
+        // Lấy nhân viên đầu tiên được phân công cho hoạt động này (chỉ 1 staff duy nhất)
+        let firstAssignedStaff: any = null;
         
-        currentActivityParticipations.forEach((participation: any) => {
+        for (const participation of currentActivityParticipations) {
           if (participation.staff_id) {
             let staffId = participation.staff_id;
             let staffName = 'Nhân viên chưa xác định';
-            let staffRole = 'Nhân viên';
+            let staffPosition = 'Nhân viên';
             
             if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
               staffId = participation.staff_id._id;
               staffName = participation.staff_id.full_name || staffName;
-              staffRole = participation.staff_id.role || staffRole;
+              staffPosition = participation.staff_id.position || staffPosition;
             } else {
               const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
               if (foundStaff) {
                 staffName = foundStaff.name;
-                staffRole = foundStaff.role;
+                staffPosition = foundStaff.position;
               }
             }
             
-            if (!staffIds.has(staffId)) {
-              staffIds.add(staffId);
-              assignedStaffs.push({
-                id: staffId,
-                name: staffName,
-                role: staffRole
-              });
-            }
+            firstAssignedStaff = {
+              id: staffId,
+              name: staffName,
+              position: staffPosition
+            };
+            break; // Chỉ lấy staff đầu tiên
           }
-        });
-        
-        setAssignedStaffList(assignedStaffs);
-        
-        // Giữ lại currentAssignedStaff cho backward compatibility (lấy nhân viên đầu tiên)
-        if (assignedStaffs.length > 0) {
-          setCurrentAssignedStaff(assignedStaffs[0]);
-        } else {
-          setCurrentAssignedStaff(null);
         }
+        
+        setAssignedStaffList(firstAssignedStaff ? [firstAssignedStaff] : []);
+        setCurrentAssignedStaff(firstAssignedStaff);
         
         // Initialize evaluations from existing participations
         // Sử dụng trực tiếp resident_id từ participation data
@@ -505,47 +508,38 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         return participationActivityId === activity.id;
       });
       
-      // Lấy danh sách tất cả nhân viên được phân công cho hoạt động này
-      const staffIds = new Set();
-      const assignedStaffs: any[] = [];
+      // Lấy nhân viên đầu tiên được phân công cho hoạt động này (chỉ 1 staff duy nhất)
+      let assignedStaff: any = null;
       
-      currentActivityParticipations.forEach((participation: any) => {
+      for (const participation of currentActivityParticipations) {
         if (participation.staff_id) {
           let staffId = participation.staff_id;
           let staffName = 'Nhân viên chưa xác định';
-          let staffRole = 'Nhân viên';
+          let staffPosition = 'Nhân viên';
           
           if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
             staffId = participation.staff_id._id;
             staffName = participation.staff_id.full_name || staffName;
-            staffRole = participation.staff_id.role || staffRole;
+            staffPosition = participation.staff_id.position || staffPosition;
           } else {
             const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
             if (foundStaff) {
               staffName = foundStaff.name;
-              staffRole = foundStaff.role;
+              staffPosition = foundStaff.position;
             }
           }
           
-          if (!staffIds.has(staffId)) {
-            staffIds.add(staffId);
-            assignedStaffs.push({
-              id: staffId,
-              name: staffName,
-              role: staffRole
-            });
-          }
+          assignedStaff = {
+            id: staffId,
+            name: staffName,
+            position: staffPosition
+          };
+          break; // Chỉ lấy staff đầu tiên
         }
-      });
-      
-      setAssignedStaffList(assignedStaffs);
-      
-      // Giữ lại currentAssignedStaff cho backward compatibility (lấy nhân viên đầu tiên)
-      if (assignedStaffs.length > 0) {
-        setCurrentAssignedStaff(assignedStaffs[0]);
-      } else {
-        setCurrentAssignedStaff(null);
       }
+      
+      setAssignedStaffList(assignedStaff ? [assignedStaff] : []);
+      setCurrentAssignedStaff(assignedStaff);
       
       setEvaluationMode(false);
       setNotificationModal({
@@ -781,47 +775,38 @@ const activityResidents: ActivityResident[] = Object.values(
       );
       setParticipations(participationsData);
       
-      // Cập nhật danh sách staff được phân công
-      const staffIds = new Set();
-      const assignedStaffs: any[] = [];
+      // Cập nhật danh sách staff được phân công (chỉ 1 staff duy nhất)
+      let removeStaffAssigned: any = null;
       
-      participationsData.forEach((participation: any) => {
+      for (const participation of participationsData) {
         if (participation.staff_id) {
           let staffId = participation.staff_id;
           let staffName = 'Nhân viên chưa xác định';
-          let staffRole = 'Nhân viên';
+          let staffPosition = 'Nhân viên';
           
           if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
             staffId = participation.staff_id._id;
             staffName = participation.staff_id.full_name || staffName;
-            staffRole = participation.staff_id.role || staffRole;
+            staffPosition = participation.staff_id.position || staffPosition;
           } else {
             const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
             if (foundStaff) {
               staffName = foundStaff.name;
-              staffRole = foundStaff.role;
+              staffPosition = foundStaff.position;
             }
           }
           
-          if (!staffIds.has(staffId)) {
-            staffIds.add(staffId);
-            assignedStaffs.push({
-              id: staffId,
-              name: staffName,
-              role: staffRole
-            });
-          }
+          removeStaffAssigned = {
+            id: staffId,
+            name: staffName,
+            position: staffPosition
+          };
+          break; // Chỉ lấy staff đầu tiên
         }
-      });
-      
-      setAssignedStaffList(assignedStaffs);
-      
-      // Cập nhật currentAssignedStaff
-      if (assignedStaffs.length > 0) {
-        setCurrentAssignedStaff(assignedStaffs[0]);
-      } else {
-        setCurrentAssignedStaff(null);
       }
+      
+      setAssignedStaffList(removeStaffAssigned ? [removeStaffAssigned] : []);
+      setCurrentAssignedStaff(removeStaffAssigned);
       
       setNotificationModal({
         open: true,
@@ -862,6 +847,18 @@ const activityResidents: ActivityResident[] = Object.values(
       });
       return;
     }
+
+    // Kiểm tra xem đã có staff được phân công chưa
+    if (assignedStaffList.length > 0) {
+      setNotificationModal({
+        open: true,
+        title: 'Đã có nhân viên',
+        message: 'Hoạt động này đã có nhân viên hướng dẫn. Mỗi hoạt động chỉ được phép có 1 nhân viên.',
+        type: 'warning'
+      });
+      return;
+    }
+    
     setAssigningStaff(true);
     try {
       // Lấy danh sách cư dân được phân công cho staff này
@@ -911,6 +908,15 @@ const activityResidents: ActivityResident[] = Object.values(
       let addedCount = 0;
       for (const residentId of newResidentIds) {
         try {
+          console.log('Creating participation for resident:', residentId, 'with data:', {
+            staff_id: selectedStaffId,
+            activity_id: activity.id,
+            resident_id: residentId,
+            date: activity.date + 'T00:00:00Z',
+            attendance_status: 'attended',
+            performance_notes: 'Tham gia tích cực, tinh thần tốt'
+          });
+          
           await activityParticipationsAPI.create({
             staff_id: selectedStaffId,
             activity_id: activity.id,
@@ -922,6 +928,7 @@ const activityResidents: ActivityResident[] = Object.values(
           addedCount++;
         } catch (error) {
           console.error(`Error adding resident ${residentId}:`, error);
+          // Continue with other residents even if one fails
         }
       }
       
@@ -943,40 +950,37 @@ const activityResidents: ActivityResident[] = Object.values(
       );
       setParticipations(participationsData);
       
-      // Cập nhật danh sách staff được phân công
-      const staffIds = new Set();
-      const assignedStaffs: any[] = [];
+      // Cập nhật danh sách staff được phân công (chỉ 1 staff duy nhất)
+      let thirdAssignedStaff: any = null;
       
-      participationsData.forEach((participation: any) => {
+      for (const participation of participationsData) {
         if (participation.staff_id) {
           let staffId = participation.staff_id;
           let staffName = 'Nhân viên chưa xác định';
-          let staffRole = 'Nhân viên';
+          let staffPosition = 'Nhân viên';
           
           if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
             staffId = participation.staff_id._id;
             staffName = participation.staff_id.full_name || staffName;
-            staffRole = participation.staff_id.role || staffRole;
+            staffPosition = participation.staff_id.position || staffPosition;
           } else {
             const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
             if (foundStaff) {
               staffName = foundStaff.name;
-              staffRole = foundStaff.role;
+              staffPosition = foundStaff.position;
             }
           }
           
-          if (!staffIds.has(staffId)) {
-            staffIds.add(staffId);
-            assignedStaffs.push({
-              id: staffId,
-              name: staffName,
-              role: staffRole
-            });
-          }
+          thirdAssignedStaff = {
+            id: staffId,
+            name: staffName,
+            position: staffPosition
+          };
+          break; // Chỉ lấy staff đầu tiên
         }
-      });
+      }
       
-      setAssignedStaffList(assignedStaffs);
+      setAssignedStaffList(thirdAssignedStaff ? [thirdAssignedStaff] : []);
       
       setAssignStaffModalOpen(false);
       setSelectedStaffId('');
@@ -1659,7 +1663,7 @@ const activityResidents: ActivityResident[] = Object.values(
                       <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>
                         Nhân viên hướng dẫn:
                       </div>
-                      {user?.role === 'admin' && (
+                      {user?.role === 'admin' && assignedStaffList.length === 0 && (
                         <button
                           onClick={() => setAssignStaffModalOpen(true)}
                           style={{
@@ -1688,69 +1692,60 @@ const activityResidents: ActivityResident[] = Object.values(
                       padding: '0.75rem',
                       border: '1px solid #e2e8f0'
                     }}>
-                      {assignedStaffList.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {assignedStaffList.map((staff, index) => (
-                            <div key={staff.id} style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.75rem'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem'
-                          }}>
+                                              {assignedStaffList.length > 0 ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
                             <div style={{
-                              width: '2rem',
-                              height: '2rem',
-                              borderRadius: '50%',
-                              background: '#3b82f6',
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                              fontWeight: 600,
-                              fontSize: '0.875rem'
+                              gap: '0.75rem'
                             }}>
-                                  {staff.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
-                                    {staff.name}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                    {staff.role || 'Nhân viên'}
-                              </div>
-                            </div>
-                          </div>
-                          {user?.role === 'admin' && (
-                            <button
-                              onClick={() => handleRemoveStaff(staff.id)}
-                              style={{
+                              <div style={{
+                                width: '2rem',
+                                height: '2rem',
+                                borderRadius: '50%',
+                                background: '#3b82f6',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                width: '1.5rem',
-                                height: '1.5rem',
-                                borderRadius: '50%',
-                                background: '#ef4444',
                                 color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
                                 fontWeight: 600,
-                                transition: 'all 0.2s ease'
-                              }}
-                              title="Xóa nhân viên khỏi hoạt động"
-                            >
-                              ×
-                            </button>
-                          )}
+                                fontSize: '0.875rem'
+                              }}>
+                                {assignedStaffList[0].name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                                  {assignedStaffList[0].name}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                  {assignedStaffList[0].position}
+                                </div>
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                            {user?.role === 'admin' && (
+                              <button
+                                onClick={() => handleRemoveStaff(assignedStaffList[0].id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '1.5rem',
+                                  height: '1.5rem',
+                                  borderRadius: '50%',
+                                  background: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  transition: 'all 0.2s ease'
+                                }}
+                                title="Xóa nhân viên khỏi hoạt động"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
                       ) : (
                         <div style={{
                           display: 'flex',
@@ -1830,28 +1825,7 @@ const activityResidents: ActivityResident[] = Object.values(
                   </div>
                 )}
               </div>
-              {!evaluationMode && (
-                <button
-                  onClick={() => setEvaluationMode(true)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    background: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <PencilIcon style={{ width: '1rem', height: '1rem' }} />
-                  Đánh giá tham gia
-                </button>
-              )}
+             
             </div>
 
             {evaluationMode ? (
@@ -2148,7 +2122,7 @@ const activityResidents: ActivityResident[] = Object.values(
             >
               <option value="">-- Chọn nhân viên --</option>
               {staffList.map((staff) => (
-                <option key={staff.id} value={staff.id}>{staff.name} ({staff.role})</option>
+                <option key={staff.id} value={staff.id}>{staff.name} ({staff.position})</option>
               ))}
             </select>
             <div className="flex justify-end gap-2">

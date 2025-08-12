@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
@@ -127,7 +129,7 @@ export default function AddStaffPage() {
       router.push('/staff');
     } catch (error) {
       console.error('Error adding staff:', error);
-      alert('Có lỗi xảy ra khi thêm nhân viên. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi thêm nhân viên. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }

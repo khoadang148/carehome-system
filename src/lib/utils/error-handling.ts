@@ -1,115 +1,103 @@
 import { toast } from 'react-toastify';
 
-// Error types and interfaces
+// Error handling utilities for consistent error messages across the application
+
 export interface AppError {
   code: string;
   message: string;
   details?: any;
-  timestamp: Date;
-  source: string;
+  context?: string;
 }
 
-export interface ApiError {
-  status: number;
-  message: string;
-  details?: any;
-  endpoint?: string;
-}
-
-export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
-
-// Error codes constants
+// Error codes for different types of errors
 export const ERROR_CODES = {
-  // Network errors
-  NETWORK_ERROR: 'NETWORK_ERROR',
-  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
-  SERVER_ERROR: 'SERVER_ERROR',
-  
-  // Authentication errors
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN: 'FORBIDDEN',
-  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
-  
-  // Validation errors
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  REQUIRED_FIELD: 'REQUIRED_FIELD',
-  INVALID_FORMAT: 'INVALID_FORMAT',
-  
-  // Business logic errors
-  BUSINESS_RULE_VIOLATION: 'BUSINESS_RULE_VIOLATION',
-  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
   RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
   DUPLICATE_RESOURCE: 'DUPLICATE_RESOURCE',
-  
-  // System errors
+  SERVER_ERROR: 'SERVER_ERROR',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
-  DATABASE_ERROR: 'DATABASE_ERROR',
-  FILE_UPLOAD_ERROR: 'FILE_UPLOAD_ERROR',
 } as const;
 
-// Error messages in Vietnamese
+// User-friendly error messages in Vietnamese
 export const ERROR_MESSAGES = {
-  [ERROR_CODES.NETWORK_ERROR]: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.',
-  [ERROR_CODES.TIMEOUT_ERROR]: 'Yêu cầu quá thời gian chờ. Vui lòng thử lại.',
-  [ERROR_CODES.SERVER_ERROR]: 'Lỗi máy chủ. Vui lòng thử lại sau.',
-  [ERROR_CODES.UNAUTHORIZED]: 'Bạn cần đăng nhập để thực hiện thao tác này.',
+  [ERROR_CODES.VALIDATION_ERROR]: 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.',
+  [ERROR_CODES.UNAUTHORIZED]: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
   [ERROR_CODES.FORBIDDEN]: 'Bạn không có quyền thực hiện thao tác này.',
-  [ERROR_CODES.TOKEN_EXPIRED]: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-  [ERROR_CODES.VALIDATION_ERROR]: 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.',
-  [ERROR_CODES.REQUIRED_FIELD]: 'Vui lòng điền đầy đủ thông tin bắt buộc.',
-  [ERROR_CODES.INVALID_FORMAT]: 'Định dạng dữ liệu không đúng.',
-  [ERROR_CODES.BUSINESS_RULE_VIOLATION]: 'Thao tác vi phạm quy tắc nghiệp vụ.',
-  [ERROR_CODES.INSUFFICIENT_PERMISSIONS]: 'Không đủ quyền hạn để thực hiện thao tác.',
-  [ERROR_CODES.RESOURCE_NOT_FOUND]: 'Không tìm thấy tài nguyên yêu cầu.',
-  [ERROR_CODES.DUPLICATE_RESOURCE]: 'Tài nguyên đã tồn tại.',
-  [ERROR_CODES.UNKNOWN_ERROR]: 'Đã xảy ra lỗi không xác định. Vui lòng thử lại.',
-  [ERROR_CODES.DATABASE_ERROR]: 'Lỗi cơ sở dữ liệu. Vui lòng thử lại sau.',
-  [ERROR_CODES.FILE_UPLOAD_ERROR]: 'Lỗi tải tệp lên. Vui lòng thử lại.',
+  [ERROR_CODES.RESOURCE_NOT_FOUND]: 'Không tìm thấy thông tin cần thiết.',
+  [ERROR_CODES.DUPLICATE_RESOURCE]: 'Thông tin đã tồn tại trong hệ thống.',
+  [ERROR_CODES.SERVER_ERROR]: 'Lỗi máy chủ. Vui lòng thử lại sau.',
+  [ERROR_CODES.NETWORK_ERROR]: 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet.',
+  [ERROR_CODES.TIMEOUT_ERROR]: 'Yêu cầu hết thời gian chờ. Vui lòng thử lại.',
+  [ERROR_CODES.UNKNOWN_ERROR]: 'Có lỗi không xác định xảy ra. Vui lòng thử lại.',
 } as const;
 
-// Error severity mapping
-export const ERROR_SEVERITY: Record<string, ErrorSeverity> = {
-  [ERROR_CODES.NETWORK_ERROR]: 'medium',
-  [ERROR_CODES.TIMEOUT_ERROR]: 'medium',
-  [ERROR_CODES.SERVER_ERROR]: 'high',
-  [ERROR_CODES.UNAUTHORIZED]: 'medium',
-  [ERROR_CODES.FORBIDDEN]: 'medium',
-  [ERROR_CODES.TOKEN_EXPIRED]: 'medium',
-  [ERROR_CODES.VALIDATION_ERROR]: 'low',
-  [ERROR_CODES.REQUIRED_FIELD]: 'low',
-  [ERROR_CODES.INVALID_FORMAT]: 'low',
-  [ERROR_CODES.BUSINESS_RULE_VIOLATION]: 'medium',
-  [ERROR_CODES.INSUFFICIENT_PERMISSIONS]: 'medium',
-  [ERROR_CODES.RESOURCE_NOT_FOUND]: 'low',
-  [ERROR_CODES.DUPLICATE_RESOURCE]: 'low',
-  [ERROR_CODES.UNKNOWN_ERROR]: 'high',
-  [ERROR_CODES.DATABASE_ERROR]: 'critical',
-  [ERROR_CODES.FILE_UPLOAD_ERROR]: 'medium',
-};
-
-// Error handling class
-export class ErrorHandler {
+// Specific error message mappings for common backend errors
+export const BACKEND_ERROR_MESSAGES = {
+  // User/Account related errors
+  'Username already exists': 'Tên đăng nhập đã được sử dụng. Vui lòng chọn tên đăng nhập khác.',
+  'Email already exists': 'Email đã được sử dụng. Vui lòng sử dụng email khác.',
+  'Email đã được sử dụng bởi người dùng khác': 'Email đã được sử dụng bởi người dùng khác. Vui lòng sử dụng email khác.',
+  'Invalid email format': 'Định dạng email không hợp lệ. Vui lòng kiểm tra lại.',
+  'Invalid user id': 'ID người dùng không hợp lệ.',
+  'User not found': 'Không tìm thấy người dùng.',
+  'Old password is incorrect': 'Mật khẩu cũ không chính xác.',
+  'New passwords do not match': 'Mật khẩu mới và xác nhận mật khẩu không khớp.',
   
+  // Date/Time related errors
+  'Invalid join_date format': 'Định dạng ngày vào làm không hợp lệ. Vui lòng kiểm tra lại.',
+  'Invalid date format': 'Định dạng ngày không hợp lệ. Vui lòng kiểm tra lại.',
+  
+  // Validation errors
+  'Invalid input': 'Dữ liệu đầu vào không hợp lệ.',
+  'Required field': 'Trường này là bắt buộc.',
+  'must be a number': 'phải là số.',
+  'must be greater than': 'phải lớn hơn.',
+  'must be less than': 'phải nhỏ hơn.',
+  'must be between': 'phải nằm trong khoảng.',
+  'must be an integer': 'phải là số nguyên.',
+  'decimal places': 'chữ số thập phân.',
+  'maximum': 'tối đa.',
+  'minimum': 'tối thiểu.',
+  'value': 'giá trị.',
+  'values': 'giá trị.',
+  
+  // Vital signs related errors
+  'blood pressure': 'Huyết áp không hợp lệ. Vui lòng kiểm tra lại định dạng (ví dụ: 120/80).',
+  'heart rate': 'Nhịp tim không hợp lệ. Vui lòng nhập giá trị từ 40-200 bpm.',
+  'temperature': 'Nhiệt độ không hợp lệ. Vui lòng nhập giá trị từ 35°C đến 42°C.',
+  'oxygen saturation': 'Nồng độ oxy không hợp lệ. Vui lòng nhập giá trị từ 70% đến 100%.',
+  'respiratory rate': 'Nhịp thở không hợp lệ. Vui lòng nhập giá trị từ 8-40 lần/phút.',
+  'weight': 'Cân nặng không hợp lệ. Vui lòng nhập giá trị từ 30kg đến 150kg.',
+  
+  // General errors
+  'No valid fields to update': 'Không có dữ liệu nào để cập nhật.',
+  'No valid fields to update': 'Không có dữ liệu nào để cập nhật.',
+} as const;
+
+export class ErrorHandler {
   /**
-   * Create standardized error object
+   * Create a standardized error object
    */
   static createError(
-    code: string,
-    message?: string,
-    details?: any,
-    source: string = 'unknown'
+    code: string, 
+    message?: string, 
+    details?: any, 
+    context?: string
   ): AppError {
     return {
       code,
       message: message || ERROR_MESSAGES[code as keyof typeof ERROR_MESSAGES] || ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR],
       details,
-      timestamp: new Date(),
-      source
+      context,
     };
   }
 
   /**
-   * Handle API errors
+   * Handle API errors and return user-friendly messages
    */
   static handleApiError(error: any, context: string = 'API'): AppError {
     console.error(`${context} Error:`, error);
@@ -123,7 +111,7 @@ export class ErrorHandler {
       switch (status) {
         case 400:
           code = ERROR_CODES.VALIDATION_ERROR;
-          message = data?.message || ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR];
+          message = this.translateBackendMessage(data?.message || data?.detail);
           break;
         case 401:
           code = ERROR_CODES.UNAUTHORIZED;
@@ -139,11 +127,11 @@ export class ErrorHandler {
           break;
         case 409:
           code = ERROR_CODES.DUPLICATE_RESOURCE;
-          message = data?.message || ERROR_MESSAGES[ERROR_CODES.DUPLICATE_RESOURCE];
+          message = this.translateBackendMessage(data?.message || data?.detail);
           break;
         case 422:
           code = ERROR_CODES.VALIDATION_ERROR;
-          message = data?.message || ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR];
+          message = this.translateBackendMessage(data?.message || data?.detail);
           break;
         case 500:
         case 502:
@@ -154,7 +142,7 @@ export class ErrorHandler {
           break;
         default:
           code = ERROR_CODES.UNKNOWN_ERROR;
-          message = data?.message || ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR];
+          message = this.translateBackendMessage(data?.message || data?.detail);
       }
 
       return this.createError(code, message, { status, data }, context);
@@ -167,158 +155,82 @@ export class ErrorHandler {
       return this.createError(ERROR_CODES.NETWORK_ERROR, undefined, error, context);
     }
     
-    return this.createError(ERROR_CODES.UNKNOWN_ERROR, error.message, error, context);
+    // Handle other types of errors
+    if (error.message) {
+      return this.createError(ERROR_CODES.UNKNOWN_ERROR, this.translateBackendMessage(error.message), error, context);
+    }
+    
+    return this.createError(ERROR_CODES.UNKNOWN_ERROR, undefined, error, context);
   }
 
   /**
-   * Handle form validation errors
+   * Translate backend error messages to user-friendly Vietnamese messages
    */
-  static handleValidationErrors(
-    errors: { [field: string]: string }
-  ): AppError {
-    const errorCount = Object.keys(errors).length;
-    const message = errorCount === 1 
-      ? Object.values(errors)[0]
-      : `Có ${errorCount} lỗi cần được sửa`;
-
-    return this.createError(
-      ERROR_CODES.VALIDATION_ERROR,
-      message,
-      errors,
-      'form_validation'
-    );
-  }
-
-  /**
-   * Show error notification
-   */
-  static showError(error: AppError | string, options?: {
-    position?: 'top-right' | 'top-center' | 'top-left' | 'bottom-right' | 'bottom-center' | 'bottom-left';
-    autoClose?: number;
-    hideProgressBar?: boolean;
-  }) {
-    const message = typeof error === 'string' ? error : error.message;
-    const defaultOptions = {
-      position: 'top-right' as const,
-      autoClose: 5000,
-      hideProgressBar: false,
-      ...options
-    };
-
-    toast.error(message, defaultOptions);
-  }
-
-  /**
-   * Show success notification
-   */
-  static showSuccess(message: string, options?: {
-    position?: 'top-right' | 'top-center' | 'top-left' | 'bottom-right' | 'bottom-center' | 'bottom-left';
-    autoClose?: number;
-    hideProgressBar?: boolean;
-  }) {
-    const defaultOptions = {
-      position: 'top-right' as const,
-      autoClose: 3000,
-      hideProgressBar: false,
-      ...options
-    };
-
-    toast.success(message, defaultOptions);
-  }
-
-  /**
-   * Show warning notification
-   */
-  static showWarning(message: string, options?: {
-    position?: 'top-right' | 'top-center' | 'top-left' | 'bottom-right' | 'bottom-center' | 'bottom-left';
-    autoClose?: number;
-    hideProgressBar?: boolean;
-  }) {
-    const defaultOptions = {
-      position: 'top-right' as const,
-      autoClose: 4000,
-      hideProgressBar: false,
-      ...options
-    };
-
-    toast.warning(message, defaultOptions);
-  }
-
-  /**
-   * Show info notification
-   */
-  static showInfo(message: string, options?: {
-    position?: 'top-right' | 'top-center' | 'top-left' | 'bottom-right' | 'bottom-center' | 'bottom-left';
-    autoClose?: number;
-    hideProgressBar?: boolean;
-  }) {
-    const defaultOptions = {
-      position: 'top-right' as const,
-      autoClose: 3000,
-      hideProgressBar: false,
-      ...options
-    };
-
-    toast.info(message, defaultOptions);
-  }
-
-  /**
-   * Log error for debugging (development mode)
-   */
-  static logError(error: AppError, context?: string) {
-    if (process.env.NODE_ENV === 'development') {
-      console.group(`🚨 Error${context ? ` in ${context}` : ''}`);
-      console.error('Code:', error.code);
-      console.error('Message:', error.message);
-      console.error('Timestamp:', error.timestamp);
-      console.error('Source:', error.source);
-      if (error.details) {
-        console.error('Details:', error.details);
+  static translateBackendMessage(message: string): string {
+    if (!message) return ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR];
+    
+    // Check for exact matches first
+    for (const [key, value] of Object.entries(BACKEND_ERROR_MESSAGES)) {
+      if (message.includes(key)) {
+        return value;
       }
-      console.groupEnd();
     }
+    
+    // Handle common patterns
+    let translatedMessage = message
+      .replace(/Please enter a valid value/g, 'Vui lòng nhập giá trị hợp lệ')
+      .replace(/The two nearest valid values are/g, 'Hai giá trị hợp lệ gần nhất là')
+      .replace(/Please enter a valid value\. The two nearest valid values are/g, 'Vui lòng nhập giá trị hợp lệ. Hai giá trị hợp lệ gần nhất là')
+      .replace(/Invalid input/g, 'Dữ liệu đầu vào không hợp lệ')
+      .replace(/Required field/g, 'Trường bắt buộc')
+      .replace(/must be a number/g, 'phải là số')
+      .replace(/must be greater than/g, 'phải lớn hơn')
+      .replace(/must be less than/g, 'phải nhỏ hơn')
+      .replace(/must be between/g, 'phải nằm trong khoảng')
+      .replace(/must be an integer/g, 'phải là số nguyên')
+      .replace(/decimal places/g, 'chữ số thập phân')
+      .replace(/maximum/g, 'tối đa')
+      .replace(/minimum/g, 'tối thiểu')
+      .replace(/value/g, 'giá trị')
+      .replace(/values/g, 'giá trị');
+    
+    return translatedMessage || message;
   }
 
   /**
-   * Get user-friendly error message
+   * Extract field-specific errors from API response
    */
-  static getUserMessage(error: AppError | any): string {
-    if (typeof error === 'string') {
-      return error;
+  static extractFieldErrors(error: any): { [key: string]: string } {
+    const fieldErrors: { [key: string]: string } = {};
+    
+    if (error.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+      // FastAPI validation error format
+      error.response.data.detail.forEach((item: any) => {
+        if (item.loc && item.msg) {
+          const field = item.loc[item.loc.length - 1];
+          fieldErrors[field] = this.translateBackendMessage(item.msg);
+        }
+      });
     }
-
-    if (error && typeof error === 'object' && 'message' in error) {
-      return error.message;
+    
+    if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+      // Custom validation error format
+      error.response.data.errors.forEach((err: any) => {
+        if (err.field && err.message) {
+          fieldErrors[err.field] = this.translateBackendMessage(err.message);
+        }
+      });
     }
-
-    if (error && typeof error === 'object' && 'code' in error) {
-      return ERROR_MESSAGES[error.code as keyof typeof ERROR_MESSAGES] || ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR];
-    }
-
-    return ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR];
+    
+    return fieldErrors;
   }
 
   /**
-   * Determine if error requires user action
+   * Get a user-friendly error message for display
    */
-  static requiresUserAction(error: AppError): boolean {
-    const actionRequiredCodes = [
-      ERROR_CODES.UNAUTHORIZED,
-      ERROR_CODES.TOKEN_EXPIRED,
-      ERROR_CODES.FORBIDDEN,
-      ERROR_CODES.VALIDATION_ERROR,
-      ERROR_CODES.REQUIRED_FIELD,
-      ERROR_CODES.INVALID_FORMAT,
-    ];
-
-    return actionRequiredCodes.includes(error.code as any);
-  }
-
-  /**
-   * Get error severity
-   */
-  static getSeverity(error: AppError): ErrorSeverity {
-    return ERROR_SEVERITY[error.code] || 'medium';
+  static getUserFriendlyMessage(error: any): string {
+    const appError = this.handleApiError(error);
+    return appError.message;
   }
 }
 

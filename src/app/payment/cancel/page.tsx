@@ -7,7 +7,7 @@ export default function PaymentCancelPage() {
   const router = useRouter();
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.push("/finance");
+      router.push("/family/finance");
     }, 3000);
     return () => clearTimeout(timer);
   }, [router]);

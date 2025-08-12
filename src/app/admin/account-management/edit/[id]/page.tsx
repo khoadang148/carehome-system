@@ -1,9 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter, useParams } from "next/navigation";
 import { userAPI } from "@/lib/api";
 import Image from "next/image";
 import Link from "next/link";
+import { UserFriendlyErrorHandler } from '@/lib/utils/user-friendly-errors';
 
 export default function EditAccountPage() {
   const router = useRouter();
@@ -48,11 +51,43 @@ export default function EditAccountPage() {
     setSaving(true);
     setError("");
     try {
-      await userAPI.update(id, formData);
+      console.log('handleSubmit - formData:', formData);
+      
+      // Validate email format
+      if (formData.email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          setError("Email không hợp lệ!");
+          setSaving(false);
+          return;
+        }
+      }
+      
+      // Lọc dữ liệu chỉ giữ lại các trường hợp lệ
+      const allowedFields = ['full_name', 'email', 'phone', 'notes', 'address', 'position', 'qualification'];
+      const filteredData: any = {};
+      for (const key of allowedFields) {
+        if (formData[key] !== undefined && formData[key] !== null && formData[key] !== '') {
+          filteredData[key] = formData[key];
+        }
+      }
+      
+      // Kiểm tra xem có dữ liệu nào để cập nhật không
+      if (Object.keys(filteredData).length === 0) {
+        setError("Không có dữ liệu nào để cập nhật!");
+        setSaving(false);
+        return;
+      }
+      
+      console.log('handleSubmit - filteredData:', filteredData);
+      await userAPI.update(id, filteredData);
       setSuccessMessage("Tài khoản đã được cập nhật thành công!");
       setShowSuccessModal(true);
-    } catch (err) {
-      setError("Có lỗi khi cập nhật tài khoản!");
+    } catch (err: any) {
+      console.error('handleSubmit - Error:', err);
+      
+      const errorResult = UserFriendlyErrorHandler.handleError(err);
+      setError(errorResult.message);
     } finally {
       setSaving(false);
     }
@@ -64,11 +99,11 @@ export default function EditAccountPage() {
     if (!file) return;
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Chỉ chấp nhận file ảnh JPG, PNG, GIF');
+      toast.error('Chỉ chấp nhận file ảnh JPG, PNG, GIF');
       return;
     }
     if (file.size > 1024 * 1024) {
-      alert('File quá lớn, chỉ chấp nhận tối đa 1MB');
+      toast.error('File quá lớn, chỉ chấp nhận tối đa 1MB');
       return;
     }
     setAvatarUploading(true);
@@ -79,12 +114,12 @@ export default function EditAccountPage() {
       const res = await userAPI.updateAvatar(id, formData);
       if (res.success) {
         setFormData((prev: any) => ({ ...prev, avatar: res.avatar }));
-        alert('Cập nhật ảnh đại diện thành công!');
+        toast.success('Cập nhật ảnh đại diện thành công!');
       } else {
-        alert('Lỗi khi upload ảnh đại diện!');
+        toast.error('Lỗi khi upload ảnh đại diện!');
       }
     } catch (err) {
-      alert('Lỗi khi upload ảnh đại diện!');
+      toast.error('Lỗi khi upload ảnh đại diện!');
     } finally {
       setAvatarUploading(false);
     }
@@ -101,7 +136,7 @@ export default function EditAccountPage() {
       }
       setFormData((prev: any) => ({ ...prev, status: newStatus }));
     } catch {
-      alert('Cập nhật trạng thái thất bại!');
+      toast.error('Cập nhật trạng thái thất bại!');
     } finally {
       setSaving(false);
     }
@@ -190,13 +225,13 @@ export default function EditAccountPage() {
                       if (res.avatar) {
                         setFormData((prev: any) => ({ ...prev, avatar: res.avatar }));
                       } else {
-                        alert('Upload ảnh thành công nhưng không nhận được URL!');
+                        toast.success('Upload ảnh thành công nhưng không nhận được URL!');
                       }
                     } else {
-                      alert('Upload ảnh thất bại!');
+                      toast.error('Upload ảnh thất bại!');
                     }
                   } catch {
-                    alert('Upload ảnh thất bại!');
+                    toast.error('Upload ảnh thất bại!');
                   } finally {
                     setAvatarUploading(false);
                   }

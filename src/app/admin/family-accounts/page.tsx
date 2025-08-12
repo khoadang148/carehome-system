@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { 
   UserIcon, 
   PlusIcon, 
@@ -152,7 +154,7 @@ export default function FamilyAccountsPage() {
 
   const handleSubmit = () => {
     if (!formData.username || !formData.email || !formData.fullName) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
       return;
     }
 

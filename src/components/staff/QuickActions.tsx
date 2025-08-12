@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { 
   PlusCircleIcon, 
   BeakerIcon, 
@@ -237,7 +239,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
       onComplete();
     } catch (error) {
       console.error('Error adding care note:', error);
-      alert('Có lỗi xảy ra khi thêm ghi chú. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi thêm ghi chú. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -401,7 +403,7 @@ function MedicationModal({ residentId, residentName, onClose, onComplete }: {
       onComplete();
     } catch (error) {
       console.error('Error adding medication:', error);
-      alert('Có lỗi xảy ra khi thêm thuốc. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi thêm thuốc. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -657,7 +659,7 @@ function AppointmentModal({ residentId, residentName, onClose, onComplete }: {
       onComplete();
     } catch (error) {
       console.error('Error adding appointment:', error);
-      alert('Có lỗi xảy ra khi đặt lịch hẹn. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi đặt lịch hẹn. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -923,7 +925,7 @@ function MedicationListModal({ residentId, residentName, onClose, onComplete }: 
       }
     } catch (error) {
       console.error('Error marking medication as taken:', error);
-      alert('Có lỗi xảy ra. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
     }
   };
 

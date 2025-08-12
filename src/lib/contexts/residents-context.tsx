@@ -1,6 +1,7 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { residentAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from './auth-context';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
@@ -29,57 +30,51 @@ interface ResidentsContextType {
   getResidentById: (id: string) => Resident | undefined;
   getResidentByName: (name: string) => Resident | undefined;
   refreshResidents: () => Promise<void>;
+  initialized: boolean;
+  initializeResidents: () => void;
 }
 
 const ResidentsContext = createContext<ResidentsContextType | undefined>(undefined);
 
 export function ResidentsProvider({ children }: { children: ReactNode }) {
   const [residents, setResidents] = useState<Resident[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [initialized, setInitialized] = useState(false);
   const { user } = useAuth();
 
   const fetchResidents = async () => {
+    if (loading) return; // Prevent multiple simultaneous requests
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
+      const residentsData = await residentAPI.getAll();
       
-      let residentsData;
-      
-      // Nếu user là family member, chỉ lấy residents liên quan
-      if (user?.role === 'family') {
-        console.log('Fetching residents for family member:', user.id);
-        residentsData = await residentAPI.getByFamilyMemberId(user.id);
-      } else {
-        // Nếu là admin hoặc staff, lấy tất cả residents và lọc chỉ lấy cư dân chính thức
-        const allResidents = await residentAPI.getAll();
-        residentsData = await filterOfficialResidents(allResidents);
-        console.log('Filtered official residents for admin/staff:', residentsData);
-      }
-      
-      console.log('Raw residents data from API:', residentsData);
-      
-      // Map API data to Resident interface and fetch room numbers
+      // Map residents data with additional information
       const mappedResidentsPromises = residentsData.map(async (resident: any) => {
-        console.log('Processing resident:', resident);
-        
-        // Calculate age from date_of_birth if available
-        let age = 0;
-        if (resident.date_of_birth) {
-          const birth = new Date(resident.date_of_birth);
-          const now = new Date();
-          age = now.getFullYear() - birth.getFullYear();
-          const m = now.getMonth() - birth.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
-            age--;
-          }
-        } else if (resident.age) {
-          age = resident.age;
-        }
+        const mappedResident = {
+          id: resident._id || resident.id,
+          name: resident.full_name || '',
+          age: resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '',
+          gender: resident.gender || '',
+          admissionDate: resident.admission_date,
+          dischargeDate: resident.discharge_date,
+          relationship: resident.relationship || '',
+          medicalHistory: resident.medical_history || '',
+          currentMedications: resident.current_medications || '',
+          allergies: resident.allergies || '',
+          emergencyContact: resident.emergency_contact || '',
+          careLevel: resident.care_level || '',
+          avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+          status: resident.status || 'active',
+          roomNumber: 'Loading...', // Default value
+          carePlan: null,
+          ...resident
+        };
 
-        // Fetch room number for this resident
-        let roomNumber = 'N/A';
+        // Fetch care plan assignments (gói dịch vụ đang sử dụng)
         try {
           const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id || resident.id);
           console.log(`Care plan assignments for resident ${resident._id}:`, assignments);
@@ -94,105 +89,75 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
             
             // Check if assignment has room information
             if (activeAssignment?.bed_id?.room_id) {
-              const roomData = activeAssignment.bed_id.room_id;
-              
-              // If roomData is already populated (has room_number), use it directly
-              if (typeof roomData === 'object' && roomData?.room_number) {
-                roomNumber = roomData.room_number;
-                console.log(`Found room number from populated data: ${roomNumber}`);
-              } else {
-                // If roomData is just an ID, fetch the room details
-                const roomId = typeof roomData === 'string' ? roomData : 
-                              typeof roomData === 'object' && roomData?._id ? roomData._id :
-                              String(roomData);
-                
-                if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
-                  console.log(`Fetching room details for ID: ${roomId}`);
-                  const room = await roomsAPI.getById(roomId);
-                  roomNumber = room?.room_number || 'N/A';
-                  console.log(`Fetched room number: ${roomNumber}`);
+              try {
+                // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+                if (typeof activeAssignment.bed_id.room_id === 'object' && activeAssignment.bed_id.room_id.room_number) {
+                  mappedResident.roomNumber = activeAssignment.bed_id.room_id.room_number;
                 } else {
-                  console.warn(`Invalid room ID: ${roomId}`);
+                  // Nếu chỉ có _id, fetch thêm thông tin
+                  const roomId = activeAssignment.bed_id.room_id._id || activeAssignment.bed_id.room_id;
+                  if (roomId) {
+                    const room = await roomsAPI.getById(roomId);
+                    mappedResident.roomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
+                  } else {
+                    mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
+                  }
                 }
-              }
-            } else if (activeAssignment?.assigned_room_id) {
-              // Fallback for old API structure
-              const roomData = activeAssignment.assigned_room_id;
-              
-              // If roomData is already populated (has room_number), use it directly
-              if (typeof roomData === 'object' && roomData?.room_number) {
-                roomNumber = roomData.room_number;
-                console.log(`Found room number from populated data (fallback): ${roomNumber}`);
-              } else {
-                // If roomData is just an ID, fetch the room details
-                const roomId = typeof roomData === 'string' ? roomData : 
-                              typeof roomData === 'object' && roomData?._id ? roomData._id :
-                              String(roomData);
-                
-                if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
-                  console.log(`Fetching room details for ID (fallback): ${roomId}`);
-                  const room = await roomsAPI.getById(roomId);
-                  roomNumber = room?.room_number || 'N/A';
-                  console.log(`Fetched room number (fallback): ${roomNumber}`);
-                } else {
-                  console.warn(`Invalid room ID (fallback): ${roomId}`);
-                }
+              } catch (roomError) {
+                console.error(`Error fetching room for resident ${resident._id}:`, roomError);
+                mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
               }
             } else {
-              console.log(`No room assigned for resident ${resident._id}`);
+              mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
             }
+            
+            // Set care plan information
+            mappedResident.carePlan = activeAssignment;
           } else {
-            console.log(`No care plan assignments found for resident ${resident._id}`);
+            mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
           }
-        } catch (error) {
-          console.error(`Error fetching room for resident ${resident._id}:`, error);
-          roomNumber = 'N/A';
+        } catch (assignmentError) {
+          console.error(`Error fetching care plan assignments for resident ${resident._id}:`, assignmentError);
+          mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
         }
 
-        const mappedResident = {
-          id: resident._id || resident.id,
-          name: resident.full_name || resident.fullName || resident.name || 'Không có tên',
-          room: roomNumber,
-          photo: resident.photo || resident.avatar || resident.avatarUrl || '/default-avatar.svg',
-          age: age,
-          status: resident.status || 'Ổn định',
-          activities: resident.activities || [],
-          vitals: resident.vitals || {},
-          careNotes: resident.care_notes || [],
-          medications: resident.medications || [],
-          appointments: resident.appointments || []
-        };
-        
-        console.log('Mapped resident:', mappedResident);
         return mappedResident;
       });
-      
+
       const mappedResidents = await Promise.all(mappedResidentsPromises);
-      console.log('Final mapped residents:', mappedResidents);
-      
       setResidents(mappedResidents);
-      if (mappedResidents.length > 0 && !selectedResident) {
-        setSelectedResident(mappedResidents[0]);
-      }
-    } catch (err: any) {
+      setInitialized(true);
+    } catch (err) {
       console.error('Error fetching residents:', err);
-      setError(err.message || 'Không thể tải danh sách cư dân');
+      setError('Không thể tải danh sách cư dân');
+      setResidents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const refreshResidents = async () => {
-    await fetchResidents();
-  };
+  // Lazy loading: chỉ fetch data khi cần thiết
+  const initializeResidents = useCallback(() => {
+    if (!initialized && !loading) {
+      fetchResidents();
+    }
+  }, [initialized, loading]);
 
+  const refreshResidents = useCallback(() => {
+    fetchResidents();
+  }, []);
+
+  // Tối ưu: Không tự động fetch data khi user login
+  // Chỉ fetch khi component thực sự cần data
   useEffect(() => {
+    // Chỉ clear data khi user logout, không tự động fetch
     if (!user) {
       setResidents([]);
       setLoading(false);
+      setInitialized(false);
       return;
     }
-    fetchResidents();
+    // Không tự động initializeResidents() ở đây
   }, [user]);
 
   const getResidentById = (id: string) => {
@@ -204,15 +169,13 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ResidentsContext.Provider value={{
-      residents,
-      loading,
-      error,
-      selectedResident,
-      setSelectedResident,
-      getResidentById,
-      getResidentByName,
-      refreshResidents
+    <ResidentsContext.Provider value={{ 
+      residents, 
+      loading, 
+      error, 
+      initialized,
+      initializeResidents,
+      refreshResidents 
     }}>
       {children}
     </ResidentsContext.Provider>

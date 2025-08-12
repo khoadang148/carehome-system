@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, apiClient, roomTypesAPI } from '@/lib/api';
+import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, apiClient, roomTypesAPI, bedAssignmentsAPI } from '@/lib/api';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -93,6 +95,22 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     'Hoàn tất'
   ];
 
+  // State cho validation warning
+  const [validationWarning, setValidationWarning] = useState<string | null>(null);
+  
+  // State cho thông tin phòng hiện tại
+  const [existingRoomInfo, setExistingRoomInfo] = useState<{
+    roomNumber: string;
+    roomType: string;
+    roomTypeName: string;
+    monthlyPrice: number;
+  } | null>(null);
+  const [loadingExistingRoomInfo, setLoadingExistingRoomInfo] = useState(false);
+  const [currentBedInfo, setCurrentBedInfo] = useState<{
+    bedId: string;
+    bedNumber: string;
+  } | null>(null);
+
   // Get packageId from params using React.use()
   const packageId = React.use(params).packageId;
 
@@ -172,62 +190,29 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
         // Kiểm tra từng cư dân
         for (const resident of residents) {
           try {
-            const response = await apiClient.get(`/care-plan-assignments/by-resident/${resident.id}`);
-            const assignments = response.data || [];
-            
-            // Kiểm tra xem cư dân có gói chính active không
-            console.log(`🔍 Checking resident ${resident.name} (${resident.id}):`, assignments);
-            
-            // Kiểm tra dựa trên assigned_room_id - nếu có phòng thì đã đăng ký gói chính
-            const hasActiveAssignment = assignments.some((a: any) => 
-              a.status === 'active' && 
-              (a.bed_id?.room_id || a.assigned_room_id) &&
-              a.packages && a.packages.length > 0
+            const assignments = await carePlansAPI.getByResidentId(resident.id);
+            const activeAssignments = assignments.filter((a: any) => 
+              a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval'
             );
             
-            console.log(`  Has room assignment: ${hasActiveAssignment}`);
+            console.log(`🔍 Checking resident ${resident.name} (${resident.id}):`, activeAssignments);
             
-            // Nếu có phòng thì chắc chắn đã đăng ký gói chính
-            if (hasActiveAssignment) {
-              statusMap[resident.id] = true;
-              console.log(`✅ Resident ${resident.name} has main package (has room assignment)`);
-              continue;
-            }
-            
-            const hasMainPackage = assignments.some((a: any) => {
-              console.log(`  Assignment:`, a);
-              console.log(`  Care plan IDs:`, a.care_plan_ids);
-              
-              let hasMain = false;
-              
+            // Kiểm tra xem có gói chính nào không
+            const hasMainPackage = activeAssignments.some((a: any) => {
               // Kiểm tra nếu care_plan_ids là array của objects
               if (Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0 && typeof a.care_plan_ids[0] === 'object') {
-                hasMain = a.care_plan_ids.some((cp: any) => {
-                  console.log(`    Care plan object:`, cp);
-                  console.log(`    Category:`, cp.category);
-                  return cp.category === 'main';
-                });
+                return a.care_plan_ids.some((cp: any) => cp.category === 'main');
               }
               // Kiểm tra nếu care_plan_ids là array của strings (IDs)
               else if (Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0) {
-                console.log(`    Care plan IDs (strings):`, a.care_plan_ids);
-                // Nếu là strings, cần kiểm tra thông qua care_plans array
+                // Nếu có care_plans array, kiểm tra trong đó
                 if (a.care_plans && Array.isArray(a.care_plans)) {
-                  hasMain = a.care_plans.some((cp: any) => {
-                    console.log(`    Care plan from care_plans:`, cp);
-                    return cp.category === 'main';
-                  });
-                } else {
-                  // Nếu không có care_plans, thử gọi API để lấy thông tin
-                  console.log(`    No care_plans array, will check via API calls`);
+                  return a.care_plans.some((cp: any) => cp.category === 'main');
                 }
+                // Nếu không có care_plans, cần kiểm tra qua API
+                return false; // Tạm thời return false
               }
-              
-              const validStatus = (a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval');
-              console.log(`  Status: ${a.status}, Valid: ${validStatus}`);
-              console.log(`  Has main package: ${hasMain && validStatus}`);
-              
-              return hasMain && validStatus;
+              return false;
             });
             
             statusMap[resident.id] = hasMainPackage;
@@ -250,6 +235,13 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     checkResidentPackages();
   }, [residents, selectedPackage?.category]);
 
+  // Refresh room numbers khi có thay đổi về care plans
+  useEffect(() => {
+    if (residents.length > 0) {
+      refreshRoomNumbers();
+    }
+  }, [residents]);
+
   const hasActiveMainCarePlan = residentAssignments.some(a => {
     const carePlanId = Array.isArray(a.care_plan_ids) && a.care_plan_ids[0]?._id;
     const carePlan = allCarePlans.find(cp => cp._id === carePlanId);
@@ -261,6 +253,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   const isSelectedPackageMain = selectedPackage?.category === 'main';
   const canRegisterMain = !(hasActiveMainCarePlan && isSelectedPackageMain);
 
+  // Kiểm tra xem resident đã có gói dịch vụ này chưa
   const checkDuplicatePackage = async () => {
     try {
     const assignments = await carePlansAPI.getByResidentId(selectedResident);
@@ -270,6 +263,58 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     );
     } catch (error) {
       console.error('Error checking duplicate package:', error);
+      return false;
+    }
+  };
+
+  // Kiểm tra xem resident có thể đăng ký gói này không
+  const canRegisterPackage = async () => {
+    if (!selectedResident || !selectedPackage) return false;
+    
+    try {
+      const assignments = await carePlansAPI.getByResidentId(selectedResident);
+      const activeAssignments = assignments.filter((a: any) => 
+        a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval'
+      );
+
+      // Nếu là gói chính, kiểm tra xem đã có gói chính nào chưa
+      if (selectedPackage.category === 'main') {
+        const hasMainPackage = activeAssignments.some((a: any) => {
+          // Kiểm tra nếu care_plan_ids là array của objects
+          if (Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0 && typeof a.care_plan_ids[0] === 'object') {
+            return a.care_plan_ids.some((cp: any) => cp.category === 'main');
+          }
+          // Kiểm tra nếu care_plan_ids là array của strings (IDs)
+          else if (Array.isArray(a.care_plan_ids) && a.care_plan_ids.length > 0) {
+            // Nếu có care_plans array, kiểm tra trong đó
+            if (a.care_plans && Array.isArray(a.care_plans)) {
+              return a.care_plans.some((cp: any) => cp.category === 'main');
+            }
+            // Nếu không có care_plans, cần kiểm tra qua API
+            return false; // Tạm thời return false, sẽ cần cải thiện logic này
+          }
+          return false;
+        });
+        
+        if (hasMainPackage) {
+          console.log('❌ Resident đã có gói chính, không thể đăng ký thêm gói chính');
+          return false;
+        }
+      }
+
+      // Kiểm tra xem đã có gói này chưa
+      const hasThisPackage = activeAssignments.some((a: any) =>
+        a.care_plan_ids.some((cp: any) => cp._id === selectedPackage._id)
+      );
+      
+      if (hasThisPackage) {
+        console.log('❌ Resident đã có gói này');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error checking package registration eligibility:', error);
       return false;
     }
   };
@@ -288,7 +333,275 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     if (selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí') {
       console.log(`✅ Resident ${selectedResidentObj?.name} đã có phòng: ${roomNumbers[selectedResident]}`);
     }
-  }, [selectedResident, residents, roomNumbers]);
+
+    // Kiểm tra validation khi chọn cư dân
+    if (selectedResident && selectedPackage) {
+      canRegisterPackage().then(canRegister => {
+        if (!canRegister) {
+          console.log('⚠️ Resident không thể đăng ký gói này');
+          if (selectedPackage.category === 'main') {
+            setValidationWarning('Người cao tuổi này đã có gói dịch vụ chính. Vui lòng chọn gói dịch vụ bổ sung hoặc chọn người cao tuổi khác.');
+          } else {
+            setValidationWarning('Người cao tuổi này đã có gói dịch vụ này. Vui lòng chọn gói dịch vụ khác hoặc chọn người cao tuổi khác.');
+          }
+        } else {
+          setValidationWarning(null);
+        }
+      });
+
+      // Lấy thông tin phòng và giường hiện tại nếu resident đã có phòng (cho cả gói chính và bổ sung)
+      if (roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí') {
+        setLoadingExistingRoomInfo(true);
+        const fetchExistingRoomInfo = async () => {
+          try {
+            // Thử lấy từ bedAssignments trước
+            try {
+              const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResident);
+              
+              const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+              
+              if (bedAssignment?.bed_id?.room_id) {
+                let roomId = bedAssignment.bed_id.room_id;
+                let roomNumber = '';
+                let roomType = '';
+                let roomTypeName = '';
+                let monthlyPrice = 0;
+
+                                 // Nếu room_id đã có thông tin đầy đủ
+                 if (typeof roomId === 'object' && roomId?.room_number) {
+                   roomNumber = roomId.room_number;
+                   roomType = roomId.room_type;
+                   // Lấy giá từ roomTypes thay vì từ room object
+                   const roomTypeObj = roomTypes.find(rt => rt.room_type === roomId.room_type);
+                   monthlyPrice = roomTypeObj?.monthly_price || 0;
+                 } else {
+                  // Nếu chỉ có _id, fetch thêm thông tin
+                  const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                  if (roomIdString) {
+                    const room = await roomsAPI.getById(roomIdString);
+                    if (room) {
+                      roomNumber = room.room_number;
+                      roomType = room.room_type;
+                                           // Lấy giá từ roomTypes thay vì từ room
+                     const roomTypeObj = roomTypes.find(rt => rt.room_type === room.room_type);
+                     monthlyPrice = roomTypeObj?.monthly_price || 0;
+                    }
+                  }
+                }
+
+                // Lấy tên loại phòng
+                if (roomType) {
+                  const roomTypeObj = roomTypes.find(rt => rt.room_type === roomType);
+                  roomTypeName = roomTypeObj?.type_name || roomTypeNameMap[roomType] || roomType;
+                }
+
+                setExistingRoomInfo({
+                  roomNumber,
+                  roomType,
+                  roomTypeName,
+                  monthlyPrice
+                });
+                return;
+              }
+                         } catch (error) {
+               // Error fetching bed assignments
+             }
+
+                         // Nếu không tìm thấy từ bedAssignments, thử lấy từ carePlanAssignments
+             try {
+               const carePlanAssignments = await carePlansAPI.getByResidentId(selectedResident);
+               
+               const assignment = Array.isArray(carePlanAssignments) ? carePlanAssignments.find((a: any) => a.assigned_room_id || a.bed_id?.room_id) : null;
+              
+              if (assignment) {
+                let roomId = assignment.assigned_room_id || assignment.bed_id?.room_id;
+                let roomNumber = '';
+                let roomType = '';
+                let roomTypeName = '';
+                let monthlyPrice = 0;
+
+                                 // Nếu room_id đã có thông tin đầy đủ
+                 if (typeof roomId === 'object' && roomId?.room_number) {
+                   roomNumber = roomId.room_number;
+                   roomType = roomId.room_type;
+                   // Lấy giá từ roomTypes thay vì từ room object
+                   const roomTypeObj = roomTypes.find(rt => rt.room_type === roomId.room_type);
+                   monthlyPrice = roomTypeObj?.monthly_price || 0;
+                 } else {
+                  // Nếu chỉ có _id, fetch thêm thông tin
+                  const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                  if (roomIdString) {
+                                         const room = await roomsAPI.getById(roomIdString);
+                     if (room) {
+                       roomNumber = room.room_number;
+                       roomType = room.room_type;
+                       // Lấy giá từ roomTypes thay vì từ room
+                       const roomTypeObj = roomTypes.find(rt => rt.room_type === room.room_type);
+                       monthlyPrice = roomTypeObj?.monthly_price || 0;
+                     }
+                  }
+                }
+
+                // Lấy tên loại phòng
+                if (roomType) {
+                  const roomTypeObj = roomTypes.find(rt => rt.room_type === roomType);
+                  roomTypeName = roomTypeObj?.type_name || roomTypeNameMap[roomType] || roomType;
+                }
+
+                setExistingRoomInfo({
+                  roomNumber,
+                  roomType,
+                  roomTypeName,
+                  monthlyPrice
+                });
+                return;
+              }
+                         } catch (error) {
+               // Error fetching care plan assignments
+             }
+
+            // Fallback: thử lấy thông tin phòng từ roomNumbers
+            if (roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí') {
+              // Tìm phòng trong danh sách rooms
+              const existingRoom = rooms.find(r => r.room_number === roomNumbers[selectedResident]);
+              if (existingRoom) {
+                const roomTypeObj = roomTypes.find(rt => rt.room_type === existingRoom.room_type);
+                const monthlyPrice = roomTypeObj?.monthly_price || 0;
+                
+                setExistingRoomInfo({
+                  roomNumber: existingRoom.room_number,
+                  roomType: existingRoom.room_type,
+                  roomTypeName: roomTypeObj?.type_name || roomTypeNameMap[existingRoom.room_type] || existingRoom.room_type,
+                  monthlyPrice
+                });
+                return;
+              }
+            }
+            
+            setExistingRoomInfo(null);
+          } catch (error) {
+            console.error('Error fetching existing room info:', error);
+            setExistingRoomInfo(null);
+          } finally {
+            setLoadingExistingRoomInfo(false);
+          }
+          
+          // Luôn lấy thông tin giường từ bedAssignmentsAPI cho cả gói chính và bổ sung
+          try {
+            // Thử lấy từ bedAssignments trước
+            let bedInfo: { bedId: string; bedNumber: string } | null = null;
+            
+            try {
+              const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResident);
+              const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id) : null;
+              
+              if (bedAssignment?.bed_id) {
+                const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                  bedAssignment.bed_id._id : bedAssignment.bed_id;
+                const bed = beds.find(b => b._id === bedId);
+                bedInfo = {
+                  bedId: bedId,
+                  bedNumber: bed?.bed_number || 'Không có thông tin'
+                };
+              }
+            } catch (error) {
+              console.log('No bed assignments found, trying care plan assignments...');
+            }
+            
+            // Nếu không tìm thấy từ bedAssignments, thử từ carePlanAssignments
+            if (!bedInfo) {
+              try {
+                const carePlanAssignments = await carePlansAPI.getByResidentId(selectedResident);
+                const assignment = Array.isArray(carePlanAssignments) ? 
+                  carePlanAssignments.find((a: any) => a.assigned_bed_id) : null;
+                
+                if (assignment?.assigned_bed_id) {
+                  const bedId = typeof assignment.assigned_bed_id === 'object' && assignment.assigned_bed_id?._id ? 
+                    assignment.assigned_bed_id._id : assignment.assigned_bed_id;
+                  const bed = beds.find(b => b._id === bedId);
+                  bedInfo = {
+                    bedId: bedId,
+                    bedNumber: bed?.bed_number || 'Không có thông tin'
+                  };
+                }
+              } catch (error) {
+                console.log('No care plan assignments with bed info found');
+              }
+            }
+            
+            setCurrentBedInfo(bedInfo);
+          } catch (error) {
+            console.error('Error getting bed info:', error);
+            setCurrentBedInfo(null);
+          }
+        };
+
+        fetchExistingRoomInfo();
+      } else {
+        setExistingRoomInfo(null);
+        setLoadingExistingRoomInfo(false);
+        // Vẫn lấy thông tin giường ngay cả khi không có phòng hiện tại
+        if (selectedResident) {
+          const getBedInfo = async () => {
+            try {
+              // Thử lấy từ bedAssignments trước
+              let bedInfo: { bedId: string; bedNumber: string } | null = null;
+              
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResident);
+                const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id) : null;
+                
+                if (bedAssignment?.bed_id) {
+                  const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                    bedAssignment.bed_id._id : bedAssignment.bed_id;
+                  const bed = beds.find(b => b._id === bedId);
+                  bedInfo = {
+                    bedId: bedId,
+                    bedNumber: bed?.bed_number || 'Không có thông tin'
+                  };
+                }
+              } catch (error) {
+                console.log('No bed assignments found, trying care plan assignments...');
+              }
+              
+              // Nếu không tìm thấy từ bedAssignments, thử từ carePlanAssignments
+              if (!bedInfo) {
+                try {
+                  const carePlanAssignments = await carePlansAPI.getByResidentId(selectedResident);
+                  const assignment = Array.isArray(carePlanAssignments) ? 
+                    carePlanAssignments.find((a: any) => a.assigned_bed_id) : null;
+                  
+                  if (assignment?.assigned_bed_id) {
+                    const bedId = typeof assignment.assigned_bed_id === 'object' && assignment.assigned_bed_id?._id ? 
+                      assignment.assigned_bed_id._id : assignment.assigned_bed_id;
+                    const bed = beds.find(b => b._id === bedId);
+                    bedInfo = {
+                      bedId: bedId,
+                      bedNumber: bed?.bed_number || 'Không có thông tin'
+                    };
+                  }
+                } catch (error) {
+                  console.log('No care plan assignments with bed info found');
+                }
+              }
+              
+              setCurrentBedInfo(bedInfo);
+            } catch (error) {
+              console.error('Error getting bed info:', error);
+              setCurrentBedInfo(null);
+            }
+          };
+          
+          getBedInfo();
+        }
+      }
+          } else {
+        setValidationWarning(null);
+        setExistingRoomInfo(null);
+        setLoadingExistingRoomInfo(false);
+        setCurrentBedInfo(null);
+      }
+      }, [selectedResident, residents, roomNumbers, selectedPackage, roomTypes, rooms]);
 
   useEffect(() => {
     if (!user) return;
@@ -307,14 +620,36 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       // Fetch room number for each resident
       mapped.forEach(async (resident: any) => {
         try {
-          const assignments = await carePlansAPI.getByResidentId(resident.id);
-          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-          const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-          // Đảm bảo roomId là string, không phải object
-          const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-          if (roomIdString) {
-            const room = await roomsAPI.getById(roomIdString);
+          // Kiểm tra xem resident có care plan active không trước khi lấy thông tin phòng
+          const carePlanAssignments = await carePlansAPI.getByResidentId(resident.id);
+          const hasActiveCarePlan = Array.isArray(carePlanAssignments) && carePlanAssignments.some((a: any) => 
+            a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval'
+          );
+          
+          if (!hasActiveCarePlan) {
+            // Nếu không có care plan active, không hiển thị số phòng
+            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+            return;
+          }
+          
+          // Chỉ lấy thông tin phòng nếu có care plan active
+          const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+          const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+          
+          if (bedAssignment?.bed_id?.room_id) {
+            // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+            if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+              setRoomNumbers(prev => ({ ...prev, [resident.id]: bedAssignment.bed_id.room_id.room_number }));
+            } else {
+              // Nếu chỉ có _id, fetch thêm thông tin
+              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
             setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
+              } else {
+                setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+              }
+            }
           } else {
             setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
           }
@@ -324,6 +659,52 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       });
     });
   }, [user]);
+
+  // Function để refresh room numbers
+  const refreshRoomNumbers = async () => {
+    if (residents.length === 0) return;
+    
+    const newRoomNumbers: {[residentId: string]: string} = {};
+    
+    for (const resident of residents) {
+      try {
+        // Kiểm tra xem resident có care plan active không
+        const carePlanAssignments = await carePlansAPI.getByResidentId(resident.id);
+        const hasActiveCarePlan = Array.isArray(carePlanAssignments) && carePlanAssignments.some((a: any) => 
+          a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval'
+        );
+        
+        if (!hasActiveCarePlan) {
+          newRoomNumbers[resident.id] = 'Chưa hoàn tất đăng kí';
+          continue;
+        }
+        
+        // Chỉ lấy thông tin phòng nếu có care plan active
+        const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+        const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+        
+        if (bedAssignment?.bed_id?.room_id) {
+          if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+            newRoomNumbers[resident.id] = bedAssignment.bed_id.room_id.room_number;
+          } else {
+            const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+            if (roomId) {
+              const room = await roomsAPI.getById(roomId);
+              newRoomNumbers[resident.id] = room?.room_number || 'Chưa hoàn tất đăng kí';
+            } else {
+              newRoomNumbers[resident.id] = 'Chưa hoàn tất đăng kí';
+            }
+          }
+        } else {
+          newRoomNumbers[resident.id] = 'Chưa hoàn tất đăng kí';
+        }
+      } catch {
+        newRoomNumbers[resident.id] = 'Chưa hoàn tất đăng kí';
+      }
+    }
+    
+    setRoomNumbers(newRoomNumbers);
+  };
 
   // Lọc cư dân dựa trên loại gói dịch vụ
   const getFilteredResidents = () => {
@@ -354,7 +735,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       return filteredResidents;
     }
     
-    // Nếu là gói bổ sung, hiển thị tất cả cư dân
+    // Nếu là gói bổ sung, hiển thị tất cả cư dân (có thể đăng ký nhiều gói bổ sung)
     console.log('✅ Showing all residents for supplementary package');
     return residents;
   };
@@ -382,6 +763,63 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       setLoadingBeds(false);
     });
   }, []);
+
+  // Cập nhật thông tin giường khi danh sách beds được load
+  useEffect(() => {
+    if (selectedResident && beds.length > 0) {
+      const updateBedInfo = async () => {
+        try {
+          // Thử lấy từ bedAssignments trước
+          let bedInfo: { bedId: string; bedNumber: string } | null = null;
+          
+          try {
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResident);
+            const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id) : null;
+            
+            if (bedAssignment?.bed_id) {
+              const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                bedAssignment.bed_id._id : bedAssignment.bed_id;
+              const bed = beds.find(b => b._id === bedId);
+              bedInfo = {
+                bedId: bedId,
+                bedNumber: bed?.bed_number || 'Không có thông tin'
+              };
+            }
+          } catch (error) {
+            console.log('No bed assignments found, trying care plan assignments...');
+          }
+          
+          // Nếu không tìm thấy từ bedAssignments, thử từ carePlanAssignments
+          if (!bedInfo) {
+            try {
+              const carePlanAssignments = await carePlansAPI.getByResidentId(selectedResident);
+              const assignment = Array.isArray(carePlanAssignments) ? 
+                carePlanAssignments.find((a: any) => a.assigned_bed_id) : null;
+              
+              if (assignment?.assigned_bed_id) {
+                const bedId = typeof assignment.assigned_bed_id === 'object' && assignment.assigned_bed_id?._id ? 
+                  assignment.assigned_bed_id._id : assignment.assigned_bed_id;
+                const bed = beds.find(b => b._id === bedId);
+                bedInfo = {
+                  bedId: bedId,
+                  bedNumber: bed?.bed_number || 'Không có thông tin'
+                };
+              }
+            } catch (error) {
+              console.log('No care plan assignments with bed info found');
+            }
+          }
+          
+          setCurrentBedInfo(bedInfo);
+        } catch (error) {
+          console.error('Error updating bed info:', error);
+          setCurrentBedInfo(null);
+        }
+      };
+      
+      updateBedInfo();
+    }
+  }, [selectedResident, beds]);
 
   // 🚀 Thêm thông báo đơn giản và hiệu ứng nâng cao
   useEffect(() => {
@@ -500,7 +938,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       printWindow.document.write(`<pre style="font-family: monospace; font-size: 12px; line-height: 1.4;">${printContent}</pre>`);
       printWindow.document.close();
       printWindow.print();
-      alert('✅ Đã chuẩn bị hóa đơn để in!');
+      toast.success('✅ Đã chuẩn bị hóa đơn để in!');
     }
   };
 
@@ -516,7 +954,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
           title: 'Đăng ký dịch vụ thành công',
           text: shareText
         });
-        alert('✅ Đã chia sẻ thông tin thành công!');
+        toast.success('✅ Đã chia sẻ thông tin thành công!');
       } catch (err) {
         console.log('Chia sẻ bị hủy');
       }
@@ -524,7 +962,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       // Fallback: copy to clipboard
       try {
         await navigator.clipboard.writeText(shareText);
-        alert('📋 Đã sao chép thông tin vào clipboard!');
+        toast.info('📋 Đã sao chép thông tin vào clipboard!');
       } catch (err) {
         // Fallback for older browsers
         const textArea = document.createElement('textarea');
@@ -533,7 +971,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        alert('📋 Đã sao chép thông tin vào clipboard!');
+        toast.info('📋 Đã sao chép thông tin vào clipboard!');
       }
     }
   };
@@ -572,7 +1010,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       const existingRatings = JSON.parse(clientStorage.getItem('serviceRatings') || '[]');
       existingRatings.push(ratingData);
       clientStorage.setItem('serviceRatings', JSON.stringify(existingRatings));
-      alert(`⭐ Cảm ơn bạn đã đánh giá ${rating}/5 sao cho dịch vụ của chúng tôi!`);
+      toast.info(`⭐ Cảm ơn bạn đã đánh giá ${rating}/5 sao cho dịch vụ của chúng tôi!`);
     } catch (error) {
       console.log('Không thể lưu đánh giá:', error);
     }
@@ -600,8 +1038,10 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       }
     }
     
-    // End date validation (optional but must be after start date if provided)
-    if (endDate) {
+    // End date validation (bắt buộc)
+    if (!endDate) {
+      errors.endDate = 'Vui lòng chọn ngày kết thúc dịch vụ';
+    } else {
       const endDateObj = new Date(endDate);
       const startDateObj = startDate ? new Date(startDate) : null;
       
@@ -651,11 +1091,6 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   const calculateDiscount = () => {
     let discount = 0;
     
-    // Multiple family member discount
-    if (user?.role === 'family' && familyResidents.length > 1) {
-      discount += 10; // 10% discount for multiple family members
-    }
-    
     // Early registration discount (if start date is more than 30 days away)
     if (startDate) {
       const selectedDate = new Date(startDate);
@@ -668,7 +1103,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     }
     
     // Senior citizen additional discount
-    const selectedMember = familyResidents.find(member => member.id.toString() === selectedResident);
+    const selectedMember = residents.find(member => member.id === selectedResident);
     if (selectedMember && selectedMember.age >= 80) {
       discount += 5; // 5% senior discount
     }
@@ -677,7 +1112,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   };
 
   const checkExistingPackage = () => {
-    const selectedMember = familyResidents.find(member => member.id.toString() === selectedResident);
+    const selectedMember = residents.find(member => member.id === selectedResident);
     return selectedMember?.carePackage ? selectedMember.carePackage : null;
   };
 
@@ -685,7 +1120,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     console.log('handleInitialPurchase called');
     
     if (!selectedResident) {
-      alert('Vui lòng chọn người cần chăm sóc');
+      toast.error('Vui lòng chọn người cần chăm sóc');
       return;
     }
 
@@ -726,7 +1161,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   const hasExistingRoom = selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí';
   
   // Thêm kiểm tra trước khi gửi đăng ký
-  const canSubmit = selectedResident && selectedPackage && startDate && 
+  const canSubmit = selectedResident && selectedPackage && startDate && endDate && 
+    !validationWarning &&
     (selectedPackage?.category === 'supplementary' || 
      (selectedPackage?.category === 'main' && (hasExistingRoom || (roomType && selectedRoomId && selectedBedId))));
 
@@ -734,17 +1170,31 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
 
   const handlePurchase = async () => {
     if (!canSubmit) {
-      alert('Vui lòng nhập đầy đủ thông tin bắt buộc!');
+      toast.error('Vui lòng nhập đầy đủ thông tin bắt buộc!');
       return;
     }
-    if (await checkDuplicatePackage()) {
+
+    // Kiểm tra xem có thể đăng ký gói này không
+    const canRegister = await canRegisterPackage();
+    if (!canRegister) {
+      if (selectedPackage?.category === 'main') {
+        setShowMainCarePlanModal(true);
+      } else {
       setShowDuplicateCarePlanModal(true);
+      }
       return;
     }
+
     setLoading(true);
     try {
       const carePlansMonthlyCost = selectedPackage?.monthly_price || 0;
       let totalMonthlyCost = carePlansMonthlyCost;
+      
+      // Tính tổng tiền phòng cho gói chính
+      if (selectedPackage?.category === 'main') {
+        const actualRoomCost = hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost;
+        totalMonthlyCost += actualRoomCost;
+      }
       let payload: any = {
         care_plan_ids: [selectedPackage._id],
         resident_id: selectedResident,
@@ -755,31 +1205,199 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
           special_requests: familyPreferences.special_requests || ""
         },
         care_plans_monthly_cost: carePlansMonthlyCost,
-        start_date: startDate || "",
+        start_date: startDate,
         additional_medications: Array.isArray(additionalMedications) ? additionalMedications : [],
         status: "active",
         notes: notes || ""
       };
 
-      // Nếu là gói chính, thêm thông tin phòng và giường
+      // Thêm thông tin phòng và giường cho cả gói chính và bổ sung
       if (selectedPackage?.category === 'main') {
-        totalMonthlyCost += roomMonthlyCost;
+        // Gói chính - có thể cần phòng mới hoặc sử dụng phòng hiện có
+        const actualRoomCost = hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost;
+        
+        if (hasExistingRoom) {
+          // Sử dụng thông tin phòng hiện tại
+          payload.selected_room_type = existingRoomInfo?.roomType || "";
+          payload.room_monthly_cost = actualRoomCost;
+          
+          // Lấy thông tin phòng và giường từ care plan assignments hiện tại
+          try {
+            const existingAssignments = await carePlansAPI.getByResidentId(selectedResident);
+            
+            // Tìm assignment có thông tin giường đầy đủ nhất
+            let existingAssignment: any = null;
+            if (Array.isArray(existingAssignments)) {
+              // Ưu tiên assignment có bed_id
+              existingAssignment = existingAssignments.find((a: any) => a.bed_id) ||
+                                  existingAssignments.find((a: any) => a.assigned_bed_id) ||
+                                  existingAssignments.find((a: any) => a.assigned_room_id || a.bed_id?.room_id);
+            }
+            
+            if (existingAssignment?.assigned_room_id) {
+              // Đảm bảo assigned_room_id là string ID
+              const roomId = typeof existingAssignment.assigned_room_id === 'object' && existingAssignment.assigned_room_id?._id ? 
+                existingAssignment.assigned_room_id._id : existingAssignment.assigned_room_id;
+              payload.assigned_room_id = roomId;
+            } else if (existingAssignment?.bed_id?.room_id) {
+              const roomId = typeof existingAssignment.bed_id.room_id === 'object' && existingAssignment.bed_id.room_id?._id ? 
+                existingAssignment.bed_id.room_id._id : existingAssignment.bed_id.room_id;
+              payload.assigned_room_id = roomId;
+            }
+            
+            // Lấy thông tin bed_id từ care plan assignment hiện tại
+            if (existingAssignment?.bed_id) {
+              const bedId = typeof existingAssignment.bed_id === 'object' && existingAssignment.bed_id?._id ? 
+                existingAssignment.bed_id._id : existingAssignment.bed_id;
+              payload.assigned_bed_id = bedId;
+            } else if (existingAssignment?.assigned_bed_id) {
+              // Fallback: kiểm tra assigned_bed_id
+              const bedId = typeof existingAssignment.assigned_bed_id === 'object' && existingAssignment.assigned_bed_id?._id ? 
+                existingAssignment.assigned_bed_id._id : existingAssignment.assigned_bed_id;
+              payload.assigned_bed_id = bedId;
+            } else {
+              // Fallback: tìm thông tin giường từ bedAssignmentsAPI
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResident);
+                const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id) : null;
+                
+                if (bedAssignment?.bed_id) {
+                  const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                    bedAssignment.bed_id._id : bedAssignment.bed_id;
+                  payload.assigned_bed_id = bedId;
+                }
+              } catch (error) {
+                console.error('Error getting bed assignment:', error);
+              }
+            }
+          } catch (error) {
+            console.error('Error getting existing room assignment:', error);
+          }
+        } else {
+          // Sử dụng thông tin phòng mới
         payload.selected_room_type = roomType || "";
-        payload.assigned_room_id = selectedRoomId || "";
-        payload.assigned_bed_id = selectedBedId || "";
-        payload.room_monthly_cost = roomMonthlyCost;
+          // Đảm bảo selectedRoomId và selectedBedId là string ID
+          payload.assigned_room_id = typeof selectedRoomId === 'object' && (selectedRoomId as any)?._id ? (selectedRoomId as any)._id : selectedRoomId || "";
+          payload.assigned_bed_id = typeof selectedBedId === 'object' && (selectedBedId as any)?._id ? (selectedBedId as any)._id : selectedBedId || "";
+          payload.room_monthly_cost = actualRoomCost;
+        }
+      } else if (selectedPackage?.category === 'supplementary') {
+        // Gói bổ sung - luôn sử dụng thông tin phòng hiện tại
+        if (roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí') {
+          try {
+            // Lấy thông tin phòng hiện tại từ care plan assignments
+            const existingAssignments = await carePlansAPI.getByResidentId(selectedResident);
+            
+            // Tìm assignment có thông tin giường đầy đủ nhất
+            let existingAssignment: any = null;
+            if (Array.isArray(existingAssignments)) {
+              // Ưu tiên assignment có bed_id
+              existingAssignment = existingAssignments.find((a: any) => a.bed_id) ||
+                                  existingAssignments.find((a: any) => a.assigned_bed_id) ||
+                                  existingAssignments.find((a: any) => a.assigned_room_id || a.bed_id?.room_id);
+            }
+            
+            if (existingAssignment?.assigned_room_id) {
+              // Đảm bảo assigned_room_id là string ID
+              const roomId = typeof existingAssignment.assigned_room_id === 'object' && existingAssignment.assigned_room_id?._id ? 
+                existingAssignment.assigned_room_id._id : existingAssignment.assigned_room_id;
+              payload.assigned_room_id = roomId;
+            } else if (existingAssignment?.bed_id?.room_id) {
+              const roomId = typeof existingAssignment.bed_id.room_id === 'object' && existingAssignment.bed_id.room_id?._id ? 
+                existingAssignment.bed_id.room_id._id : existingAssignment.bed_id.room_id;
+              payload.assigned_room_id = roomId;
+            }
+            
+            // Lấy thông tin bed_id từ care plan assignment hiện tại
+            if (existingAssignment?.bed_id) {
+              const bedId = typeof existingAssignment.bed_id === 'object' && existingAssignment.bed_id?._id ? 
+                existingAssignment.bed_id._id : existingAssignment.bed_id;
+              payload.assigned_bed_id = bedId;
+            } else if (existingAssignment?.assigned_bed_id) {
+              // Fallback: kiểm tra assigned_bed_id
+              const bedId = typeof existingAssignment.assigned_bed_id === 'object' && existingAssignment.assigned_bed_id?._id ? 
+                existingAssignment.assigned_bed_id._id : existingAssignment.assigned_bed_id;
+              payload.assigned_bed_id = bedId;
+            } else {
+              // Fallback: tìm thông tin giường từ bedAssignmentsAPI
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResident);
+                const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id) : null;
+                
+                if (bedAssignment?.bed_id) {
+                  const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                    bedAssignment.bed_id._id : bedAssignment.bed_id;
+                  payload.assigned_bed_id = bedId;
+                }
+              } catch (error) {
+                console.error('Error getting bed assignment:', error);
+              }
+            }
+            
+            // Lấy thông tin loại phòng và giá từ existingRoomInfo hoặc từ roomNumbers
+            if (existingRoomInfo) {
+              payload.selected_room_type = existingRoomInfo.roomType || "";
+              payload.room_monthly_cost = existingRoomInfo.monthlyPrice || 0;
+            } else {
+              // Fallback: tìm thông tin phòng từ roomNumbers
+              const roomNumber = roomNumbers[selectedResident];
+              const existingRoom = rooms.find(r => r.room_number === roomNumber);
+              if (existingRoom) {
+                payload.selected_room_type = existingRoom.room_type || "";
+                const roomTypeObj = roomTypes.find(rt => rt.room_type === existingRoom.room_type);
+                payload.room_monthly_cost = roomTypeObj?.monthly_price || 0;
+              }
+            }
+          } catch (error) {
+            console.error('Error getting existing room assignment for supplementary package:', error);
+          }
+        }
       }
 
       payload.total_monthly_cost = totalMonthlyCost;
+      payload.end_date = endDate;
       
-      if (endDate) (payload as any).end_date = endDate;
+      // Validate payload before sending
+      if (!payload.care_plan_ids || payload.care_plan_ids.length === 0) {
+        throw new Error('Missing care_plan_ids');
+      }
+      if (!payload.resident_id) {
+        throw new Error('Missing resident_id');
+      }
+      if (!payload.start_date) {
+        throw new Error('Missing start_date');
+      }
+      if (!payload.end_date) {
+        throw new Error('Missing end_date');
+      }
+      
+      // Đảm bảo assigned_room_id và assigned_bed_id là string ID hợp lệ
+      if (payload.assigned_room_id && typeof payload.assigned_room_id === 'object') {
+        payload.assigned_room_id = (payload.assigned_room_id as any)._id || payload.assigned_room_id;
+      }
+      if (payload.assigned_bed_id && typeof payload.assigned_bed_id === 'object') {
+        payload.assigned_bed_id = (payload.assigned_bed_id as any)._id || payload.assigned_bed_id;
+      }
+      
       console.log('Payload gửi lên:', payload);
       const result = await apiClient.post('/care-plan-assignments', payload);
       setShowConfirmation(false);
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error('API error:', error?.response?.data || error);
-      alert('Có lỗi xảy ra khi đăng ký dịch vụ. Vui lòng thử lại!');
+      
+      // Hiển thị lỗi chi tiết hơn
+      let errorMessage = 'Có lỗi xảy ra khi đăng ký dịch vụ. Vui lòng thử lại!';
+      
+      if (error?.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1018,6 +1636,22 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                     </div>
                   </div>
                 )}
+                
+                {/* Hiển thị validation warning */}
+                {validationWarning && (
+                  <div style={{
+                    background: '#fef2f2',
+                    borderRadius: 8,
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                    border: '1px solid #ef4444'
+                  }}>
+                    <div style={{ fontSize: '0.9rem', color: '#dc2626' }}>
+                      ⚠️ <strong>Cảnh báo:</strong> {validationWarning}
+                    </div>
+                  </div>
+                )}
+                
                   <Select
                     options={getFilteredResidents().map(getResidentOption)}
                     value={getFilteredResidents().map(getResidentOption).find(opt => opt.value === selectedResident) || null}
@@ -1145,31 +1779,31 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   Quay lại trang dịch vụ
                 </Link>
                   <button
-                    disabled={!selectedResident}
+                    disabled={!selectedResident || !!validationWarning}
                     onClick={() => setStep(2)}
                   style={{ 
-                    background: selectedResident 
+                    background: (selectedResident && !validationWarning)
                       ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' 
                       : '#e5e7eb',
-                    color: selectedResident ? '#fff' : '#9ca3af',
+                    color: (selectedResident && !validationWarning) ? '#fff' : '#9ca3af',
                     border: 'none', 
                     borderRadius: 12, 
                     padding: '1rem 2.5rem', 
                     fontWeight: 600, 
                     fontSize: '1.1rem',
-                    cursor: selectedResident ? 'pointer' : 'not-allowed',
-                    boxShadow: selectedResident ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                    cursor: (selectedResident && !validationWarning) ? 'pointer' : 'not-allowed',
+                    boxShadow: (selectedResident && !validationWarning) ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
                     transition: 'all 0.3s ease',
                     minWidth: '160px'
                   }}
                   onMouseOver={(e) => {
-                    if (selectedResident) {
+                    if (selectedResident && !validationWarning) {
                       e.currentTarget.style.transform = 'translateY(-2px)';
                       e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
                     }
                   }}
                   onMouseOut={(e) => {
-                    if (selectedResident) {
+                    if (selectedResident && !validationWarning) {
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
                     }
@@ -1756,7 +2390,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 }}>
                   <div style={{ fontSize: '1rem', color: '#0369a1', textAlign: 'center' }}>
                     {selectedPackage?.category === 'supplementary' ? (
-                      <>🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì người cao tuổi đã có phòng từ gói chính</>
+                      <>🎯 <strong>Gói bổ sung:</strong> Không cần chọn phòng vì người cao tuổi đã có phòng {roomNumbers[selectedResident]} từ gói chính</>
                     ) : (
                       <>🏠 <strong>Đã có phòng:</strong> Người cao tuổi đã được phân bổ phòng {roomNumbers[selectedResident]} nên bỏ qua bước chọn phòng</>
                     )}
@@ -1794,7 +2428,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 // If end date exists and is now invalid, clear it
                 if (endDate && newStartDate && new Date(endDate) <= new Date(newStartDate)) {
                   setEndDate('');
-                  setValidationErrors(prev => ({ ...prev, endDate: '' }));
+                  setValidationErrors(prev => ({ ...prev, endDate: 'Ngày kết thúc phải sau ngày bắt đầu' }));
                 }
               }}
               dateFormat="dd/MM/yyyy"
@@ -1827,7 +2461,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Ngày kết thúc dịch vụ:
+                  Ngày kết thúc dịch vụ: *
                 </label>
             <DatePicker
               selected={endDate ? new Date(endDate) : null}
@@ -1838,9 +2472,26 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 if (validationErrors.endDate) {
                   setValidationErrors(prev => ({ ...prev, endDate: '' }));
                 }
+                // Validate the new end date
+                if (newEndDate && startDate) {
+                  const endDateObj = new Date(newEndDate);
+                  const startDateObj = new Date(startDate);
+                  
+                  if (endDateObj <= startDateObj) {
+                    setValidationErrors(prev => ({ ...prev, endDate: 'Ngày kết thúc phải sau ngày bắt đầu' }));
+                  } else {
+                    // Check if end date is more than 2 years from start date
+                    const maxEndDate = new Date(startDateObj);
+                    maxEndDate.setFullYear(maxEndDate.getFullYear() + 2);
+                    
+                    if (endDateObj > maxEndDate) {
+                      setValidationErrors(prev => ({ ...prev, endDate: 'Ngày kết thúc không được quá 2 năm từ ngày bắt đầu' }));
+                    }
+                  }
+                }
               }}
               dateFormat="dd/MM/yyyy"
-              placeholderText="dd/mm/yyyy (tùy chọn)"
+              placeholderText="dd/mm/yyyy"
               filterDate={(date) => {
                 const selectedDate = new Date(date);
                 selectedDate.setHours(0, 0, 0, 0);
@@ -1871,7 +2522,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                     marginTop: '0.25rem',
                     fontStyle: 'italic'
                   }}>
-                    Để trống nếu không muốn đặt ngày kết thúc cụ thể. Dịch vụ sẽ kéo dài cho đến khi bạn hủy.
+                    
                   </p>
                 )}
               </div>
@@ -1910,7 +2561,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Yêu cầu đặc biệt:
+                  Yêu cầu đặc biệt (Nếu có)
                 </label>
                 <input 
                   type='text' 
@@ -1935,7 +2586,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Ghi chú tư vấn:
+                  Ghi chú tư vấn (Nếu có)
                 </label>
                 <textarea 
                   value={medicalNotes} 
@@ -2032,7 +2683,7 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                   transition: 'all 0.3s ease',
                   minWidth: '160px'
                 }}
-                disabled={!startDate || Object.keys(validationErrors).length > 0}
+                disabled={!startDate || !endDate || Object.keys(validationErrors).length > 0}
               >
                 Tiếp tục
               </button>
@@ -2089,12 +2740,16 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 <div><b style={{ color: '#374151' }}>Người thụ hưởng:</b> {residents.find(r => r.id === selectedResident)?.name}</div>
                 <div><b style={{ color: '#374151' }}>Gói dịch vụ:</b> {selectedPackage?.plan_name}</div>
                 <div><b style={{ color: '#374151' }}>Ngày bắt đầu:</b> {startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
-                <div><b style={{ color: '#374151' }}>Ngày kết thúc:</b> {endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Không có (kéo dài vô thời hạn)'}</div>
+                <div><b style={{ color: '#374151' }}>Ngày kết thúc:</b> {endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
+                
+                {/* Hiển thị thông tin phòng cho gói chính */}
                                  {selectedPackage?.category === 'main' && (
                    <>
                      {hasExistingRoom ? (
                        <>
-                         <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {roomNumbers[selectedResident]}</div>
+                        <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {existingRoomInfo?.roomNumber || roomNumbers[selectedResident]}</div>
+                        <div><b style={{ color: '#374151' }}>Loại phòng:</b> {loadingExistingRoomInfo ? 'Đang tải...' : (existingRoomInfo?.roomTypeName || 'Không có thông tin')}</div>
+                        <div><b style={{ color: '#374151' }}>Giường hiện tại:</b> {currentBedInfo?.bedNumber || 'Không có thông tin'}</div>
                          <div><b style={{ color: '#374151' }}>Ghi chú:</b> Sử dụng phòng hiện có</div>
                        </>
                      ) : (
@@ -2107,12 +2762,24 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                      )}
                    </>
                  )}
+                
+                {/* Hiển thị thông tin phòng hiện tại cho gói bổ sung */}
+                {selectedPackage?.category === 'supplementary' && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí' && (
+                  <>
+                    <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {roomNumbers[selectedResident]}</div>
+                    <div><b style={{ color: '#374151' }}>Giường hiện tại:</b> {currentBedInfo?.bedNumber || 'Không có thông tin'}</div>
+                    <div><b style={{ color: '#374151' }}>Ghi chú:</b> Gói bổ sung - sử dụng phòng hiện có</div>
+                   </>
+                 )}
                 <div><b style={{ color: '#374151' }}>Yêu cầu đặc biệt:</b> {familyPreferences.special_requests || 'Không có'}</div>
                 <div><b style={{ color: '#374151' }}>Ghi chú:</b> {medicalNotes || 'Không có'}</div>
+                {/* Hiển thị tiền phòng cho gói chính */}
                                  {selectedPackage?.category === 'main' && (
-                   <div><b style={{ color: '#374151' }}>Tiền phòng/tháng:</b> {roomMonthlyCost.toLocaleString()} đ</div>
+                  <div><b style={{ color: '#374151' }}>Tiền phòng/tháng:</b> {(hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost).toLocaleString()} đ</div>
                  )}
+
                  <div><b style={{ color: '#374151' }}>Tiền gói dịch vụ/tháng:</b> {selectedPackage?.monthly_price?.toLocaleString()} đ</div>
+                
                 <div style={{ 
                   gridColumn: '1 / -1',
                   padding: '1rem',
@@ -2127,7 +2794,13 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                      fontSize: '1.2rem',
                      fontWeight: 700
                    }}>
-                     {((selectedPackage?.category === 'main' && !hasExistingRoom ? roomMonthlyCost : 0) + (selectedPackage?.monthly_price || 0)).toLocaleString()} đ
+                    {(() => {
+                      let total = selectedPackage?.monthly_price || 0;
+                      if (selectedPackage?.category === 'main') {
+                        total += hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost;
+                      }
+                      return total.toLocaleString();
+                    })()} đ
                    </span>
                 </div>
               </div>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import Link from 'next/link';
 import { 
   MagnifyingGlassIcon, 
@@ -318,7 +320,7 @@ export default function ActivitiesPage() {
       setEvaluationResidents(filteredResidents);
       setEvaluationModalOpen(true);
     } catch (err) {
-      alert('Không thể tải danh sách cư dân tham gia hoạt động này.');
+      toast.error('Không thể tải danh sách cư dân tham gia hoạt động này.');
     }
   };
 

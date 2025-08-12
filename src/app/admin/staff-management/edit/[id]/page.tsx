@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
@@ -21,6 +22,9 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAPI, userAPI } from '@/lib/api';
 import { processAvatarUrl } from '@/lib/utils/avatarUtils';
+import { handleAPIError } from '@/lib/utils/api-error-handler';
+import { convertDDMMYYYYToISO } from '@/lib/utils/validation';
+import SuccessModal from '@/components/SuccessModal';
 
 export default function EditStaffPage() {
   const { user, loading } = useAuth();
@@ -31,11 +35,12 @@ export default function EditStaffPage() {
   const [staff, setStaff] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showAvatarConfirmModal, setShowAvatarConfirmModal] = useState(false);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [originalData, setOriginalData] = useState<any>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -63,7 +68,10 @@ export default function EditStaffPage() {
         console.log('Staff avatar type:', typeof data.avatar);
         console.log('Staff avatar length:', data.avatar?.length);
         
-        setFormData({
+        console.log('Staff data from API:', data);
+        console.log('Original join_date:', data.join_date);
+        
+        const initialFormData = {
           full_name: data.full_name || '',
           email: data.email || '',
           phone: data.phone || '',
@@ -71,11 +79,30 @@ export default function EditStaffPage() {
           qualification: data.qualification || '',
           status: data.status || 'active',
           notes: data.notes || '',
-          join_date: data.join_date ? new Date(data.join_date).toISOString().split('T')[0] : '',
+          join_date: data.join_date ? (() => {
+            try {
+              const date = new Date(data.join_date);
+              if (isNaN(date.getTime())) {
+                console.log('Invalid join_date from API:', data.join_date);
+                return '';
+              }
+              return date.toISOString().split('T')[0];
+            } catch (error) {
+              console.log('Error parsing join_date:', data.join_date, error);
+              return '';
+            }
+          })() : '',
           avatar: null
-        });
+        };
+        
+        console.log('Initial form data:', initialFormData);
+        console.log('Initial join_date:', initialFormData.join_date);
+        
+        setFormData(initialFormData);
+        setOriginalData(initialFormData);
+        setHasChanges(false);
       } catch (err: any) {
-        setError(err?.message || 'Không thể tải thông tin nhân viên');
+        handleAPIError(err, 'Không thể tải thông tin nhân viên');
       } finally {
         setLoadingData(false);
       }
@@ -84,12 +111,104 @@ export default function EditStaffPage() {
     fetchStaff();
   }, [user, staffId]);
 
+  const checkForChanges = (newFormData: any) => {
+    if (!originalData) return false;
+    
+    // Check all text fields
+    const textFields = ['full_name', 'email', 'phone', 'position', 'qualification', 'notes'];
+    for (const field of textFields) {
+      if (newFormData[field] !== originalData[field]) {
+        return true;
+      }
+    }
+    
+    // Check join_date field - normalize for comparison
+    const normalizeDate = (date: any) => {
+      if (!date) return '';
+      if (typeof date === 'string' && date.includes('-')) {
+        return date; // Already ISO format
+      }
+      if (typeof date === 'string' && date.includes('/')) {
+        return convertDDMMYYYYToISO(date) || date;
+      }
+      return date;
+    };
+    
+    const originalDate = normalizeDate(originalData.join_date);
+    const newDate = normalizeDate(newFormData.join_date);
+    
+    if (originalDate !== newDate) {
+      console.log('Date changed:', { original: originalDate, new: newDate });
+      return true;
+    }
+    
+    // Check status field
+    if (newFormData.status !== originalData.status) {
+      return true;
+    }
+    
+    // Check if avatar has been added
+    if (newFormData.avatar && !originalData.avatar) {
+      return true;
+    }
+    
+    return false;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for join_date field
+    if (name === 'join_date') {
+      console.log('Date input name:', name, 'value:', value);
+      
+      let newFormData;
+      
+      // Allow empty value or partial input
+      if (!value || value.trim() === '') {
+        newFormData = {
+          ...formData,
+          [name]: ''
+        };
+        console.log('Cleared join date');
+      } else {
+        // Always allow input, only validate when complete
+        newFormData = {
+          ...formData,
+          [name]: value // Keep as string for all input
+        };
+        console.log('Date input updated:', value);
+        
+        // Only validate if the input looks like a complete date (has 2 slashes and 3 parts)
+        if (value.includes('/') && value.split('/').length === 3) {
+          const isoDate = parseDateFromDisplay(value);
+          console.log('Parsed ISO date:', isoDate);
+          
+          if (isoDate) {
+            newFormData = {
+              ...formData,
+              [name]: isoDate
+            };
+            console.log('Updated form data with ISO date:', newFormData[name]);
+          } else {
+            // Invalid date format - keep the input value but don't show error immediately
+            // Error will be shown during submit if needed
+            console.log('Invalid date format, keeping input value for now');
+          }
+        }
+      }
+      
+      setFormData(newFormData);
+      setHasChanges(checkForChanges(newFormData));
+    } else {
+      // Normal handling for other fields
+      const newFormData = {
+        ...formData,
+        [name]: value
+      };
+      setFormData(newFormData);
+      setHasChanges(checkForChanges(newFormData));
+    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,114 +216,138 @@ export default function EditStaffPage() {
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        setError('Vui lòng chọn file hình ảnh hợp lệ');
+        toast.error('Vui lòng chọn file hình ảnh hợp lệ');
         return;
       }
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError('Kích thước file không được vượt quá 5MB');
+        toast.error('Kích thước file không được vượt quá 5MB');
         return;
       }
-      setFormData(prev => ({
-        ...prev,
-        avatar: file
-      }));
-      setError(''); // Clear any previous errors
+      
+      // Show confirmation modal instead of directly setting the avatar
+      setPendingAvatarFile(file);
+      setShowAvatarConfirmModal(true);
+    }
+  };
+
+  const confirmAvatarChange = () => {
+    if (pendingAvatarFile) {
+      const newFormData = {
+        ...formData,
+        avatar: pendingAvatarFile
+      };
+      setFormData(newFormData);
+      setHasChanges(checkForChanges(newFormData));
+      setShowAvatarConfirmModal(false);
+      setPendingAvatarFile(null);
+      toast.success('Ảnh đại diện đã được chọn. Vui lòng lưu thông tin để cập nhật.');
+    }
+  };
+
+  const cancelAvatarChange = () => {
+    setShowAvatarConfirmModal(false);
+    setPendingAvatarFile(null);
+    // Reset the file input
+    const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
     }
   };
 
   const removeAvatar = () => {
-    setFormData(prev => ({
-      ...prev,
+    const newFormData = {
+      ...formData,
       avatar: null
-    }));
+    };
+    setFormData(newFormData);
+    setHasChanges(checkForChanges(newFormData));
   };
 
-  // Date formatting utilities
+  // Date formatting utilities for dd/mm/yyyy
   const formatDateForDisplay = (dateString: string): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  const formatDateForInput = (dateString: string): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toISOString().split('T')[0];
+    if (!dateString || dateString.trim() === '') return '';
+    
+    try {
+      console.log('formatDateForDisplay input:', dateString);
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.log('Invalid date:', dateString);
+        return '';
+      }
+      const formatted = date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      console.log('formatted date:', formatted);
+      return formatted;
+    } catch (error) {
+      console.log('Error formatting date:', dateString, error);
+      return '';
+    }
   };
 
   const parseDateFromDisplay = (displayDate: string): string => {
     if (!displayDate) return '';
-    const parts = displayDate.split('/');
-    if (parts.length !== 3) return '';
-    
-    const day = parseInt(parts[0]);
-    const month = parseInt(parts[1]) - 1; // Month is 0-indexed
-    const year = parseInt(parts[2]);
-    
-    const date = new Date(year, month, day);
-    if (isNaN(date.getTime())) return '';
-    
-    return date.toISOString().split('T')[0];
+    console.log('parseDateFromDisplay input:', displayDate);
+    const result = convertDDMMYYYYToISO(displayDate);
+    console.log('parseDateFromDisplay result:', result);
+    return result;
   };
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    if (value) {
-      const isoDate = parseDateFromDisplay(value);
-      setFormData(prev => ({
-        ...prev,
-        join_date: isoDate
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        join_date: ''
-      }));
-    }
-  };
 
-  const handleDatePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      join_date: value
-    }));
-    setShowDatePicker(false);
-  };
 
-  // Handle date picker click
-  useEffect(() => {
-    if (showDatePicker && dateInputRef.current) {
-      // Focus on the date input when picker opens
-      setTimeout(() => {
-        dateInputRef.current?.focus();
-      }, 100);
-    }
-  }, [showDatePicker]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.full_name.trim() || !formData.email.trim()) {
-      setError('Vui lòng điền đầy đủ thông tin bắt buộc');
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
       return;
     }
 
     try {
       setSaving(true);
-      setError('');
       
-      await staffAPI.update(staffId, formData);
-      setShowSuccessModal(true);
+      // Prepare data for API - ensure join_date is in ISO format
+      const apiData = { ...formData };
+      
+      // Convert join_date to ISO format if it's not already
+      if (apiData.join_date && typeof apiData.join_date === 'string') {
+        console.log('handleSubmit - join_date before conversion:', apiData.join_date);
+        if (apiData.join_date.includes('/')) {
+          // Convert dd/mm/yyyy to ISO
+          const isoDate = convertDDMMYYYYToISO(apiData.join_date);
+          console.log('handleSubmit - convertDDMMYYYYToISO result:', isoDate);
+          if (isoDate) {
+            apiData.join_date = isoDate;
+            console.log('handleSubmit - join_date after conversion:', apiData.join_date);
+          } else {
+            toast.error('Định dạng ngày không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy');
+            setSaving(false);
+            return;
+          }
+        }
+      }
+      
+      // Debug: Log form data before sending
+      console.log('Form data to be sent:', apiData);
+      console.log('Join date value:', apiData.join_date);
+      console.log('Join date type:', typeof apiData.join_date);
+      
+      await staffAPI.update(staffId, apiData);
+      
+      // Update original data and reset changes flag
+      setOriginalData(formData);
+      setHasChanges(false);
+      
+      setSuccessMessage('Thông tin nhân viên đã được cập nhật thành công!');
+      setTimeout(() => {
+        router.push('/admin/staff-management');
+      }, 2000);
     } catch (err: any) {
-      setError(err?.message || 'Có lỗi xảy ra khi cập nhật thông tin');
+      handleAPIError(err, 'Có lỗi xảy ra khi cập nhật thông tin nhân viên');
     } finally {
       setSaving(false);
     }
@@ -226,6 +369,50 @@ export default function EditStaffPage() {
   if (!user || user.role !== 'admin') {
     router.replace('/');
     return null;
+  }
+
+  // Success message
+  if (successMessage) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '1rem',
+          padding: '3rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center',
+          maxWidth: '400px'
+        }}>
+          <CheckCircleIcon style={{
+            width: '3rem',
+            height: '3rem',
+            color: '#10b981',
+            margin: '0 auto 1rem'
+          }} />
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1f2937',
+            margin: '0 0 0.5rem 0'
+          }}>
+            Cập nhật thành công!
+          </h2>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#6b7280',
+            margin: 0
+          }}>
+            {successMessage}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -267,15 +454,6 @@ export default function EditStaffPage() {
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-8">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
-              <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
-          )}
-
-
-
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
             <div>
@@ -334,11 +512,10 @@ export default function EditStaffPage() {
                               alt="Current avatar"
                               className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
                               onError={(e) => {
-                                console.log('Avatar load error, showing fallback');
+                                console.log('Avatar load error, showing default avatar');
                                 // Fallback to default avatar if image fails to load
                                 const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                target.nextElementSibling?.classList.remove('hidden');
+                                target.src = '/default-avatar.svg';
                               }}
                               onLoad={() => {
                                 console.log('Avatar loaded successfully');
@@ -347,18 +524,18 @@ export default function EditStaffPage() {
                             <div className="absolute inset-0 bg-black bg-opacity-20 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                               <span className="text-white text-xs font-medium">Thay đổi</span>
                             </div>
-                            {/* Fallback avatar */}
-                            <div className="w-20 h-20 rounded-full border-2 border-slate-200 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg hidden">
-                              {staff.full_name?.charAt(0) || 'N'}
-                            </div>
                           </div>
                         );
                       } else {
                         console.log('Showing placeholder');
                         return (
-                          // Hiển thị placeholder khi không có avatar
-                          <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
-                            <PhotoIcon className="w-8 h-8 text-slate-400" />
+                          // Hiển thị avatar mặc định khi không có avatar
+                          <div className="w-20 h-20 rounded-full border-2 border-slate-200 flex items-center justify-center">
+                            <img
+                              src="/default-avatar.svg"
+                              alt="Default avatar"
+                              className="w-full h-full rounded-full object-cover"
+                            />
                           </div>
                         );
                       }
@@ -438,7 +615,7 @@ export default function EditStaffPage() {
                   </div>
                 </div>
 
-                <div className="relative">
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Ngày vào làm
                   </label>
@@ -446,47 +623,15 @@ export default function EditStaffPage() {
                     <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                       type="text"
-                      name="join_date_display"
-                      value={formatDateForDisplay(formData.join_date)}
-                      onChange={handleDateChange}
+                      name="join_date"
+                      value={formData.join_date && formData.join_date.includes('-') 
+                        ? formatDateForDisplay(formData.join_date) 
+                        : formData.join_date || ''}
+                      onChange={handleInputChange}
                       placeholder="dd/mm/yyyy"
-                      className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowDatePicker(!showDatePicker)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <CalendarIcon className="w-5 h-5" />
-                    </button>
                   </div>
-                  
-                  {/* Custom date picker */}
-                  {showDatePicker && (
-                    <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg p-3 min-w-[280px]">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium text-slate-900">Chọn ngày</h4>
-                        <button
-                          type="button"
-                          onClick={() => setShowDatePicker(false)}
-                          className="text-slate-400 hover:text-slate-600"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <input
-                        ref={dateInputRef}
-                        type="date"
-                        value={formatDateForInput(formData.join_date)}
-                        onChange={handleDatePickerChange}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        onBlur={() => setTimeout(() => setShowDatePicker(false), 200)}
-                      />
-                      <div className="mt-3 text-xs text-slate-500">
-                        Hoặc nhập trực tiếp theo định dạng dd/mm/yyyy
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -567,8 +712,12 @@ export default function EditStaffPage() {
               
               <button
                 type="submit"
-                disabled={saving}
-                className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-medium rounded-xl hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl"
+                disabled={saving || !hasChanges}
+                className={`px-8 py-3 font-medium rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${
+                  hasChanges 
+                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700' 
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {saving ? (
                   <>
@@ -578,7 +727,7 @@ export default function EditStaffPage() {
                 ) : (
                   <>
                     <CheckCircleIcon className="w-5 h-5" />
-                    Cập nhật thông tin
+                    {hasChanges ? 'Cập nhật thông tin' : 'Không có thay đổi'}
                   </>
                 )}
               </button>
@@ -587,100 +736,61 @@ export default function EditStaffPage() {
         </div>
       </div>
 
-      {/* Success Modal */}
-      {showSuccessModal && (
+      {/* Avatar Confirmation Modal */}
+      {showAvatarConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white text-center">
+            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 p-6 text-white text-center">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircleIcon className="w-8 h-8" />
+                <PhotoIcon className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Cập nhật thành công!</h3>
-              <p className="text-green-100 text-sm">
-                Thông tin nhân viên đã được cập nhật thành công
+              <h3 className="text-xl font-bold mb-2">Xác nhận thay đổi ảnh</h3>
+              <p className="text-indigo-100 text-sm">
+                Bạn có chắc chắn muốn thay đổi ảnh đại diện?
               </p>
             </div>
 
             {/* Content */}
             <div className="p-6">
-              {/* Updated Info */}
+              {/* Avatar Preview */}
               <div className="mb-6">
                 <h4 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <UserIcon className="w-5 h-5 text-indigo-600" />
-                  Thông tin đã cập nhật
+                  <PhotoIcon className="w-5 h-5 text-indigo-600" />
+                  Ảnh đại diện mới
                 </h4>
-                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Tên:</span>
-                    <span className="font-medium text-slate-900">{formData.full_name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Email:</span>
-                    <span className="font-medium text-slate-900">{formData.email}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Vị trí:</span>
-                    <span className="font-medium text-slate-900">{formData.position || 'Chưa hoàn tất đăng kí'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Trạng thái:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      formData.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-slate-100 text-slate-800'
-                    }`}>
-                      {formData.status === 'active' ? 'Đang làm việc' : 'Nghỉ việc'}
-                    </span>
-                  </div>
-                  {formData.avatar && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 text-sm">Ảnh đại diện:</span>
-                      <span className="font-medium text-green-600">✅ Đã cập nhật</span>
-                    </div>
-                  )}
+                <div className="flex justify-center">
+                  <img
+                    src={pendingAvatarFile ? URL.createObjectURL(pendingAvatarFile) : ''}
+                    alt="New avatar preview"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-indigo-200 shadow-lg"
+                  />
+                </div>
+                <div className="mt-3 text-center">
+                  <p className="text-sm text-slate-600">
+                    Tên file: {pendingAvatarFile?.name}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Kích thước: {pendingAvatarFile?.size ? (pendingAvatarFile.size / 1024 / 1024).toFixed(2) : '0'} MB
+                  </p>
                 </div>
               </div>
-
-              {/* Avatar Preview if updated */}
-              {formData.avatar && (
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <PhotoIcon className="w-5 h-5 text-indigo-600" />
-                    Ảnh đại diện mới
-                  </h4>
-                  <div className="flex justify-center">
-                    <img
-                      src={formData.avatar ? URL.createObjectURL(formData.avatar) : ''}
-                      alt="New avatar"
-                      className="w-24 h-24 rounded-full object-cover border-4 border-green-200 shadow-lg"
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Actions */}
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    router.push('/admin/staff-management');
-                  }}
-                  className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                  onClick={cancelAvatarChange}
+                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
                 >
-                  Quay lại danh sách
+                  Hủy bỏ
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    // Reset form to show updated data
-                    window.location.reload();
-                  }}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                  onClick={confirmAvatarChange}
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
                 >
-                  Xem chi tiết
+                  Xác nhận
                 </button>
               </div>
             </div>
@@ -688,10 +798,7 @@ export default function EditStaffPage() {
             {/* Close button */}
             <button
               type="button"
-              onClick={() => {
-                setShowSuccessModal(false);
-                router.push('/admin/staff-management');
-              }}
+              onClick={cancelAvatarChange}
               className="absolute top-4 right-4 text-white hover:text-slate-200 transition-colors"
             >
               <XMarkIcon className="w-6 h-6" />

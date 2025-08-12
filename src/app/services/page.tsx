@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { clientStorage } from '@/lib/utils/clientStorage';
@@ -375,11 +377,11 @@ export default function ServicesPage() {
         
         clientStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
         loadPendingPackages(); // Reload pending packages
-        alert('✅ Đã duyệt gói dịch vụ thành công!');
+        toast.success('✅ Đã duyệt gói dịch vụ thành công!');
       }
     } catch (error) {
       console.error('Error approving package:', error);
-      alert('❌ Có lỗi xảy ra khi duyệt gói dịch vụ!');
+      toast.error('❌ Có lỗi xảy ra khi duyệt gói dịch vụ!');
     }
   };
 
@@ -406,11 +408,11 @@ export default function ServicesPage() {
         
         clientStorage.setItem('nurseryHomeResidents', JSON.stringify(updatedResidents));
         loadPendingPackages(); // Reload pending packages
-        alert('❌ Đã từ chối gói dịch vụ!');
+        toast.error('❌ Đã từ chối gói dịch vụ!');
       }
     } catch (error) {
       console.error('Error rejecting package:', error);
-      alert('❌ Có lỗi xảy ra khi từ chối gói dịch vụ!');
+      toast.error('❌ Có lỗi xảy ra khi từ chối gói dịch vụ!');
     }
   };
 
@@ -606,7 +608,7 @@ export default function ServicesPage() {
       // 2. Kiểm tra trùng gói
       const selectedPlan = carePlans.find((plan: any) => plan.planId === selectedPackage && ['active', 'pending_approval'].includes(plan.status));
       if (selectedPlan) {
-        alert('Cư dân đã có gói này đang hoạt động hoặc chờ duyệt!');
+        toast.error('Cư dân đã có gói này đang hoạt động hoặc chờ duyệt!');
         return;
       }
       // 3. Nếu hợp lệ, chuyển sang trang đăng ký
@@ -614,7 +616,7 @@ export default function ServicesPage() {
       setShowStaffRegisterModal(false);
       setSelectedStaffResidentId(null);
     } catch (err) {
-      alert('Không thể kiểm tra gói dịch vụ. Vui lòng thử lại!');
+      toast.error('Không thể kiểm tra gói dịch vụ. Vui lòng thử lại!');
     }
   }
 

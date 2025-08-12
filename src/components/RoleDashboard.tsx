@@ -49,7 +49,7 @@ const ROLE_DASHBOARDS = {
         title: 'Lịch thăm viếng',
         description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',
         icon: CalendarDaysIcon,
-        href: '/staff/visits',
+        href: '/admin/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       },
       {

@@ -8,12 +8,15 @@ export function clearSessionData() {
     sessionStorage.clear();
   }
   
-  clientStorage.removeItem('access_token');
-  clientStorage.removeItem('user');
-  clientStorage.removeItem('session_start');
-  clientStorage.removeItem('login_success');
-  clientStorage.removeItem('login_error');
-  clientStorage.removeItem('login_attempts');
+  // Sử dụng batch remove để tăng hiệu suất
+  clientStorage.removeItems([
+    'access_token',
+    'user', 
+    'session_start',
+    'login_success',
+    'login_error',
+    'login_attempts'
+  ]);
   
   if (typeof document !== 'undefined') {
     document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -57,10 +60,24 @@ export function extendSession() {
 export function initializeSession(token: string, userData: any) {
   const currentTime = Date.now().toString();
   
-  // Store data synchronously for immediate access
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('access_token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('session_start', currentTime);
-  }
+  // Sử dụng Promise để có thể await
+  return new Promise<void>((resolve) => {
+    // Store data synchronously for immediate access
+    if (typeof window !== 'undefined') {
+      // Sử dụng batch operation để tăng hiệu suất
+      try {
+        clientStorage.setItems({
+          'access_token': token,
+          'user': JSON.stringify(userData),
+          'session_start': currentTime
+        });
+        resolve();
+      } catch (error) {
+        console.error('Error initializing session:', error);
+        resolve(); // Vẫn resolve để không block login flow
+      }
+    } else {
+      resolve();
+    }
+  });
 } 

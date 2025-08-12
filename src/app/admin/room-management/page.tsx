@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
 import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI } from "@/lib/api";
-import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 interface Room {
   _id: string;
@@ -97,166 +97,152 @@ export default function RoomManagementPage() {
     );
   });
 
-  if (loading) return <div>Đang tải dữ liệu...</div>;
-  if (error) return <div style={{ color: "red" }}>{error}</div>;
+  // Tính toán thống kê
+  const totalRooms = rooms.length;
+  const availableRooms = rooms.filter(room => room.status === "available").length;
+  const occupiedRooms = totalRooms - availableRooms;
+  const totalBeds = beds.length;
+  const occupiedBeds = beds.filter(bed => bed.status === "occupied").length;
+
+  if (loading) return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600 font-medium">Đang tải dữ liệu...</p>
+      </div>
+    </div>
+  );
+  
+  if (error) return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+      <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <BuildingOfficeIcon className="w-8 h-8 text-red-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Lỗi tải dữ liệu</h3>
+        <p className="text-red-600">{error}</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
-    }}>
-      {/* Back Button */}
-      <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '2rem 1.5rem',
-        position: 'relative',
-        zIndex: 1
-      }}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Back Button */}
         <button
           onClick={() => router.push('/admin')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            background: 'white',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            marginBottom: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f9fafb';
-            e.currentTarget.style.borderColor = '#9ca3af';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'white';
-            e.currentTarget.style.borderColor = '#d1d5db';
-          }}
+          className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl text-sm font-medium cursor-pointer mb-6 shadow-sm hover:bg-gray-50 hover:shadow-md transition-all duration-200 group"
         >
-          <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
+          <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Quay lại
         </button>
 
-        {/* Header Section */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                <div style={{
-              width: '3.5rem',
-              height: '3.5rem',
-              background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
-                  borderRadius: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
-                }}>
-              <BuildingOfficeIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
-                </div>
-                <div>
-                  <h1 style={{
-                    fontSize: '2rem',
-                    fontWeight: 700,
-                margin: 0,
-                background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                letterSpacing: '-0.025em'
-                  }}>
+        {/* Enhanced Header Section */}
+        <div className="bg-gradient-to-r from-white to-blue-50 rounded-3xl p-8 mb-8 shadow-xl border border-blue-100">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <BuildingOfficeIcon className="w-8 h-8 text-white" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
                 Quản lý phòng & giường
-                  </h1>
-              <p style={{fontSize: '1rem', color: '#64748b', margin: '0.25rem 0 0 0', fontWeight: 500}}>
-                Tổng số: {rooms.length} phòng
-                  </p>
+              </h1>
+                              <p className="text-lg text-gray-600 font-medium">
+                  Quản lý và theo dõi tình trạng phòng và giường bệnh
+                </p>
             </div>
           </div>
+        </div>
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium">Tổng phòng</p>
+                <p className="text-3xl font-bold">{totalRooms}</p>
+                <p className="text-blue-100 text-xs font-bold">phòng</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <HomeIcon className="w-6 h-6" />
+              </div>
+            </div>
           </div>
 
-        {/* Search Section */}
-          <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-            <div style={{flex: 1, position: 'relative'}}>
-                <input
-                  type="text"
-                placeholder="Tìm theo số phòng, loại phòng, tầng..."
-                  value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.5rem',
-                  borderRadius: '0.5rem',
-                    border: '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
-              />
-              <MagnifyingGlassIcon style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '1rem',
-                height: '1rem',
-                color: '#9ca3af'
-              }} />
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg shadow-green-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm font-medium">Phòng trống</p>
+                <p className="text-3xl font-bold">{availableRooms}</p>
+                <p className="text-green-100 text-xs font-bold">phòng</p>
               </div>
-            <div style={{
-              background: 'rgba(59, 130, 246, 0.1)',
-              padding: '0.75rem 1rem',
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(59, 130, 246, 0.2)'
-            }}>
-              <p style={{fontSize: '0.875rem', color: '#3b82f6', margin: 0, fontWeight: 600}}>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <UsersIcon className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg shadow-orange-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100 text-sm font-medium">Phòng đã sử dụng</p>
+                <p className="text-3xl font-bold">{occupiedRooms}</p>
+                <p className="text-orange-100 text-xs font-bold">phòng</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <MapPinIcon className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg shadow-purple-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium">Tổng giường</p>
+                <p className="text-3xl font-bold">{totalBeds}</p>
+                <p className="text-purple-100 text-xs font-bold">giường</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <ClockIcon className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Enhanced Search Section */}
+        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+          <div className="flex flex-col lg:flex-row gap-4 items-center">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Tìm theo số phòng, loại phòng, tầng..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+              <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            </div>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 rounded-xl border border-blue-200">
+              <p className="text-blue-700 font-semibold text-lg">
                 Hiển thị: {filteredRooms.length} phòng
               </p>
             </div>
           </div>
         </div>
 
-        {/* Rooms Table */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem',
-          overflow: 'hidden',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{overflowX: 'auto'}}>
-            <table style={{width: '100%', borderCollapse: 'collapse'}}>
+        {/* Enhanced Rooms Table */}
+        <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
+          <div className="overflow-x-auto">
+            <table className="w-full">
               <thead>
-                <tr style={{
-                  background: '#3b82f6',
-                  borderBottom: '1px solid #2563eb'
-                }}>
-                  <th style={thStyle}>Số phòng</th>
-                  <th style={thStyle}>Loại phòng</th>
-                  <th style={thStyle}>Số giường</th>
-                  <th style={thStyle}>Loại phòng theo giới tính</th>
-                  <th style={thStyle}>Tầng</th>
-                  <th style={thStyle}>Trạng thái</th>
-                  <th style={thStyle}></th>
+                <tr className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                  <th className="px-6 py-4 text-left text-white font-bold text-base">Số phòng</th>
+                  <th className="px-6 py-4 text-left text-white font-bold text-base">Loại phòng</th>
+                  <th className="px-6 py-4 text-center text-white font-bold text-base">Số giường</th>
+                  <th className="px-6 py-4 text-center text-white font-bold text-base">Giới tính</th>
+                  <th className="px-6 py-4 text-center text-white font-bold text-base">Tầng</th>
+                  <th className="px-6 py-4 text-center text-white font-bold text-base">Trạng thái</th>
+                  <th className="px-6 py-4 text-center text-white font-bold text-base">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -265,335 +251,218 @@ export default function RoomManagementPage() {
                   return (
                     <tr
                       key={room._id}
-                    style={{
-                        borderBottom: index < filteredRooms.length - 1 ? '1px solid #f3f4f6' : 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
+                      className={`border-b border-gray-100 hover:bg-blue-50 transition-all duration-200 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}
                     >
-                      <td style={tdStyle}>{room.room_number}</td>
-                      <td style={tdStyle}>{type ? type.type_name : room.room_type}</td>
-                      <td style={tdStyle}>{room.bed_count}</td>
-                      <td style={tdStyle}>{room.gender === "male" ? "Nam" : room.gender === "female" ? "Nữ" : ""}</td>
-                      <td style={tdStyle}>{room.floor}</td>
-                      <td style={{
-  ...tdStyle,
-  color: room.status === "available" ? "#16a34a" : "#dc2626", // xanh lá cho còn trống, đỏ cho hết giường
-  fontWeight: 700
-}}>
-  {room.status === "available" ? "Còn trống" : "Hết giường"}
-</td>
-                      <td style={tdStyle}>
-                  <button
-                    style={{
-                            background: '#3b82f6',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: 8,
-                            padding: '6px 16px',
-                      cursor: 'pointer',
-                  fontWeight: 600, 
-                      display: 'flex',
-                      alignItems: 'center',
-                            gap: 6,
-                            transition: 'all 0.2s',
-                          }}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                            {room.room_number}
+                          </div>
+                          
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                            {type ? type.type_name : room.room_type}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-semibold text-gray-900">{room.bed_count}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          room.gender === "male" 
+                            ? "bg-blue-100 text-blue-800" 
+                            : room.gender === "female" 
+                            ? "bg-pink-100 text-pink-800" 
+                            : "bg-gray-100 text-gray-800"
+                        }`}>
+                          {room.gender === "male" ? "Nam" : room.gender === "female" ? "Nữ" : "Hỗn hợp"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-semibold text-gray-900">Tầng {room.floor}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                          room.status === "available" 
+                            ? "bg-green-100 text-green-800" 
+                            : "bg-red-100 text-red-800"
+                        }`}>
+                          {room.status === "available" ? "Còn trống" : "Hết giường"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center gap-2 mx-auto ${
+                            selectedRoomId === room._id
+                              ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30"
+                              : "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                          }`}
                           onClick={() => setSelectedRoomId(selectedRoomId === room._id ? null : room._id)}
-                          onMouseOver={e => {
-                            e.currentTarget.style.background = '#2563eb';
-                          }}
-                          onMouseOut={e => {
-                              e.currentTarget.style.background = '#3b82f6';
-                            }}
-                          >
-                          <EyeIcon style={{width: 18, height: 18}} />
+                        >
+                          <EyeIcon className="w-4 h-4" />
                           {selectedRoomId === room._id ? "Ẩn giường" : "Xem giường"}
-                  </button>
+                        </button>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-                </div>
-              </div>
-
-        {/* Beds Table for selected room */}
-        {selectedRoomId && (
-              <div style={{ 
-    marginTop: 32,
-                background: '#f9fafb',
-    borderRadius: 16,
-    padding: 24,
-    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.08)',
-    border: '1px solid #e5e7eb'
-  }}>
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.5rem',
-      marginBottom: '2rem'
-    }}>
-      <h2 style={{
-        fontSize: '1.75rem',
-        fontWeight: 700,
-        margin: 0,
-        color: '#1f2937',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem'
-      }}>
-        <div style={{
-          width: '2.5rem',
-          height: '2.5rem',
-          background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
-                    borderRadius: '0.75rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-                    color: 'white',
-          fontSize: '1.25rem',
-          fontWeight: 'bold'
-                  }}>
-          {rooms.find((r) => r._id === selectedRoomId)?.room_number}
-                </div>
-        Danh sách giường phòng {rooms.find((r) => r._id === selectedRoomId)?.room_number}
-      </h2>
-      {/* Thông tin loại phòng */}
-      {(() => {
-        const room = rooms.find((r) => r._id === selectedRoomId);
-        const type = room ? getRoomType(room.room_type) : null;
-        if (!type) return null;
-        return (
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
-                <div style={{ 
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '1rem'
-            }}>
-              <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                gap: '0.75rem',
-                        padding: '0.75rem',
-                background: '#f0f9ff',
-                borderRadius: '0.5rem',
-                border: '1px solid #0ea5e9'
-              }}>
-                          <div style={{ 
-                  width: '2rem',
-                  height: '2rem',
-                  background: '#0ea5e9',
-                  borderRadius: '0.375rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                  justifyContent: 'center',
-                                    fontSize: '0.75rem', 
-                  fontWeight: 'bold',
-                  color: 'white'
-                }}>
-                  LG
-                                </div>
-                            <div>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Loại phòng</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0ea5e9' }}>{type.type_name}</div>
-                            </div>
-                        </div>
-                  <div style={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem',
-                background: '#f0fdf4',
-                borderRadius: '0.5rem',
-                border: '1px solid #22c55e'
-              }}>
-          <div style={{
-                  width: '2rem',
-                  height: '2rem',
-                  background: '#22c55e',
-                  borderRadius: '0.375rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  color: 'white'
-                }}>
-                  ₫
-                    </div>
-                    <div>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Giá thuê</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#22c55e' }}>{type.monthly_price?.toLocaleString()}đ/tháng</div>
-                    </div>
-                    </div>
-                    </div>
-            <div style={{ marginTop: '1rem' }}>
-                <div style={{
-                          padding: '1rem',
-                background: '#fafafa',
-                borderRadius: '0.5rem',
-                          border: '1px solid #e5e7eb'
-              }}>
-                <div style={{
-                                    fontSize: '0.875rem',
-                  color: '#6b7280',
-                  fontWeight: 500,
-                  marginBottom: '0.5rem'
-                }}>
-                  Mô tả
-                                </div>
-                <div style={{
-                  fontSize: '0.95rem',
-                    color: '#374151',
-                  lineHeight: '1.5'
-                }}>
-                  {type.description}
-              </div>
-            </div>
           </div>
-            {type.amenities && type.amenities.length > 0 && (
-              <div style={{ marginTop: '1rem' }}>
-          <div style={{
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  fontWeight: 500,
-                  marginBottom: '0.75rem'
-                }}>
-                  Tiện ích
+        </div>
+
+        {/* Enhanced Beds Table for selected room */}
+        {selectedRoomId && (
+          <div className="mt-8 bg-gradient-to-br from-gray-50 to-blue-50 rounded-3xl p-8 shadow-xl border border-blue-100">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                  {rooms.find((r) => r._id === selectedRoomId)?.room_number}
                 </div>
-            <div style={{
-                display: 'flex',
-                  flexWrap: 'wrap',
-                gap: '0.5rem'
-              }}>
-                  {type.amenities.map((amenity, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        display: 'inline-flex',
-                    alignItems: 'center',
-                        padding: '0.375rem 0.75rem',
-                        background: '#e0f2fe',
-                        color: '#0369a1',
-                        borderRadius: '9999px',
-                          fontSize: '0.875rem',
-                        fontWeight: 500,
-                        border: '1px solid #7dd3fc'
-                      }}
-                    >
-                      {amenity}
-                    </span>
-                  ))}
-              </div>
+                Danh sách giường phòng {rooms.find((r) => r._id === selectedRoomId)?.room_number}
+              </h2>
+              
+              {/* Enhanced Room Type Information */}
+              {(() => {
+                const room = rooms.find((r) => r._id === selectedRoomId);
+                const type = room ? getRoomType(room.room_type) : null;
+                if (!type) return null;
+                return (
+                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                        <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
+                          LG
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600 font-medium">Loại phòng</div>
+                          <div className="text-lg font-bold text-blue-700">{type.type_name}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                        <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold">
+                          $
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600 font-medium">Giá phòng</div>
+                          <div className="text-lg font-bold text-green-700">{type.monthly_price?.toLocaleString()}đ/tháng</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-6">
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <div className="text-sm text-gray-600 font-medium mb-2">Mô tả</div>
+                        <div className="text-gray-800 leading-relaxed">{type.description}</div>
+                      </div>
+                    </div>
+                    
+                    {type.amenities && type.amenities.length > 0 && (
+                      <div className="mt-6">
+                        <div className="text-sm text-gray-600 font-medium mb-3">Tiện ích</div>
+                        <div className="flex flex-wrap gap-2">
+                          {type.amenities.map((amenity, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200"
+                            >
+                              {amenity}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+            
+            <div className="overflow-x-auto">
+              {bedsOfRoom(selectedRoomId).length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-2xl shadow-lg border border-gray-100">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <BuildingOfficeIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Chưa có giường</h3>
+                  <p className="text-gray-600">Phòng này hiện chưa có giường nào được thiết lập.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-indigo-600 to-purple-600">
+                        <th className="px-6 py-4 text-left text-white font-bold text-base">Số giường</th>
+                        <th className="px-6 py-4 text-left text-white font-bold text-base">Loại giường</th>
+                        <th className="px-6 py-4 text-center text-white font-bold text-base">Trạng thái</th>
+                        <th className="px-6 py-4 text-left text-white font-bold text-base">Người cao tuổi đang ở</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bedsOfRoom(selectedRoomId).map((bed, idx) => (
+                        <tr key={bed._id} className={`border-b border-gray-100 hover:bg-indigo-50 transition-all duration-200 ${
+                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                        }`}>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                             
+                              <span className="font-semibold text-gray-900">{bed.bed_number}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                                                       <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+                             {bed.bed_type === "standard" ? "Tiêu chuẩn" : 
+                              bed.bed_type === "electric" ? "Giường điện" :
+                              bed.bed_type}
+                           </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                              bed.status === "occupied" 
+                                ? "bg-red-100 text-red-800" 
+                                : "bg-green-100 text-green-800"
+                            }`}>
+                              {bed.status === "occupied" ? "Đang sử dụng" : "Còn trống"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-medium text-gray-900">
+                              {getResidentOfBed(bed._id) || "-"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-                </div>
-        );
-      })()}
-              </div>
-    <div style={{overflowX: 'auto'}}>
-      {bedsOfRoom(selectedRoomId).length === 0 ? (
-                <div style={{
-          padding: '2rem',
-          textAlign: 'center',
-          color: '#64748b',
-          background: '#f1f5f9',
-          borderRadius: '1rem',
-          marginTop: '1rem',
-          fontWeight: 500,
-          fontSize: '1.1rem',
-                    display: 'flex',
-          flexDirection: 'column',
-                    alignItems: 'center',
-          gap: '1rem',
-        }}>
-          <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75v-1.5A2.25 2.25 0 016.75 9h10.5a2.25 2.25 0 012.25 2.25v1.5m-15 0v4.5A2.25 2.25 0 006.75 19.5h10.5a2.25 2.25 0 002.25-2.25v-4.5m-15 0h15" /></svg>
-          Phòng này hiện chưa có giường nào.
-                </div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden' }}>
-          <thead>
-            <tr style={{ background: '#3b82f6', borderBottom: '1px solid #2563eb' }}>
-              <th style={thStyle}>Số giường</th>
-              <th style={thStyle}>Loại giường</th>
-              <th style={thStyle}>Trạng thái</th>
-              <th style={thStyle}>Người cao tuổi đang ở</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bedsOfRoom(selectedRoomId).map((bed, idx) => (
-              <tr key={bed._id} style={{ borderBottom: idx < bedsOfRoom(selectedRoomId).length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'all 0.2s' }}>
-                <td style={tdStyle}>{bed.bed_number}</td>
-                <td style={tdStyle}>{bed.bed_type}</td>
-                <td style={tdStyle}>{bed.status === "occupied" ? "Đang sử dụng" : "Còn trống"}</td>
-                <td style={tdStyle}>{getResidentOfBed(bed._id) || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
             </div>
           </div>
         )}
 
-        {/* Empty state */}
+        {/* Enhanced Empty state */}
         {filteredRooms.length === 0 && (
-          <div style={{
-            padding: '3rem',
-            textAlign: 'center',
-            color: '#6b7280'
-          }}>
-            <BuildingOfficeIcon style={{
-              width: '3rem',
-              height: '3rem',
-              margin: '0 auto 1rem',
-              color: '#d1d5db'
-            }} />
-                  <h3 style={{ 
-              fontSize: '1.125rem',
-                          fontWeight: 600,
-              margin: '0 0 0.5rem 0',
-              color: '#374151'
-            }}>
-              Không tìm thấy phòng phù hợp
-            </h3>
-            <p style={{margin: 0, fontSize: '0.875rem'}}>
-              Thử thay đổi tiêu chí tìm kiếm hoặc bộ lọc
-                  </p>
+          <div className="text-center py-16 bg-white rounded-2xl shadow-lg border border-gray-100">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <BuildingOfficeIcon className="w-10 h-10 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">Không tìm thấy phòng phù hợp</h3>
+            <p className="text-gray-600 mb-6">Thử thay đổi tiêu chí tìm kiếm hoặc bộ lọc</p>
+            <button
+              onClick={() => setSearchTerm('')}
+              className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+            >
+              Xóa bộ lọc
+            </button>
           </div>
         )}
       </div>
     </div>
   );
 }
-
-const thStyle = {
-  padding: "1rem",
-  textAlign: "center" as const,
-  fontWeight: 700,
-  fontSize: 16,
-  color: '#ffffff',
-  background: '#3b82f6',
-  borderBottom: '1px solid #2563eb',
-};
-const tdStyle = {
-  padding: "1rem",
-  fontSize: 15,
-  color: '#1f2937',
-  textAlign: 'center' as const,
-  fontWeight: 500,
-  background: '#ffffff',
-  borderBottom: '1px solid #e5e7eb',
-};

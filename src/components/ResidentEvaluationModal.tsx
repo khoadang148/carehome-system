@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { Dialog } from '@headlessui/react';
 import { UserGroupIcon, UserIcon, CheckCircleIcon, XCircleIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useActivityEvaluation } from '@/hooks/useActivityEvaluation';
@@ -68,7 +70,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
       await handleSaveEvaluations(activity);
       onClose();
     } catch (err: any) {
-      alert(err.message || 'Có lỗi xảy ra khi lưu đánh giá.');
+      toast.error(err.message || 'Có lỗi xảy ra khi lưu đánh giá.');
     }
   };
 

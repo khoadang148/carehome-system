@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -706,7 +708,7 @@ const activityResidents: ActivityResident[] = Object.values(
     }).length;
     
     if (currentParticipantCount >= activity.capacity) {
-      alert(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`);
+      toast.error(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`);
       return;
     }
     

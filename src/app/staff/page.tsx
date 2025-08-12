@@ -1,77 +1,77 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { 
-  MagnifyingGlassIcon, 
-  FunnelIcon, 
-  PlusCircleIcon, 
-  PencilIcon, 
-  EyeIcon, 
-  CalendarIcon,
-  TrashIcon,
-  UsersIcon,
-
-  XMarkIcon,
-  ArrowLeftIcon,
-} from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
-import RoleDashboard from '@/components/RoleDashboard';
-import StaffDashboardWidgets from '@/components/staff/StaffDashboardWidgets';
-import { clientStorage } from '@/lib/utils/clientStorage';
+import { useResidents } from '@/lib/contexts/residents-context';
+import { useRouter } from 'next/navigation';
+import { RoleDashboard } from '@/components';
 import SuccessModal from '@/components/SuccessModal';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
-export default function StaffDashboardPage() {
+export default function StaffPage() {
   const { user, loading } = useAuth();
+  const { residents, loading: residentsLoading, initialized, initializeResidents } = useResidents();
   const router = useRouter();
-  
-  // Success modal state
+  const [pageReady, setPageReady] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined);
+  const [successMessage, setSuccessMessage] = useState('');
 
-  // Chỉ cho phép staff truy cập
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'staff')) {
-      router.replace('/');
+    if (!loading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      
+      if (user.role !== 'staff') {
+        router.push('/');
+        return;
+      }
+
+      // Tối ưu: Không tự động initialize residents khi page mount
+      // Chỉ load data khi user thực sự cần
+      setPageReady(true);
     }
   }, [user, loading, router]);
 
-  // Load success message khi đăng nhập thành công
+  // Tối ưu: Load success message với delay nhỏ
   useEffect(() => {
     const msg = clientStorage.getItem('login_success');
     if (msg) {
-      setSuccessMessage(msg);
-      setShowSuccessModal(true);
-      clientStorage.removeItem('login_success');
+      const timer = setTimeout(() => {
+        setSuccessMessage(msg);
+        setShowSuccessModal(true);
+        clientStorage.removeItem('login_success');
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, []);
 
-  if (loading || !user) {
+  // Tối ưu: Lazy load residents chỉ khi cần thiết
+  const handleLoadResidents = () => {
+    if (!initialized) {
+      initializeResidents();
+    }
+  };
+
+  if (loading || !pageReady) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-        <p style={{ marginLeft: 16, color: '#6366f1', fontWeight: 600 }}>Đang tải...</p>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải trang nhân viên...</p>
+        </div>
       </div>
     );
   }
 
-  if (user.role !== 'staff') return null;
-
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
-      {/* Staff Dashboard Widgets */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1rem' }}>
-        <StaffDashboardWidgets />
+    <>
+      <SuccessModal open={showSuccessModal} onClose={() => setShowSuccessModal(false)} name={successMessage} />
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
         <RoleDashboard />
       </div>
-
-      {/* Success Modal */}
-      <SuccessModal
-        open={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        name={user?.name}
-      />
-    </div>
+    </>
   );
 } 

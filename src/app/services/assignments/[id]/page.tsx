@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -18,7 +19,7 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI } from '@/lib/api';
+import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI, bedAssignmentsAPI, roomsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 export default function CarePlanAssignmentDetailPage() {
@@ -29,6 +30,7 @@ export default function CarePlanAssignmentDetailPage() {
   const [residentDetails, setResidentDetails] = useState<any>(null);
   const [familyMemberDetails, setFamilyMemberDetails] = useState<any>(null);
   const [carePlanDetails, setCarePlanDetails] = useState<any[]>([]);
+  const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
   const [roomTypeDetails, setRoomTypeDetails] = useState<any>(null);
   const [roomNumber, setRoomNumber] = useState<string>('N/A');
   const [bedNumber, setBedNumber] = useState<string>('Chưa phân giường');
@@ -68,32 +70,77 @@ export default function CarePlanAssignmentDetailPage() {
           const residentData = await residentAPI.getById(data.resident_id._id);
           setResidentDetails(residentData);
           
-          // Lấy thông tin phòng và giường từ assignment data
-          if (data.assigned_room_id && typeof data.assigned_room_id === 'object') {
-            const room = data.assigned_room_id;
-            setRoomNumber(room.room_number || 'N/A');
-            setRoomFloor(room.floor || '');
-            console.log(`Room ${room.room_number} (from assignment data)`);
-          } else if (data.assigned_room_id) {
-            // Nếu assigned_room_id là string (ID), có nghĩa là chưa được populate
-            console.log('Assigned room ID is string, not populated:', data.assigned_room_id);
-            setRoomNumber('Chưa phân phòng');
-          } else {
-            console.log('No assigned room found in assignment data');
-            setRoomNumber('Chưa phân phòng');
-          }
-          
-          if (data.assigned_bed_id && typeof data.assigned_bed_id === 'object') {
-            const bed = data.assigned_bed_id;
-            setBedNumber(bed.bed_number || 'Chưa phân giường');
-            console.log(`Bed ${bed.bed_number} (from assignment data)`);
-          } else if (data.assigned_bed_id) {
-            // Nếu assigned_bed_id là string (ID), có nghĩa là chưa được populate
-            console.log('Assigned bed ID is string, not populated:', data.assigned_bed_id);
-            setBedNumber('Chưa phân giường');
-          } else {
-            console.log('No assigned bed found in assignment data');
-            setBedNumber('Chưa phân giường');
+          // Lấy thông tin phòng và giường từ bedAssignmentsAPI (giống như trang staff/residents)
+          try {
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(data.resident_id._id);
+            const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            
+            if (bedAssignment?.bed_id?.room_id) {
+              // Nếu room_id đã có thông tin đầy đủ
+              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                setRoomNumber(bedAssignment.bed_id.room_id.room_number);
+                setRoomFloor(bedAssignment.bed_id.room_id.floor || '');
+                console.log(`Room ${bedAssignment.bed_id.room_id.room_number} (from bed assignment)`);
+              } else {
+                // Nếu chỉ có _id, fetch thêm thông tin
+                const roomId = typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id?._id ? 
+                  bedAssignment.bed_id.room_id._id : bedAssignment.bed_id.room_id;
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  setRoomNumber(room?.room_number || 'N/A');
+                  setRoomFloor(room?.floor || '');
+                  console.log(`Room ${room?.room_number} (fetched from room ID)`);
+                }
+              }
+              
+              // Lấy thông tin giường
+              if (bedAssignment.bed_id) {
+                if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
+                  setBedNumber(bedAssignment.bed_id.bed_number);
+                  console.log(`Bed ${bedAssignment.bed_id.bed_number} (from bed assignment)`);
+                } else {
+                  const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                    bedAssignment.bed_id._id : bedAssignment.bed_id;
+                  // Có thể cần fetch thông tin giường từ bedsAPI nếu cần
+                  setBedNumber(bedId || 'Chưa phân giường');
+                }
+              }
+            } else {
+              // Fallback: sử dụng thông tin từ care plan assignment
+              if (data.assigned_room_id && typeof data.assigned_room_id === 'object') {
+                const room = data.assigned_room_id;
+                setRoomNumber(room.room_number || 'N/A');
+                setRoomFloor(room.floor || '');
+                console.log(`Room ${room.room_number} (fallback from assignment data)`);
+              } else {
+                setRoomNumber('Chưa phân phòng');
+              }
+              
+              if (data.assigned_bed_id && typeof data.assigned_bed_id === 'object') {
+                const bed = data.assigned_bed_id;
+                setBedNumber(bed.bed_number || 'Chưa phân giường');
+                console.log(`Bed ${bed.bed_number} (fallback from assignment data)`);
+              } else {
+                setBedNumber('Chưa phân giường');
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching bed assignment:', error);
+            // Fallback: sử dụng thông tin từ care plan assignment
+            if (data.assigned_room_id && typeof data.assigned_room_id === 'object') {
+              const room = data.assigned_room_id;
+              setRoomNumber(room.room_number || 'N/A');
+              setRoomFloor(room.floor || '');
+            } else {
+              setRoomNumber('Chưa phân phòng');
+            }
+            
+            if (data.assigned_bed_id && typeof data.assigned_bed_id === 'object') {
+              const bed = data.assigned_bed_id;
+              setBedNumber(bed.bed_number || 'Chưa phân giường');
+            } else {
+              setBedNumber('Chưa phân giường');
+            }
           }
         } catch (err) {
           console.error('Error fetching resident details:', err);
@@ -115,31 +162,77 @@ export default function CarePlanAssignmentDetailPage() {
         console.log('No family_member_id found in assignment data');
       }
 
-      // Fetch care plan details
-      if (Array.isArray(data.care_plan_ids) && data.care_plan_ids.length > 0) {
+      // Fetch tất cả care plan assignments của resident để hiển thị đầy đủ
+      if (data.resident_id?._id) {
         try {
-          console.log('Fetching care plan details for:', data.care_plan_ids.length, 'plans');
-          const carePlanPromises = data.care_plan_ids.map(async (plan: any) => {
-            const planId = plan._id || plan;
-            console.log('Fetching care plan with ID:', planId);
-            try {
-              const planData = await carePlansAPI.getById(planId);
-              console.log('Care plan data received for ID', planId, ':', planData);
-              return planData;
-            } catch (err) {
-              console.error('Error fetching care plan with ID', planId, ':', err);
-              return plan; // Return original plan data if fetch fails
-            }
-          });
+          console.log('Fetching all care plan assignments for resident:', data.resident_id._id);
+          const allAssignments = await carePlanAssignmentsAPI.getByResidentId(data.resident_id._id);
+          console.log('All assignments for resident:', allAssignments);
           
-          const carePlanData = await Promise.all(carePlanPromises);
-          console.log('All care plan details received:', carePlanData);
+          // Lấy tất cả care plan IDs từ tất cả assignments
+          const allCarePlanIds: any[] = [];
+          if (Array.isArray(allAssignments)) {
+            allAssignments.forEach((assignment: any) => {
+              if (Array.isArray(assignment.care_plan_ids)) {
+                assignment.care_plan_ids.forEach((plan: any) => {
+                  const planId = plan._id || plan;
+                  if (!allCarePlanIds.find(p => (p._id || p) === planId)) {
+                    allCarePlanIds.push(plan);
+                  }
+                });
+              }
+            });
+          }
+          
+          console.log('All unique care plan IDs:', allCarePlanIds);
+          
+          // Fetch chi tiết của tất cả care plans
+          if (allCarePlanIds.length > 0) {
+            const carePlanPromises = allCarePlanIds.map(async (plan: any) => {
+              const planId = plan._id || plan;
+              console.log('Fetching care plan with ID:', planId);
+              try {
+                const planData = await carePlansAPI.getById(planId);
+                console.log('Care plan data received for ID', planId, ':', planData);
+                return planData;
+              } catch (err) {
+                console.error('Error fetching care plan with ID', planId, ':', err);
+                return plan; // Return original plan data if fetch fails
+              }
+            });
+            
+            const carePlanData = await Promise.all(carePlanPromises);
+                      console.log('All care plan details received:', carePlanData);
           setCarePlanDetails(carePlanData);
+          setCarePlanAssignments(allAssignments);
+          } else {
+            console.log('No care plans found for resident');
+            setCarePlanDetails([]);
+          }
         } catch (err) {
-          console.error('Error fetching care plan details:', err);
+          console.error('Error fetching all care plan assignments:', err);
+          // Fallback: sử dụng care plans từ assignment hiện tại
+          if (Array.isArray(data.care_plan_ids) && data.care_plan_ids.length > 0) {
+            try {
+              const carePlanPromises = data.care_plan_ids.map(async (plan: any) => {
+                const planId = plan._id || plan;
+                try {
+                  const planData = await carePlansAPI.getById(planId);
+                  return planData;
+                } catch (err) {
+                  return plan;
+                }
+              });
+              
+              const carePlanData = await Promise.all(carePlanPromises);
+              setCarePlanDetails(carePlanData);
+            } catch (err) {
+              console.error('Error fetching fallback care plan details:', err);
+            }
+          }
         }
       } else {
-        console.log('No care plans found in assignment data');
+        console.log('No resident ID found in assignment data');
       }
 
       // Fetch room type details
@@ -221,6 +314,30 @@ export default function CarePlanAssignmentDetailPage() {
       ...prev,
       [index]: !prev[index]
     }));
+  };
+
+  // Function để tìm assignment cho từng care plan
+  const getAssignmentForCarePlan = (carePlanId: string) => {
+    if (!Array.isArray(carePlanAssignments)) return null;
+    
+    return carePlanAssignments.find((assignment: any) => {
+      if (Array.isArray(assignment.care_plan_ids)) {
+        return assignment.care_plan_ids.some((plan: any) => {
+          const planId = plan._id || plan;
+          return planId === carePlanId;
+        });
+      }
+      return false;
+    });
+  };
+
+  // Function để tính tổng tiền dịch vụ từ tất cả care plans
+  const calculateTotalServiceCost = () => {
+    if (!Array.isArray(carePlanDetails)) return 0;
+    
+    return carePlanDetails.reduce((total, carePlan) => {
+      return total + (carePlan.monthly_price || 0);
+    }, 0);
   };
 
   // Show loading state while fetching data
@@ -666,7 +783,7 @@ export default function CarePlanAssignmentDetailPage() {
                         color: '#1e293b',
                         margin: 0
                       }}>
-                        {formatCurrency(assignment?.care_plans_monthly_cost || 0)}
+                        {formatCurrency(calculateTotalServiceCost())}
                     </p>
                   </div>
                 </div>
@@ -731,7 +848,9 @@ export default function CarePlanAssignmentDetailPage() {
           </div>
 
               <div style={{ display: 'grid', gap: '1.5rem' }}>
-                {carePlanDetails.map((carePlan: any, index: number) => (
+                {carePlanDetails.map((carePlan: any, index: number) => {
+                  const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
+                  return (
                   <div key={index} style={{
                     background: 'rgba(255, 255, 255, 0.9)',
               borderRadius: '1rem',
@@ -832,7 +951,7 @@ export default function CarePlanAssignmentDetailPage() {
                             color: '#1e293b',
                             margin: 0
                           }}>
-                            {assignment?.start_date ? formatDate(assignment.start_date) : 'N/A'}
+                            {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
                           </p>
                         </div>
                         <div style={{ textAlign: 'center' }}>
@@ -858,7 +977,7 @@ export default function CarePlanAssignmentDetailPage() {
                             color: '#1e293b',
                             margin: 0
                           }}>
-                            {assignment?.end_date ? formatDate(assignment.end_date) : 'Không có thời hạn'}
+                            {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
                           </p>
                                 </div>
                                 </div>
@@ -946,7 +1065,8 @@ export default function CarePlanAssignmentDetailPage() {
                         </div>
                     </div>
                   </div>
-                ))}
+                );
+                })}
                 
                 {carePlanDetails.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
@@ -1071,13 +1191,7 @@ export default function CarePlanAssignmentDetailPage() {
                       {roomNumber}
                       {roomFloor && roomNumber !== 'Chưa phân phòng' && ` (Tầng ${roomFloor})`}
                       </p>
-                    <p style={{
-                      fontSize: '0.75rem',
-                      color: '#64748b',
-                      margin: '0.25rem 0 0 0'
-                    }}>
-                      Debug: {assignment?.assigned_room_id ? (typeof assignment.assigned_room_id === 'object' ? 'Object' : 'String ID') : 'Null'}
-                    </p>
+
                     {roomNumber === 'Chưa phân phòng' && (
                       <p style={{
                         fontSize: '0.75rem',
@@ -1112,13 +1226,7 @@ export default function CarePlanAssignmentDetailPage() {
                     }}>
                       {bedNumber}
                           </p>
-                    <p style={{
-                      fontSize: '0.75rem',
-                      color: '#64748b',
-                      margin: '0.25rem 0 0 0'
-                    }}>
-                      Debug: {assignment?.assigned_bed_id ? (typeof assignment.assigned_bed_id === 'object' ? 'Object' : 'String ID') : 'Null'}
-                    </p>
+
                     {bedNumber === 'Chưa phân giường' && (
                       <p style={{
                         fontSize: '0.75rem',

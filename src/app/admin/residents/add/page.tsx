@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 import { 
   ArrowLeftIcon, 
   UserIcon, 
@@ -14,6 +15,8 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { residentAPI, userAPI } from '@/lib/api';
+import { convertDDMMYYYYToISO } from '@/lib/utils/validation';
+import { handleAPIError } from '@/lib/utils/api-error-handler';
 
 type Medication = {
   medication_name: string;
@@ -37,6 +40,7 @@ type ResidentFormData = {
   emergency_contact: {
     name: string;
     phone: string;
+    email: string;
     relationship: string;
     relationship_other?: string;
     address?: string;
@@ -90,6 +94,19 @@ const validatePhone = (phone: string) => {
   
   if (!phoneRegex.test(cleanPhone)) {
     return "Số điện thoại không đúng định dạng (VD: 0987654321 hoặc +84987654321)";
+  }
+  
+  return true;
+};
+
+const validateEmail = (email: string) => {
+  if (!email) return "Email là bắt buộc";
+  
+  // Kiểm tra định dạng email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!emailRegex.test(email)) {
+    return "Email không đúng định dạng (VD: example@email.com)";
   }
   
   return true;
@@ -240,13 +257,13 @@ export default function AddResidentPage() {
     if (file) {
       // Kiểm tra loại file
       if (!file.type.startsWith('image/')) {
-        alert('Vui lòng chọn file ảnh hợp lệ (JPG, PNG, GIF)');
+        toast.error('Vui lòng chọn file ảnh hợp lệ (JPG, PNG, GIF)');
         return;
       }
       
       // Kiểm tra kích thước file (max 1MB thay vì 5MB)
       if (file.size > 1 * 1024 * 1024) {
-        alert('File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 1MB');
+        toast.error('File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 1MB');
         return;
       }
 
@@ -299,13 +316,13 @@ export default function AddResidentPage() {
     try {
       // Validate required fields
       if (!data.full_name?.trim()) {
-        alert('Họ và tên là bắt buộc');
+        toast.error('Họ và tên là bắt buộc');
         setIsSubmitting(false);
         return;
       }
       
       if (!data.date_of_birth) {
-        alert('Ngày sinh là bắt buộc');
+        toast.error('Ngày sinh là bắt buộc');
         setIsSubmitting(false);
         return;
       }
@@ -314,7 +331,7 @@ export default function AddResidentPage() {
       const formattedDate = formatDateToDisplay(data.date_of_birth);
       const dateValidation = validateDate(formattedDate, 'Ngày sinh');
       if (dateValidation !== true) {
-        alert(dateValidation);
+        toast.error(dateValidation);
         setIsSubmitting(false);
         return;
       }
@@ -322,25 +339,25 @@ export default function AddResidentPage() {
       // Validate age
       const ageValidation = validateAge(data.date_of_birth);
       if (ageValidation !== true) {
-        alert(ageValidation);
+        toast.error(ageValidation);
         setIsSubmitting(false);
         return;
       }
       
       if (!data.gender) {
-        alert('Giới tính là bắt buộc');
+        toast.error('Giới tính là bắt buộc');
         setIsSubmitting(false);
         return;
       }
 
       if (!data.relationship?.trim()) {
-        alert('Mối quan hệ là bắt buộc');
+        toast.error('Mối quan hệ là bắt buộc');
         setIsSubmitting(false);
         return;
       }
       
       if (data.relationship === 'khác' && !data.relationship_other?.trim()) {
-        alert('Vui lòng nhập mối quan hệ cụ thể');
+        toast.error('Vui lòng nhập mối quan hệ cụ thể');
         setIsSubmitting(false);
         return;
       }
@@ -348,13 +365,13 @@ export default function AddResidentPage() {
       // Validate emergency contact chỉ khi tạo tài khoản mới
       if (data.family_account_type === 'new') {
         if (!data.emergency_contact?.name?.trim()) {
-          alert('Tên người liên hệ khẩn cấp là bắt buộc');
+          toast.error('Tên người liên hệ khẩn cấp là bắt buộc');
           setIsSubmitting(false);
           return;
         }
         
         if (!data.emergency_contact?.phone?.trim()) {
-          alert('Số điện thoại khẩn cấp là bắt buộc');
+          toast.error('Số điện thoại khẩn cấp là bắt buộc');
           setIsSubmitting(false);
           return;
         }
@@ -362,19 +379,33 @@ export default function AddResidentPage() {
         // Validate phone number
         const phoneValidation = validatePhone(data.emergency_contact.phone);
         if (phoneValidation !== true) {
-          alert(phoneValidation);
+          toast.error(phoneValidation);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (!data.emergency_contact?.email?.trim()) {
+          toast.error('Email là bắt buộc');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Validate email
+        const emailValidation = validateEmail(data.emergency_contact.email);
+        if (emailValidation !== true) {
+          toast.error(emailValidation);
           setIsSubmitting(false);
           return;
         }
         
         if (!data.emergency_contact?.relationship?.trim()) {
-          alert('Mối quan hệ với người liên hệ là bắt buộc');
+          toast.error('Mối quan hệ với người liên hệ là bắt buộc');
           setIsSubmitting(false);
           return;
         }
         
         if (data.emergency_contact.relationship === 'khác' && !data.emergency_contact.relationship_other?.trim()) {
-          alert('Vui lòng nhập mối quan hệ cụ thể với người liên hệ');
+          toast.error('Vui lòng nhập mối quan hệ cụ thể với người liên hệ');
           setIsSubmitting(false);
           return;
         }
@@ -382,7 +413,7 @@ export default function AddResidentPage() {
 
       // Validate tài khoản family hiện có
       if (data.family_account_type === 'existing' && !data.existing_family_id) {
-        alert('Vui lòng chọn tài khoản gia đình hiện có');
+        toast.error('Vui lòng chọn tài khoản gia đình hiện có');
         setIsSubmitting(false);
         return;
       }
@@ -392,6 +423,7 @@ export default function AddResidentPage() {
       let emergencyContactInfo = {
         name: '',
         phone: '',
+        email: '',
         relationship: ''
       };
 
@@ -403,6 +435,7 @@ export default function AddResidentPage() {
           emergencyContactInfo = {
             name: selectedFamilyAccount.full_name || '',
             phone: selectedFamilyAccount.phone || '',
+            email: selectedFamilyAccount.email || '',
             relationship: data.relationship === 'khác' ? (data.relationship_other || '') : (data.relationship || '')
           };
         }
@@ -411,18 +444,39 @@ export default function AddResidentPage() {
         emergencyContactInfo = {
           name: data.emergency_contact.name || '',
           phone: data.emergency_contact.phone || '',
+          email: data.emergency_contact.email || '',
           relationship: data.emergency_contact.relationship === 'khác' ? (data.emergency_contact.relationship_other || '') : (data.emergency_contact.relationship || '')
         };
       }
 
+      // Debug: Kiểm tra định dạng ngày tháng
+      console.log('Debug - data.date_of_birth:', data.date_of_birth);
+      console.log('Debug - data.date_of_birth type:', typeof data.date_of_birth);
+      
+      const convertedDateOfBirth = convertDDMMYYYYToISO(data.date_of_birth);
+      console.log('Debug - convertDDMMYYYYToISO result:', convertedDateOfBirth);
+      
+      // Validate date_of_birth
+      if (!convertedDateOfBirth) {
+        toast.error('Ngày sinh không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Khai báo biến cho tài khoản mới
+      let username = '';
+      let password = '';
+      let email = '';
+      let createdFamilyAccountId = null;
+
       // Prepare the payload according to API specification
       const payload: any = {
         full_name: data.full_name,
-        date_of_birth: data.date_of_birth,
+        date_of_birth: convertedDateOfBirth,
         gender: data.gender,
         avatar: avatarFile && avatarPreview ? avatarPreview : '/default-avatar.svg',
         relationship: data.relationship === 'khác' ? (data.relationship_other || '') : (data.relationship || ''),
-        admission_date: data.admission_date || new Date().toISOString().slice(0, 10),
+        admission_date: data.admission_date ? convertDDMMYYYYToISO(data.admission_date) : new Date().toISOString().slice(0, 10),
         medical_history: data.medical_history || 'Không có',
         current_medications: medications.filter(med => med.medication_name && med.dosage && med.frequency),
         allergies: allergies.filter(allergy => allergy.trim()),
@@ -434,8 +488,58 @@ export default function AddResidentPage() {
       if (data.family_account_type === 'existing' && data.existing_family_id) {
         payload.family_member_id = familyMemberId;
       }
-      // Nếu tạo tài khoản mới, không thêm family_member_id vào payload
-      // Nó sẽ được cập nhật sau khi tài khoản family được tạo thành công
+      // Nếu tạo tài khoản mới, tạo tài khoản family trước để có family_member_id
+      else if (data.family_account_type === 'new') {
+        // Tạo tài khoản family trước để có family_member_id
+        try {
+          // Chuẩn bị thông tin tài khoản
+          const tempUsername = data.full_name.toLowerCase()
+            .replace(/[^a-z0-9]/g, '')
+            .substring(0, 15) + Math.floor(Math.random() * 1000);
+          
+          const tempPassword = Math.random().toString(36).substring(2, 10) + 
+                          Math.random().toString(36).substring(2, 10).toUpperCase() + 
+                          Math.floor(Math.random() * 10);
+          
+          const tempEmail = data.emergency_contact.email || `${tempUsername}@example.com`;
+          
+          // Tạo tài khoản family
+          const accountData = new FormData();
+          accountData.append("username", tempUsername);
+          accountData.append("password", tempPassword);
+          accountData.append("email", tempEmail);
+          accountData.append("role", "family");
+          accountData.append("full_name", data.emergency_contact.name);
+          accountData.append("phone", data.emergency_contact.phone);
+          accountData.append("status", "active");
+          accountData.append("created_at", new Date().toISOString());
+          accountData.append("updated_at", new Date().toISOString());
+          
+          if (data.emergency_contact.address) {
+            accountData.append("address", data.emergency_contact.address);
+          }
+          
+          const userResponse = await userAPI.create(accountData);
+          
+          if (userResponse.status === 201) {
+            const user = userResponse.data;
+            payload.family_member_id = user._id;
+            
+            // Lưu thông tin tài khoản để hiển thị sau
+            username = tempUsername;
+            password = tempPassword;
+            email = tempEmail;
+            createdFamilyAccountId = user._id;
+          } else {
+            throw new Error('Failed to create family account');
+          }
+        } catch (accountError: any) {
+          console.error('Error creating family account:', accountError);
+          handleAPIError(accountError, 'Có lỗi xảy ra khi tạo tài khoản gia đình. Vui lòng thử lại.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       // Đảm bảo các trường array không rỗng
       if (!payload.current_medications.length) {
@@ -445,61 +549,13 @@ export default function AddResidentPage() {
         payload.allergies = [];
       }
 
-      // Khai báo biến cho tài khoản mới
-      let username = '';
-      let password = '';
-      let email = '';
-
-      // Xử lý tài khoản gia đình dựa trên lựa chọn
-      if (data.family_account_type === 'new') {
-        // Tạo tài khoản family trước
-        try {
-          // Tạo username từ tên cư dân
-          username = data.full_name.toLowerCase()
-            .replace(/[^a-z0-9]/g, '')
-            .substring(0, 15) + Math.floor(Math.random() * 1000);
-          
-          // Tạo mật khẩu ngẫu nhiên
-          password = Math.random().toString(36).substring(2, 10) + 
-                          Math.random().toString(36).substring(2, 10).toUpperCase() + 
-                          Math.floor(Math.random() * 10);
-          
-          // Tạo email từ username
-          email = `${username}@example.com`;
-          
-          // Tạo tài khoản
-          const accountData = new FormData();
-          accountData.append("username", username);
-          accountData.append("password", password);
-          accountData.append("email", email);
-          accountData.append("role", "family");
-          accountData.append("full_name", data.emergency_contact.name);
-          accountData.append("phone", data.emergency_contact.phone);
-          accountData.append("status", "active");
-          accountData.append("created_at", new Date().toISOString());
-          accountData.append("updated_at", new Date().toISOString());
-          // Thêm trường địa chỉ cho tài khoản family
-          if (data.emergency_contact.address) {
-            accountData.append("address", data.emergency_contact.address);
-          }
-          
-          const userResponse = await userAPI.create(accountData);
-          
-          if (userResponse.status === 201) {
-            const user = userResponse.data;
-            // Gán family_member_id vào payload trước khi tạo resident
-            payload.family_member_id = user._id;
-          } else {
-            throw new Error('Failed to create family account');
-          }
-        } catch (accountError: any) {
-          console.error('Error creating account:', accountError);
-          throw accountError;
-        }
-      }
-
       console.log('Sending payload to API:', payload);
       const residentResponse = await residentAPI.create(payload);
+      
+      // Nếu tạo resident thành công, kiểm tra xem có cần rollback không
+      if (residentResponse.status === 201) {
+        console.log('✅ Resident created successfully:', residentResponse.data._id);
+      }
       
       // Chuyển hướng đến trang thành công
       if (data.family_account_type === 'new') {
@@ -514,26 +570,11 @@ export default function AddResidentPage() {
     } catch (error: any) {
       console.error('Error submitting form:', error);
       
+      // Nếu có lỗi và đã tạo resident thành công nhưng chưa tạo family account
+      // thì không cần rollback vì resident có thể tồn tại độc lập
+      
       // Log chi tiết lỗi
-      if (error.response) {
-        console.error('Error response:', error.response);
-        console.error('Error status:', error.response.status);
-        console.error('Error data:', error.response.data);
-        
-        if (error.response.data && error.response.data.detail) {
-          alert(`Lỗi: ${error.response.data.detail}`);
-        } else if (error.response.data && error.response.data.message) {
-          alert(`Lỗi: ${error.response.data.message}`);
-        } else {
-          alert(`Lỗi ${error.response.status}: Có lỗi xảy ra khi tạo người cao tuổi. Vui lòng kiểm tra lại thông tin.`);
-        }
-      } else if (error.request) {
-        console.error('Error request:', error.request);
-        alert('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
-      } else {
-        console.error('Error message:', error.message);
-        alert(`Lỗi: ${error.message}`);
-      }
+      handleAPIError(error, 'Có lỗi xảy ra khi tạo người cao tuổi. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1220,7 +1261,7 @@ export default function AddResidentPage() {
                         <option value="">-- Chọn tài khoản gia đình --</option>
                         {existingFamilyAccounts.map(account => (
                           <option key={account._id} value={account._id}>
-                            {account.full_name} ({account.username}) - {account.phone}
+                            {account.full_name} ({account.username}) - {account.phone} - {account.email}
                           </option>
                         ))}
                       </select>
@@ -1310,6 +1351,29 @@ export default function AddResidentPage() {
                       <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.phone.message}</p>
                     )}
                   </div>
+                  
+                  {/* Email người liên hệ */}
+                  <div>
+                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
+                      Email người liên hệ <span style={{color: '#ef4444'}}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.email ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.email ? '#fef2f2' : 'white'}}
+                      placeholder="example@email.com"
+                      {...register('emergency_contact.email', { 
+                        required: 'Email là bắt buộc', 
+                        validate: validateEmail,
+                        pattern: {
+                          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                          message: 'Email không đúng định dạng'
+                        }
+                      })}
+                    />
+                    {errors.emergency_contact?.email && (
+                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.email.message}</p>
+                    )}
+                  </div>
                   {/* Địa chỉ người liên hệ */}
                   <div>
                     <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
@@ -1385,6 +1449,12 @@ export default function AddResidentPage() {
                       <label style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>Số điện thoại:</label>
                       <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.95rem', fontWeight: 600, color: '#166534' }}>
                         {existingFamilyAccounts.find(acc => acc._id === watch('existing_family_id'))?.phone}
+                      </p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>Email:</label>
+                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.95rem', fontWeight: 600, color: '#166534' }}>
+                        {existingFamilyAccounts.find(acc => acc._id === watch('existing_family_id'))?.email}
                       </p>
                     </div>
                     <div>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
@@ -123,7 +125,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
       
     } catch (error) {
       console.error('Error updating activity:', error);
-      alert('Có lỗi xảy ra khi cập nhật hoạt động. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi cập nhật hoạt động. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }

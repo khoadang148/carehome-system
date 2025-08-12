@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -436,7 +437,7 @@ export default function EditCarePlanAssignmentPage() {
                     margin: 0,
                     color: '#1e293b'
                   }}>
-            Chỉnh sửa trạng thái phân công
+            Gia hạn dịch vụ
           </h1>
                   <p style={{
                     fontSize: '1rem',

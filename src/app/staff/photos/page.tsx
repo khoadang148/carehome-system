@@ -356,14 +356,17 @@ export default function PhotoUploadPage() {
       });
       await Promise.all(uploadPromises);
       setUploadProgress(100);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Hiển thị modal thành công ngay lập tức
       setResultMessage(`✅ Đã tải lên ${successCount}/${selectedFiles.length} ảnh thành công!${errorCount > 0 ? ' Có ' + errorCount + ' ảnh lỗi.' : ''}`);
       setShowResultModal(true);
+      
+      // Chuyển hướng nhanh hơn sau 1 giây
       if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
       const timeout = setTimeout(() => {
         setShowResultModal(false);
         router.push('/staff/photos/gallery');
-      }, 2000);
+      }, 1000);
       setAutoCloseTimeout(timeout);
     } catch (error) {
       setResultMessage('❌ Có lỗi xảy ra khi tải ảnh. Vui lòng thử lại.');
@@ -991,14 +994,48 @@ export default function PhotoUploadPage() {
         </div>
       </div>
 
-      {/* Add spinning animation */}
+      {/* Add animations */}
       <style jsx>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes slideIn {
+          from { 
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        
+        @keyframes bounceIn {
+          0% { 
+            opacity: 0;
+            transform: scale(0.3);
+          }
+          50% { 
+            opacity: 1;
+            transform: scale(1.05);
+          }
+          70% { 
+            transform: scale(0.9);
+          }
+          100% { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
       `}</style>
-      {/* Modal kết quả upload */}
+      {/* Modal kết quả upload chuyên nghiệp */}
       {showResultModal && (
         <div style={{
           position: 'fixed',
@@ -1006,46 +1043,163 @@ export default function PhotoUploadPage() {
           left: 0,
           width: '100vw',
           height: '100vh',
-          background: 'rgba(0,0,0,0.35)',
+          background: 'rgba(0,0,0,0.5)',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          animation: 'fadeIn 0.3s ease-out'
         }}>
           <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '2rem 2.5rem',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            minWidth: 320,
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1.5rem',
+            padding: '2.5rem 3rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+            minWidth: 400,
+            maxWidth: 500,
             textAlign: 'center',
             position: 'relative',
+            animation: 'slideIn 0.4s ease-out',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
           }}>
-            <div style={{fontSize: '2rem', marginBottom: 12}}>
-              {resultMessage.startsWith('✅') ? '✅' : '❌'}
-            </div>
-            <div style={{fontSize: '1.1rem', fontWeight: 600, color: resultMessage.startsWith('✅') ? '#22c55e' : '#ef4444', marginBottom: 16}}>
-              {resultMessage.replace(/^✅|^❌/, '')}
-            </div>
-            <button
-              onClick={() => {
-                setShowResultModal(false);
-                if (resultMessage.startsWith('✅')) router.push('/staff/photos');
-              }}
-              style={{
-                padding: '0.5rem 1.5rem',
-                borderRadius: '0.5rem',
-                background: resultMessage.startsWith('✅') ? '#22c55e' : '#ef4444',
+            {/* Success/Error Icon */}
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              margin: '0 auto 1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: resultMessage.startsWith('✅') 
+                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              boxShadow: resultMessage.startsWith('✅')
+                ? '0 8px 25px rgba(34, 197, 94, 0.3)'
+                : '0 8px 25px rgba(239, 68, 68, 0.3)',
+              animation: 'bounceIn 0.6s ease-out'
+            }}>
+              <span style={{
+                fontSize: '2rem',
                 color: 'white',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '1rem',
-                cursor: 'pointer',
-                marginTop: 8
-              }}
-            >
-              Đóng
-            </button>
+                fontWeight: 'bold'
+              }}>
+                {resultMessage.startsWith('✅') ? '✓' : '✕'}
+              </span>
+            </div>
+            
+            {/* Title */}
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: '#1f2937',
+              margin: '0 0 0.75rem 0',
+              lineHeight: 1.2
+            }}>
+              {resultMessage.startsWith('✅') ? 'Tải lên thành công!' : 'Có lỗi xảy ra'}
+            </h3>
+            
+            {/* Message */}
+            <p style={{
+              fontSize: '1rem',
+              color: '#6b7280',
+              margin: '0 0 2rem 0',
+              lineHeight: 1.5
+            }}>
+              {resultMessage.replace(/^✅|^❌/, '')}
+            </p>
+            
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              {resultMessage.startsWith('✅') && (
+                <button
+                  onClick={() => {
+                    setShowResultModal(false);
+                    router.push('/staff/photos/gallery');
+                  }}
+                  style={{
+                    padding: '0.875rem 2rem',
+                    borderRadius: '0.75rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+                  }}
+                >
+                  <PhotoIcon style={{width: '1.25rem', height: '1.25rem'}} />
+                  Xem thư viện ảnh
+                </button>
+              )}
+              
+              <button
+                onClick={() => {
+                  setShowResultModal(false);
+                  if (resultMessage.startsWith('✅')) {
+                    resetForm();
+                  }
+                }}
+                style={{
+                  padding: '0.875rem 2rem',
+                  borderRadius: '0.75rem',
+                  background: 'white',
+                  color: '#6b7280',
+                  border: '2px solid #e5e7eb',
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                }}
+              >
+                {resultMessage.startsWith('✅') ? 'Tiếp tục tải lên' : 'Đóng'}
+              </button>
+            </div>
+            
+            {/* Progress indicator for auto-close */}
+            {resultMessage.startsWith('✅') && (
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '0.5rem',
+                background: 'rgba(34, 197, 94, 0.1)',
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(34, 197, 94, 0.2)'
+              }}>
+                <p style={{
+                  fontSize: '0.85rem',
+                  color: '#22c55e',
+                  margin: 0,
+                  fontWeight: 500
+                }}>
+                  ⏱️ Tự động chuyển hướng sau 1 giây...
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

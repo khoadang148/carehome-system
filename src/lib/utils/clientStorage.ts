@@ -23,6 +23,20 @@ export const clientStorage = {
     }
   },
 
+  // Batch set multiple items for better performance
+  setItems: (items: Record<string, string>): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      Object.entries(items).forEach(([key, value]) => {
+        localStorage.setItem(key, value);
+      });
+    } catch (error) {
+      console.error('Error setting multiple localStorage items:', error);
+    }
+  },
+
   removeItem: (key: string): void => {
     if (typeof window === 'undefined') {
       return;
@@ -31,6 +45,18 @@ export const clientStorage = {
       localStorage.removeItem(key);
     } catch (error) {
       console.error('Error removing from localStorage:', error);
+    }
+  },
+
+  // Batch remove multiple items
+  removeItems: (keys: string[]): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      keys.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+      console.error('Error removing multiple localStorage items:', error);
     }
   },
 

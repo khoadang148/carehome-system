@@ -31,7 +31,7 @@ export function useSessionTimeout() {
     const remainingTime = getRemainingSessionTime();
     
     if (remainingTime <= 0) {
-      logout();
+      logout().catch(console.error);
       return;
     }
 
@@ -48,7 +48,7 @@ export function useSessionTimeout() {
 
     timeoutRef.current = setTimeout(() => {
       // Immediate logout when session expires
-      logout();
+      logout().catch(console.error);
     }, remainingTime);
 
     return () => {
@@ -90,7 +90,7 @@ export function useSessionTimeout() {
         }, warningTime);
 
         timeoutRef.current = setTimeout(() => {
-          logout();
+          logout().catch(console.error);
         }, newRemainingTime);
       }
     };
@@ -129,13 +129,13 @@ export function useSessionTimeout() {
     }, warningTime);
 
     timeoutRef.current = setTimeout(() => {
-      logout();
+      logout().catch(console.error);
     }, newRemainingTime);
   };
 
   const handleLogout = () => {
     // Immediate logout without any delay
-    logout();
+    logout().catch(console.error);
   };
 
   return {

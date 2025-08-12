@@ -1,9 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { residentAPI } from "@/lib/api";
 import { userAPI } from "@/lib/api";
+import { UserFriendlyErrorHandler } from '@/lib/utils/user-friendly-errors';
 
 // Format ngày sinh dạng dd/mm/yyyy
 function formatDate(dateStr: string) {
@@ -57,11 +60,11 @@ export default function NewAccountPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("Chỉ chấp nhận file ảnh JPG, PNG, GIF");
+      toast.error("Chỉ chấp nhận file ảnh JPG, PNG, GIF");
       return;
     }
     if (file.size > 1024 * 1024) {
-      alert("File quá lớn, chỉ chấp nhận tối đa 1MB");
+      toast.error("File quá lớn, chỉ chấp nhận tối đa 1MB");
       return;
     }
     setFormData((prev) => ({ ...prev, avatar: file }));
@@ -143,13 +146,15 @@ export default function NewAccountPage() {
         setError(errData.detail || errData.message || "Tạo tài khoản thất bại!");
       }
     } catch (err: any) {
-      // Xử lý lỗi trùng lặp cụ thể
-      if (err.message?.includes('username') || err.message?.includes('tên đăng nhập')) {
-        setValidationErrors(prev => ({ ...prev, username: "Tên đăng nhập đã tồn tại trong hệ thống" }));
-      } else if (err.message?.includes('email')) {
-        setValidationErrors(prev => ({ ...prev, email: "Email đã được sử dụng bởi tài khoản khác" }));
+      console.error('Error creating account:', err);
+      
+      const errorResult = UserFriendlyErrorHandler.handleError(err);
+      
+      // Handle field-specific errors
+      if (errorResult.fieldErrors && Object.keys(errorResult.fieldErrors).length > 0) {
+        setValidationErrors(errorResult.fieldErrors);
       } else {
-        setError(err.message || "Tạo tài khoản thất bại! Vui lòng thử lại.");
+        setError(errorResult.message);
       }
     } finally {
       setSaving(false);

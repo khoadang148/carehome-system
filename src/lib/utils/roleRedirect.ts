@@ -1,41 +1,41 @@
-import { UserRole } from '@/lib/contexts/auth-context';
+import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 
-/**
- * Get the appropriate redirect path based on user role
- */
-export const getRoleRedirectPath = (role: UserRole): string => {
-  switch (role) {
-    case 'family':
-      return '/family';
-    case 'staff':
-      return '/staff';
-    case 'admin':
-      return '/admin';
-    default:
-      return '/';
-  }
+export const redirectByRole = (router: AppRouterInstance, role: string) => {
+  // Preload trang đích trước khi redirect
+  const targetPath = getTargetPath(role);
+  
+  // Prefetch để tăng tốc độ chuyển trang
+  router.prefetch(targetPath);
+  
+  // Redirect ngay lập tức
+  router.push(targetPath);
 };
 
-/**
- * Redirect user based on their role
- */
-export const redirectByRole = (router: any, role: UserRole): void => {
-  const redirectPath = getRoleRedirectPath(role);
-  router.push(redirectPath);
+const getTargetPath = (role: string): string => {
+  switch (role) {
+    case 'admin':
+      return '/admin';
+    case 'staff':
+      return '/staff';
+    case 'family':
+      return '/family';
+    default:
+      return '/login';
+  }
 };
 
 /**
  * Check if current path matches user role
  */
-export const isPathForRole = (pathname: string, role: UserRole): boolean => {
-  const rolePath = getRoleRedirectPath(role);
+export const isPathForRole = (pathname: string, role: string): boolean => {
+  const rolePath = getTargetPath(role);
   return pathname.startsWith(rolePath);
 };
 
 /**
  * Get role from pathname
  */
-export const getRoleFromPath = (pathname: string): UserRole | null => {
+export const getRoleFromPath = (pathname: string): string | null => {
   if (pathname.startsWith('/family')) return 'family';
   if (pathname.startsWith('/staff')) return 'staff';
   if (pathname.startsWith('/admin')) return 'admin';

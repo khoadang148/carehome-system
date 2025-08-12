@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -78,10 +80,10 @@ export default function InvoiceDetailPage() {
       if (data && data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
-        alert('Không lấy được link thanh toán online. Vui lòng thử lại.');
+        toast.error('Không lấy được link thanh toán online. Vui lòng thử lại.');
       }
     } catch (err: any) {
-      alert(err?.message || 'Không thể tạo link thanh toán. Vui lòng thử lại.');
+      toast.error(err?.message || 'Không thể tạo link thanh toán. Vui lòng thử lại.');
     }
   };
 
@@ -500,8 +502,215 @@ export default function InvoiceDetailPage() {
 
           {/* Right Column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Care Plan Information */}
-            {invoice.care_plan_snapshot && (
+            {/* Billing Details */}
+            {invoice.billing_details && (
+              <div style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  margin: '0 0 1rem 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <BuildingLibraryIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
+                  Chi tiết hóa đơn
+                </h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Chi tiết dịch vụ */}
+                  {invoice.billing_details.serviceDetails && invoice.billing_details.serviceDetails.length > 0 && (
+                    <div>
+                      <h3 style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b',
+                        margin: '0 0 0.75rem 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        📋 Gói dịch vụ:
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {invoice.billing_details.serviceDetails.map((service: any, index: number) => (
+                          <div key={index} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.75rem',
+                            background: '#eff6ff',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #dbeafe'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                color: '#1e293b',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {service.plan_name}
+                              </div>
+                              {service.description && (
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#64748b',
+                                  lineHeight: 1.4
+                                }}>
+                                  {service.description}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{
+                              fontSize: '0.875rem',
+                              fontWeight: 700,
+                              color: '#3b82f6',
+                              marginLeft: '1rem'
+                            }}>
+                              {formatCurrency(service.monthly_price)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.75rem',
+                        background: '#f0f9ff',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #bae6fd'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: '0.875rem'
+                        }}>
+                          <span style={{ fontWeight: 600, color: '#1e293b' }}>Tổng tiền dịch vụ:</span>
+                          <span style={{ fontWeight: 700, color: '#3b82f6' }}>
+                            {formatCurrency(invoice.billing_details.totalServiceCost || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chi tiết phòng */}
+                  {invoice.billing_details.roomDetails && (
+                    <div>
+                      <h3 style={{
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        color: '#1e293b',
+                        margin: '0 0 0.75rem 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        🏠 Thông tin phòng:
+                      </h3>
+                      <div style={{
+                        padding: '0.75rem',
+                        background: '#f0fdf4',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #bbf7d0'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              color: '#1e293b',
+                              marginBottom: '0.25rem'
+                            }}>
+                              Phòng {invoice.billing_details.roomDetails.room_number} - {invoice.billing_details.roomDetails.room_type}
+                            </div>
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: '#64748b'
+                            }}>
+                              Tầng {invoice.billing_details.roomDetails.floor}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: 700,
+                            color: '#16a34a',
+                            marginLeft: '1rem'
+                          }}>
+                            {formatCurrency(invoice.billing_details.roomDetails.monthly_price)}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.75rem',
+                        background: '#f0fdf4',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #bbf7d0'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: '0.875rem'
+                        }}>
+                          <span style={{ fontWeight: 600, color: '#1e293b' }}>Tổng tiền phòng:</span>
+                          <span style={{ fontWeight: 700, color: '#16a34a' }}>
+                            {formatCurrency(invoice.billing_details.totalRoomCost || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tổng cộng */}
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                    borderRadius: '0.75rem',
+                    border: '2px solid #cbd5e1'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '1rem',
+                      fontWeight: 700
+                    }}>
+                      <span style={{ color: '#1e293b' }}>TỔNG CỘNG:</span>
+                      <span style={{ color: '#3b82f6', fontSize: '1.125rem' }}>
+                        {formatCurrency(invoice.amount)}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      textAlign: 'center',
+                      marginTop: '0.5rem'
+                    }}>
+                      mỗi tháng
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback: Care Plan Information (nếu không có billing_details) */}
+            {!invoice.billing_details && invoice.care_plan_snapshot && (
               <div style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 borderRadius: '1rem',

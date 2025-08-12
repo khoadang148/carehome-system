@@ -360,12 +360,10 @@ export default function FamilyPortalPage() {
       }
       activitiesAPI.getById(id)
         .then(data => {
-          // Chuyển đổi thời gian từ UTC về múi giờ Việt Nam (+7)
+          // Sử dụng thời gian trực tiếp từ API (đã là Vietnam time)
           const convertToVietnamTime = (utcTime: string) => {
             if (!utcTime) return '';
-            const utcDate = new Date(utcTime);
-            const vietnamTime = new Date(utcDate.getTime() + (7 * 60 * 60 * 1000)); // +7 giờ
-            return vietnamTime.toISOString();
+            return utcTime; // Không chuyển đổi timezone nữa
           };
           
           setActivityTimes(prev => ({
@@ -1079,63 +1077,50 @@ useEffect(() => {
                   <div className="text-base font-semibold">{assignedStaffError}</div>
                   </div>
                                   ) : assignedStaff.length > 0 ? (
-                <div className="flex flex-col gap-4">
-                      {assignedStaff.map((assignment: any, index: number) => {
-                        const staff = assignment.staff_id;
-                        const staffName = staff?.full_name || staff?.fullName || staff?.name || staff?.username || staff?.email || 'Chưa rõ';
-                        const staffPosition = staff?.position || 'Nhân viên chăm sóc';
-                        
-                        return (
-                      <div key={assignment._id || index} className="bg-white rounded-xl p-5 border border-blue-200 shadow-lg">
-                        {/* Header with icon and title */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                            <UsersIcon className="w-5 h-5 text-white" />
-                              </div>
-                          <h3 className="text-lg font-bold text-slate-800 m-0">
-                                Nhân viên phụ trách chăm sóc
-                              </h3>
-                            </div>
-                            
-                            {/* Separator line */}
-                        <div className="h-0.5 bg-blue-500 mb-4" />
-                        
-                        {/* Content - 3 columns */}
-                        <div className="grid grid-cols-3 gap-4">
-                          {/* Column 1: Staff name */}
-                          <div className="bg-blue-50 rounded-lg p-3 text-center">
-                            <div className="text-xs text-blue-600 font-semibold mb-1">
-                                  Tên nhân viên
-                                </div>
-                            <div className="text-sm text-slate-800 font-bold">
-                                  {staffName}
-                                </div>
-                              </div>
-                              
-                          {/* Column 2: Position */}
-                          <div className="bg-blue-50 rounded-lg p-3 text-center">
-                            <div className="text-xs text-blue-600 font-semibold mb-1">
-                                  Chức vụ
-                                </div>
-                            <div className="text-sm text-slate-800 font-bold">
-                                  {staffPosition}
-                                </div>
-                              </div>
-                              
-                          {/* Column 3: Phone */}
-                          <div className="bg-blue-50 rounded-lg p-3 text-center">
-                            <div className="text-xs text-blue-600 font-semibold mb-1">
-                                  Số điện thoại
-                                </div>
-                            <div className="text-sm text-slate-800 font-bold">
-                                  {staff?.phone || 'Chưa hoàn tất đăng kí'}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                <div className="bg-white rounded-xl p-5 border border-blue-200 shadow-lg">
+                  {/* Header with icon and title */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                      <UsersIcon className="w-5 h-5 text-white" />
                     </div>
+                    <h3 className="text-lg font-bold text-slate-800 m-0">
+                      Nhân viên phụ trách chăm sóc
+                    </h3>
+                  </div>
+                  
+                  {/* Separator line */}
+                  <div className="h-0.5 bg-blue-500 mb-4" />
+                  
+                  {/* Table header */}
+                  <div className="grid grid-cols-3 gap-4 mb-3 px-3">
+                    <div className="text-xs text-blue-600 font-semibold text-center">Tên nhân viên</div>
+                    <div className="text-xs text-blue-600 font-semibold text-center">Chức vụ</div>
+                    <div className="text-xs text-blue-600 font-semibold text-center">Số điện thoại</div>
+                  </div>
+                  
+                  {/* Staff list */}
+                  <div className="space-y-2">
+                    {assignedStaff.map((assignment: any, index: number) => {
+                      const staff = assignment.staff_id;
+                      const staffName = staff?.full_name || staff?.fullName || staff?.name || staff?.username || staff?.email || 'Chưa rõ';
+                      const staffPosition = staff?.position || 'Nhân viên chăm sóc';
+                      
+                      return (
+                        <div key={assignment._id || index} className="grid grid-cols-3 gap-4 bg-blue-50 rounded-lg p-3">
+                          <div className="text-sm text-slate-800 font-bold text-center">
+                            {staffName}
+                          </div>
+                          <div className="text-sm text-slate-800 font-bold text-center">
+                            {staffPosition}
+                          </div>
+                          <div className="text-sm text-slate-800 font-bold text-center">
+                            {staff?.phone || 'Chưa hoàn tất đăng kí'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 ) : (
                 <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-dashed border-blue-400 text-center">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mb-4">

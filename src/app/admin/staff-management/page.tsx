@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -34,6 +35,7 @@ export default function StaffManagementPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -87,9 +89,12 @@ export default function StaffManagementPage() {
       setDeleteId(null);
       // Thông báo thành công chi tiết
       setError(''); // Xóa lỗi cũ nếu có
-      setSuccessMessage(`✅ Đã xóa thành công nhân viên: ${staffName}`);
-      // Tự động ẩn thông báo sau 5 giây
-      setTimeout(() => setSuccessMessage(''), 5000);
+      setSuccessMessage(`Đã xóa thành công nhân viên: ${staffName}`);
+      setShowSuccessModal(true);
+      // Tự động chuyển hướng sau 2 giây
+      setTimeout(() => {
+        setShowSuccessModal(false);
+      }, 2000);
     } catch (error: any) {
       console.error('Error deleting staff:', error);
       setError(`❌ Không thể xóa nhân viên ${staffName}: ${error.message || 'Lỗi không xác định'}`);
@@ -171,44 +176,25 @@ export default function StaffManagementPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)',
           backdropFilter: 'blur(10px)'
         }}>
-          {/* Error and Success Messages */}
-          {(error || successMessage) && (
+          {/* Error Messages */}
+          {error && (
             <div style={{
               marginBottom: '1rem',
               padding: '1rem',
               borderRadius: '0.75rem',
               border: '1px solid',
-              ...(error ? {
-                backgroundColor: '#fef2f2',
-                borderColor: '#fecaca',
-                color: '#dc2626'
-              } : {
-                backgroundColor: '#f0fdf4',
-                borderColor: '#bbf7d0',
-                color: '#16a34a'
-              })
+              backgroundColor: '#fef2f2',
+              borderColor: '#fecaca',
+              color: '#dc2626'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {error ? (
-                    <>
-                      <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-                      <span style={{ fontWeight: 600 }}>Lỗi:</span>
-                      <span>{error}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircleIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-                      <span style={{ fontWeight: 600 }}>Thành công:</span>
-                      <span>{successMessage}</span>
-                    </>
-                  )}
+                  <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                  <span style={{ fontWeight: 600 }}>Lỗi:</span>
+                  <span>{error}</span>
                 </div>
                 <button
-                  onClick={() => {
-                    setError('');
-                    setSuccessMessage('');
-                  }}
+                  onClick={() => setError('')}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -454,31 +440,19 @@ export default function StaffManagementPage() {
                           width: '2.5rem',
                           height: '2.5rem',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)',
+                          overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '0.875rem',
-                          overflow: 'hidden'
+                          justifyContent: 'center'
                         }}>
-                          {staff.avatar ? (
-                            <img 
-                              src={processAvatarUrl(staff.avatar)} 
-                              alt={staff.full_name} 
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  parent.textContent = staff.full_name ? staff.full_name.charAt(0).toUpperCase() : 'N';
-                                }
-                              }}
-                            />
-                          ) : (
-                            staff.full_name?.charAt(0) || 'N'
-                          )}
+                          <img 
+                            src={staff.avatar ? processAvatarUrl(staff.avatar) : '/default-avatar.svg'} 
+                            alt={staff.full_name} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.src = '/default-avatar.svg';
+                            }}
+                          />
                         </div>
                         <div>
                           <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>{staff.full_name}</p>
@@ -751,33 +725,21 @@ export default function StaffManagementPage() {
                       width: '100%',
                       height: '100%',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #3b82f6 100%)',
+                      overflow: 'hidden',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'white',
-                      fontWeight: 700,
-                      fontSize: '1.75rem',
-                      overflow: 'hidden',
                       boxShadow: '0 12px 32px rgba(99,102,241,0.25), 0 0 0 3px rgba(255,255,255,0.8)',
                       border: '2px solid rgba(255,255,255,0.9)',
                     }}>
-                      {selectedStaff.avatar ? (
-                        <img 
-                          src={processAvatarUrl(selectedStaff.avatar)} 
-                          alt={selectedStaff.full_name} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const parent = e.currentTarget.parentElement;
-                            if (parent) {
-                              parent.textContent = selectedStaff.full_name ? selectedStaff.full_name.charAt(0).toUpperCase() : 'N';
-                            }
-                          }}
-                        />
-                      ) : (
-                        selectedStaff.full_name?.charAt(0) || 'N'
-                      )}
+                      <img 
+                        src={selectedStaff.avatar ? processAvatarUrl(selectedStaff.avatar) : '/default-avatar.svg'} 
+                        alt={selectedStaff.full_name} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.currentTarget.src = '/default-avatar.svg';
+                        }}
+                      />
                     </div>
                   </div>
                 
@@ -921,6 +883,52 @@ export default function StaffManagementPage() {
           </div>
         )}
 
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '1rem',
+              padding: '3rem',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+              textAlign: 'center',
+              maxWidth: '400px'
+            }}>
+              <CheckCircleIcon style={{
+                width: '3rem',
+                height: '3rem',
+                color: '#10b981',
+                margin: '0 auto 1rem'
+              }} />
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: 600,
+                color: '#1f2937',
+                margin: '0 0 0.5rem 0'
+              }}>
+                Xóa thành công!
+              </h2>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                {successMessage}
+              </p>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -362,7 +363,7 @@ export default function PhotoGalleryPage() {
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem'}}>
               <button
-                onClick={() => router.push('/residents')}
+                onClick={() => router.push('/staff/photos')}
                 style={{
                   padding: '0.75rem',
                   border: 'none',

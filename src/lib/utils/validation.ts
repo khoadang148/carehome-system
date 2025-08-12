@@ -675,4 +675,207 @@ export const getDateYYYYMMDDWithTimezone = (date: Date | string | null | undefin
     console.warn('Error processing date for comparison:', error);
     return '';
   }
+};
+
+// Interface cho activity participation
+export interface ActivityParticipation {
+  _id?: string;
+  date?: string;
+  activity_id?: {
+    _id?: string;
+    activity_name?: string;
+    schedule_time?: string;
+    duration?: number;
+  };
+  resident_id?: string;
+  staff_id?: string;
+  attendance_status?: string;
+  performance_notes?: string;
+}
+
+// Interface cho schedule conflict validation
+export interface ScheduleConflictData {
+  residentId: string;
+  selectedDate: Date;
+  selectedTime: string;
+  duration: number;
+  existingParticipations: ActivityParticipation[];
+}
+
+/**
+ * Kiểm tra trùng lịch hoạt động cho cư dân
+ * @param data - Dữ liệu để kiểm tra trùng lịch
+ * @returns ValidationError | null - Lỗi nếu có trùng lịch, null nếu không
+ */
+export const checkScheduleConflict = (data: ScheduleConflictData): ValidationError | null => {
+  const { selectedDate, selectedTime, duration, existingParticipations } = data;
+  
+  // Tạo thời gian bắt đầu và kết thúc cho hoạt động mới
+  const newActivityStartTime = new Date(selectedDate);
+  const [hours, minutes] = selectedTime.split(':').map(Number);
+  newActivityStartTime.setHours(hours, minutes, 0, 0);
+  const newActivityEndTime = new Date(newActivityStartTime.getTime() + duration * 60 * 1000);
+  
+  // Lấy ngày để so sánh
+  const activityDate = getDateYYYYMMDDWithTimezone(selectedDate);
+  
+  // Tìm các hoạt động trong cùng ngày
+  const sameDayActivities = existingParticipations.filter((participation) => {
+    if (!participation.date) return false;
+    const participationDate = getDateYYYYMMDDWithTimezone(participation.date);
+    return participationDate === activityDate;
+  });
+  
+  // Kiểm tra trùng lịch
+  for (const participation of sameDayActivities) {
+    if (!participation.activity_id?.schedule_time) continue;
+    
+    const existingActivityStartTime = new Date(participation.activity_id.schedule_time);
+    const existingActivityEndTime = new Date(
+      existingActivityStartTime.getTime() + (participation.activity_id.duration || 60) * 60 * 1000
+    );
+    
+    // Kiểm tra overlap
+    if (newActivityStartTime < existingActivityEndTime && newActivityEndTime > existingActivityStartTime) {
+      const activityName = participation.activity_id.activity_name || 'Hoạt động khác';
+      const activityTime = existingActivityStartTime.toLocaleTimeString('vi-VN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      return {
+        field: 'schedule_time',
+        message: `Cư dân đã có hoạt động "${activityName}" vào lúc ${activityTime} trong cùng ngày. Vui lòng chọn thời gian khác.`,
+        code: 'SCHEDULE_CONFLICT'
+      };
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Kiểm tra thời gian tạo hoạt động hợp lệ
+ * @param selectedDate - Ngày được chọn
+ * @param selectedTime - Thời gian được chọn
+ * @param duration - Thời lượng hoạt động (phút)
+ * @returns ValidationError | null - Lỗi nếu thời gian không hợp lệ
+ */
+export const validateActivitySchedule = (
+  selectedDate: Date | null,
+  selectedTime: string | null,
+  duration: number = 60
+): ValidationError | null => {
+  // Kiểm tra có chọn ngày và giờ không
+  if (!selectedDate || !selectedTime) {
+    return {
+      field: 'schedule_time',
+      message: 'Vui lòng chọn ngày và giờ cho hoạt động.',
+      code: 'MISSING_SCHEDULE'
+    };
+  }
+  
+  // Tạo thời gian bắt đầu
+  const selectedDateTime = new Date(selectedDate);
+  const [hours, minutes] = selectedTime.split(':').map(Number);
+  selectedDateTime.setHours(hours, minutes, 0, 0);
+  
+  const now = new Date();
+  
+  // Kiểm tra không được tạo trong quá khứ
+  if (selectedDateTime <= now) {
+    return {
+      field: 'schedule_time',
+      message: `Vui lòng chọn thời gian trong tương lai. Thời gian hiện tại là ${now.toLocaleString('vi-VN')}.`,
+      code: 'PAST_TIME'
+    };
+  }
+  
+  // Kiểm tra phải tạo trước ít nhất 1 tiếng
+  const oneHourFromNow = new Date(now.getTime() + 1 * 60 * 60 * 1000);
+  if (selectedDateTime < oneHourFromNow) {
+    return {
+      field: 'schedule_time',
+      message: `Hoạt động cần được tạo trước ít nhất 1 tiếng để có đủ thời gian chuẩn bị. Thời gian sớm nhất có thể tạo là ${oneHourFromNow.toLocaleString('vi-VN')}.`,
+      code: 'TOO_SOON'
+    };
+  }
+  
+  // Kiểm tra không được tạo trước quá 1 tuần
+  const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  if (selectedDateTime > oneWeekFromNow) {
+    return {
+      field: 'schedule_time',
+      message: `Hoạt động chỉ có thể được tạo trước tối đa 1 tuần. Thời gian muộn nhất có thể tạo là ${oneWeekFromNow.toLocaleString('vi-VN')}.`,
+      code: 'TOO_LATE'
+    };
+  }
+  
+  return null;
 }; 
+
+/**
+ * Chuyển đổi ngày từ định dạng dd/mm/yyyy sang ISO 8601 format (YYYY-MM-DD)
+ * Sử dụng để gửi dữ liệu cho backend API
+ * @param dateString - Chuỗi ngày theo định dạng dd/mm/yyyy
+ * @returns string - ngày theo định dạng ISO 8601 (YYYY-MM-DD) hoặc chuỗi rỗng nếu lỗi
+ */
+export const convertDDMMYYYYToISO = (dateString: string): string => {
+  if (!dateString || typeof dateString !== 'string') return '';
+  
+  try {
+    // Kiểm tra nếu đã là định dạng ISO (yyyy-mm-dd)
+    const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoRegex.test(dateString)) {
+      console.log('Date is already in ISO format:', dateString);
+      return dateString;
+    }
+    
+    // Kiểm tra định dạng dd/mm/yyyy
+    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const match = dateString.match(dateRegex);
+    
+    if (!match) {
+      console.warn('Invalid date format. Expected dd/mm/yyyy or yyyy-mm-dd, got:', dateString);
+      return '';
+    }
+    
+    const [, day, month, year] = match;
+    const dayNum = parseInt(day, 10);
+    const monthNum = parseInt(month, 10);
+    const yearNum = parseInt(year, 10);
+    
+    // Kiểm tra tính hợp lệ của ngày
+    const date = new Date(yearNum, monthNum - 1, dayNum);
+    if (date.getDate() !== dayNum || date.getMonth() !== monthNum - 1 || date.getFullYear() !== yearNum) {
+      console.warn('Invalid date:', dateString);
+      return '';
+    }
+    
+    // Trả về định dạng ISO 8601
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    console.error('Error converting date format:', error);
+    return '';
+  }
+};
+
+/**
+ * Chuyển đổi ngày từ định dạng dd/mm/yyyy sang Date object
+ * Sử dụng để xử lý ngày tháng trong JavaScript
+ * @param dateString - Chuỗi ngày theo định dạng dd/mm/yyyy
+ * @returns Date | null - Date object hoặc null nếu lỗi
+ */
+export const parseDDMMYYYYToDate = (dateString: string): Date | null => {
+  if (!dateString || typeof dateString !== 'string') return null;
+  
+  try {
+    const isoDate = convertDDMMYYYYToISO(dateString);
+    if (!isoDate) return null;
+    
+    return new Date(isoDate);
+  } catch (error) {
+    console.error('Error parsing date:', error);
+    return null;
+  }
+};

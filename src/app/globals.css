@@ -97,6 +97,15 @@ body:not(.hide-header) header {
   display: flex !important;
 }
 
+/* Date picker z-index fix */
+.react-datepicker-popper {
+  z-index: 9999 !important;
+}
+
+.react-datepicker-wrapper {
+  z-index: 10;
+}
+
 /* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

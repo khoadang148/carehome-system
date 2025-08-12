@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { 
   DocumentTextIcon,
   ClipboardIcon,
@@ -296,7 +298,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
     
     // 1. Kiểm tra độ dài tối thiểu
     if (noteContent.length < 15) {
-      alert('⚠️ Nội dung nhật ký quá ngắn.\n\nVui lòng mô tả chi tiết:\n• Tình trạng hiện tại\n• Triệu chứng quan sát\n• Hoạt động thực hiện\n• Phản ứng của người cao tuổi\n\n(Tối thiểu 15 ký tự)');
+      toast.warning('⚠️ Nội dung nhật ký quá ngắn.\n\nVui lòng mô tả chi tiết:\n• Tình trạng hiện tại\n• Triệu chứng quan sát\n• Hoạt động thực hiện\n• Phản ứng của người cao tuổi\n\n(Tối thiểu 15 ký tự)');
       return;
     }
 
@@ -460,13 +462,13 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
         successMessage += `\n📋 LƯU Ý: Theo dõi thường xuyên.`;
       }
       
-      alert(successMessage);
+      toast.success(successMessage);
       // Trigger custom event để refresh widgets
       window.dispatchEvent(new CustomEvent('dataUpdated'));
       onComplete();
     } catch (error) {
       console.error('Error adding care note:', error);
-      alert('❌ Có lỗi xảy ra khi lưu nhật ký. Vui lòng thử lại.');
+      toast.error('❌ Có lỗi xảy ra khi lưu nhật ký. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }

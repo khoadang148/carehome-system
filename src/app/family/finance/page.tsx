@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -127,10 +129,10 @@ export default function FinancePage() {
       if (data && data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
-        alert('Không lấy được link thanh toán online. Vui lòng thử lại.');
+        toast.error('Không lấy được link thanh toán online. Vui lòng thử lại.');
       }
     } catch (err: any) {
-      alert(err?.message || 'Không thể tạo link thanh toán. Vui lòng thử lại.');
+      toast.error(err?.message || 'Không thể tạo link thanh toán. Vui lòng thử lại.');
     }
   };
 

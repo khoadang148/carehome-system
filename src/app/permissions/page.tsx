@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState } from 'react'
+import { toast } from 'react-toastify';;
 import Link from 'next/link';
 import { 
   MagnifyingGlassIcon, 
@@ -178,7 +179,7 @@ export default function PermissionsPage() {
   const handleDeleteUser = (userId: number) => {
     if (confirm('Bạn có chắc chắn muốn xóa người dùng này không?')) {
       // In a real application, this would make an API call to delete the user
-      alert(`Người dùng ID ${userId} đã được xóa thành công!`);
+      toast.success(`Người dùng ID ${userId} đã được xóa thành công!`);
       // Optionally refresh the page or update the state to remove the user from the list
     }
   };

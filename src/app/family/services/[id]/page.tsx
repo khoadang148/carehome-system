@@ -15,7 +15,7 @@ import {
   ExclamationTriangleIcon,
   HomeIcon
 } from '@heroicons/react/24/outline';
-import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { carePlansAPI, carePlanAssignmentsAPI, residentAPI, userAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 
 // Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
@@ -37,11 +37,14 @@ export default function ServiceDetailsPage() {
   const [selectedRelative, setSelectedRelative] = useState<any>(null);
   const [residentCarePlans, setResidentCarePlans] = useState<any[]>([]);
   const [residentCarePlanDetail, setResidentCarePlanDetail] = useState<any>(null);
+  const [carePlanDetails, setCarePlanDetails] = useState<any[]>([]);
+  const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
   const [loadingCarePlanDetail, setLoadingCarePlanDetail] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // Thêm state cho số phòng
+  // Thêm state cho số phòng và giường
   const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
+  const [bedNumber, setBedNumber] = useState<string>('Chưa phân giường');
   const [roomLoading, setRoomLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
 
@@ -97,8 +100,8 @@ export default function ServiceDetailsPage() {
       if (!selectedRelative?._id) return;
 
       try {
-        const response = await carePlansAPI.getByResidentId(selectedRelative._id);
-        console.log('Care plans response:', response);
+        const response = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
+        console.log('Care plan assignments response:', response);
         setResidentCarePlans(Array.isArray(response) ? response : []);
       } catch (error) {
         console.error('Error loading care plans:', error);
@@ -115,12 +118,56 @@ export default function ServiceDetailsPage() {
 
       try {
         setLoadingCarePlanDetail(true);
-        // Use the first care plan assignment as the detail
-        const firstAssignment = residentCarePlans[0];
-        console.log('First assignment:', firstAssignment);
-        console.log('All care plans:', residentCarePlans);
-        if (firstAssignment) {
-          setResidentCarePlanDetail(firstAssignment);
+        
+        // Fetch tất cả care plan assignments của resident để hiển thị đầy đủ
+        console.log('Fetching all care plan assignments for resident:', selectedRelative._id);
+        const allAssignments = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
+        console.log('All assignments for resident:', allAssignments);
+        setCarePlanAssignments(Array.isArray(allAssignments) ? allAssignments : []);
+        
+        // Lấy tất cả care plan IDs từ tất cả assignments
+        const allCarePlanIds: any[] = [];
+        if (Array.isArray(allAssignments)) {
+          allAssignments.forEach((assignment: any) => {
+            if (Array.isArray(assignment.care_plan_ids)) {
+              assignment.care_plan_ids.forEach((plan: any) => {
+                const planId = plan._id || plan;
+                if (!allCarePlanIds.find(p => (p._id || p) === planId)) {
+                  allCarePlanIds.push(plan);
+                }
+              });
+            }
+          });
+        }
+        
+        console.log('All unique care plan IDs:', allCarePlanIds);
+        
+        // Fetch chi tiết của tất cả care plans
+        if (allCarePlanIds.length > 0) {
+          const carePlanPromises = allCarePlanIds.map(async (plan: any) => {
+            const planId = plan._id || plan;
+            console.log('Fetching care plan with ID:', planId);
+            try {
+              const planData = await carePlansAPI.getById(planId);
+              console.log('Care plan data received for ID', planId, ':', planData);
+              return planData;
+            } catch (err) {
+              console.error('Error fetching care plan with ID', planId, ':', err);
+              return plan; // Return original plan data if fetch fails
+            }
+          });
+          
+          const carePlanData = await Promise.all(carePlanPromises);
+          console.log('All care plan details received:', carePlanData);
+          setCarePlanDetails(carePlanData);
+        } else {
+          console.log('No care plans found for resident');
+          setCarePlanDetails([]);
+        }
+        
+        // Use the first assignment as the main detail for backward compatibility
+        if (allAssignments.length > 0) {
+          setResidentCarePlanDetail(allAssignments[0]);
         }
       } catch (error) {
         console.error('Error loading care plan detail:', error);
@@ -132,10 +179,11 @@ export default function ServiceDetailsPage() {
     loadCarePlanDetail();
   }, [selectedRelative?._id, residentCarePlans]);
 
-  // Lấy số phòng khi selectedRelative thay đổi
+  // Lấy số phòng và giường khi selectedRelative thay đổi
   useEffect(() => {
     if (!selectedRelative?._id) {
       setRoomNumber('Chưa hoàn tất đăng kí');
+      setBedNumber('Chưa phân giường');
       return;
     }
     setRoomLoading(true);
@@ -160,9 +208,22 @@ export default function ServiceDetailsPage() {
               setRoomNumber('Chưa hoàn tất đăng kí');
             }
           }
+          
+          // Lấy thông tin giường
+          if (assignment.bed_id) {
+            if (typeof assignment.bed_id === 'object' && assignment.bed_id.bed_number) {
+              setBedNumber(assignment.bed_id.bed_number);
+            } else {
+              const bedId = typeof assignment.bed_id === 'object' && assignment.bed_id?._id ? 
+                assignment.bed_id._id : assignment.bed_id;
+              setBedNumber(bedId || 'Chưa phân giường');
+            }
+          } else {
+            setBedNumber('Chưa phân giường');
+          }
         } else {
           // Fallback: lấy từ care plan assignments
-          return carePlansAPI.getByResidentId(selectedRelative._id)
+          return carePlanAssignmentsAPI.getByResidentId(selectedRelative._id)
             .then((careAssignments: any[]) => {
               const careAssignment = Array.isArray(careAssignments) ? careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
               const roomId = careAssignment?.bed_id?.room_id || careAssignment?.assigned_room_id;
@@ -176,11 +237,30 @@ export default function ServiceDetailsPage() {
               } else {
                 setRoomNumber('Chưa hoàn tất đăng kí');
               }
+              
+              // Lấy thông tin giường từ care assignment
+              if (careAssignment?.bed_id) {
+                if (typeof careAssignment.bed_id === 'object' && careAssignment.bed_id.bed_number) {
+                  setBedNumber(careAssignment.bed_id.bed_number);
+                } else {
+                  const bedId = typeof careAssignment.bed_id === 'object' && careAssignment.bed_id?._id ? 
+                    careAssignment.bed_id._id : careAssignment.bed_id;
+                  setBedNumber(bedId || 'Chưa phân giường');
+                }
+              } else {
+                setBedNumber('Chưa phân giường');
+              }
             })
-            .catch(() => setRoomNumber('Chưa hoàn tất đăng kí'));
+            .catch(() => {
+              setRoomNumber('Chưa hoàn tất đăng kí');
+              setBedNumber('Chưa phân giường');
+            });
         }
       })
-      .catch(() => setRoomNumber('Chưa hoàn tất đăng kí'))
+      .catch(() => {
+        setRoomNumber('Chưa hoàn tất đăng kí');
+        setBedNumber('Chưa phân giường');
+      })
       .finally(() => setRoomLoading(false));
   }, [selectedRelative?._id]);
 
@@ -221,6 +301,30 @@ export default function ServiceDetailsPage() {
       ...prev,
       [index]: !prev[index]
     }));
+  };
+
+  // Function để tìm assignment cho từng care plan
+  const getAssignmentForCarePlan = (carePlanId: string) => {
+    if (!Array.isArray(carePlanAssignments)) return null;
+    
+    return carePlanAssignments.find((assignment: any) => {
+      if (Array.isArray(assignment.care_plan_ids)) {
+        return assignment.care_plan_ids.some((plan: any) => {
+          const planId = plan._id || plan;
+          return planId === carePlanId;
+        });
+      }
+      return false;
+    });
+  };
+
+  // Function để tính tổng tiền dịch vụ từ tất cả care plans
+  const calculateTotalServiceCost = () => {
+    if (!Array.isArray(carePlanDetails)) return 0;
+    
+    return carePlanDetails.reduce((total, carePlan) => {
+      return total + (carePlan.monthly_price || 0);
+    }, 0);
   };
 
   if (loading) {
@@ -435,18 +539,22 @@ export default function ServiceDetailsPage() {
                        </div>
                        <div className="text-center">
                          <p className="text-3xl font-bold text-blue-600 mb-1">
-                           {formatCurrency(residentCarePlanDetail.total_monthly_cost || 0)}
+                           {formatCurrency((residentCarePlanDetail?.room_monthly_cost || 0) + calculateTotalServiceCost())}
                          </p>
                          <p className="text-gray-600 text-sm mb-4">Mỗi tháng</p>
                          <div className="bg-white rounded-lg p-4 border border-blue-100">
                            <div className="grid grid-cols-2 gap-4">
                              <div className="text-center">
                                <p className="text-gray-600 text-sm">Tiền phòng</p>
-                               <p className="text-lg font-bold text-gray-900">{formatCurrency(residentCarePlanDetail.room_monthly_cost || 0)}</p>
+                               <p className="text-lg font-bold text-gray-900">
+                                 {formatCurrency(residentCarePlanDetail?.room_monthly_cost || 0)}
+                               </p>
                              </div>
                              <div className="text-center">
                                <p className="text-gray-600 text-sm">Tiền dịch vụ</p>
-                               <p className="text-lg font-bold text-gray-900">{formatCurrency(residentCarePlanDetail.care_plans_monthly_cost || 0)}</p>
+                               <p className="text-lg font-bold text-gray-900">
+                                 {formatCurrency(calculateTotalServiceCost())}
+                               </p>
                              </div>
                            </div>
                          </div>
@@ -465,13 +573,15 @@ export default function ServiceDetailsPage() {
                          </div>
                          <div className="ml-4">
                            <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                             Tổng: {residentCarePlanDetail.care_plan_ids?.length || 0} gói dịch vụ
+                             Tổng: {carePlanDetails.length} gói dịch vụ
                            </span>
                          </div>
                        </div>
                        
                        <div className="space-y-4">
-                         {residentCarePlanDetail.care_plan_ids?.map((carePlan: any, index: number) => (
+                         {carePlanDetails.map((carePlan: any, index: number) => {
+                           const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
+                           return (
                            <div key={index} className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 transform hover:-translate-y-1">
                              {/* Header with name and price */}
                              <div className="flex items-start justify-between mb-4">
@@ -499,8 +609,7 @@ export default function ServiceDetailsPage() {
                                      <span className="text-green-700 text-xs font-medium">Ngày bắt đầu</span>
                                    </div>
                                    <p className="text-sm font-semibold text-gray-900">
-                                     {carePlan.start_date ? formatDate(carePlan.start_date) : 
-                                      residentCarePlanDetail.start_date ? formatDate(residentCarePlanDetail.start_date) : 'N/A'}
+                                     {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
                                    </p>
                                  </div>
                                  <div className="text-center">
@@ -509,8 +618,7 @@ export default function ServiceDetailsPage() {
                                      <span className="text-purple-700 text-xs font-medium">Ngày kết thúc</span>
                                    </div>
                                    <p className="text-sm font-semibold text-gray-900">
-                                     {carePlan.end_date ? formatDate(carePlan.end_date) : 
-                                      residentCarePlanDetail.end_date ? formatDate(residentCarePlanDetail.end_date) : 'Không có thời hạn'}
+                                     {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
                                    </p>
                                  </div>
                                </div>
@@ -552,8 +660,9 @@ export default function ServiceDetailsPage() {
                                </div>
                              </div>
                            </div>
-                         ))}
-                         {(!residentCarePlanDetail.care_plan_ids || residentCarePlanDetail.care_plan_ids.length === 0) && (
+                         );
+                       })}
+                         {carePlanDetails.length === 0 && (
                            <div className="text-center py-8">
                              <DocumentTextIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                              <p className="text-gray-500 font-medium">Chưa có gói dịch vụ nào</p>
@@ -579,17 +688,17 @@ export default function ServiceDetailsPage() {
                             <div className="text-center">
                               <div className="bg-white rounded-lg p-3 border border-green-100">
                                 <p className="text-gray-600 text-sm mb-1">Phòng</p>
-                                <p className="text-xl font-bold text-green-600">
-                                  {residentCarePlanDetail.bed_id?.room_id?.room_number || residentCarePlanDetail.assigned_room_id?.room_number || roomNumber || 'N/A'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="bg-white rounded-lg p-3 border border-green-100">
-                                <p className="text-gray-600 text-sm mb-1">Giường</p>
-                                <p className="text-xl font-bold text-green-600">
-                                  {residentCarePlanDetail.bed_id?.bed_number || residentCarePlanDetail.assigned_bed_id?.bed_number || 'N/A'}
-                                </p>
+                                                                 <p className="text-xl font-bold text-green-600">
+                                   {roomLoading ? 'Đang tải...' : roomNumber}
+                                 </p>
+                               </div>
+                             </div>
+                             <div className="text-center">
+                               <div className="bg-white rounded-lg p-3 border border-green-100">
+                                 <p className="text-gray-600 text-sm mb-1">Giường</p>
+                                 <p className="text-xl font-bold text-green-600">
+                                   {roomLoading ? 'Đang tải...' : bedNumber}
+                                 </p>
                               </div>
                             </div>
                           </div>

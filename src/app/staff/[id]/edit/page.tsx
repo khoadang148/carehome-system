@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -98,7 +99,7 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
         } else if (error.response?.status === 403) {
           setError('Bạn không có quyền chỉnh sửa thông tin này.');
         } else {
-          setError('Có lỗi xảy ra khi tải thông tin nhân viên.');
+          setError(getUserFriendlyError(error));
         }
       } finally {
         setLoading(false);
@@ -158,7 +159,7 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
       } else if (error.response?.status === 400) {
         setError('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.');
       } else {
-        setError('Có lỗi xảy ra khi cập nhật thông tin.');
+        setError(getUserFriendlyError(error));
       }
     } finally {
       setIsSubmitting(false);

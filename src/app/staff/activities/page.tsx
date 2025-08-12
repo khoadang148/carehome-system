@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -332,7 +334,7 @@ export default function StaffActivitiesPage() {
       setEvaluationResidents(filteredResidents);
       setEvaluationModalOpen(true);
     } catch (err) {
-      alert('Không thể tải danh sách người cao tuổi tham gia hoạt động này.');
+      toast.error('Không thể tải danh sách người cao tuổi tham gia hoạt động này.');
     }
   };
 

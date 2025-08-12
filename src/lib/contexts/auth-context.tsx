@@ -11,6 +11,7 @@ import {
 import { clientStorage } from '@/lib/utils/clientStorage';
 import { optimizedLogout } from '@/lib/utils/fastLogout';
 import { redirectByRole } from '@/lib/utils/roleRedirect';
+import { preloadRolePages } from '@/lib/utils/preloadUtils';
 
 export type UserRole = 'admin' | 'staff' | 'family';
 
@@ -80,7 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
+      // Gọi API login
       const response = await authAPI.login(email, password);
+      
       if (response.access_token) {
         const userProfile = response.user;
         const userRole = userProfile.role;
@@ -93,11 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
-          // Initialize session immediately
-          initializeSession(response.access_token, userObj);
+          // Xử lý song song: session init và set user state
+          const sessionPromise = initializeSession(response.access_token, userObj);
           setUser(userObj);
           
-          // Redirect based on role immediately
+          // Preload trang dựa trên role để tăng tốc độ
+          preloadRolePages(router, userRole);
+          
+          // Chờ session init hoàn thành rồi redirect
+          await sessionPromise;
           redirectByRole(router, userRole);
           
           return userObj;
@@ -111,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     // Set logout flag to prevent unnecessary operations
     setIsLoggingOut(true);
     
@@ -119,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     
     // Use optimized logout utility for faster performance
-    optimizedLogout(router, () => authAPI.logout());
+    await optimizedLogout(router, () => authAPI.logout());
     
     // Reset logout flag after a short delay
     setTimeout(() => {

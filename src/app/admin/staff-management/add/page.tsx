@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -22,6 +24,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAPI } from '@/lib/api';
+import { UserFriendlyErrorHandler } from '@/lib/utils/user-friendly-errors';
 
 export default function AddStaffPage() {
   const { user, loading } = useAuth();
@@ -31,10 +34,8 @@ export default function AddStaffPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [createdAccount, setCreatedAccount] = useState<any>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -90,38 +91,13 @@ export default function AddStaffPage() {
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
-    if (value) {
-      const isoDate = parseDateFromDisplay(value);
-      setFormData(prev => ({
-        ...prev,
-        join_date: isoDate
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        join_date: ''
-      }));
-    }
-  };
-
-  const handleDatePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
     setFormData(prev => ({
       ...prev,
       join_date: value
     }));
-    setShowDatePicker(false);
   };
 
-  // Handle date picker click
-  useEffect(() => {
-    if (showDatePicker && dateInputRef.current) {
-      // Focus on the date input when picker opens
-      setTimeout(() => {
-        dateInputRef.current?.focus();
-      }, 100);
-    }
-  }, [showDatePicker]);
+
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -149,13 +125,13 @@ export default function AddStaffPage() {
         setTimeout(() => setCopySuccess(false), 3000);
       } catch (err) {
         console.error('Fallback copy failed:', err);
-        alert('❌ Không thể copy tự động. Vui lòng copy thủ công:\n\n' + text);
+        toast.error('❌ Không thể copy tự động. Vui lòng copy thủ công:\n\n' + text);
       } finally {
         document.body.removeChild(textArea);
       }
     } catch (err) {
       console.error('Copy failed:', err);
-      alert('❌ Không thể copy tự động. Vui lòng copy thủ công:\n\n' + text);
+      toast.error('❌ Không thể copy tự động. Vui lòng copy thủ công:\n\n' + text);
     }
   };
 
@@ -171,12 +147,7 @@ export default function AddStaffPage() {
     });
   };
 
-  const formatDateForInput = (dateString: string): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toISOString().split('T')[0];
-  };
+
 
   const parseDateFromDisplay = (displayDate: string): string => {
     if (!displayDate) return '';
@@ -201,6 +172,15 @@ export default function AddStaffPage() {
       return;
     }
 
+    // Validate phone number if provided
+    if (formData.phone.trim()) {
+      const phoneRegex = /^[0-9]{10,15}$/;
+      if (!phoneRegex.test(formData.phone.trim())) {
+        setError('Số điện thoại phải có 10-15 chữ số');
+        return;
+      }
+    }
+
     // Validate password if not auto-generating
     if (!formData.autoGeneratePassword) {
       if (!formData.password.trim()) {
@@ -219,25 +199,103 @@ export default function AddStaffPage() {
       }
     }
 
+    // Validate join_date - không cho phép ngày trong tương lai
+    if (formData.join_date) {
+      // Parse date from dd/mm/yyyy format
+      const parsedDate = parseDateFromDisplay(formData.join_date);
+      if (!parsedDate) {
+        setError('Ngày vào làm không đúng định dạng dd/mm/yyyy');
+        return;
+      }
+      
+      const joinDate = new Date(parsedDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to start of day
+      
+      if (joinDate > today) {
+        setError('Ngày vào làm không thể là ngày trong tương lai');
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setError('');
       
+      // Generate username from email
+      const emailPrefix = formData.email.split('@')[0];
+      let username = emailPrefix.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      
+      // Add random number to avoid conflicts
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      username = `${username}_${randomSuffix}`;
+      
+      // Generate password if auto-generating
+      let password = formData.password;
+      if (formData.autoGeneratePassword) {
+        // Generate a random password
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        password = '';
+        for (let i = 0; i < 8; i++) {
+          password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+      }
+      
       // Prepare data for API
       const staffData = {
-        ...formData,
-        password: formData.autoGeneratePassword ? undefined : formData.password
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || '0000000000', // Default phone if empty
+        username: username,
+        password: password,
+        role: 'staff',
+        status: formData.status,
+        position: formData.position.trim() || undefined,
+        qualification: formData.qualification.trim() || undefined,
+        notes: formData.notes.trim() || undefined,
+        // Ensure join_date is in correct format and not in future
+        join_date: formData.join_date ? (() => {
+          const parsedDate = parseDateFromDisplay(formData.join_date);
+          if (!parsedDate) return undefined;
+          
+          const date = new Date(parsedDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // If date is in future, use today's date
+          if (date > today) {
+            return today.toISOString().split('T')[0];
+          }
+          
+          return date.toISOString().split('T')[0];
+        })() : undefined,
+        // Add avatar if exists
+        ...(formData.avatar && { avatar: formData.avatar })
       };
       
-      // Remove confirmPassword from API call
-      delete staffData.confirmPassword;
-      delete staffData.autoGeneratePassword;
+      console.log('Sending staff data:', staffData);
       
       const result = await staffAPI.create(staffData);
+      
+      // Add password to result for display (both auto-generated and manual)
+      if (formData.autoGeneratePassword) {
+        result.tempPassword = password;
+      } else {
+        result.password = password; // Lưu mật khẩu thủ công
+      }
+      
       setCreatedAccount(result);
       setShowSuccessModal(true);
     } catch (err: any) {
-      setError(err?.message || 'Có lỗi xảy ra khi tạo nhân viên mới');
+      console.error('Error creating staff:', err);
+      
+      const errorResult = UserFriendlyErrorHandler.handleError(err);
+      setError(errorResult.message);
+      
+      // Set field-specific errors if any
+      if (errorResult.fieldErrors && Object.keys(errorResult.fieldErrors).length > 0) {
+        // setValidationErrors(errorResult.fieldErrors); // This state is not defined in the original file
+      }
     } finally {
       setSaving(false);
     }
@@ -499,7 +557,7 @@ export default function AddStaffPage() {
                   </div>
                 </div>
 
-                <div className="relative">
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Ngày vào làm
                   </label>
@@ -507,47 +565,16 @@ export default function AddStaffPage() {
                     <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                       type="text"
-                      name="join_date_display"
-                      value={formatDateForDisplay(formData.join_date)}
+                      name="join_date"
+                      value={formData.join_date}
                       onChange={handleDateChange}
                       placeholder="dd/mm/yyyy"
-                      className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowDatePicker(!showDatePicker)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <CalendarIcon className="w-5 h-5" />
-                    </button>
                   </div>
-                  
-                  {/* Custom date picker */}
-                  {showDatePicker && (
-                    <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg p-3 min-w-[280px]">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium text-slate-900">Chọn ngày</h4>
-                        <button
-                          type="button"
-                          onClick={() => setShowDatePicker(false)}
-                          className="text-slate-400 hover:text-slate-600"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <input
-                        ref={dateInputRef}
-                        type="date"
-                        value={formatDateForInput(formData.join_date)}
-                        onChange={handleDatePickerChange}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        onBlur={() => setTimeout(() => setShowDatePicker(false), 200)}
-                      />
-                      <div className="mt-3 text-xs text-slate-500">
-                        Hoặc nhập trực tiếp theo định dạng dd/mm/yyyy
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-xs text-slate-500 mt-1">
+                    Nhập ngày theo định dạng dd/mm/yyyy
+                  </p>
                 </div>
               </div>
             </div>
@@ -663,39 +690,37 @@ export default function AddStaffPage() {
 
       {/* Success Modal */}
       {showSuccessModal && createdAccount && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden mb-8">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white text-center">
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircleIcon className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Tạo thành công!</h3>
-              <p className="text-green-100 text-sm">
-                Nhân viên và tài khoản đã được tạo thành công
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden">
+            {/* Success Header */}
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-white text-center">
+              <CheckCircleIcon className="w-16 h-16 mx-auto mb-4 drop-shadow-lg" />
+              <h3 className="text-2xl font-bold mb-2">Hoàn thành!</h3>
+              <p className="text-green-100 text-lg">
+                Nhân viên <strong>{createdAccount.full_name}</strong> đã được thêm vào hệ thống
               </p>
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className="p-8">
               {/* Staff Info */}
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <UserIcon className="w-5 h-5 text-indigo-600" />
+              <div className="mb-8">
+                <h4 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <UserIcon className="w-6 h-6 text-indigo-600" />
                   Thông tin nhân viên
                 </h4>
-                <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Tên:</span>
-                    <span className="font-medium text-slate-900">{createdAccount.full_name}</span>
+                <div className="bg-slate-50 rounded-lg p-6 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600 font-medium">Tên:</span>
+                    <span className="font-semibold text-slate-900">{createdAccount.full_name}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Vị trí:</span>
-                    <span className="font-medium text-slate-900">{createdAccount.position || 'Chưa hoàn tất đăng kí'}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600 font-medium">Vị trí:</span>
+                    <span className="font-semibold text-slate-900">{createdAccount.position || 'Chưa cập nhật'}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 text-sm">Trạng thái:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600 font-medium">Trạng thái:</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                       createdAccount.status === 'active' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-slate-100 text-slate-800'
@@ -707,75 +732,113 @@ export default function AddStaffPage() {
               </div>
 
               {/* Login Info */}
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <LockClosedIcon className="w-5 h-5 text-indigo-600" />
+              <div className="mb-8">
+                <h4 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <LockClosedIcon className="w-6 h-6 text-indigo-600" />
                   Thông tin đăng nhập
                 </h4>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Email:</span>
-                    <span className="font-mono text-slate-900 text-sm bg-white px-2 py-1 rounded border">
-                      {createdAccount.email}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Username:</span>
-                    <span className="font-mono text-slate-900 text-sm bg-white px-2 py-1 rounded border">
-                      {createdAccount.username}
-                    </span>
-                  </div>
-                  {createdAccount.tempPassword && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600 text-sm">Mật khẩu:</span>
-                      <span className="font-mono text-slate-900 text-sm bg-yellow-100 px-2 py-1 rounded border border-yellow-300">
-                        {createdAccount.tempPassword}
+                <div className="space-y-4">
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Email
+                    </label>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <span className="flex-1 font-mono text-slate-900 font-medium">
+                        {createdAccount.email}
                       </span>
+                      <button
+                        onClick={() => copyToClipboard(createdAccount.email)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        Sao chép
+                      </button>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Username */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên đăng nhập
+                    </label>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <span className="flex-1 font-mono text-slate-900 font-medium">
+                        {createdAccount.username}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(createdAccount.username)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        Sao chép
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Password - Hiển thị cả khi random và không random */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Mật khẩu
+                    </label>
+                    <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <span className="flex-1 font-mono text-slate-900 font-medium tracking-wider">
+                        {createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(createdAccount.tempPassword || createdAccount.password || '')}
+                        className="px-3 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        Sao chép
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Warning */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              {/* Important Notice */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
                 <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 text-yellow-600 mt-0.5">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
+                  <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-sm font-bold">!</span>
                   </div>
                   <div>
-                    <p className="text-yellow-800 text-sm font-medium mb-1">Lưu ý quan trọng</p>
-                    <p className="text-yellow-700 text-xs">
-                      Vui lòng lưu thông tin đăng nhập và chia sẻ với nhân viên. 
-                      Mật khẩu sẽ không hiển thị lại sau khi đóng modal này.
-                    </p>
+                    <h4 className="text-lg font-semibold text-yellow-800 mb-3">
+                      Lưu ý quan trọng
+                    </h4>
+                    <ul className="text-yellow-700 space-y-2 text-sm">
+                      <li>• Vui lòng lưu lại thông tin đăng nhập này một cách an toàn</li>
+                      <li>• Mật khẩu sẽ không thể xem lại sau khi đóng modal này</li>
+                      <li>• Nhân viên nên đổi mật khẩu sau lần đăng nhập đầu tiên</li>
+                      <li>• Nếu quên mật khẩu, liên hệ quản trị viên để được hỗ trợ</li>
+                    </ul>
                   </div>
                 </div>
               </div>
 
               {/* Copy Success Message */}
               {copySuccess && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircleIcon className="w-4 h-4" />
-                    <span className="text-sm font-medium">✅ Đã copy thông tin đăng nhập vào clipboard!</span>
+                    <CheckCircleIcon className="w-5 h-5" />
+                    <span className="font-medium">✅ Đã sao chép thông tin vào clipboard!</span>
                   </div>
                 </div>
               )}
 
               {/* Actions */}
-              <div className="flex gap-3">
+              <div className="flex gap-4 justify-center">
                 <button
                   type="button"
                   onClick={() => {
-                    const loginInfo = `Thông tin đăng nhập:\nEmail: ${createdAccount.email}\nUsername: ${createdAccount.username}${createdAccount.tempPassword ? `\nMật khẩu: ${createdAccount.tempPassword}` : ''}`;
+                    const loginInfo = `Thông tin đăng nhập:\nEmail: ${createdAccount.email}\nUsername: ${createdAccount.username}\nMật khẩu: ${createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}`;
                     copyToClipboard(loginInfo);
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
                 >
-                  <ClipboardDocumentIcon className="w-4 h-4" />
-                  Copy thông tin
+                  <ClipboardDocumentIcon className="w-5 h-5" />
+                  Sao chép tất cả
                 </button>
                 <button
                   type="button"
@@ -783,7 +846,7 @@ export default function AddStaffPage() {
                     setShowSuccessModal(false);
                     router.push('/admin/staff-management');
                   }}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
                 >
                   Hoàn tất
                 </button>
@@ -797,7 +860,7 @@ export default function AddStaffPage() {
                 setShowSuccessModal(false);
                 router.push('/admin/staff-management');
               }}
-              className="absolute top-4 right-4 text-white hover:text-slate-200 transition-colors"
+              className="absolute top-4 right-4 text-white hover:text-slate-200 transition-colors p-2"
             >
               <XMarkIcon className="w-6 h-6" />
             </button>

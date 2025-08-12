@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { clientStorage } from './utils/clientStorage';
+import { isTokenValid } from './utils/tokenUtils';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -10,7 +11,7 @@ const loginClient = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 8000, // Giảm timeout xuống 8 giây cho login
+  timeout: 1000, // Giảm timeout xuống 5 giây cho login nhanh hơn
 });
 
 const apiClient = axios.create({
@@ -178,47 +179,36 @@ const endpoints = {
 
 export const authAPI = {
   login: async (email: string, password: string) => {
-    const maxRetries = 2;
-    let lastError: any;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Login attempt ${attempt + 1}/${maxRetries + 1}`);
-        
-        const response = await loginClient.post('/auth/login', {
-          email,
-          password,
-        });
-        
-        const { access_token } = response.data;
-        console.log('Login successful, setting token:', access_token);
-        
-        // Lưu token vào localStorage
-        if (typeof window !== 'undefined') {
-          clientStorage.setItem('access_token', access_token);
-        }
-        return response.data;
-      } catch (error: any) {
-        lastError = error;
-        console.error(`Login attempt ${attempt + 1} failed:`, error);
-        
-        // Nếu là lỗi 401 (sai thông tin đăng nhập), không retry
-        if (error.response?.status === 401) {
-          break;
-        }
-        
-        // Nếu là lỗi network và còn retry, chờ một chút rồi thử lại
-        if (attempt < maxRetries && (error.code === 'ECONNABORTED' || error.message.includes('timeout'))) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
-          continue;
-        }
-        
-        break;
+    try {
+      console.log('🔄 Login attempt starting...');
+      
+      const response = await loginClient.post('/auth/login', {
+        email,
+        password,
+      });
+      
+      const { access_token } = response.data;
+      console.log('✅ Login successful, setting token');
+      
+      // Lưu token vào localStorage ngay lập tức
+      if (typeof window !== 'undefined') {
+        clientStorage.setItem('access_token', access_token);
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Login failed:', error);
+      
+      // Xử lý lỗi cụ thể để trả về thông báo chính xác
+      if (error.response?.status === 401) {
+        throw new Error('Email hoặc mật khẩu không chính xác');
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
+      } else {
+        throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
       }
     }
-    
-    const errorMessage = handleApiError(lastError, 'Login');
-    throw new Error(errorMessage);
   },
 
   register: async (userData: any) => {
@@ -243,6 +233,12 @@ export const authAPI = {
 
   logout: async () => {
     try {
+      // Kiểm tra token validity trước khi gọi API
+      if (!isTokenValid()) {
+        console.log('Token invalid or expired, skipping logout API call');
+        return { message: 'No valid session to logout', success: true };
+      }
+
       // Use AbortController to prevent hanging requests
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
@@ -253,9 +249,13 @@ export const authAPI = {
       
       clearTimeout(timeoutId);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       // Don't throw error to avoid blocking logout process
-      console.warn('Logout API call failed:', error);
+      if (error.response?.status === 401) {
+        console.log('Token expired or invalid, continuing with local logout');
+      } else {
+        console.warn('Logout API call failed:', error);
+      }
       return { message: 'Logged out locally', success: true };
     }
   },
@@ -335,7 +335,9 @@ export const userAPI = {
 
   update: async (id: string, data: any) => {
     try {
+      console.log('userAPI.update - Input:', { id, data });
       const response = await apiClient.patch(`/users/${id}`, data);
+      console.log('userAPI.update - Success:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -370,6 +372,10 @@ export const userAPI = {
     const fullUrl = `${API_BASE_URL}/${cleanPath}`;
     console.log('Avatar URL:', { original: avatarPath, cleaned: cleanPath, full: fullUrl });
     return fullUrl;
+  },
+  getAvatarUrlById: (id: string) => {
+    if (!id) return '';
+    return `${API_BASE_URL}/users/${id}/avatar`;
   },
   activate: async (id: string) => {
     try {
@@ -574,7 +580,36 @@ export const staffAPI = {
 
   create: async (staff: any) => {
     try {
-      const response = await apiClient.post(endpoints.staff, staff);
+      let response;
+      
+      // Check if there's an avatar file to upload
+      if (staff.avatar && staff.avatar instanceof File) {
+        // Use FormData for file upload
+        const formData = new FormData();
+        
+        // Add file
+        formData.append('avatar', staff.avatar);
+        
+        // Add other fields
+        Object.keys(staff).forEach(key => {
+          if (key !== 'avatar' && staff[key] !== undefined && staff[key] !== null) {
+            formData.append(key, staff[key]);
+          }
+        });
+        
+        // Set content type for multipart/form-data
+        const config = {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        };
+        
+        response = await apiClient.post(endpoints.staff, formData, config);
+      } else {
+        // Regular JSON request
+        response = await apiClient.post(endpoints.staff, staff);
+      }
+      
       return response.data;
     } catch (error) {
       console.error('Error creating staff:', error);
@@ -584,7 +619,36 @@ export const staffAPI = {
 
   update: async (id: string, staff: any) => {
     try {
-      const response = await apiClient.patch(`${endpoints.staff}/${id}`, staff);
+      let response;
+      
+      // Check if there's an avatar file to upload
+      if (staff.avatar && staff.avatar instanceof File) {
+        // Use FormData for file upload
+        const formData = new FormData();
+        
+        // Add file
+        formData.append('avatar', staff.avatar);
+        
+        // Add other fields
+        Object.keys(staff).forEach(key => {
+          if (key !== 'avatar' && staff[key] !== undefined && staff[key] !== null) {
+            formData.append(key, staff[key]);
+          }
+        });
+        
+        // Set content type for multipart/form-data
+        const config = {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        };
+        
+        response = await apiClient.patch(`${endpoints.staff}/${id}`, formData, config);
+      } else {
+        // Regular JSON request
+        response = await apiClient.patch(`${endpoints.staff}/${id}`, staff);
+      }
+      
       return response.data;
     } catch (error) {
       console.error(`Error updating staff with ID ${id}:`, error);
@@ -820,6 +884,21 @@ export const activitiesAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error getting AI recommendation for resident(s)`, error);
+      throw error;
+    }
+  },
+
+  // Check schedule conflict endpoint
+  checkScheduleConflict: async (residentId: string, scheduleTime: string, duration: number) => {
+    try {
+      const response = await apiClient.post(`${endpoints.activities}/check-schedule-conflict`, {
+        residentId,
+        scheduleTime,
+        duration
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error checking schedule conflict:', error);
       throw error;
     }
   },
@@ -1116,7 +1195,14 @@ export const familyMembersAPI = {
   getById: async (id: string) => {
     try {
       const response = await apiClient.get(`${endpoints.familyMembers}/${id}`);
-      return response.data;
+      const familyMember = response.data;
+      
+      // Nếu family member có avatar, tạo URL đầy đủ
+      if (familyMember && familyMember.avatar) {
+        familyMember.avatar = `${API_BASE_URL}/family-members/${id}/avatar`;
+      }
+      
+      return familyMember;
     } catch (error) {
       console.error(`Error fetching family member with ID ${id}:`, error);
       throw error;
@@ -1148,6 +1234,11 @@ export const familyMembersAPI = {
       console.error(`Error deleting family member with ID ${id}:`, error);
       throw error;
     }
+  },
+
+  getAvatarUrl: (id: string) => {
+    if (!id) return '';
+    return `${API_BASE_URL}/users/${id}/avatar`;
   },
 };
 
@@ -1716,7 +1807,13 @@ export const photosAPI = {
 export const visitsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.visits, { params });
+      // Thêm populate để lấy thông tin đầy đủ của family member
+      const response = await apiClient.get(endpoints.visits, { 
+        params: { 
+          ...params,
+          populate: 'family_member_id' // Yêu cầu backend populate thông tin family member
+        } 
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching visits:', error);
@@ -2026,6 +2123,15 @@ export const billsAPI = {
       throw error;
     }
   },
+  calculateTotal: async (residentId: string) => {
+    try {
+      const response = await apiClient.get(`/bills/calculate-total/${residentId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error calculating total:', error);
+      throw error;
+    }
+  },
 };
 
 export const bedsAPI = {
@@ -2089,7 +2195,8 @@ export const bedAssignmentsAPI = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching bed assignments by residentId ${residentId}:`, error);
-      throw error;
+      // Return empty array instead of throwing error when no bed assignments found
+      return [];
     }
   },
 };

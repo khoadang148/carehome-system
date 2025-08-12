@@ -39,8 +39,10 @@ export default function NewActivityPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [customActivityType, setCustomActivityType] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customLocation, setCustomLocation] = useState('');
+  const [showCustomLocationInput, setShowCustomLocationInput] = useState(false);
 
-  const LOCATIONS = ['Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật'];
+  const LOCATIONS = ['Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật', 'Khác'];
   const ACTIVITY_TYPES = ['Thể dục', 'Văn nghệ', 'Giải trí', 'Giáo dục', 'Khác'];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -55,6 +57,15 @@ export default function NewActivityPage() {
         setCustomActivityType('');
         setForm({ ...form, [name]: value });
       }
+    } else if (name === 'location') {
+      if (value === 'Khác') {
+        setShowCustomLocationInput(true);
+        setForm({ ...form, [name]: value });
+      } else {
+        setShowCustomLocationInput(false);
+        setCustomLocation('');
+        setForm({ ...form, [name]: value });
+      }
     } else {
       setForm({ ...form, [name]: value });
     }
@@ -66,6 +77,13 @@ export default function NewActivityPage() {
   const handleCustomActivityTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCustomActivityType(e.target.value);
     setForm({ ...form, activity_type: e.target.value });
+    setError('');
+    setSuccess('');
+  };
+
+  const handleCustomLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomLocation(e.target.value);
+    setForm({ ...form, location: e.target.value });
     setError('');
     setSuccess('');
   };
@@ -101,6 +119,12 @@ export default function NewActivityPage() {
     // Validate activity type
     if (showCustomInput && !customActivityType.trim()) {
       setError('Vui lòng nhập loại hoạt động khi chọn "Khác".');
+      return;
+    }
+
+    // Validate location
+    if (showCustomLocationInput && !customLocation.trim()) {
+      setError('Vui lòng nhập địa điểm khi chọn "Khác".');
       return;
     }
     
@@ -150,7 +174,7 @@ export default function NewActivityPage() {
       description: form.description,
       duration: Number(form.duration),
       schedule_time: scheduleDateTime,
-      location: form.location,
+      location: showCustomLocationInput ? customLocation : form.location,
       capacity: Number(form.capacity),
       activity_type: showCustomInput ? customActivityType : form.activity_type
     };
@@ -618,27 +642,85 @@ export default function NewActivityPage() {
                 }}>
                   Địa điểm <span style={{color: '#ef4444'}}>*</span>
                 </label>
-                <select 
-                  name="location" 
-                  value={form.location} 
-                  onChange={handleChange} 
-                  required 
-                  style={{ 
-                    width: '100%', 
-                    padding: '0.75rem', 
-                    borderRadius: '0.5rem', 
-                    border: '2px solid #e5e7eb', 
-                    fontSize: '0.95rem', 
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                    background: 'white'
-                  }}
-                >
-                  <option value="">-- Chọn địa điểm --</option>
-                  {LOCATIONS.map(loc => (
-                    <option key={loc} value={loc}>{loc}</option>
-                  ))}
-                </select>
+                {!showCustomLocationInput ? (
+                  <select 
+                    name="location" 
+                    value={form.location} 
+                    onChange={handleChange} 
+                    required 
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.75rem', 
+                      borderRadius: '0.5rem', 
+                      border: '2px solid #e5e7eb', 
+                      fontSize: '0.95rem', 
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      background: 'white'
+                    }}
+                  >
+                    <option value="">-- Chọn địa điểm --</option>
+                    {LOCATIONS.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={customLocation}
+                      onChange={handleCustomLocationChange}
+                      placeholder="Nhập địa điểm..."
+                      required
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.75rem', 
+                        borderRadius: '0.5rem', 
+                        border: '2px solid #10b981', 
+                        fontSize: '0.95rem', 
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        background: 'white',
+                        paddingRight: '2.5rem'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomLocationInput(false);
+                        setCustomLocation('');
+                        setForm({ ...form, location: '' });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '0.5rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#6b7280',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        borderRadius: '0.25rem',
+                        transition: 'all 0.2s',
+                        fontSize: '0.875rem'
+                      }}
+                      title="Quay lại danh sách"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                {showCustomLocationInput && (
+                  <p style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    fontStyle: 'italic'
+                  }}>
+                    Nhập địa điểm tùy chỉnh hoặc nhấn ✕ để quay lại danh sách
+                  </p>
+                )}
               </div>
             </div>
 

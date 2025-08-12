@@ -19,6 +19,7 @@ import { carePlansAPI } from '@/lib/api';
 import { vitalSignsAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { bedsAPI } from '@/lib/api';
+import { bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { careNotesAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
@@ -68,46 +69,111 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           ...data
         };
         setResident(mapped);
+        // Fetch care plan assignments (gói dịch vụ đang sử dụng)
+        const assignments = await carePlansAPI.getByResidentId(residentId);
+        
+        // Ensure assignments is an array and filter out invalid ones
+        const validAssignments = Array.isArray(assignments) 
+          ? assignments.filter(assignment => assignment && assignment._id)
+          : [];
+        
+        setCarePlanAssignments(validAssignments);
+        
         // Lấy số phòng giống trang family
         setRoomLoading(true);
         try {
-          const assignments = await carePlansAPI.getByResidentId(residentId);
-          const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-          const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-          // Đảm bảo roomId là string, không phải object
-          const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-          if (roomIdString) {
-            const room = await roomsAPI.getById(roomIdString);
-            setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-          } else {
-            setRoomNumber('Chưa hoàn tất đăng kí');
+          // Ưu tiên sử dụng bedAssignmentsAPI
+          try {
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+            const bedAssignment = Array.isArray(bedAssignments) ? 
+              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+            
+            if (bedAssignment?.bed_id?.room_id) {
+              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                setRoomNumber(bedAssignment.bed_id.room_id.room_number);
+              } else {
+                // Nếu chỉ có _id, fetch thêm thông tin
+                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+                } else {
+                  throw new Error('No room ID found');
+                }
+              }
+            } else {
+              throw new Error('No bed assignment found');
+            }
+          } catch (bedError) {
+            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
+            // Fallback về carePlansAPI
+            const assignment = validAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id);
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+            // Đảm bảo roomId là string, không phải object
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
+              setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+            } else {
+              setRoomNumber('Chưa hoàn tất đăng kí');
+            }
           }
         } catch {
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
         setRoomLoading(false);
-        // Fetch care plan assignments (gói dịch vụ đang sử dụng)
-        const assignments = await carePlansAPI.getByResidentId(residentId);
-        setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
-        // Lấy số giường nếu có assigned_bed_id
+        // Lấy số giường từ bedAssignmentsAPI
         setBedLoading(true);
-        let currentAssignment: any = null;
-        if (Array.isArray(assignments)) {
-          currentAssignment = assignments.find(a =>
-            (a.resident_id?._id || a.resident_id) === residentId
-          ) || assignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
-        }
-        const assignedBedId = currentAssignment?.assigned_bed_id as any;
-        // Đảm bảo assignedBedId là string, không phải object
-        const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
-        if (bedIdString) {
+        try {
+          // Ưu tiên sử dụng bedAssignmentsAPI
           try {
-            const bed = await bedsAPI.getById(bedIdString);
-            setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
-          } catch {
-            setBedNumber('Chưa hoàn tất đăng kí');
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+            const bedAssignment = Array.isArray(bedAssignments) ? 
+              bedAssignments.find((a: any) => a.bed_id) : null;
+            
+            if (bedAssignment?.bed_id) {
+              // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
+              if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
+                setBedNumber(bedAssignment.bed_id.bed_number);
+              } else {
+                // Nếu chỉ có _id, fetch thêm thông tin
+                const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                  bedAssignment.bed_id._id : bedAssignment.bed_id;
+                if (bedId) {
+                  const bed = await bedsAPI.getById(bedId);
+                  setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
+                } else {
+                  throw new Error('No bed ID found');
+                }
+              }
+            } else {
+              throw new Error('No bed assignment found');
+            }
+          } catch (bedError) {
+            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
+            // Fallback về carePlansAPI
+            let currentAssignment: any = null;
+            if (validAssignments.length > 0) {
+              currentAssignment = validAssignments.find(a =>
+                (a.resident_id?._id || a.resident_id) === residentId
+              ) || validAssignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
+            }
+            const assignedBedId = currentAssignment?.assigned_bed_id as any;
+            // Đảm bảo assignedBedId là string, không phải object
+            const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
+            if (bedIdString) {
+              try {
+                const bed = await bedsAPI.getById(bedIdString);
+                setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
+              } catch {
+                setBedNumber('Chưa hoàn tất đăng kí');
+              }
+            } else {
+              setBedNumber('Chưa hoàn tất đăng kí');
+            }
           }
-        } else {
+        } catch {
           setBedNumber('Chưa hoàn tất đăng kí');
         }
         setBedLoading(false);
@@ -386,28 +452,48 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                   <h3 className="text-base font-semibold m-0 text-slate-800">
                     Gói dịch vụ đang sử dụng
+                    {carePlanAssignments.length > 0 && (
+                      <span className="ml-2 text-sm font-normal text-gray-500">
+                        ({carePlanAssignments.reduce((total, assignment) => 
+                          total + (assignment.care_plan_ids?.length || 0), 0
+                        )} gói)
+                      </span>
+                    )}
                   </h3>
                 </div>
                 {/* Render danh sách gói dịch vụ từ carePlanAssignments */}
-                {carePlanAssignments.length > 0 && carePlanAssignments[0].care_plan_ids && carePlanAssignments[0].care_plan_ids.length > 0 ? (
+                {carePlanAssignments.length > 0 ? (
                   <div className="grid gap-3">
-                    {carePlanAssignments[0].care_plan_ids.map((plan: any, idx: number) => (
-                      <Link
-                        key={plan._id || idx}
-                        href={`/staff/residents/${residentId}/services/${carePlanAssignments[0]._id}`}
-                        className="bg-white/80 rounded-lg p-4 border border-green-200 mb-2 no-underline transition-all duration-200 cursor-pointer block hover:bg-white/95 hover:border-green-500 hover:-translate-y-0.5 hover:shadow-md"
-                      >
-                        <div className="font-semibold text-base text-green-700 flex items-center justify-between">
-                          <span>{plan.plan_name || 'Gói dịch vụ'}</span>
-                          <span className="text-xs text-green-500 font-medium">
-                            Xem chi tiết →
-                          </span>
+                    {carePlanAssignments.map((assignment: any, assignmentIdx: number) => (
+                      assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
+                        assignment.care_plan_ids.map((plan: any, planIdx: number) => (
+                          <div
+                            key={`${assignment._id}-${plan._id || planIdx}`}
+                            className="bg-white/80 rounded-lg p-4 border border-green-200 mb-2"
+                          >
+                            <div className="font-semibold text-base text-green-700">
+                              <span>{plan.plan_name || 'Gói dịch vụ'}</span>
+                            </div>
+                            <div className="text-sm text-gray-700 mb-2">
+                              Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
+                            </div>
+                            
+                          </div>
+                        ))
+                      ) : (
+                        <div key={`empty-assignment-${assignmentIdx}`} className="bg-white/80 rounded-lg p-4 border border-gray-200 text-sm text-gray-500">
+                          Assignment {assignmentIdx + 1}: Không có gói dịch vụ được gán
                         </div>
-                        <div className="text-sm text-gray-700 mb-2">
-                          Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
-                        </div>
-                      </Link>
+                      )
                     ))}
+                    
+                    {/* Link xem chi tiết tổng hợp */}
+                    <Link
+                      href={`/staff/residents/${residentId}/services`}
+                      className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4 text-center font-medium no-underline transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      Xem chi tiết →
+                    </Link>
                   </div>
                 ) : (
                   <div>
@@ -422,6 +508,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     </Link>
                   </div>
                 )}
+                
+
               </div>
             </div>
           )}

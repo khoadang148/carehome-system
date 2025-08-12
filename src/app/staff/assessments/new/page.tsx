@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { 
@@ -93,7 +95,7 @@ export default function NewCareNotePage() {
       }, 2000);
     } catch (error) {
       setIsSubmitting(false);
-      alert('Lưu ghi chú thất bại. Vui lòng thử lại!');
+      toast.error('Lưu ghi chú thất bại. Vui lòng thử lại!');
     }
   };
 

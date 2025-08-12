@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { 
   UserIcon, 
   UsersIcon,
@@ -156,7 +158,7 @@ export default function AccountManagementPage() {
         setStaffUsers(staff);
         setFamilyAccounts(family);
       } catch (err) {
-        alert('Lỗi khi tải dữ liệu tài khoản!');
+        toast.error('Lỗi khi tải dữ liệu tài khoản!');
       } finally {
         setLoadingData(false);
       }
@@ -246,7 +248,7 @@ export default function AccountManagementPage() {
     try {
       if (activeTab === 'staff') {
         if (Array.isArray((selectedAccount as any).roles) && (selectedAccount as any).roles.includes('admin')) {
-          alert('Không thể xóa tài khoản admin!');
+          toast.error('Không thể xóa tài khoản admin!');
           setShowDeleteModal(false);
           setSelectedAccount(null);
           setLoadingData(false);
@@ -256,18 +258,18 @@ export default function AccountManagementPage() {
         // await userAPI.delete(String(selectedAccount._id));
         // const data = await userAPI.getAll();
         // setStaffUsers(data);
-        // alert(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
+        // toast.success(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
       } else {
         // TODO: Gọi API xóa user khi có endpoint phù hợp
         // await userAPI.delete(String(selectedAccount._id));
         // const data = await userAPI.getAll();
         // setFamilyAccounts(data);
-        // alert(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
+        // toast.success(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
       }
       setShowDeleteModal(false);
       setSelectedAccount(null);
     } catch (err) {
-      alert('Lỗi khi xóa tài khoản!');
+      toast.error('Lỗi khi xóa tài khoản!');
     } finally {
       setLoadingData(false);
     }
@@ -282,7 +284,7 @@ export default function AccountManagementPage() {
         } else if (showEditModal && selectedAccount) {
           // Gọi API update user cho staff/admin
           await userAPI.update(String(selectedAccount._id), formData);
-          alert(`Đã cập nhật tài khoản ${formData.name || formData.full_name} thành công!`);
+          toast.success(`Đã cập nhật tài khoản ${formData.name || formData.full_name} thành công!`);
           const data = await userAPI.getAll();
           setStaffUsers(data.filter((u: any) => u.role === 'admin' || u.role === 'staff'));
         }
@@ -291,7 +293,7 @@ export default function AccountManagementPage() {
           // TODO: Gọi API tạo user khi có endpoint phù hợp
         } else if (showEditModal && selectedAccount) {
           await userAPI.update(String(selectedAccount._id), formData);
-          alert(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
+          toast.success(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
           const data = await userAPI.getAll();
           setFamilyAccounts(data.filter((u: any) => u.role === 'family'));
         }
@@ -300,7 +302,7 @@ export default function AccountManagementPage() {
       setShowEditModal(false);
       setFormData({});
     } catch (err) {
-      alert('Lỗi khi lưu tài khoản!');
+      toast.error('Lỗi khi lưu tài khoản!');
     } finally {
       setLoadingData(false);
     }

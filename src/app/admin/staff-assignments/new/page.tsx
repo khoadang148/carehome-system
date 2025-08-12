@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -14,6 +16,7 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAssignmentsAPI, staffAPI, residentAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
+import { getAvatarUrlWithFallback } from '@/lib/utils/avatarUtils';
 
 export default function NewStaffAssignmentPage() {
   const { user, loading } = useAuth();
@@ -39,6 +42,8 @@ export default function NewStaffAssignmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
+
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Check permissions
@@ -161,32 +166,42 @@ export default function NewStaffAssignmentPage() {
 
   // Handle create assignment
   const handleCreate = async () => {
+    // Clear previous validation errors
+    setValidationErrors({});
+
+    // Validate required fields
     if (!formData.staff_id || formData.resident_ids.length === 0) {
-      alert('Vui lòng chọn nhân viên và ít nhất một cư dân');
+      toast.error('Vui lòng chọn nhân viên và ít nhất một cư dân');
+      return;
+    }
+
+    // Validate end date is required
+    if (!formData.end_date || formData.end_date.trim() === '') {
+      setValidationErrors({ end_date: 'Ngày kết thúc không được để trống' });
       return;
     }
 
     // Kiểm tra ngày kết thúc không được ở quá khứ
-    if (formData.end_date && formData.end_date.trim() !== '') {
-      const endDate = new Date(formData.end_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time về 00:00:00
-      
-      if (endDate < today) {
-        alert('Ngày kết thúc phân công không được ở quá khứ. Vui lòng chọn ngày từ hôm nay trở đi.');
-        return;
-      }
+    const endDate = new Date(formData.end_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time về 00:00:00
+    
+    if (endDate < today) {
+      setValidationErrors({ end_date: 'Ngày kết thúc không được ở quá khứ' });
+      return;
     }
+
+
 
     // Validate staff_id and resident_ids are valid ObjectIds
     if (!formData.staff_id.match(/^[0-9a-fA-F]{24}$/)) {
-      alert('ID nhân viên không hợp lệ');
+      toast.error('ID nhân viên không hợp lệ');
       return;
     }
 
     for (const residentId of formData.resident_ids) {
       if (!residentId.match(/^[0-9a-fA-F]{24}$/)) {
-        alert('ID cư dân không hợp lệ');
+        toast.error('ID cư dân không hợp lệ');
         return;
       }
     }
@@ -208,7 +223,7 @@ export default function NewStaffAssignmentPage() {
     }
 
     if (existingActiveAssignments.length > 0) {
-      alert(`Các cư dân sau đã được phân công cho nhân viên này rồi: ${existingActiveAssignments.join(', ')}. Vui lòng bỏ chọn các cư dân này hoặc chọn nhân viên khác.`);
+      toast.error(`Các cư dân sau đã được phân công cho nhân viên này rồi: ${existingActiveAssignments.join(', ')}. Vui lòng bỏ chọn các cư dân này hoặc chọn nhân viên khác.`);
       return;
     }
 
@@ -220,6 +235,8 @@ export default function NewStaffAssignmentPage() {
           const assignmentData: any = {
             staff_id: formData.staff_id,
             resident_id: residentId,
+            assigned_date: new Date().toISOString(), // Ngày phân công hiện tại
+            assigned_by: user?.id, // ID của admin đang tạo phân công
             responsibilities: formData.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
           };
           
@@ -288,7 +305,7 @@ export default function NewStaffAssignmentPage() {
         }
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -309,9 +326,18 @@ export default function NewStaffAssignmentPage() {
       notes: '',
       responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
     });
+    setValidationErrors({});
   };
 
   // Get available residents (not assigned to any staff OR only expired assignments)
+  // Helper function to check if assignment is expired based on actual date
+  const isExpired = (endDate: string) => {
+    if (!endDate) return false;
+    const end = new Date(endDate);
+    const now = new Date();
+    return end < now;
+  };
+
   const getAvailableResidents = () => {
     return residents.filter(resident => {
       // Tìm tất cả assignments cho resident này với staff được chọn
@@ -333,15 +359,19 @@ export default function NewStaffAssignmentPage() {
           return true;
         }
         
-        // Nếu có assignment active -> không thể phân công
-        const hasActiveAssignment = residentAssignments.some(assignment => assignment.status === 'active');
+        // Nếu có assignment chưa hết hạn -> không thể phân công
+        const hasActiveAssignment = residentAssignments.some(assignment => 
+          !assignment.end_date || !isExpired(assignment.end_date)
+        );
         if (hasActiveAssignment) {
           console.log(`Resident ${resident.full_name} - Has active assignment, cannot be assigned`);
           return false;
         }
         
-        // Nếu chỉ có assignment expired -> có thể phân công lại
-        const hasOnlyExpiredAssignments = residentAssignments.every(assignment => assignment.status === 'expired');
+        // Nếu chỉ có assignment đã hết hạn -> có thể phân công lại
+        const hasOnlyExpiredAssignments = residentAssignments.every(assignment => 
+          assignment.end_date && isExpired(assignment.end_date)
+        );
         if (hasOnlyExpiredAssignments) {
           console.log(`Resident ${resident.full_name} - Has only expired assignments, can be reassigned`);
           return true;
@@ -368,21 +398,17 @@ export default function NewStaffAssignmentPage() {
           return true;
         }
         
-        // Nếu có assignment active với staff này -> không thể phân công
-        if (specificAssignment.status === 'active') {
+        // Nếu có assignment chưa hết hạn với staff này -> không thể phân công
+        if (!specificAssignment.end_date || !isExpired(specificAssignment.end_date)) {
           console.log(`Resident ${resident.full_name} - Has active assignment with selected staff, cannot be assigned`);
           return false;
         }
         
-        // Nếu có assignment expired với staff này -> có thể phân công lại
-        if (specificAssignment.status === 'expired') {
+        // Nếu có assignment đã hết hạn với staff này -> có thể phân công lại
+        if (specificAssignment.end_date && isExpired(specificAssignment.end_date)) {
           console.log(`Resident ${resident.full_name} - Has expired assignment with selected staff, can be reassigned`);
           return true;
         }
-        
-        // Nếu có assignment với status khác -> có thể phân công lại
-        console.log(`Resident ${resident.full_name} - Has assignment with status ${specificAssignment.status}, can be reassigned`);
-        return true;
         
         // Trường hợp khác -> không thể phân công
         console.log(`Resident ${resident.full_name} - Other case, cannot be assigned`);
@@ -398,7 +424,9 @@ export default function NewStaffAssignmentPage() {
       return assignmentResidentId === residentId;
     });
     
-    return residentAssignments.length > 0 && residentAssignments.every(assignment => assignment.status === 'expired');
+    return residentAssignments.length > 0 && residentAssignments.every(assignment => 
+      assignment.end_date && isExpired(assignment.end_date)
+    );
   };
 
   // Helper function to get assignment status for a resident with selected staff
@@ -411,7 +439,12 @@ export default function NewStaffAssignmentPage() {
       return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
     });
     
-    return assignment ? assignment.status : null;
+    if (!assignment) return null;
+    
+    // Return status based on actual expiration date
+    if (!assignment.end_date) return 'active'; // No end date = active
+    if (isExpired(assignment.end_date)) return 'expired';
+    return 'active';
   };
 
   // Get filtered residents based on search term
@@ -433,6 +466,8 @@ export default function NewStaffAssignmentPage() {
     formData.resident_ids.includes(resident._id)
   );
 
+
+
   // Utility functions for date formatting
   const formatDateForDisplay = (dateString: string) => {
     if (!dateString) return '';
@@ -441,12 +476,6 @@ export default function NewStaffAssignmentPage() {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
-  };
-
-  const formatDateForInput = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
   };
 
   const parseDateFromDisplay = (displayDate: string) => {
@@ -462,13 +491,14 @@ export default function NewStaffAssignmentPage() {
   const isFormValid = () => {
     if (!formData.staff_id || formData.resident_ids.length === 0) return false;
     
+    // Check if end date is required and not empty
+    if (!formData.end_date || formData.end_date.trim() === '') return false;
+    
     // Check if end date is in the past
-    if (formData.end_date && formData.end_date.trim() !== '') {
-      const endDate = new Date(formData.end_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (endDate < today) return false;
-    }
+    const endDate = new Date(formData.end_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (endDate < today) return false;
     
     return true;
   };
@@ -798,13 +828,13 @@ export default function NewStaffAssignmentPage() {
                             <div
                               key={resident._id}
                               onClick={() => {
-                                // Không cho phép chọn resident đã có assignment active với staff được chọn
+                                // Không cho phép chọn resident đã có assignment chưa hết hạn với staff được chọn
                                 if (formData.staff_id && getAssignmentStatus(resident._id) === 'active') {
-                                  alert(`Cư dân ${resident.full_name} đã được phân công cho nhân viên này rồi. Vui lòng chọn cư dân khác hoặc nhân viên khác.`);
+                                  toast.error(`Cư dân ${resident.full_name} đã được phân công cho nhân viên này rồi. Vui lòng chọn cư dân khác hoặc nhân viên khác.`);
                                   return;
                                 }
                                 
-                                // Cho phép chọn resident có assignment expired (có thể phân công lại)
+                                // Cho phép chọn resident có assignment đã hết hạn (có thể phân công lại)
                                 if (isSelected) {
                                   setFormData({
                                     ...formData,
@@ -902,7 +932,7 @@ export default function NewStaffAssignmentPage() {
                       <div className="mt-4 flex items-center justify-between bg-white rounded-xl p-4 border-2 border-green-200">
                         <p className="text-sm text-gray-600 flex items-center">
                           <CheckIcon className="w-4 h-4 mr-2 text-green-500" />
-                          Đã chọn: <span className="font-semibold text-green-600 ml-1">{formData.resident_ids.length}</span> cư dân
+                          Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">{formData.resident_ids.length}</span> cư dân
                         </p>
                         <button
                           onClick={() => setFormData({ ...formData, resident_ids: [] })}
@@ -917,7 +947,7 @@ export default function NewStaffAssignmentPage() {
                   {/* End Date */}
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 date-picker-container">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      Ngày kết thúc phân công
+                      Ngày kết thúc phân công <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -942,10 +972,15 @@ export default function NewStaffAssignmentPage() {
                               const parsedDate = parseDateFromDisplay(formatted);
                               if (parsedDate) {
                                 setFormData({ ...formData, end_date: parsedDate });
+                                // Clear validation error when user enters a valid date
+                                if (validationErrors.end_date) {
+                                  setValidationErrors(prev => ({ ...prev, end_date: '' }));
+                                }
                               }
                             }
                           }
                         }}
+                        onFocus={() => setShowDatePicker(true)}
                         placeholder="dd/mm/yyyy"
                         className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:outline-none transition-all duration-200 text-lg"
                       />
@@ -958,30 +993,35 @@ export default function NewStaffAssignmentPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </button>
-                    </div>
-                    
-                    {/* Date Picker Dropdown */}
-                    {showDatePicker && (
-                      <div className="absolute z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
+                      
+                      {/* Hidden date input for native picker */}
+                      {showDatePicker && (
                         <input
                           type="date"
                           value={formData.end_date}
                           onChange={(e) => {
                             setFormData({ ...formData, end_date: e.target.value });
                             setShowDatePicker(false);
+                            // Clear validation error when user selects a date
+                            if (validationErrors.end_date) {
+                              setValidationErrors(prev => ({ ...prev, end_date: '' }));
+                            }
                           }}
                           min={new Date().toISOString().split('T')[0]}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          style={{ zIndex: 10 }}
+                          autoFocus
                         />
-                      </div>
-                    )}
+                      )}
+                    </div>
                     
-                    <p className="text-sm text-gray-500 mt-2 flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Để trống nếu không có ngày kết thúc cụ thể. Ngày kết thúc phải từ hôm nay trở đi.
-                    </p>
+                    
+                    {validationErrors.end_date && (
+                      <p className="text-sm text-red-600 mt-2 flex items-center">
+                        <ExclamationTriangleIcon className="w-4 h-4 mr-2" />
+                        {validationErrors.end_date}
+                      </p>
+                    )}
                     {formData.end_date && new Date(formData.end_date) < new Date(new Date().setHours(0, 0, 0, 0)) && (
                       <p className="text-sm text-red-600 mt-2 flex items-center">
                         <ExclamationTriangleIcon className="w-4 h-4 mr-2" />
@@ -1029,10 +1069,24 @@ export default function NewStaffAssignmentPage() {
                         Nhân viên được chọn
                       </h3>
                       <div className="flex items-center">
-                        <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-4 shadow-lg">
-                          <span className="text-white font-bold text-lg">
-                            {selectedStaff.full_name.split(' ').map((n: string) => n[0]).join('')}
-                          </span>
+                        <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-4 shadow-lg overflow-hidden">
+                          {selectedStaff.avatar ? (
+                            <img
+                              src={getAvatarUrlWithFallback(selectedStaff.avatar)}
+                              alt={selectedStaff.full_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Khi avatar lỗi, thay thế bằng avatar mặc định
+                                e.currentTarget.src = "/default-avatar.svg";
+                              }}
+                            />
+                          ) : (
+                            <img
+                              src="/default-avatar.svg"
+                              alt={selectedStaff.full_name}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
                         </div>
                         <div>
                           <p className="font-semibold text-blue-900 text-lg">{selectedStaff.full_name}</p>
@@ -1064,7 +1118,25 @@ export default function NewStaffAssignmentPage() {
                             className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200 shadow-sm"
                           >
                             <div className="flex items-center">
-                              <div className="w-3 h-3 bg-green-500 rounded-full mr-3 shadow-sm"></div>
+                              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-sm overflow-hidden">
+                                {resident.avatar ? (
+                                  <img
+                                    src={getAvatarUrlWithFallback(resident.avatar)}
+                                    alt={resident.full_name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      // Khi avatar lỗi, thay thế bằng avatar mặc định
+                                      e.currentTarget.src = "/default-avatar.svg";
+                                    }}
+                                  />
+                                ) : (
+                                  <img
+                                    src="/default-avatar.svg"
+                                    alt={resident.full_name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
+                              </div>
                               <div>
                                 <p className="text-sm font-semibold text-green-900">{resident.full_name}</p>
                                 <p className="text-xs text-green-700">Phòng {roomNumbers[resident._id] || 'Chưa hoàn tất đăng kí'}</p>
@@ -1122,20 +1194,20 @@ export default function NewStaffAssignmentPage() {
                     <div className="text-sm text-yellow-800 space-y-2">
                       <p className="flex items-center">
                         <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                        Sẽ tạo <span className="font-bold text-yellow-900">{formData.resident_ids.length}</span> phân công
+                        Sẽ tạo <span className="font-bold text-yellow-900 mx-1">{formData.resident_ids.length}</span> phân công
                       </p>
                       <p className="flex items-center">
                         <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                        Nhân viên: <span className="font-semibold text-yellow-900">{selectedStaff?.full_name || 'Chưa chọn'}</span>
+                        Nhân viên: <span className="font-semibold text-yellow-900 ml-1">{selectedStaff?.full_name || 'Chưa chọn'}</span>
                       </p>
                       <p className="flex items-center">
                         <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                        Trạng thái: <span className="font-semibold text-green-600">Hoạt động</span>
+                        Trạng thái: <span className="font-semibold text-green-600 ml-1">Hoạt động</span>
                       </p>
                       {formData.end_date && (
                         <p className="flex items-center">
                           <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                          Kết thúc: <span className="font-semibold text-yellow-900">{new Date(formData.end_date).toLocaleDateString('vi-VN')}</span>
+                          Kết thúc: <span className="font-semibold text-yellow-900 ml-1">{new Date(formData.end_date).toLocaleDateString('vi-VN')}</span>
                         </p>
                       )}
                     </div>

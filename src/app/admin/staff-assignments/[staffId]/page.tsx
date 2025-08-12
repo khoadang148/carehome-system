@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -121,7 +123,7 @@ export default function StaffAssignmentDetailPage() {
       setShowSuccessModal(true);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Không thể cập nhật phân công. Vui lòng thử lại.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -155,7 +157,7 @@ export default function StaffAssignmentDetailPage() {
       setShowSuccessModal(true);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Không thể tạo phân công. Vui lòng thử lại.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -180,7 +182,7 @@ export default function StaffAssignmentDetailPage() {
       setShowSuccessModal(true);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Không thể xóa phân công. Vui lòng thử lại.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }

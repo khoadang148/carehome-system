@@ -23,6 +23,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { residentAPI, carePlansAPI, roomsAPI, staffAssignmentsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
+import { validateActivitySchedule, checkScheduleConflict, ActivityParticipation } from '@/lib/utils/validation';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -37,7 +38,7 @@ export default function AIRecommendationsPage() {
   const [aiResponse, setAiResponse] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
-  const [notification, setNotification] = useState<{ open: boolean; type: 'success' | 'error'; message: string }>({ open: false, type: 'success', message: '' });
+  const [notification, setNotification] = useState<{ open: boolean; type: 'success' | 'error' | 'warning'; message: string }>({ open: false, type: 'success', message: '' });
   const [searchText, setSearchText] = useState('');
   const [residents, setResidents] = useState<any[]>([]);
   const [residentsLoading, setResidentsLoading] = useState(false);
@@ -154,6 +155,13 @@ export default function AIRecommendationsPage() {
     
     setLoading(true);
     try {
+      // Validate thời gian trước khi tạo gợi ý
+      if (!selectedDate || !selectedTime) {
+        setNotification({ open: true, type: 'error', message: 'Vui lòng chọn ngày và giờ cho hoạt động.' });
+        setLoading(false);
+        return;
+      }
+
       // Tạo datetime string từ ngày và giờ được chọn (không dùng toISOString)
       let scheduleDateTime = '';
       if (selectedDate && selectedTime) {
@@ -161,6 +169,18 @@ export default function AIRecommendationsPage() {
         const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
         const day = String(selectedDate.getDate()).padStart(2, '0');
         scheduleDateTime = `${year}-${month}-${day}T${selectedTime}`;
+      }
+
+      // Validate thời gian sử dụng utility function
+      const scheduleValidation = validateActivitySchedule(selectedDate, selectedTime, 60); // Default duration 60 minutes
+      if (scheduleValidation) {
+        setNotification({ 
+          open: true, 
+          type: 'warning', 
+          message: scheduleValidation.message 
+        });
+        setLoading(false);
+        return;
       }
       
       // Gọi API mới với residentIds và schedule_time
@@ -279,43 +299,76 @@ export default function AIRecommendationsPage() {
       // Create a comprehensive description from trợ lý thông minh recommendation data
       let description = '';
       
-      // Tạo mô tả ngắn gọn và chuyên nghiệp
+      // Tạo mô tả chuyên nghiệp và dễ đọc
       const descriptionParts = [];
       
-      // Thêm mô tả chi tiết nếu có
-      if (recommendation.detailedDescription && recommendation.detailedDescription.length > 20) {
-        descriptionParts.push(recommendation.detailedDescription);
+      // Tạo mô tả cơ bản
+      let baseDescription = `Hoạt động ${recommendation.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi.`;
+      
+      // Thêm thông tin về độ khó và thời lượng
+      if (recommendation.difficulty) {
+        baseDescription += ` Độ khó: ${recommendation.difficulty}.`;
+      }
+      if (recommendation.duration) {
+        baseDescription += ` Thời lượng: ${recommendation.duration}.`;
+      }
+      
+      descriptionParts.push(baseDescription);
+      
+      // Thêm mô tả chi tiết nếu có và hợp lệ
+      if (recommendation.detailedDescription && 
+          recommendation.detailedDescription.length > 20 &&
+          !recommendation.detailedDescription.includes('**') &&
+          !recommendation.detailedDescription.includes('*')) {
+        
+        // Làm sạch mô tả chi tiết
+        let cleanDescription = recommendation.detailedDescription
+          .replace(/\*\*/g, '') // Loại bỏ dấu **
+          .replace(/\*/g, '') // Loại bỏ dấu *
+          .replace(/\n/g, ' ') // Thay thế xuống dòng bằng khoảng trắng
+          .replace(/\s+/g, ' ') // Loại bỏ khoảng trắng thừa
+          .trim();
+        
+        if (cleanDescription.length > 50) {
+          descriptionParts.push(cleanDescription);
+        }
       }
       
       // Thêm mục tiêu nếu có
       if (recommendation.objectives && recommendation.objectives.length > 0) {
-        const objectives = recommendation.objectives.slice(0, 2).join(', '); // Chỉ lấy 2 mục tiêu đầu
-        descriptionParts.push(`Mục tiêu: ${objectives}`);
+        const validObjectives = recommendation.objectives
+          .filter(obj => obj && obj.length > 5 && !obj.includes('*'))
+          .slice(0, 2);
+        
+        if (validObjectives.length > 0) {
+          const objectivesText = validObjectives.join('. ');
+          descriptionParts.push(`Mục tiêu: ${objectivesText}`);
+        }
       }
       
       // Thêm lợi ích nếu có
       if (recommendation.benefits && recommendation.benefits.length > 0) {
-        const benefits = recommendation.benefits.slice(0, 2).join(', '); // Chỉ lấy 2 lợi ích đầu
-        descriptionParts.push(`Lợi ích: ${benefits}`);
-      }
-      
-      // Thêm lưu ý quan trọng nếu có
-      if (recommendation.precautions && recommendation.precautions.length > 0) {
-        const precautions = recommendation.precautions.slice(0, 1).join(', '); // Chỉ lấy 1 lưu ý đầu
-        descriptionParts.push(`Lưu ý: ${precautions}`);
+        const validBenefits = recommendation.benefits
+          .filter(benefit => benefit && benefit.length > 5 && !benefit.includes('*'))
+          .slice(0, 2);
+        
+        if (validBenefits.length > 0) {
+          const benefitsText = validBenefits.join('. ');
+          descriptionParts.push(`Lợi ích: ${benefitsText}`);
+        }
       }
       
       // Ghép các phần lại thành mô tả hoàn chỉnh
-      description = descriptionParts.join('. ');
+      description = descriptionParts.join(' ');
       
-      // Nếu không có mô tả chi tiết, tạo mô tả mặc định ngắn gọn
-      if (!description || description.length < 30) {
-        description = `Hoạt động ${recommendation.activityName} được thiết kế phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần.`;
+      // Nếu không có mô tả đủ dài, tạo mô tả mặc định
+      if (!description || description.length < 50) {
+        description = `Hoạt động ${recommendation.activityName} được thiết kế phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần. Hoạt động này có độ khó ${recommendation.difficulty || 'trung bình'} và thời lượng ${recommendation.duration || '30-45 phút'}.`;
       }
       
       // Giới hạn độ dài mô tả để tránh quá dài
-      if (description.length > 300) {
-        description = description.substring(0, 297) + '...';
+      if (description.length > 500) {
+        description = description.substring(0, 497) + '...';
       }
       const getActivityType = (activityName: string): string => {
         const name = activityName.toLowerCase();
@@ -348,7 +401,12 @@ export default function AIRecommendationsPage() {
         }
       };
       const activityType = getActivityType(recommendation.activityName);
-      // Gửi schedule_time đúng local, không dùng toISOString
+      // Validate thời gian - Bắt buộc phải chọn ngày và giờ
+      if (!selectedDate || !selectedTime) {
+        throw new Error('Vui lòng chọn ngày và giờ cho hoạt động.');
+      }
+
+      // Tạo scheduleDateTime với timezone local
       let scheduleDateTime = '';
       if (selectedDate && selectedTime) {
         const year = selectedDate.getFullYear();
@@ -357,27 +415,39 @@ export default function AIRecommendationsPage() {
         scheduleDateTime = `${year}-${month}-${day}T${selectedTime}`;
       }
 
-      // Validate thời gian
-      if (scheduleDateTime) {
-        const selectedDateTime = new Date(scheduleDateTime);
-        const now = new Date();
+      // Validate thời gian sử dụng utility function
+      const scheduleValidation = validateActivitySchedule(selectedDate, selectedTime, duration);
+      if (scheduleValidation) {
+        throw new Error(scheduleValidation.message);
+      }
+
+      // KIỂM TRA TRÙNG LỊCH TRƯỚC KHI TẠO HOẠT ĐỘNG
+      console.log('Checking schedule conflicts for resident:', selectedResident);
+      
+      try {
+        const conflictCheck = await activitiesAPI.checkScheduleConflict(
+          selectedResident,
+          scheduleDateTime,
+          duration
+        );
         
-        // Kiểm tra không được tạo trong quá khứ
-        if (selectedDateTime <= now) {
-          throw new Error('Thời gian bắt đầu không thể là thời gian trong quá khứ. Vui lòng chọn thời gian trong tương lai.');
+        if (conflictCheck.hasConflict) {
+          console.log('Schedule conflict detected:', conflictCheck.message);
+          
+          // Hiển thị thông báo lỗi và dừng việc tạo hoạt động
+          setNotification({
+            open: true,
+            type: 'warning',
+            message: conflictCheck.message
+          });
+          setCreateLoading(false);
+          return; // Dừng ngay tại đây, không tạo hoạt động
         }
         
-        // Kiểm tra phải tạo trước ít nhất 2 tiếng
-        const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-        if (selectedDateTime < twoHoursFromNow) {
-          throw new Error('Hoạt động phải được tạo trước ít nhất 2 tiếng so với thời gian bắt đầu để đảm bảo chuẩn bị đầy đủ.');
-        }
-        
-        // Kiểm tra không được tạo trước quá 1 tuần
-        const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        if (selectedDateTime > oneWeekFromNow) {
-          throw new Error('Hoạt động chỉ có thể được tạo trước tối đa 1 tuần so với thời gian bắt đầu.');
-        }
+        console.log('No schedule conflicts found');
+      } catch (error) {
+        console.error('Error checking schedule conflict:', error);
+        // Nếu có lỗi khi kiểm tra, vẫn cho phép tạo hoạt động
       }
 
       const activityData = {
@@ -440,13 +510,35 @@ export default function AIRecommendationsPage() {
               message: 'Hoạt động đã được tạo thành công! Tuy nhiên không tìm thấy thông tin người cao tuổi để thêm vào hoạt động.' 
             });
           }
-        } catch (participationError) {
+        } catch (participationError: any) {
           console.error('Error adding resident to activity:', participationError);
-          setNotification({ 
-            open: true, 
-            type: 'success', 
-            message: 'Hoạt động đã được tạo thành công! Tuy nhiên có lỗi khi thêm người cao tuổi vào hoạt động. Bạn có thể thêm thủ công sau.' 
-          });
+          
+          // Kiểm tra xem có phải lỗi trùng lịch không
+          let errorMessage = 'Có lỗi khi thêm người cao tuổi vào hoạt động.';
+          if (participationError?.response?.data?.message) {
+            errorMessage = participationError.response.data.message;
+          } else if (participationError?.response?.data?.detail) {
+            errorMessage = participationError.response.data.detail;
+          } else if (participationError?.message) {
+            errorMessage = participationError.message;
+          }
+          
+          // Nếu là lỗi trùng lịch (400), hiển thị thông báo lỗi và không chuyển trang
+          if (participationError?.response?.status === 400) {
+            setNotification({ 
+              open: true, 
+              type: 'warning', 
+              message: `Hoạt động đã được tạo thành công! Tuy nhiên: ${errorMessage}` 
+            });
+            // Không chuyển trang nếu có lỗi trùng lịch
+            return;
+          } else {
+            setNotification({ 
+              open: true, 
+              type: 'success', 
+              message: 'Hoạt động đã được tạo thành công! Tuy nhiên có lỗi khi thêm người cao tuổi vào hoạt động. Bạn có thể thêm thủ công sau.' 
+            });
+          }
         }
       } else {
         setNotification({ 
@@ -472,7 +564,20 @@ export default function AIRecommendationsPage() {
       if (error?.response?.data) {
         console.error('Backend error details:', error.response.data);
       }
-      setNotification({ open: true, type: 'error', message: errorMessage });
+      
+      // Kiểm tra xem có phải lỗi trùng lịch không
+      const isScheduleConflict = errorMessage.includes('Cư dân đã có hoạt động') || 
+                                errorMessage.includes('trong cùng ngày') ||
+                                error?.response?.status === 400;
+      
+      // Chỉ hiển thị thông báo lỗi nếu không phải lỗi trùng lịch (vì đã xử lý ở trên)
+      if (!isScheduleConflict) {
+        setNotification({ 
+          open: true, 
+          type: 'error', 
+          message: errorMessage 
+        });
+      }
     } finally {
       setCreateLoading(false);
     }
@@ -654,7 +759,7 @@ export default function AIRecommendationsPage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                Ngày (tùy chọn)
+                Ngày <span style={{ color: '#dc2626' }}>*</span>
                   </label>
               <DatePicker
                 selected={selectedDate}
@@ -690,7 +795,7 @@ export default function AIRecommendationsPage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                Giờ (tùy chọn)
+                Giờ <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <input
                 type="time"
@@ -713,17 +818,17 @@ export default function AIRecommendationsPage() {
 
               <button
             onClick={generateIndividualRecommendations}
-            disabled={!selectedResident || loading}
+            disabled={!selectedResident || !selectedDate || !selectedTime || loading}
                 style={{
                   padding: '0.875rem 2rem',
                   borderRadius: '0.75rem',
                   border: 'none',
-              background: selectedResident && !loading 
+              background: selectedResident && selectedDate && selectedTime && !loading 
                     ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
                     : '#9ca3af',
                   color: 'white',
                   fontWeight: 600,
-              cursor: selectedResident && !loading ? 'pointer' : 'not-allowed',
+              cursor: selectedResident && selectedDate && selectedTime && !loading ? 'pointer' : 'not-allowed',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
@@ -745,7 +850,7 @@ export default function AIRecommendationsPage() {
                 ) : (
                   <>
                     <SparklesIcon style={{ width: '1rem', height: '1rem' }} />
-                Tạo gợi ý trợ lý thông minh
+                {!selectedDate || !selectedTime ? 'Chọn ngày và giờ trước' : 'Tạo gợi ý trợ lý thông minh'}
                   </>
                 )}
               </button>
@@ -1265,16 +1370,16 @@ export default function AIRecommendationsPage() {
                       {user?.role === 'admin' || (user?.role === 'staff' && safeRec.confidenceLevel > 60) ? (
                         <button
                           onClick={() => handleCreateActivity(safeRec)}
-                          disabled={createLoading}
+                          disabled={createLoading || !selectedDate || !selectedTime}
                           style={{
                             width: '100%',
                             padding: '0.875rem 1rem',
                             borderRadius: '0.5rem',
                             border: 'none',
-                            background: createLoading ? '#9ca3af' : '#10b981',
+                            background: createLoading || !selectedDate || !selectedTime ? '#9ca3af' : '#10b981',
                             color: 'white',
                             fontWeight: 600,
-                            cursor: createLoading ? 'not-allowed' : 'pointer',
+                            cursor: createLoading || !selectedDate || !selectedTime ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1295,7 +1400,7 @@ export default function AIRecommendationsPage() {
                           ) : (
                             <PlusIcon style={{ width: '1rem', height: '1rem' }} />
                           )}
-                          Tạo hoạt động
+                          {!selectedDate || !selectedTime ? 'Chọn ngày và giờ trước' : 'Tạo hoạt động'}
                         </button>
                       ) : (
                         <div style={{
@@ -1350,6 +1455,54 @@ export default function AIRecommendationsPage() {
                 Phản hồi trợ lý thông minh
               </h3>
             </div>
+
+            {/* Debug Info */}
+            {selectedDate && selectedTime && (
+              <div style={{
+                background: '#f8fafc',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                marginBottom: '1rem',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.875rem'
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                  Thông tin thời gian đã chọn:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Ngày đã chọn:</span> {selectedDate.toLocaleDateString('vi-VN')}
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Giờ đã chọn:</span> {selectedTime}
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Thời gian hiện tại:</span> {new Date().toLocaleString('vi-VN')}
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Trạng thái:</span> 
+                    <span style={{ 
+                      color: (() => {
+                        const selectedDateTime = new Date(selectedDate);
+                        const [hours, minutes] = selectedTime.split(':').map(Number);
+                        selectedDateTime.setHours(hours, minutes, 0, 0);
+                        const now = new Date();
+                        return selectedDateTime <= now ? '#dc2626' : '#059669';
+                      })(),
+                      fontWeight: 600
+                    }}>
+                      {(() => {
+                        const selectedDateTime = new Date(selectedDate);
+                        const [hours, minutes] = selectedTime.split(':').map(Number);
+                        selectedDateTime.setHours(hours, minutes, 0, 0);
+                        const now = new Date();
+                        return selectedDateTime <= now ? 'Quá khứ (không hợp lệ)' : 'Tương lai (hợp lệ)';
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{
               background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
               borderRadius: '0.75rem',
@@ -1462,7 +1615,7 @@ export default function AIRecommendationsPage() {
 
       <NotificationModal
         open={notification.open}
-        title={notification.type === 'success' ? 'Thành công' : 'Lỗi'}
+        title={notification.type === 'success' ? 'Thành công' : notification.type === 'warning' ? 'Lưu ý' : 'Lỗi'}
         type={notification.type}
         message={notification.message}
         onClose={() => setNotification({ ...notification, open: false })}

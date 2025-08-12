@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -19,7 +20,8 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline';
 
 interface ValidationErrors {
@@ -53,6 +55,9 @@ export default function NewBillPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [billingPreview, setBillingPreview] = useState<any>(null);
+  const [showBillingPreview, setShowBillingPreview] = useState(false);
+  const [billingDetails, setBillingDetails] = useState<any>(null);
 
 
 
@@ -114,76 +119,49 @@ export default function NewBillPage() {
     setFilteredResidents(filtered);
   }, [residentSearchTerm, residents]);
 
-  // Fetch care plan assignments when resident changes
+  // Tính tổng tiền khi resident thay đổi
   useEffect(() => {
     if (resident_id) {
       setLoadingAssignments(true);
-      carePlansAPI.getByResidentId(resident_id)
-        .then(data => {
-          const assignments = Array.isArray(data) ? data : [];
-          // Lọc chỉ những assignment còn hạn (active và chưa hết hạn)
-          const activeAssignments = assignments.filter((assignment: any) => {
-            // Kiểm tra status phải là 'active'
-            if (assignment.status !== 'active') return false;
-            
-            // Kiểm tra end_date phải còn trong tương lai
-            if (assignment.end_date) {
-              const endDate = new Date(assignment.end_date);
-              const now = new Date();
-              return endDate > now;
-            }
-            
-            // Nếu không có end_date, coi như còn hạn
-            return true;
-          });
-          
-          setCarePlanAssignments(activeAssignments);
+      // Tính tổng tiền từ BE
+      billsAPI.calculateTotal(resident_id)
+        .then(totalCalculation => {
+          setAmount(totalCalculation.totalAmount.toString());
+          setBillingDetails(totalCalculation);
+          // Gợi ý title/notes tự động
+          const month = due_date ? new Date(due_date).getMonth() + 1 : '';
+          const year = due_date ? new Date(due_date).getFullYear() : '';
+          setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
+          setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
         })
-        .catch(() => setCarePlanAssignments([]))
+        .catch(() => {
+          setAmount('');
+          setBillingDetails(null);
+          setTitle('');
+          setNotes('');
+        })
         .finally(() => setLoadingAssignments(false));
-      setCarePlanAssignmentId('');
-      setAmount('');
-    } else {
-      setCarePlanAssignments([]);
-      setCarePlanAssignmentId('');
-      setAmount('');
-    }
-  }, [resident_id]);
-
-  // Set amount when care plan assignment changes
-  useEffect(() => {
-    if (care_plan_assignment_id) {
-      const assignment = carePlanAssignments.find((a: any) => a._id === care_plan_assignment_id);
-      setAmount(assignment ? assignment.total_monthly_cost?.toString() : '');
-      // Gợi ý title/notes tự động
-      if (assignment) {
-        const planName = assignment.care_plan_ids && assignment.care_plan_ids[0]?.plan_name ? assignment.care_plan_ids[0].plan_name : '';
-        const month = due_date ? new Date(due_date).getMonth() + 1 : '';
-        const year = due_date ? new Date(due_date).getFullYear() : '';
-        setTitle(`Hóa đơn tháng ${month}/${year} cho gói chăm sóc ${planName}`);
-        setNotes(`Chưa thanh toán cho ${planName}${assignment.room_type ? ' + phòng ' + assignment.room_type : ''} tháng ${month}/${year}`);
-      } else {
-        setTitle('');
-        setNotes('');
-      }
+      setCarePlanAssignmentId(''); // Không cần chọn assignment cụ thể
     } else {
       setAmount('');
+      setBillingDetails(null);
       setTitle('');
       setNotes('');
+      setCarePlanAssignmentId('');
     }
-  }, [care_plan_assignment_id, carePlanAssignments, due_date]);
+  }, [resident_id, due_date]);
 
-  // Update title/notes when due_date changes
+  // Cập nhật title/notes khi due_date thay đổi
   useEffect(() => {
-    if (care_plan_assignment_id && due_date) {
-      const assignment = carePlanAssignments.find((a: any) => a._id === care_plan_assignment_id);
-      const planName = assignment?.care_plan_ids && assignment.care_plan_ids[0]?.plan_name ? assignment.care_plan_ids[0].plan_name : '';
+    if (resident_id && due_date) {
       const month = new Date(due_date).getMonth() + 1;
       const year = new Date(due_date).getFullYear();
-      setTitle(`Hóa đơn tháng ${month}/${year} cho gói chăm sóc ${planName}`);
-      setNotes(`Chưa thanh toán cho ${planName}${assignment?.room_type ? ' + phòng ' + assignment.room_type : ''} tháng ${month}/${year}`);
+      setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
+      setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
     }
-  }, [due_date]);
+  }, [due_date, resident_id]);
+
+  // Xóa useEffect cũ không cần thiết
 
   // Validation function
   const validateForm = (): boolean => {
@@ -193,23 +171,7 @@ export default function NewBillPage() {
       errors.resident_id = 'Vui lòng chọn người cao tuổi';
     }
 
-    if (!care_plan_assignment_id) {
-      errors.care_plan_assignment_id = 'Vui lòng chọn gói chăm sóc';
-    } else {
-      // Kiểm tra thêm xem gói chăm sóc có còn hạn không
-      const selectedAssignment = carePlanAssignments.find((a: any) => a._id === care_plan_assignment_id);
-      if (selectedAssignment) {
-        if (selectedAssignment.status !== 'active') {
-          errors.care_plan_assignment_id = 'Gói chăm sóc không còn hoạt động';
-        } else if (selectedAssignment.end_date) {
-          const endDate = new Date(selectedAssignment.end_date);
-          const now = new Date();
-          if (endDate <= now) {
-            errors.care_plan_assignment_id = 'Gói chăm sóc đã hết hạn';
-          }
-        }
-      }
-    }
+    // Không cần validate care_plan_assignment_id nữa vì tính tổng tất cả
 
     if (!staff_id) {
       errors.staff_id = 'Không thể xác định nhân viên hiện tại';
@@ -253,11 +215,12 @@ export default function NewBillPage() {
     }
 
     try {
+      // Tạo bill với tổng tiền đã tính từ BE
       await billsAPI.create({
         resident_id,
-        care_plan_assignment_id,
+        care_plan_assignment_id: null, // Không cần assignment cụ thể
         staff_id,
-        amount: Number(amount),
+        amount: Number(amount), // Sử dụng amount đã tính
         due_date: due_date ? new Date(due_date).toISOString() : '',
         title,
         notes
@@ -294,6 +257,24 @@ export default function NewBillPage() {
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     router.push('/admin/financial-reports');
+  };
+
+  const handlePreviewBill = async () => {
+    if (!resident_id) {
+      setError('Vui lòng chọn cư dân trước');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const totalCalculation = await billsAPI.calculateTotal(resident_id);
+      setBillingPreview(totalCalculation);
+      setShowBillingPreview(true);
+    } catch (err: any) {
+      setError(err?.message || 'Có lỗi xảy ra khi tính toán hóa đơn');
+    } finally {
+      setLoading(false);
+    }
   };
 
       return (
@@ -458,81 +439,113 @@ export default function NewBillPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      Gói chăm sóc <span className="text-red-500">*</span>
+                      Tổng dịch vụ
                     </label>
-                    <select 
-                      value={care_plan_assignment_id} 
-                      onChange={e => {
-                        setCarePlanAssignmentId(e.target.value);
-                        setValidationErrors(prev => ({ ...prev, care_plan_assignment_id: undefined }));
-                      }} 
-                      disabled={!resident_id || loadingAssignments}
-                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                        validationErrors.care_plan_assignment_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-                      } ${(!resident_id || loadingAssignments) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    >
-                      <option value="">{loadingAssignments ? 'Đang tải...' : 'Chọn gói chăm sóc'}</option>
-                      {carePlanAssignments.length === 0 && !loadingAssignments && (
-                        <option value="" disabled>Không có gói chăm sóc còn hạn</option>
-                      )}
-                      {carePlanAssignments.map(cp => {
-                        const planName = cp?.care_plan_ids && cp.care_plan_ids[0]?.plan_name ? cp.care_plan_ids[0].plan_name : 'Gói chăm sóc';
-                        const cost = cp?.total_monthly_cost ? ` - ${Number(cp.total_monthly_cost).toLocaleString('vi-VN')} đ/tháng` : '';
-                        const endDate = cp?.end_date ? new Date(cp.end_date) : null;
-                        const endDateStr = endDate ? ` (Hết hạn: ${endDate.toLocaleDateString('vi-VN')})` : '';
-                        
-                        return (
-                          <option key={cp?._id} value={cp?._id}>
-                            {planName}{cost}{endDateStr}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {validationErrors.care_plan_assignment_id && (
-                      <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
-                        <ExclamationTriangleIcon className="w-4 h-4" />
-                        {validationErrors.care_plan_assignment_id}
-                      </p>
-                    )}
-                    {carePlanAssignments.length === 0 && !loadingAssignments && resident_id && (
-                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <ExclamationTriangleIcon className="w-4 h-4 text-amber-600" />
-                          <p className="text-amber-800 text-sm font-medium">
-                            Không có gói chăm sóc còn hạn cho người cao tuổi này
-                          </p>
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">Tự động tính tổng tất cả gói dịch vụ</p>
+                          <p className="text-xs text-gray-500 mt-1">Bao gồm dịch vụ và phòng</p>
                         </div>
-                        <p className="text-amber-700 text-xs mt-1">
-                          Chỉ có thể tạo hóa đơn cho các gói dịch vụ đang hoạt động và chưa hết hạn.
-                        </p>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600">
+                            {loadingAssignments ? 'Đang tính...' : (amount ? `${Number(amount).toLocaleString('vi-VN')} ₫` : '0 ₫')}
+                          </p>
+                          <p className="text-xs text-gray-500">mỗi tháng</p>
+                        </div>
                       </div>
+                    </div>
+                    {!resident_id && (
+                      <p className="text-gray-500 text-sm mt-2">Vui lòng chọn người cao tuổi để tính tổng tiền</p>
                     )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      Số tiền <span className="text-red-500">*</span>
+                      Chi tiết
                     </label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        value={amount} 
-                        readOnly 
-                        className={`w-full px-4 py-3 border rounded-xl bg-gray-50 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                          validationErrors.amount ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                        }`}
-                        placeholder="Tự động từ gói chăm sóc"
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm font-medium">
-                        VNĐ
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 max-h-96 overflow-y-auto">
+                      {loadingAssignments ? (
+                        <div className="text-center py-4">
+                          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-600">Đang tính toán...</p>
+                        </div>
+                      ) : billingDetails ? (
+                        <div className="space-y-4">
+                          {/* Chi tiết dịch vụ */}
+                          {billingDetails.serviceDetails && billingDetails.serviceDetails.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-900 mb-2">📋 Gói dịch vụ:</h4>
+                              <div className="space-y-2">
+                                {billingDetails.serviceDetails.map((service: any, index: number) => (
+                                  <div key={index} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-gray-900">{service.plan_name}</p>
+                                      <p className="text-xs text-gray-600 truncate">{service.description}</p>
+                                    </div>
+                                    <p className="text-sm font-semibold text-blue-600 ml-2">
+                                      {new Intl.NumberFormat('vi-VN').format(service.monthly_price)} ₫
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-gray-200">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="font-medium text-gray-900">Tổng tiền dịch vụ:</span>
+                                  <span className="font-semibold text-blue-600">
+                                    {new Intl.NumberFormat('vi-VN').format(billingDetails.totalServiceCost)} ₫
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Chi tiết phòng */}
+                          {billingDetails.roomDetails && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-900 mb-2">🏠 Thông tin phòng:</h4>
+                              <div className="p-2 bg-white rounded-lg border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-900">
+                                      Phòng {billingDetails.roomDetails.room_number} - {billingDetails.roomDetails.room_type}
+                                    </p>
+                                    <p className="text-xs text-gray-600">Tầng {billingDetails.roomDetails.floor}</p>
+                                  </div>
+                                  <p className="text-sm font-semibold text-green-600 ml-2">
+                                    {new Intl.NumberFormat('vi-VN').format(billingDetails.roomDetails.monthly_price)} ₫
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-gray-200">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="font-medium text-gray-900">Tổng tiền phòng:</span>
+                                  <span className="font-semibold text-green-600">
+                                    {new Intl.NumberFormat('vi-VN').format(billingDetails.totalRoomCost)} ₫
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tổng cộng */}
+                          <div className="pt-2 border-t-2 border-gray-300">
+                            <div className="flex items-center justify-between text-sm font-semibold">
+                              <span className="text-gray-900">TỔNG CỘNG:</span>
+                              <span className="text-lg text-blue-600">
+                                {new Intl.NumberFormat('vi-VN').format(billingDetails.totalAmount)} ₫
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">mỗi tháng</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-gray-500">Chưa có thông tin chi tiết</p>
+                          <p className="text-xs text-gray-400 mt-1">Vui lòng chọn người cao tuổi</p>
                       </div>
+                      )}
                     </div>
-                    {validationErrors.amount && (
-                      <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
-                        <ExclamationTriangleIcon className="w-4 h-4" />
-                        {validationErrors.amount}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -642,8 +655,26 @@ export default function NewBillPage() {
                   Hủy bỏ
                 </button>
                 <button 
+                  type="button" 
+                  onClick={handlePreviewBill}
+                  disabled={loading || !resident_id}
+                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Đang tính...
+                    </>
+                  ) : (
+                    <>
+                      <EyeIcon className="w-4 h-4" />
+                      Xem trước
+                    </>
+                  )}
+                </button>
+                <button 
                   type="submit" 
-                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || carePlanAssignments.length === 0 || !staff_id}
+                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || !amount || !staff_id}
                   className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
                 >
                   {loading ? (
@@ -696,6 +727,111 @@ export default function NewBillPage() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
               >
                 Xem hóa đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Billing Preview Modal */}
+      {showBillingPreview && billingPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl transform transition-all duration-300">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Xem trước hóa đơn</h3>
+              <button
+                onClick={() => setShowBillingPreview(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Tổng tiền */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-semibold text-gray-900">Tổng tiền hóa đơn</h4>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-blue-600">
+                      {new Intl.NumberFormat('vi-VN').format(billingPreview.totalAmount)} ₫
+                    </p>
+                    <p className="text-sm text-gray-600">mỗi tháng</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chi tiết dịch vụ */}
+              {billingPreview.serviceDetails && billingPreview.serviceDetails.length > 0 && (
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Chi tiết dịch vụ</h4>
+                  <div className="space-y-3">
+                    {billingPreview.serviceDetails.map((service: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                        <div>
+                          <p className="font-medium text-gray-900">{service.plan_name}</p>
+                          <p className="text-sm text-gray-600">{service.description}</p>
+                        </div>
+                        <p className="font-semibold text-blue-600">
+                          {new Intl.NumberFormat('vi-VN').format(service.monthly_price)} ₫
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-gray-900">Tổng tiền dịch vụ:</p>
+                      <p className="font-semibold text-blue-600">
+                        {new Intl.NumberFormat('vi-VN').format(billingPreview.totalServiceCost)} ₫
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chi tiết phòng */}
+              {billingPreview.roomDetails && (
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Chi tiết phòng</h4>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        Phòng {billingPreview.roomDetails.room_number} - {billingPreview.roomDetails.room_type}
+                      </p>
+                      <p className="text-sm text-gray-600">Tầng {billingPreview.roomDetails.floor}</p>
+                    </div>
+                    <p className="font-semibold text-green-600">
+                      {new Intl.NumberFormat('vi-VN').format(billingPreview.roomDetails.monthly_price)} ₫
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-gray-900">Tổng tiền phòng:</p>
+                      <p className="font-semibold text-green-600">
+                        {new Intl.NumberFormat('vi-VN').format(billingPreview.totalRoomCost)} ₫
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowBillingPreview(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => {
+                  setShowBillingPreview(false);
+                  // Tự động điền amount vào form
+                  setAmount(billingPreview.totalAmount.toString());
+                }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium"
+              >
+                Sử dụng số tiền này
               </button>
             </div>
           </div>

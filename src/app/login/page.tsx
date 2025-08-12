@@ -309,9 +309,9 @@ export default function LoginPage() {
     console.log('✅ Starting login process...');
     setIsLoading(true);
 
-    // Tạo timeout promise để tránh chờ quá lâu (tăng lên 12 giây để phù hợp với retry logic)
+    // Tạo timeout promise để tránh chờ quá lâu (giảm xuống 6 giây)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 12000);
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 6000);
     });
 
     try {

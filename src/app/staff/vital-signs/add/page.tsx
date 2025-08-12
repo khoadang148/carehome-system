@@ -20,6 +20,134 @@ import { useAuth } from '@/lib/contexts';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Success Modal Component
+const SuccessModal = ({ isOpen, onClose }: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-8 max-w-lg w-11/12 shadow-2xl border border-gray-200">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="bg-green-100 rounded-full p-3 flex items-center justify-center">
+            <CheckCircleIcon className="w-8 h-8 text-green-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-green-800 m-0">
+            Thêm chỉ số sức khỏe thành công!
+          </h2>
+        </div>
+        
+        <div className="mb-6">
+          <p className="text-gray-600 mb-4">
+            Dữ liệu chỉ số sinh hiệu đã được lưu thành công vào hệ thống.
+          </p>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircleIcon className="w-4 h-4 text-green-600" />
+              <p className="text-green-700 text-sm font-medium">
+                Dữ liệu đã được lưu an toàn
+              </p>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircleIcon className="w-4 h-4 text-green-600" />
+              <p className="text-green-700 text-sm font-medium">
+                Có thể xem trong danh sách chỉ số sức khỏe
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="w-4 h-4 text-green-600" />
+              <p className="text-green-700 text-sm font-medium">
+                Hệ thống sẽ chuyển về trang danh sách
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-4">
+          <button
+            onClick={onClose}
+            className="px-6 py-3 bg-green-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all hover:bg-green-600 hover:shadow-lg"
+          >
+            Xem danh sách
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Medical Warning Component
+const MedicalWarning = ({ vitalSigns }: { vitalSigns: VitalSigns }) => {
+  const warnings: string[] = [];
+  
+  // Check for medical warnings
+  if (vitalSigns.temperature && vitalSigns.temperature > 37.8) {
+    warnings.push('⚠️ Nhiệt độ cao (>37.8°C) - cần theo dõi sát');
+  }
+  
+  if (vitalSigns.heartRate) {
+    const hr = Number(vitalSigns.heartRate);
+    if (hr < 60 || hr > 100) {
+      warnings.push('⚠️ Nhịp tim bất thường - cần theo dõi');
+    }
+  }
+  
+  if (vitalSigns.bloodPressure) {
+    const [systolic, diastolic] = vitalSigns.bloodPressure.split('/').map(Number);
+    if (systolic >= 140 || diastolic >= 90) {
+      warnings.push('⚠️ Huyết áp cao - cần theo dõi');
+    }
+    if (systolic < 100 || diastolic < 60) {
+      warnings.push('⚠️ Huyết áp thấp - cần theo dõi');
+    }
+  }
+  
+  if (vitalSigns.respiratoryRate) {
+    const rr = Number(vitalSigns.respiratoryRate);
+    if (rr < 16 || rr > 20) {
+      warnings.push('⚠️ Nhịp thở bất thường - cần theo dõi');
+    }
+  }
+  
+  if (vitalSigns.oxygenSaturation && vitalSigns.oxygenSaturation < 95) {
+    warnings.push('⚠️ Nồng độ oxy thấp - cần theo dõi sát');
+  }
+  
+  if (vitalSigns.weight) {
+    const weight = Number(vitalSigns.weight);
+    if (weight < 40 || weight > 120) {
+      warnings.push('⚠️ Cân nặng bất thường - cần đánh giá dinh dưỡng');
+    }
+  }
+  
+  if (warnings.length === 0) return null;
+  
+  return (
+    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300 rounded-2xl p-6 mb-6 shadow-lg">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="bg-yellow-100 rounded-full p-2">
+          <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600" />
+        </div>
+        <h3 className="text-yellow-800 font-semibold text-lg">
+          Cảnh báo Y khoa
+        </h3>
+      </div>
+      <div className="space-y-2">
+        {warnings.map((warning, index) => (
+          <p key={index} className="text-yellow-700 text-sm font-medium">
+            {warning}
+          </p>
+        ))}
+      </div>
+      <p className="text-yellow-600 text-xs italic mt-3">
+        * Các giá trị này vẫn có thể được lưu nhưng cần theo dõi đặc biệt
+      </p>
+    </div>
+  );
+};
+
 // Error Modal Component
 const ErrorModal = ({ isOpen, onClose, errors }: { 
   isOpen: boolean; 
@@ -124,6 +252,7 @@ export default function AddVitalSignsPage() {
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalErrors, setModalErrors] = useState<{ [key: string]: string }>({});
   
   // Check access permissions
@@ -219,7 +348,7 @@ export default function AddVitalSignsPage() {
     notes: '',
   });
 
-  // Validation based on MongoDB schema
+  // Validation based on medical standards for elderly patients
   const validateForm = (data: VitalSigns) => {
     const errors: { [key: string]: string } = {};
     
@@ -228,57 +357,114 @@ export default function AddVitalSignsPage() {
       errors.residentId = 'Vui lòng chọn người cao tuổi';
     }
     
-    // Temperature validation (30-45°C)
+    // Temperature validation - Medical standard for elderly (35.0-40.0°C)
     if (data.temperature !== undefined && data.temperature !== null && !isNaN(Number(data.temperature))) {
       const temp = Number(data.temperature);
-      if (temp < 30 || temp > 45) {
-        errors.temperature = 'Nhiệt độ phải từ 30°C đến 45°C';
+      if (temp < 35.0 || temp > 40.0) {
+        errors.temperature = 'Nhiệt độ phải từ 35.0°C đến 40.0°C (tiêu chuẩn y khoa)';
+      }
+      // Warning for fever in elderly (>37.8°C)
+      if (temp > 37.8) {
+        console.warn('Nhiệt độ cao - cần theo dõi sát');
       }
     }
     
-    // Heart rate validation (30-200 bpm)
+    // Heart rate validation - Medical standard for elderly (50-120 bpm)
     if (data.heartRate !== undefined && data.heartRate !== null && !isNaN(Number(data.heartRate))) {
       const hr = Number(data.heartRate);
-      if (hr < 30 || hr > 200) {
-        errors.heartRate = 'Nhịp tim phải từ 30 đến 200 bpm';
+      if (hr < 50 || hr > 120) {
+        errors.heartRate = 'Nhịp tim phải từ 50 đến 120 bpm (tiêu chuẩn y khoa cho người cao tuổi)';
+      }
+      // Warning for abnormal heart rates
+      if (hr < 60 || hr > 100) {
+        console.warn('Nhịp tim bất thường - cần theo dõi');
       }
     }
     
-    // Blood pressure validation (format: XXX/YYY or XX/YY)
+    // Blood pressure validation - Medical standard format and ranges
     if (data.bloodPressure && data.bloodPressure.trim() !== '') {
+      // Format validation: XXX/YYY or XX/YY
       if (!/^[0-9]{2,3}\/[0-9]{2,3}$/.test(data.bloodPressure)) {
         errors.bloodPressure = 'Huyết áp phải đúng định dạng (ví dụ: 120/80)';
+      } else {
+        // Range validation for elderly
+        const [systolic, diastolic] = data.bloodPressure.split('/').map(Number);
+        
+        // Systolic pressure validation (90-200 mmHg for elderly)
+        if (systolic < 90 || systolic > 200) {
+          errors.bloodPressure = 'Huyết áp tâm thu phải từ 90-200 mmHg';
+        }
+        
+        // Diastolic pressure validation (50-120 mmHg for elderly)
+        if (diastolic < 50 || diastolic > 120) {
+          errors.bloodPressure = 'Huyết áp tâm trương phải từ 50-120 mmHg';
+        }
+        
+        // Systolic should be higher than diastolic
+        if (systolic <= diastolic) {
+          errors.bloodPressure = 'Huyết áp tâm thu phải cao hơn tâm trương';
+        }
+        
+        // Warning for hypertension in elderly
+        if (systolic >= 140 || diastolic >= 90) {
+          console.warn('Huyết áp cao - cần theo dõi');
+        }
+        
+        // Warning for hypotension in elderly
+        if (systolic < 100 || diastolic < 60) {
+          console.warn('Huyết áp thấp - cần theo dõi');
+        }
       }
     }
     
-    // Respiratory rate validation (5-60 breaths/min)
+    // Respiratory rate validation - Medical standard for elderly (12-25 breaths/min)
     if (data.respiratoryRate !== undefined && data.respiratoryRate !== null && !isNaN(Number(data.respiratoryRate))) {
       const rr = Number(data.respiratoryRate);
-      if (rr < 5 || rr > 60) {
-        errors.respiratoryRate = 'Nhịp thở phải từ 5 đến 60 lần/phút';
+      if (rr < 12 || rr > 25) {
+        errors.respiratoryRate = 'Nhịp thở phải từ 12 đến 25 lần/phút (tiêu chuẩn y khoa cho người cao tuổi)';
+      }
+      // Warning for abnormal respiratory rates
+      if (rr < 16 || rr > 20) {
+        console.warn('Nhịp thở bất thường - cần theo dõi');
       }
     }
     
-    // Oxygen level validation (70-100%)
+    // Oxygen saturation validation - Medical standard (95-100% normal, 90-94% acceptable for elderly)
     if (data.oxygenSaturation !== undefined && data.oxygenSaturation !== null && !isNaN(Number(data.oxygenSaturation))) {
       const o2 = Number(data.oxygenSaturation);
-      if (o2 < 70 || o2 > 100) {
-        errors.oxygenSaturation = 'Nồng độ oxy phải từ 70% đến 100%';
+      if (o2 < 90 || o2 > 100) {
+        errors.oxygenSaturation = 'Nồng độ oxy phải từ 90% đến 100% (tiêu chuẩn y khoa)';
+      }
+      // Check for reasonable decimal precision (max 1 decimal place)
+      const decimalPlaces = o2.toString().split('.')[1]?.length || 0;
+      if (decimalPlaces > 1) {
+        errors.oxygenSaturation = 'Nồng độ oxy chỉ được nhập tối đa 1 chữ số thập phân (ví dụ: 98.5)';
+      }
+      // Warning for low oxygen saturation
+      if (o2 < 95) {
+        console.warn('Nồng độ oxy thấp - cần theo dõi sát');
       }
     }
     
-    // Weight validation (20-200 kg)
+    // Weight validation - Realistic range for elderly (30-150 kg)
     if (data.weight !== undefined && data.weight !== null && !isNaN(Number(data.weight))) {
       const weight = Number(data.weight);
-      if (weight < 20 || weight > 200) {
-        errors.weight = 'Cân nặng phải từ 20kg đến 200kg';
+      if (weight < 30 || weight > 150) {
+        errors.weight = 'Cân nặng phải từ 30kg đến 150kg (phù hợp với người cao tuổi)';
+      }
+      // Warning for extreme weights
+      if (weight < 40 || weight > 120) {
+        console.warn('Cân nặng bất thường - cần đánh giá dinh dưỡng');
       }
     }
     
-    // Notes validation - if provided, should not be too long
+    // Notes validation - Medical documentation standards
     if (data.notes && data.notes.trim() !== '') {
-      if (data.notes.trim().length > 500) {
-        errors.notes = 'Ghi chú không được quá 500 ký tự';
+      if (data.notes.trim().length > 1000) {
+        errors.notes = 'Ghi chú không được quá 1000 ký tự (tiêu chuẩn ghi chép y khoa)';
+      }
+      if (data.notes.trim().length < 5) {
+        errors.notes = 'Ghi chú phải có ít nhất 5 ký tự để mô tả đầy đủ';
       }
     }
     
@@ -330,23 +516,47 @@ export default function AddVitalSignsPage() {
       
       // Handle validation errors from backend first
       if (data.error && typeof data.error === 'string') {
-        // Check if it's a field-specific error
+        // Check if it's a field-specific error and translate to Vietnamese
         if (data.error.includes('blood pressure') || data.error.includes('huyết áp')) {
-          fieldErrors.bloodPressure = data.error;
+          fieldErrors.bloodPressure = data.error.includes('blood pressure') ? 
+            'Huyết áp không hợp lệ. Vui lòng kiểm tra lại định dạng (ví dụ: 120/80)' : data.error;
         } else if (data.error.includes('temperature') || data.error.includes('nhiệt độ')) {
-          fieldErrors.temperature = data.error;
+          fieldErrors.temperature = data.error.includes('temperature') ? 
+            'Nhiệt độ không hợp lệ. Vui lòng nhập giá trị từ 35.0°C đến 40.0°C' : data.error;
         } else if (data.error.includes('heart rate') || data.error.includes('nhịp tim')) {
-          fieldErrors.heartRate = data.error;
+          fieldErrors.heartRate = data.error.includes('heart rate') ? 
+            'Nhịp tim không hợp lệ. Vui lòng nhập giá trị từ 50 đến 120 bpm' : data.error;
         } else if (data.error.includes('oxygen') || data.error.includes('oxy')) {
-          fieldErrors.oxygenSaturation = data.error;
+          fieldErrors.oxygenSaturation = data.error.includes('oxygen') ? 
+            'Nồng độ oxy không hợp lệ. Vui lòng nhập giá trị từ 90% đến 100%' : data.error;
         } else if (data.error.includes('respiratory') || data.error.includes('thở')) {
-          fieldErrors.respiratoryRate = data.error;
+          fieldErrors.respiratoryRate = data.error.includes('respiratory') ? 
+            'Nhịp thở không hợp lệ. Vui lòng nhập giá trị từ 12 đến 25 lần/phút' : data.error;
         } else if (data.error.includes('weight') || data.error.includes('cân nặng')) {
-          fieldErrors.weight = data.error;
+          fieldErrors.weight = data.error.includes('weight') ? 
+            'Cân nặng không hợp lệ. Vui lòng nhập giá trị từ 30kg đến 150kg' : data.error;
         } else if (data.error.includes('resident') || data.error.includes('người cao tuổi')) {
-          fieldErrors.residentId = data.error;
+          fieldErrors.residentId = data.error.includes('resident') ? 
+            'Vui lòng chọn người cao tuổi' : data.error;
         } else {
-          errorMessage = data.error;
+          // Translate common English error messages to Vietnamese
+          const translatedError = data.error
+            .replace('Please enter a valid value', 'Vui lòng nhập giá trị hợp lệ')
+            .replace('The two nearest valid values are', 'Hai giá trị hợp lệ gần nhất là')
+            .replace('Please enter a valid value. The two nearest valid values are', 'Vui lòng nhập giá trị hợp lệ. Hai giá trị hợp lệ gần nhất là')
+            .replace('Invalid input', 'Dữ liệu đầu vào không hợp lệ')
+            .replace('Required field', 'Trường bắt buộc')
+            .replace('must be a number', 'phải là số')
+            .replace('must be greater than', 'phải lớn hơn')
+            .replace('must be less than', 'phải nhỏ hơn')
+            .replace('must be between', 'phải nằm trong khoảng')
+            .replace('must be an integer', 'phải là số nguyên')
+            .replace('decimal places', 'chữ số thập phân')
+            .replace('maximum', 'tối đa')
+            .replace('minimum', 'tối thiểu')
+            .replace('value', 'giá trị')
+            .replace('values', 'giá trị');
+          errorMessage = translatedError;
         }
       }
       
@@ -435,28 +645,59 @@ export default function AddVitalSignsPage() {
           fieldErrors[frontendField] = error.message;
         }
       } else {
-        // Handle specific error messages from error.message
+        // Handle specific error messages from error.message and translate to Vietnamese
         if (error.message.includes('blood pressure') || error.message.includes('huyết áp')) {
-          fieldErrors.bloodPressure = error.message;
+          fieldErrors.bloodPressure = error.message.includes('blood pressure') ? 
+            'Huyết áp không hợp lệ. Vui lòng kiểm tra lại định dạng (ví dụ: 120/80)' : error.message;
         } else if (error.message.includes('temperature') || error.message.includes('nhiệt độ')) {
-          fieldErrors.temperature = error.message;
+          fieldErrors.temperature = error.message.includes('temperature') ? 
+            'Nhiệt độ không hợp lệ. Vui lòng nhập giá trị từ 35.0°C đến 40.0°C' : error.message;
         } else if (error.message.includes('heart rate') || error.message.includes('nhịp tim')) {
-          fieldErrors.heartRate = error.message;
+          fieldErrors.heartRate = error.message.includes('heart rate') ? 
+            'Nhịp tim không hợp lệ. Vui lòng nhập giá trị từ 50 đến 120 bpm' : error.message;
         } else if (error.message.includes('oxygen') || error.message.includes('oxy')) {
-          fieldErrors.oxygenSaturation = error.message;
+          fieldErrors.oxygenSaturation = error.message.includes('oxygen') ? 
+            'Nồng độ oxy không hợp lệ. Vui lòng nhập giá trị từ 90% đến 100%' : error.message;
         } else if (error.message.includes('respiratory') || error.message.includes('thở')) {
-          fieldErrors.respiratoryRate = error.message;
+          fieldErrors.respiratoryRate = error.message.includes('respiratory') ? 
+            'Nhịp thở không hợp lệ. Vui lòng nhập giá trị từ 12 đến 25 lần/phút' : error.message;
         } else if (error.message.includes('weight') || error.message.includes('cân nặng')) {
-          fieldErrors.weight = error.message;
+          fieldErrors.weight = error.message.includes('weight') ? 
+            'Cân nặng không hợp lệ. Vui lòng nhập giá trị từ 30kg đến 150kg' : error.message;
         } else if (error.message.includes('resident') || error.message.includes('người cao tuổi')) {
-          fieldErrors.residentId = error.message;
+          fieldErrors.residentId = error.message.includes('resident') ? 
+            'Vui lòng chọn người cao tuổi' : error.message;
         } else {
-          errorMessage = error.message;
+          // Translate common English error messages to Vietnamese
+          const translatedError = error.message
+            .replace('Please enter a valid value', 'Vui lòng nhập giá trị hợp lệ')
+            .replace('The two nearest valid values are', 'Hai giá trị hợp lệ gần nhất là')
+            .replace('Please enter a valid value. The two nearest valid values are', 'Vui lòng nhập giá trị hợp lệ. Hai giá trị hợp lệ gần nhất là')
+            .replace('Invalid input', 'Dữ liệu đầu vào không hợp lệ')
+            .replace('Required field', 'Trường bắt buộc')
+            .replace('must be a number', 'phải là số')
+            .replace('must be greater than', 'phải lớn hơn')
+            .replace('must be less than', 'phải nhỏ hơn')
+            .replace('must be between', 'phải nằm trong khoảng')
+            .replace('must be an integer', 'phải là số nguyên')
+            .replace('decimal places', 'chữ số thập phân')
+            .replace('maximum', 'tối đa')
+            .replace('minimum', 'tối thiểu')
+            .replace('value', 'giá trị')
+            .replace('values', 'giá trị');
+          errorMessage = translatedError;
         }
       }
     }
 
     return { errorMessage, fieldErrors };
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    setSubmitSuccess(false);
+    // Redirect back to vital signs page
+    router.push('/staff/vital-signs');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -492,13 +733,13 @@ export default function AddVitalSignsPage() {
       requiredErrors.oxygenSaturation = 'Vui lòng nhập nồng độ oxy';
     }
     
-    // Make these fields required
+    // Make these fields required with medical standards
     if (formData.respiratoryRate === undefined || formData.respiratoryRate === null || isNaN(Number(formData.respiratoryRate))) {
       requiredErrors.respiratoryRate = 'Vui lòng nhập nhịp thở';
     } else {
       const rr = Number(formData.respiratoryRate);
-      if (rr < 5 || rr > 60) {
-        requiredErrors.respiratoryRate = 'Nhịp thở phải từ 5 đến 60 lần/phút';
+      if (rr < 12 || rr > 25) {
+        requiredErrors.respiratoryRate = 'Nhịp thở phải từ 12 đến 25 lần/phút (tiêu chuẩn y khoa cho người cao tuổi)';
       }
     }
     
@@ -506,15 +747,17 @@ export default function AddVitalSignsPage() {
       requiredErrors.weight = 'Vui lòng nhập cân nặng';
     } else {
       const weight = Number(formData.weight);
-      if (weight < 20 || weight > 200) {
-        requiredErrors.weight = 'Cân nặng phải từ 20kg đến 200kg';
+      if (weight < 30 || weight > 150) {
+        requiredErrors.weight = 'Cân nặng phải từ 30kg đến 150kg (phù hợp với người cao tuổi)';
       }
     }
     
     if (!formData.notes || formData.notes.trim() === '') {
       requiredErrors.notes = 'Vui lòng nhập ghi chú';
-    } else if (formData.notes.trim().length > 500) {
-      requiredErrors.notes = 'Ghi chú không được quá 500 ký tự';
+    } else if (formData.notes.trim().length > 1000) {
+      requiredErrors.notes = 'Ghi chú không được quá 1000 ký tự (tiêu chuẩn ghi chép y khoa)';
+    } else if (formData.notes.trim().length < 5) {
+      requiredErrors.notes = 'Ghi chú phải có ít nhất 5 ký tự để mô tả đầy đủ';
     }
     
     if (Object.keys(requiredErrors).length > 0) {
@@ -530,6 +773,7 @@ export default function AddVitalSignsPage() {
       await vitalSignsAPI.create(apiData);
       
       setSubmitSuccess(true);
+      setShowSuccessModal(true);
       
       // Reset form
       setFormData({
@@ -543,11 +787,6 @@ export default function AddVitalSignsPage() {
         notes: '',
       });
       setValidationErrors({});
-      
-      // Redirect back to vital signs page after 1.5s
-      setTimeout(() => {
-        router.push('/staff/vital-signs');
-      }, 1500);
       
     } catch (error: any) {
       // Parse the error to get detailed information
@@ -583,6 +822,11 @@ export default function AddVitalSignsPage() {
         errors={modalErrors}
       />
       
+      <SuccessModal 
+        isOpen={showSuccessModal}
+        onClose={handleSuccessModalClose}
+      />
+      
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-8">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
@@ -611,23 +855,13 @@ export default function AddVitalSignsPage() {
             </div>
           </div>
 
-          {/* Success Banner */}
-          {submitSuccess && (
-            <div className="bg-gradient-to-r from-green-100 to-green-200 border border-green-500 rounded-2xl p-6 mb-8 flex items-center gap-4 shadow-lg">
-              <CheckCircleIcon className="w-8 h-8 text-green-600" />
-              <div>
-                <h3 className="text-green-800 font-semibold mb-1">
-                  Thêm chỉ số sức khỏe thành công!
-                </h3>
-                <p className="text-green-700">
-                  Dữ liệu đã được lưu vào hệ thống. Đang chuyển về trang danh sách...
-                </p>
-              </div>
-            </div>
-          )}
+
 
           {/* Form */}
           <div className="bg-white rounded-2xl p-8 shadow-lg">
+            {/* Medical Warnings */}
+            <MedicalWarning vitalSigns={formData} />
+            
             <form onSubmit={handleSubmit}>
               <div className="space-y-8">
                 {/* Resident Selection */}
@@ -666,6 +900,21 @@ export default function AddVitalSignsPage() {
                 </div>
 
                 {/* Vital Signs Grid */}
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h3 className="text-blue-800 font-semibold mb-2 flex items-center gap-2">
+                    <BeakerIcon className="w-4 h-4" />
+                    Hướng dẫn đo chỉ số sinh hiệu
+                  </h3>
+                  <div className="text-blue-700 text-sm space-y-1">
+                    <p>• <strong>Nhiệt độ:</strong> Đo ở nách hoặc miệng, bình thường 36.5-37.5°C</p>
+                    <p>• <strong>Nhịp tim:</strong> Đếm trong 1 phút, bình thường 60-100 bpm</p>
+                    <p>• <strong>Huyết áp:</strong> Đo ở tư thế ngồi, nghỉ 5 phút trước khi đo</p>
+                    <p>• <strong>SpO2:</strong> Đo bằng máy đo oxy, bình thường ≥95% (có thể nhập số thập phân)</p>
+                    <p>• <strong>Nhịp thở:</strong> Đếm trong 1 phút, bình thường 16-20 lần/phút</p>
+                    <p>• <strong>Cân nặng:</strong> Đo bằng cân điện tử, ghi chính xác đến 0.1kg</p>
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Blood Pressure */}
                   <div>
@@ -699,9 +948,9 @@ export default function AddVitalSignsPage() {
                       type="number"
                       value={formData.heartRate || ''}
                       onChange={(e) => handleInputChange('heartRate', e.target.value ? Number(e.target.value) : undefined)}
-                      placeholder="60-100"
-                      min="30"
-                      max="200"
+                      placeholder="ví dụ: 80"
+                      min="50"
+                      max="120"
                       className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
                         validationErrors.heartRate ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
                       }`}
@@ -723,9 +972,9 @@ export default function AddVitalSignsPage() {
                       type="number"
                       value={formData.temperature || ''}
                       onChange={(e) => handleInputChange('temperature', e.target.value ? Number(e.target.value) : undefined)}
-                      placeholder="36.5-37.5"
-                      min="30"
-                      max="45"
+                      placeholder="ví dụ: 36"
+                      min="35.0"
+                      max="40.0"
                       step="0.1"
                       className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
                         validationErrors.temperature ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
@@ -748,9 +997,10 @@ export default function AddVitalSignsPage() {
                       type="number"
                       value={formData.oxygenSaturation || ''}
                       onChange={(e) => handleInputChange('oxygenSaturation', e.target.value ? Number(e.target.value) : undefined)}
-                      placeholder="95-100"
-                      min="70"
+                      placeholder="95-100 (bình thường)"
+                      min="90"
                       max="100"
+                      step="0.1"
                       className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
                         validationErrors.oxygenSaturation ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
                       }`}
@@ -772,9 +1022,9 @@ export default function AddVitalSignsPage() {
                       type="number"
                       value={formData.respiratoryRate || ''}
                       onChange={(e) => handleInputChange('respiratoryRate', e.target.value ? Number(e.target.value) : undefined)}
-                      placeholder="12-20"
-                      min="5"
-                      max="60"
+                      placeholder="ví dụ: 16"
+                      min="12"
+                      max="25"
                       className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
                         validationErrors.respiratoryRate ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
                       }`}
@@ -796,9 +1046,9 @@ export default function AddVitalSignsPage() {
                       type="number"
                       value={formData.weight || ''}
                       onChange={(e) => handleInputChange('weight', e.target.value ? Number(e.target.value) : undefined)}
-                      placeholder="50-80"
-                      min="20"
-                      max="200"
+                      placeholder="ví dụ: 50"
+                      min="30"
+                      max="150"
                       step="0.1"
                       className={`w-full p-3 border border-gray-300 rounded-lg text-sm outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 ${
                         validationErrors.weight ? 'border-red-500 bg-red-50 ring-4 ring-red-100' : ''
@@ -845,14 +1095,14 @@ export default function AddVitalSignsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting || submitSuccess}
+                    disabled={isSubmitting}
                     className={`px-6 py-3 text-white border-none rounded-lg text-sm font-semibold transition-all ${
-                      isSubmitting || submitSuccess
+                      isSubmitting
                         ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed opacity-60'
                         : 'bg-gradient-to-r from-red-500 to-red-600 hover:shadow-lg hover:scale-105'
                     }`}
                   >
-                    {isSubmitting ? 'Đang lưu...' : submitSuccess ? 'Đã lưu!' : 'Lưu chỉ số'}
+                    {isSubmitting ? 'Đang lưu...' : 'Lưu chỉ số'}
                   </button>
                 </div>
               </div>

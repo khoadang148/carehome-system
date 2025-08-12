@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 import { 
   ArrowLeftIcon, 
   CheckCircleIcon, 
@@ -16,7 +17,8 @@ import {
   ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import { residentAPI, apiClient } from '@/lib/api';
-import { formatDateDDMMYYYY } from '@/lib/utils/validation';
+import { formatDateDDMMYYYY, convertDDMMYYYYToISO } from '@/lib/utils/validation';
+import { getErrorMessage } from '@/lib/utils/api-error-handler';
 import { Fragment } from 'react';
 import { userAPI } from "@/lib/api";
 
@@ -86,6 +88,12 @@ const validationRules = {
       if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
         return 'Ngày nhập viện không hợp lệ';
       }
+      // Ngày nhập viện không thể trong tương lai
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // Set to end of today
+      if (date > today) {
+        return 'Ngày nhập viện không thể trong tương lai';
+      }
       return true;
     }
   },
@@ -135,12 +143,7 @@ const convertToDisplayDate = (dateString: string): string => {
 
 // Helper function chuyển đổi từ dd/mm/yyyy sang yyyy-mm-dd
 const convertToApiDate = (dateString: string): string => {
-  if (!dateString) return '';
-  const [day, month, year] = dateString.split('/');
-  if (day && month && year) {
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-  return dateString;
+  return convertDDMMYYYYToISO(dateString);
 };
 
 export default function EditResidentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -229,13 +232,28 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         setIsSubmitting(false);
         return;
       }
+      // Debug: Kiểm tra định dạng ngày tháng
+      console.log('Debug - data.date_of_birth:', data.date_of_birth);
+      console.log('Debug - data.date_of_birth type:', typeof data.date_of_birth);
+      
+      const convertedDateOfBirth = convertToApiDate(data.date_of_birth);
+      console.log('Debug - convertToApiDate result:', convertedDateOfBirth);
+      
+      // Validate date_of_birth
+      if (!convertedDateOfBirth) {
+        setModalMessage('Ngày sinh không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy');
+        setModalType('error');
+        setShowModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Map dữ liệu form sang request body API chuẩn
-      const body = {
+      const body: any = {
         _id: residentId, // Thêm ID vào payload
         full_name: data.full_name,
-        date_of_birth: convertToApiDate(data.date_of_birth),
+        date_of_birth: convertedDateOfBirth,
         gender: data.gender,
-        admission_date: convertToApiDate(data.admission_date) || residentData?.admission_date || new Date().toISOString().slice(0,10),
         medical_history: data.medical_history,
         current_medications: medications,
         allergies: allergyList,
@@ -250,14 +268,35 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         family_member_id: typeof data.family_member_id === 'object' && (data.family_member_id as any)?._id ? (data.family_member_id as any)._id : data.family_member_id,
         relationship: data.relationship,
       };
+
+      // Chỉ gửi admission_date nếu có giá trị hợp lệ
+      const convertedAdmissionDate = data.admission_date ? convertToApiDate(data.admission_date) : '';
+      if (convertedAdmissionDate) {
+        body.admission_date = convertedAdmissionDate;
+      }
+      // Không gửi admission_date nếu không có giá trị hợp lệ, để backend sử dụng default
+      
       await residentAPI.update(residentId, body);
+      
+      // Refresh dữ liệu sau khi update thành công
+      try {
+        const updatedData = await residentAPI.getById(residentId);
+        setResidentData(updatedData);
+      } catch (error) {
+        console.error('Error refreshing resident data:', error);
+      }
+      
       setSuccessMessage('Thông tin người cao tuổi đã được cập nhật thành công!');
       setTimeout(() => {
         router.push(`/admin/residents/${residentId}`);
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating resident:', error);
-      setModalMessage('Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
+      
+      // Xử lý lỗi chi tiết hơn
+      const errorMessage = getErrorMessage(error, 'Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
+      
+      setModalMessage(errorMessage);
       setModalType('error');
       setShowModal(true);
     } finally {
@@ -733,41 +772,18 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                         borderRadius: '8px',
                         overflow: 'hidden',
                         border: '1px solid #e5e7eb',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontSize: '1.5rem',
-                        fontWeight: 'bold'
+                        justifyContent: 'center'
                       }}>
-                        {residentData?.avatar ? (
-                          <img
-                            src={userAPI.getAvatarUrl(residentData.avatar)}
-                            alt="avatar"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                parent.textContent = getValues('full_name') ? getValues('full_name').charAt(0).toUpperCase() : 'U';
-                              }
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src="/default-avatar.svg"
-                            alt="Default avatar"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                parent.textContent = getValues('full_name') ? getValues('full_name').charAt(0).toUpperCase() : 'U';
-                              }
-                            }}
-                          />
-                        )}
+                        <img
+                          src={residentData?.avatar ? userAPI.getAvatarUrl(residentData.avatar) : '/default-avatar.svg'}
+                          alt="avatar"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.currentTarget.src = '/default-avatar.svg';
+                          }}
+                        />
                       </div>
                       <div style={{ flex: 1 }}>
                         <input
@@ -779,7 +795,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                             
                             // Kiểm tra kích thước file (max 5MB)
                             if (file.size > 5 * 1024 * 1024) {
-                              alert('File quá lớn. Vui lòng chọn file nhỏ hơn 5MB.');
+                              toast.error('File quá lớn. Vui lòng chọn file nhỏ hơn 5MB.');
                               return;
                             }
                             
@@ -835,11 +851,11 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                           </span>
                         )}
                       </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
               
             {/* Medical Information Section */}
             {formSection === 'medical' && (
@@ -1193,28 +1209,28 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             }}>
               {modalMessage}
             </p>
-            <button
-              onClick={() => setShowModal(false)}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-              }}
-            >
+              <button
+                onClick={() => setShowModal(false)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                  }}
+                >
               OK
-            </button>
+                </button>
           </div>
         </div>
       )}

@@ -13,8 +13,8 @@ export default function SuccessModal({
 }) {
   useEffect(() => {
     if (open) {
-      // Giảm thời gian hiển thị modal xuống 1.5s để nhanh hơn
-      const timer = setTimeout(onClose, 1500);
+      // Tối ưu: Giảm thời gian hiển thị modal xuống 2s để user có đủ thời gian đọc
+      const timer = setTimeout(onClose, 2000);
       return () => clearTimeout(timer);
     }
   }, [open, onClose]);
@@ -42,7 +42,7 @@ export default function SuccessModal({
         </div>
         
         <h2 className="success-title">
-          Đăng nhập thành công!
+          Đăng nhập thành công! 🎉
         </h2>
         
         <div className="success-message">

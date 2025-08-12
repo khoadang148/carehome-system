@@ -1,5 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { residentAPI, carePlansAPI, carePlanAssignmentsAPI, userAPI } from '@/lib/api';
@@ -41,7 +43,7 @@ export default function ServiceAssignmentsPage() {
       const resList = await residentAPI.getAll();
       setResidents(resList);
       
-      // Lấy assignment cho từng resident song song với giới hạn
+      // Lấy assignment cho từng resident và gộp các gói dịch vụ
       const allAssignments = await Promise.all(
         resList.map(async (r: any) => {
           try {
@@ -49,7 +51,45 @@ export default function ServiceAssignmentsPage() {
               ? (r._id as any)._id 
               : r._id;
             const data = await carePlansAPI.getByResidentId(residentId);
-            return (Array.isArray(data) ? data : []).map((a: any) => ({ ...a, resident: r }));
+            const assignments = Array.isArray(data) ? data : [];
+            
+            if (assignments.length === 0) {
+              return [];
+            }
+            
+                          // Gộp tất cả gói dịch vụ của resident này thành một assignment duy nhất
+              const mergedAssignment = {
+                _id: assignments[0]._id, // Sử dụng ID của assignment đầu tiên
+                resident_id: residentId,
+                resident: r,
+                status: assignments[0].status,
+                start_date: assignments[0].start_date,
+                end_date: assignments[0].end_date,
+                notes: assignments[0].notes,
+                consultation_notes: assignments[0].consultation_notes,
+                family_preferences: assignments[0].family_preferences,
+                // Tính tổng chi phí từ tất cả assignments
+                care_plans_monthly_cost: assignments.reduce((total: number, assignment: any) => {
+                  return total + (assignment.care_plans_monthly_cost || 0);
+                }, 0),
+                total_monthly_cost: assignments.reduce((total: number, assignment: any) => {
+                  return total + (assignment.total_monthly_cost || 0);
+                }, 0),
+                room_monthly_cost: assignments[0].room_monthly_cost || 0,
+                selected_room_type: assignments[0].selected_room_type,
+                assigned_room_id: assignments[0].assigned_room_id,
+                assigned_bed_id: assignments[0].assigned_bed_id,
+                additional_medications: assignments[0].additional_medications,
+                // Gộp tất cả care_plan_ids từ các assignments
+                care_plan_ids: assignments.reduce((allPlans: any[], assignment: any) => {
+                  if (Array.isArray(assignment.care_plan_ids)) {
+                    allPlans.push(...assignment.care_plan_ids);
+                  }
+                  return allPlans;
+                }, [])
+              };
+            
+            return [mergedAssignment];
           } catch {
             return [];
           }
@@ -67,7 +107,7 @@ export default function ServiceAssignmentsPage() {
   // Filter theo search term và tab
   const filteredAssignments = assignments.filter(a => {
     const residentName = a.resident?.full_name || a.resident?.name || '';
-    const planNames = Array.isArray(a.care_plan_ids) ? a.care_plan_ids.map((cp: any) => cp.plan_name).join(', ') : '';
+    const planNames = Array.isArray(a.care_plan_ids) ? a.care_plan_ids.map((cp: any) => cp.description || cp.plan_name || cp.name || '').join(', ') : '';
     const matchesSearch = (
       residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       planNames.toLowerCase().includes(searchTerm.toLowerCase())
@@ -113,7 +153,7 @@ export default function ServiceAssignmentsPage() {
   const handleDelete = (assignment: any) => {
     // Chỉ admin mới được xóa
     if (user?.role !== 'admin') {
-      alert('Bạn không có quyền thực hiện thao tác này.');
+      toast.error('Bạn không có quyền thực hiện thao tác này.');
       return;
     }
 
@@ -135,7 +175,7 @@ export default function ServiceAssignmentsPage() {
 
     // Chỉ admin mới được xóa
     if (user?.role !== 'admin') {
-      alert('Bạn không có quyền thực hiện thao tác này.');
+      toast.error('Bạn không có quyền thực hiện thao tác này.');
       setDeleteConfirmId(null);
       return;
     }
@@ -147,7 +187,7 @@ export default function ServiceAssignmentsPage() {
       // Refresh data
       loadData();
     } catch (error: any) {
-      alert('Không thể xóa đăng ký dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
+      toast.error('Không thể xóa đăng ký dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
     }
   };
 
@@ -157,7 +197,7 @@ export default function ServiceAssignmentsPage() {
 
     // Chỉ admin mới được xóa
     if (user?.role !== 'admin') {
-      alert('Bạn không có quyền thực hiện thao tác này.');
+      toast.error('Bạn không có quyền thực hiện thao tác này.');
       setShowPackageSelectModal(false);
       setSelectedAssignment(null);
       return;
@@ -174,7 +214,7 @@ export default function ServiceAssignmentsPage() {
       loadData();
     } catch (error: any) {
       console.error('Error deleting package:', error);
-      alert('Không thể xóa gói dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
+      toast.error('Không thể xóa gói dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
     }
   };
 
@@ -229,7 +269,7 @@ export default function ServiceAssignmentsPage() {
         {/* Back Button */}
         <div style={{ marginBottom: '1rem' }}>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/services')}
             style={{
               display: 'flex',
               alignItems: 'center',

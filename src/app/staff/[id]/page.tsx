@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -78,7 +79,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
         } else if (error.response?.status === 403) {
           setError('Bạn không có quyền xem thông tin này.');
         } else {
-          setError('Có lỗi xảy ra khi tải thông tin nhân viên.');
+          setError(getUserFriendlyError(error));
         }
       } finally {
         setLoading(false);

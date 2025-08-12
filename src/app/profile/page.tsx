@@ -1,3 +1,4 @@
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -17,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { residentAPI, userAPI, carePlanAssignmentsAPI, roomsAPI } from '@/lib/api';
+import { residentAPI, userAPI, carePlanAssignmentsAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 
 // Helper function to get full avatar URL
@@ -247,7 +248,7 @@ export default function ProfilePage() {
         })
         .catch((err) => {
           console.error('Profile - Error fetching residents:', err);
-          setError('Không tìm thấy thông tin người thân hoặc lỗi kết nối API.');
+          setError(getUserFriendlyError(error));
           setResidents([]);
         })
         .finally(() => setLoading(false));
@@ -269,22 +270,51 @@ export default function ProfilePage() {
       ? (selectedResidentId as any)._id 
       : selectedResidentId;
     
-    carePlanAssignmentsAPI.getByResidentId(residentId)
+    bedAssignmentsAPI.getByResidentId(residentId)
       .then((assignments: any[]) => {
-        const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
-        const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-        const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-        
-        if (roomIdString) {
-          return roomsAPI.getById(roomIdString)
-            .then((room: any) => {
-              setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+        const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
+        if (assignment?.bed_id?.room_id) {
+          // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+          if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
+            setRoomNumber(assignment.bed_id.room_id.room_number);
+          } else {
+            // Nếu chỉ có _id, fetch thêm thông tin
+            const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
+            if (roomId) {
+              return roomsAPI.getById(roomId)
+                .then((room: any) => {
+                  setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+                })
+                .catch(() => {
+                  setRoomNumber('Chưa hoàn tất đăng kí');
+                });
+            } else {
+              setRoomNumber('Chưa hoàn tất đăng kí');
+            }
+          }
+        } else {
+          // Fallback: lấy từ care plan assignments
+          return carePlanAssignmentsAPI.getByResidentId(residentId)
+            .then((careAssignments: any[]) => {
+              const careAssignment = Array.isArray(careAssignments) ? careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+              const roomId = careAssignment?.bed_id?.room_id || careAssignment?.assigned_room_id;
+              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+              
+              if (roomIdString) {
+                return roomsAPI.getById(roomIdString)
+                  .then((room: any) => {
+                    setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+                  })
+                  .catch(() => {
+                    setRoomNumber('Chưa hoàn tất đăng kí');
+                  });
+              } else {
+                setRoomNumber('Chưa hoàn tất đăng kí');
+              }
             })
             .catch(() => {
               setRoomNumber('Chưa hoàn tất đăng kí');
             });
-        } else {
-          setRoomNumber('Chưa hoàn tất đăng kí');
         }
       })
       .catch(() => {

@@ -77,31 +77,26 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         setRoomLoading(true);
         try {
           // Ưu tiên sử dụng bedAssignmentsAPI
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
-              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-            
-            if (bedAssignment?.bed_id?.room_id) {
-              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
-              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                setRoomNumber(bedAssignment.bed_id.room_id.room_number);
-              } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
-                  setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-                } else {
-                  throw new Error('No room ID found');
-                }
-              }
+          const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+          const bedAssignment = Array.isArray(bedAssignments) ? 
+            bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+          
+          if (bedAssignment?.bed_id?.room_id) {
+            // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+            if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+              setRoomNumber(bedAssignment.bed_id.room_id.room_number);
             } else {
-              throw new Error('No bed assignment found');
+              // Nếu chỉ có _id, fetch thêm thông tin
+              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+              } else {
+                setRoomNumber('Chưa hoàn tất đăng kí');
+              }
             }
-          } catch (bedError) {
-            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
-            // Fallback về carePlansAPI
+          } else {
+            // Fallback về carePlansAPI nếu không có bed assignment
             const assignments = await carePlansAPI.getByResidentId(residentId);
             const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
             const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
@@ -114,7 +109,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               setRoomNumber('Chưa hoàn tất đăng kí');
             }
           }
-        } catch {
+        } catch (error) {
+          console.warn(`Failed to get room assignment for resident ${residentId}:`, error);
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
         setRoomLoading(false);
@@ -125,31 +121,26 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         setBedLoading(true);
         try {
           // Ưu tiên sử dụng bedAssignmentsAPI
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
-              bedAssignments.find((a: any) => a.bed_id) : null;
-            
-            if (bedAssignment?.bed_id) {
-              // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
-              if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
-                setBedNumber(bedAssignment.bed_id.bed_number);
-              } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
-                const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
-                if (bedId) {
-                  const bed = await bedsAPI.getById(bedId);
-                  setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
-                } else {
-                  throw new Error('No bed ID found');
-                }
-              }
+          const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+          const bedAssignment = Array.isArray(bedAssignments) ? 
+            bedAssignments.find((a: any) => a.bed_id) : null;
+          
+          if (bedAssignment?.bed_id) {
+            // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
+            if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
+              setBedNumber(bedAssignment.bed_id.bed_number);
             } else {
-              throw new Error('No bed assignment found');
+              // Nếu chỉ có _id, fetch thêm thông tin
+              const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
+              if (bedId) {
+                const bed = await bedsAPI.getById(bedId);
+                setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
+              } else {
+                setBedNumber('Chưa hoàn tất đăng kí');
+              }
             }
-          } catch (bedError) {
-            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
-            // Fallback về carePlansAPI
+          } else {
+            // Fallback về carePlansAPI nếu không có bed assignment
             let currentAssignment: any = null;
             if (Array.isArray(assignments)) {
               currentAssignment = assignments.find(a =>
@@ -170,7 +161,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               setBedNumber('Chưa hoàn tất đăng kí');
             }
           }
-        } catch {
+        } catch (error) {
+          console.warn(`Failed to get bed assignment for resident ${residentId}:`, error);
           setBedNumber('Chưa hoàn tất đăng kí');
         }
         setBedLoading(false);
@@ -541,7 +533,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                       marginLeft: '0.5rem'
                     }}>
                       <div style={{width: '0.5rem', height: '0.5rem', background: !vitalSigns || vitalSigns?.notes === 'Ổn định' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '9999px', marginRight: '0.5rem'}}></div>
-                      Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa hoàn tất đăng kí'}
+                      Trạng thái sức khỏe: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa cập nhật'}
                     </span>
                   </div>
                 </div>

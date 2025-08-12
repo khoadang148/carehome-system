@@ -16,9 +16,9 @@ export default function Header() {
     setMounted(true);
   }, []);
   
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Immediate logout for better UX
-    logout();
+    await logout();
   };
 
   const handleLogin = () => {

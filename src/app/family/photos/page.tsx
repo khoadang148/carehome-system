@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react"
+import { toast } from 'react-toastify'
+import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter } from "next/navigation";
 import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownTrayIcon, XMarkIcon, EyeIcon, UsersIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/contexts/auth-context";
@@ -176,7 +178,7 @@ export default function FamilyPhotosPage() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(a.href);
     } catch (err) {
-      alert("Không thể tải ảnh. Vui lòng thử lại!");
+      toast.error("Không thể tải ảnh. Vui lòng thử lại!");
     }
   };
 
