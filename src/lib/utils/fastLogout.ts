@@ -3,7 +3,7 @@ import { clearSessionData } from './session';
 
 export const optimizedLogout = async (router: AppRouterInstance, logoutCallback?: () => Promise<void>) => {
   try {
-    // Gọi logout API trước khi clear session data
+    // Gọi logout API
     if (logoutCallback) {
       await logoutCallback();
     }
@@ -13,7 +13,4 @@ export const optimizedLogout = async (router: AppRouterInstance, logoutCallback?
   
   // Clear session data sau khi gọi API
   clearSessionData();
-  
-  // Navigate to login page immediately
-  router.push('/login');
 }; 

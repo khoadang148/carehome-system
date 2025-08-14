@@ -99,7 +99,7 @@ export default function ActivityCalendarPage() {
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const firstDayOfWeek = firstDayOfMonth.getDay();
     
-    const days = [];
+    const days: (Date | null)[] = [];
     
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfWeek; i++) {

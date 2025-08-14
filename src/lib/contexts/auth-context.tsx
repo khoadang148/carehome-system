@@ -1,17 +1,16 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import { 
+  initializeSession, 
   clearSessionData, 
-  isSessionValid, 
-  initializeSession 
+  isSessionValid
 } from '@/lib/utils/session';
 import { clientStorage } from '@/lib/utils/clientStorage';
+import { redirectByRole, preloadRolePages, navigateToLogin } from '@/lib/utils/navigation';
 import { optimizedLogout } from '@/lib/utils/fastLogout';
-import { redirectByRole } from '@/lib/utils/roleRedirect';
-import { preloadRolePages } from '@/lib/utils/preloadUtils';
 
 export type UserRole = 'admin' | 'staff' | 'family';
 
@@ -46,40 +45,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const checkUserSession = () => {
-      // Skip session check if logging out
-      if (isLoggingOut) {
-        return;
-      }
-      
-      if (!isSessionValid()) {
+  // Memoize session check function
+  const checkUserSession = useCallback(() => {
+    // Skip session check if logging out
+    if (isLoggingOut) {
+      return;
+    }
+    
+    if (!isSessionValid()) {
+      clearSessionData();
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    const storedUser = clientStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+      } catch (e) {
         clearSessionData();
         setUser(null);
-        setLoading(false);
-        return;
       }
-
-      const storedUser = clientStorage.getItem('user');
-      if (storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-        } catch (e) {
-          clearSessionData();
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    };
-    
-    // Immediate session check for faster loading
-    checkUserSession();
+    } else {
+      setUser(null);
+    }
+    setLoading(false);
   }, [isLoggingOut]);
 
-  const login = async (email: string, password: string) => {
+  useEffect(() => {
+    // Immediate session check for faster loading
+    checkUserSession();
+  }, [checkUserSession]);
+
+  const login = useCallback(async (email: string, password: string) => {
     try {
       // Gọi API login
       const response = await authAPI.login(email, password);
@@ -99,45 +99,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Xử lý song song: session init và set user state
           const sessionPromise = initializeSession(response.access_token, userObj);
           setUser(userObj);
+          setLoading(false);
           
-          // Preload trang dựa trên role để tăng tốc độ
+          // Preload pages based on role
           preloadRolePages(router, userRole);
           
-          // Chờ session init hoàn thành rồi redirect
+          // Redirect based on role
           await sessionPromise;
           redirectByRole(router, userRole);
           
           return userObj;
-        } else {
-          throw new Error('Chỉ tài khoản gia đình, nhân viên hoặc quản trị viên mới được đăng nhập!');
         }
       }
       return null;
     } catch (error) {
-      throw error;
+      console.error('Login error:', error);
+      setLoading(false);
+      return null;
     }
-  };
+  }, [router]);
 
-  const logout = async () => {
-    // Set logout flag to prevent unnecessary operations
+  const logout = useCallback(() => {
     setIsLoggingOut(true);
-    
-    // Clear user state immediately for instant UI feedback
-    setUser(null);
-    
-    // Use optimized logout utility for faster performance
-    await optimizedLogout(router, () => authAPI.logout());
-    
-    // Reset logout flag after a short delay
-    setTimeout(() => {
+    optimizedLogout(router, async () => {
+      await authAPI.logout();
+    }).then(() => {
+      setUser(null);
       setIsLoggingOut(false);
-    }, 100);
-  };
+      navigateToLogin(router);
+    });
+  }, [router]);
 
-  const refreshUser = async () => {};
+  const refreshUser = useCallback(async () => {
+    try {
+      // Implement user refresh logic here if needed
+      checkUserSession();
+    } catch (error) {
+      console.error('Refresh user error:', error);
+    }
+  }, [checkUserSession]);
+
+  // Memoize context value để tránh re-render không cần thiết
+  const contextValue = useMemo(() => ({
+    user,
+    login,
+    logout,
+    loading,
+    isLoggingOut,
+    refreshUser,
+  }), [user, login, logout, loading, isLoggingOut, refreshUser]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isLoggingOut, refreshUser }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

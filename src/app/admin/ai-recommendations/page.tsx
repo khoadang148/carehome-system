@@ -300,7 +300,7 @@ export default function AIRecommendationsPage() {
       let description = '';
       
       // Tạo mô tả chuyên nghiệp và dễ đọc
-      const descriptionParts = [];
+      const descriptionParts: string[] = [];
       
       // Tạo mô tả cơ bản
       let baseDescription = `Hoạt động ${recommendation.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi.`;

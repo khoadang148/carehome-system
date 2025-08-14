@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   
   // Rate limiting (basic implementation)
-  const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+  const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
   const rateLimitKey = `rate_limit_${ip}`;
   
   // Authentication logic (currently disabled - handled client-side)

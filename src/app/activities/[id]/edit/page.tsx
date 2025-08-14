@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
@@ -54,9 +54,16 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   const [selectedResident, setSelectedResident] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [activityId, setActivityId] = useState<string>('');
   
-  // Get activityId from params using React.use()
-  const activityId = use(params).id;
+  // Get activityId from params
+  useEffect(() => {
+    const getActivityId = async () => {
+      const resolvedParams = await params;
+      setActivityId(resolvedParams.id);
+    };
+    getActivityId();
+  }, [params]);
   
   const { 
     register, 
@@ -67,6 +74,8 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   } = useForm<ActivityFormData>();
   
   useEffect(() => {
+    if (!activityId) return;
+    
     const fetchActivity = async () => {
       try {
         setLoading(true);
@@ -96,6 +105,8 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   }, [activityId, router, reset]);
   
   const onSubmit = async (data: ActivityFormData) => {
+    if (!activityId) return;
+    
     setIsSubmitting(true);
     try {
       // Chuẩn hóa dữ liệu gửi lên backend - gửi local time string

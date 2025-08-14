@@ -244,7 +244,7 @@ export class AuthUtils {
       console.log(`🔐 Auth Event: ${event}`, {
         pathname: request.nextUrl.pathname,
         userAgent: request.headers.get('user-agent'),
-        ip: request.ip,
+        ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         timestamp: new Date().toISOString(),
         details
       });

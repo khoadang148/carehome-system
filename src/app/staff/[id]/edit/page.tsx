@@ -1,6 +1,6 @@
-import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';

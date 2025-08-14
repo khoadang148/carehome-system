@@ -1,13 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Tối ưu hóa development
-  reactStrictMode: true, // Bật strict mode để phát hiện lỗi sớm
+  reactStrictMode: false, // Tắt strict mode trong development để giảm re-render
   
   // Tối ưu hóa images
   images: {
     domains: ['localhost'],
-    unoptimized: false, // Bật tối ưu hóa images
-    formats: ['image/webp', 'image/avif'], // Hỗ trợ format hiện đại
+    unoptimized: false,
+    formats: ['image/webp', 'image/avif'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
   
   // Tối ưu hóa webpack
@@ -20,6 +22,9 @@ const nextConfig = {
         removeEmptyChunks: false,
         splitChunks: false,
       }
+      
+      // Tắt source maps trong development để tăng tốc
+      config.devtool = 'eval-cheap-module-source-map'
     }
     
     // Tối ưu hóa bundle size
@@ -30,6 +35,29 @@ const nextConfig = {
       tls: false,
     }
     
+    // Tối ưu hóa cho production
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              chunks: 'all',
+              enforce: true,
+            },
+          },
+        },
+      }
+    }
+    
     return config
   },
   
@@ -38,14 +66,22 @@ const nextConfig = {
     optimizeCss: true,
     scrollRestoration: true,
     // Tối ưu hóa performance
-    optimizePackageImports: ['@mui/material', '@mui/icons-material', 'axios'],
-    // Tối ưu hóa bundle
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+    optimizePackageImports: [
+      '@mui/material', 
+      '@mui/icons-material', 
+      'axios',
+      'react-icons',
+      'lucide-react',
+      'framer-motion'
+    ],
+  },
+  
+  // Tối ưu hóa turbopack
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
     },
   },
@@ -72,6 +108,10 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
           },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
         ],
       },
     ]
@@ -87,6 +127,9 @@ const nextConfig = {
       },
     ]
   },
+  
+  // Tối ưu hóa output
+  output: 'standalone',
 }
 
 module.exports = nextConfig

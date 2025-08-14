@@ -77,7 +77,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
   return (
     <Dialog open={open} onClose={onClose} className="fixed z-50 inset-0 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
-        <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+        <div className="fixed inset-0 bg-black opacity-30" />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-5xl mx-auto p-0 sm:p-0 z-15">
           {/* Header */}
           <div className="flex items-center gap-3 px-6 pt-6 pb-2 border-b">

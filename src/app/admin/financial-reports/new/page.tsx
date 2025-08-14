@@ -508,10 +508,9 @@ export default function NewBillPage() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
                                     <p className="text-sm font-medium text-gray-900">
-                                      Phòng {billingDetails.roomDetails.room_number} - {billingDetails.roomDetails.room_type}
+                                      Phòng {billingDetails.roomDetails.room_number} 
                                     </p>
-                                    <p className="text-xs text-gray-600">Tầng {billingDetails.roomDetails.floor}</p>
-                                  </div>
+                                    </div>
                                   <p className="text-sm font-semibold text-green-600 ml-2">
                                     {new Intl.NumberFormat('vi-VN').format(billingDetails.roomDetails.monthly_price)} ₫
                                   </p>

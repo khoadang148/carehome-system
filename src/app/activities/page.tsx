@@ -162,7 +162,7 @@ export default function ActivitiesPage() {
     const mondayDate = new Date(today);
     mondayDate.setDate(today.getDate() - currentDay + 1 + (weekOffset * 7));
     
-    const weekDates = [];
+    const weekDates: Date[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(mondayDate);
       date.setDate(mondayDate.getDate() + i);

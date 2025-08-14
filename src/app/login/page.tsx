@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { LOGIN_REDIRECT_DELAY } from '@/lib/constants/app';
 import { clientStorage, getParsedItem } from '@/lib/utils/clientStorage';
 import { usePageTransition } from '@/lib/utils/pageTransition';
-import { redirectByRole } from '@/lib/utils/roleRedirect';
+import { redirectByRole } from '@/lib/utils/navigation';
 import LoginSpinner from '@/components/shared/LoginSpinner';
 import { 
   LockClosedIcon, 
@@ -328,7 +328,7 @@ export default function LoginPage() {
         clientStorage.removeItem('login_error');
         setUserName(typedUser.name);
         
-        clientStorage.setItem('login_success', `Chào mừng bạn quay lại, ${typedUser.name || 'bạn'}!`);
+        clientStorage.setItem('login_success', `${typedUser.name || 'bạn'}!`);
         
         // Show loading state during transition
         setIsLoading(true);

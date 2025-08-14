@@ -2,174 +2,211 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 248, 250, 252;
+/* Tối ưu hóa performance */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Tối ưu hóa render */
+  will-change: auto;
+  transform: translateZ(0);
+}
+
+/* Tối ưu hóa animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tối ưu hóa scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Tối ưu hóa focus */
+*:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Tối ưu hóa loading states */
+.loading-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Tối ưu hóa transitions */
+.transition-fast {
+  transition: all 0.15s ease-in-out;
+}
+
+.transition-normal {
+  transition: all 0.3s ease-in-out;
+}
+
+.transition-slow {
+  transition: all 0.5s ease-in-out;
+}
+
+/* Tối ưu hóa responsive images */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Tối ưu hóa form elements */
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Tối ưu hóa button states */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Tối ưu hóa modal backdrop */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Tối ưu hóa card shadows */
+.card-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.card-shadow-hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Tối ưu hóa gradient backgrounds */
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-bg-light {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+/* Tối ưu hóa text rendering */
+.text-optimized {
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+  font-kerning: normal;
+}
+
+/* Tối ưu hóa layout */
+.layout-container {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-@layer base {
-  h1 {
-    @apply text-3xl font-bold;
-  }
-  h2 {
-    @apply text-2xl font-semibold;
-  }
-  h3 {
-    @apply text-xl font-semibold;
-  }
+.layout-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-@layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 font-medium;
-  }
-  
-  .btn-secondary {
-    @apply px-4 py-2 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 font-medium;
-  }
-
-  .card {
-    @apply bg-white rounded-xl shadow-card p-6;
-  }
-
-  .card-hover {
-    @apply bg-white rounded-xl shadow-card p-6 hover:shadow-lg transition-shadow duration-300;
-  }
-
-  .input-field {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500;
-  }
-
-  /* Modern modal styles */
-  .modal-backdrop {
-    @apply fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center;
-  }
-
-  .modal-container {
-    @apply bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto;
-  }
-
-  /* Modern button styles */
-  .btn-gradient {
-    @apply bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105;
-  }
-
-  .btn-outline-gradient {
-    @apply border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-medium py-2.5 px-5 rounded-xl transition-all duration-200;
-  }
-
-  /* Badge styles */
-  .badge-success {
-    @apply bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1;
-  }
-
-  .badge-info {
-    @apply bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium;
-  }
-
-  /* Feature card styles */
-  .feature-card {
-    @apply flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100;
-  }
-
-  .feature-icon {
-    @apply w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5;
-  }
-
-  /* Pricing styles */
-  .pricing-card {
-    @apply bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5;
-  }
+/* Tối ưu hóa sidebar */
+.sidebar {
+  width: 280px;
+  min-width: 280px;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-body.hide-header header {
-  display: none !important;
-}
-
-/* Backup rule to ensure header visibility */
-body:not(.hide-header) header {
-  display: flex !important;
-}
-
-/* Date picker z-index fix */
-.react-datepicker-popper {
-  z-index: 9999 !important;
-}
-
-.react-datepicker-wrapper {
+/* Tối ưu hóa header */
+.header {
+  height: 4.5rem;
+  min-height: 4.5rem;
+  position: sticky;
+  top: 0;
   z-index: 10;
 }
 
-/* Custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* Tối ưu hóa main content */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-gray-100 rounded-full;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
-}
-
-/* Spin animation for loading spinners */
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Custom animations for family page */
-@keyframes slideDown {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
+/* Tối ưu hóa responsive */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+  
+  .header {
+    height: 3.5rem;
+    min-height: 3.5rem;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+/* Tối ưu hóa print */
+@media print {
+  .no-print {
+    display: none !important;
   }
-  to {
-    opacity: 1;
+  
+  body {
+    background: white !important;
+    color: black !important;
   }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* Animation classes */
-.animate-slideDown {
-  animation: slideDown 0.4s ease-out;
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-
-.animate-slideUp {
-  animation: slideUp 0.3s ease-out;
 }

@@ -171,7 +171,7 @@ export function validateVitalSignsForm(data: Partial<VitalSignsData>): Validatio
  * Validate vital signs form data
  */
 export function validateVitalSigns(data: any) {
-  const errors = [];
+  const errors: { field: string; message: string }[] = [];
   if (!data.residentId && !data.resident_id) {
     errors.push({ field: 'residentId', message: 'Vui lòng chọn người cao tuổi' });
   }

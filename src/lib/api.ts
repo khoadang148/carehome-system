@@ -4,14 +4,14 @@ import { isTokenValid } from './utils/tokenUtils';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-// Tạo client riêng cho login với timeout ngắn hơn
+// Tạo client riêng cho login với timeout hợp lý
 const loginClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 1000, // Giảm timeout xuống 5 giây cho login nhanh hơn
+  timeout: 10000, // Tăng timeout lên 10 giây cho login
 });
 
 const apiClient = axios.create({

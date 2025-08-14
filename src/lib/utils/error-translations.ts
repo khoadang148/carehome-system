@@ -197,3 +197,12 @@ export const formatErrorMessage = (message: string): string => {
   
   return translated;
 };
+
+/**
+ * Legacy function for backward compatibility
+ * @param message - Raw error message
+ * @returns Formatted error message
+ */
+export const getUserFriendlyError = (message: string): string => {
+  return formatErrorMessage(message);
+};

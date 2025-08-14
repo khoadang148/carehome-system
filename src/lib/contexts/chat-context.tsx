@@ -157,7 +157,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
     newSocket.on('error', (error) => {
       console.error('Socket error:', error);
-      showNotification('Lỗi kết nối chat: ' + error.message, 'error');
+      showNotification({ title: 'Lỗi', message: 'Lỗi kết nối chat: ' + error.message, type: 'error' });
     });
 
     // Chat events
@@ -180,10 +180,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
       
       // Show notification if not from current user and not in active conversation
       if (message.sender_id._id !== user.id && activeConversation?._id !== conversationId) {
-        showNotification(
-          `Tin nhắn mới từ ${message.sender_id.full_name}: ${message.content}`,
-          'info'
-        );
+        showNotification({
+          title: 'Tin nhắn mới',
+          message: `Tin nhắn mới từ ${message.sender_id.full_name}: ${message.content}`,
+          type: 'info'
+        });
         setUnreadCount(prev => prev + 1);
       }
     });

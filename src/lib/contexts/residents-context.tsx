@@ -1,6 +1,6 @@
-import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
 
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { residentAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from './auth-context';

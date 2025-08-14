@@ -1,5 +1,6 @@
-import { getUserFriendlyError } from '@/lib/utils/error-translations';
 'use client';
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
+
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -49,6 +50,16 @@ export default function CarePlanAssignmentDetailPage() {
     }
     fetchAssignmentDetails();
   }, [user, router, assignmentId]);
+
+  // Debug effect để theo dõi thay đổi của carePlanDetails
+  useEffect(() => {
+    if (carePlanDetails.length > 0) {
+      console.log('Care plan details updated:', carePlanDetails);
+      console.log('Valid care plans:', getValidCarePlans());
+      console.log('Calculated total service cost:', calculateTotalServiceCost());
+      console.log('Calculated total monthly cost:', calculateTotalMonthlyCost());
+    }
+  }, [carePlanDetails]);
 
   const fetchAssignmentDetails = async () => {
     if (!assignmentId) return;
@@ -162,77 +173,54 @@ export default function CarePlanAssignmentDetailPage() {
         console.log('No family_member_id found in assignment data');
       }
 
-      // Fetch tất cả care plan assignments của resident để hiển thị đầy đủ
+      // Fetch care plans từ assignment hiện tại
+      if (Array.isArray(data.care_plan_ids) && data.care_plan_ids.length > 0) {
+        try {
+          console.log('Fetching care plans from current assignment:', data.care_plan_ids);
+          console.log('Assignment room_monthly_cost:', data.room_monthly_cost);
+          console.log('Assignment total_monthly_cost:', data.total_monthly_cost);
+          
+          const carePlanPromises = data.care_plan_ids.map(async (plan: any) => {
+            const planId = plan._id || plan;
+            console.log('Fetching care plan with ID:', planId);
+            try {
+              const planData = await carePlansAPI.getById(planId);
+              console.log('Care plan data received for ID', planId, ':', planData);
+              console.log('Care plan monthly_price:', planData?.monthly_price);
+              return planData;
+            } catch (err) {
+              console.error('Error fetching care plan with ID', planId, ':', err);
+              return plan; // Return original plan data if fetch fails
+            }
+          });
+          
+          const carePlanData = await Promise.all(carePlanPromises);
+          console.log('Care plan details received:', carePlanData);
+          console.log('Total care plans fetched:', carePlanData.length);
+          setCarePlanDetails(carePlanData);
+        } catch (err) {
+          console.error('Error fetching care plan details:', err);
+          setCarePlanDetails([]);
+        }
+      } else {
+        console.log('No care plans found in current assignment');
+        setCarePlanDetails([]);
+      }
+
+      // Fetch tất cả care plan assignments của resident để hiển thị lịch sử (không dùng để tính tiền)
       if (data.resident_id?._id) {
         try {
-          console.log('Fetching all care plan assignments for resident:', data.resident_id._id);
+          console.log('Fetching all care plan assignments for resident history:', data.resident_id._id);
           const allAssignments = await carePlanAssignmentsAPI.getByResidentId(data.resident_id._id);
           console.log('All assignments for resident:', allAssignments);
-          
-          // Lấy tất cả care plan IDs từ tất cả assignments
-          const allCarePlanIds: any[] = [];
-          if (Array.isArray(allAssignments)) {
-            allAssignments.forEach((assignment: any) => {
-              if (Array.isArray(assignment.care_plan_ids)) {
-                assignment.care_plan_ids.forEach((plan: any) => {
-                  const planId = plan._id || plan;
-                  if (!allCarePlanIds.find(p => (p._id || p) === planId)) {
-                    allCarePlanIds.push(plan);
-                  }
-                });
-              }
-            });
-          }
-          
-          console.log('All unique care plan IDs:', allCarePlanIds);
-          
-          // Fetch chi tiết của tất cả care plans
-          if (allCarePlanIds.length > 0) {
-            const carePlanPromises = allCarePlanIds.map(async (plan: any) => {
-              const planId = plan._id || plan;
-              console.log('Fetching care plan with ID:', planId);
-              try {
-                const planData = await carePlansAPI.getById(planId);
-                console.log('Care plan data received for ID', planId, ':', planData);
-                return planData;
-              } catch (err) {
-                console.error('Error fetching care plan with ID', planId, ':', err);
-                return plan; // Return original plan data if fetch fails
-              }
-            });
-            
-            const carePlanData = await Promise.all(carePlanPromises);
-                      console.log('All care plan details received:', carePlanData);
-          setCarePlanDetails(carePlanData);
           setCarePlanAssignments(allAssignments);
-          } else {
-            console.log('No care plans found for resident');
-            setCarePlanDetails([]);
-          }
         } catch (err) {
           console.error('Error fetching all care plan assignments:', err);
-          // Fallback: sử dụng care plans từ assignment hiện tại
-          if (Array.isArray(data.care_plan_ids) && data.care_plan_ids.length > 0) {
-            try {
-              const carePlanPromises = data.care_plan_ids.map(async (plan: any) => {
-                const planId = plan._id || plan;
-                try {
-                  const planData = await carePlansAPI.getById(planId);
-                  return planData;
-                } catch (err) {
-                  return plan;
-                }
-              });
-              
-              const carePlanData = await Promise.all(carePlanPromises);
-              setCarePlanDetails(carePlanData);
-            } catch (err) {
-              console.error('Error fetching fallback care plan details:', err);
-            }
-          }
+          setCarePlanAssignments([]);
         }
       } else {
         console.log('No resident ID found in assignment data');
+        setCarePlanAssignments([]);
       }
 
       // Fetch room type details
@@ -316,28 +304,83 @@ export default function CarePlanAssignmentDetailPage() {
     }));
   };
 
-  // Function để tìm assignment cho từng care plan
+  // Function để tìm assignment cho từng care plan (chỉ từ assignment hiện tại)
   const getAssignmentForCarePlan = (carePlanId: string) => {
-    if (!Array.isArray(carePlanAssignments)) return null;
+    if (!assignment || !Array.isArray(assignment.care_plan_ids)) return null;
     
-    return carePlanAssignments.find((assignment: any) => {
-      if (Array.isArray(assignment.care_plan_ids)) {
-        return assignment.care_plan_ids.some((plan: any) => {
-          const planId = plan._id || plan;
-          return planId === carePlanId;
-        });
-      }
-      return false;
+    // Kiểm tra xem care plan có thuộc assignment hiện tại không
+    const hasCarePlan = assignment.care_plan_ids.some((plan: any) => {
+      const planId = plan._id || plan;
+      return planId === carePlanId;
     });
+    
+    return hasCarePlan ? assignment : null;
   };
 
   // Function để tính tổng tiền dịch vụ từ tất cả care plans
   const calculateTotalServiceCost = () => {
     if (!Array.isArray(carePlanDetails)) return 0;
     
-    return carePlanDetails.reduce((total, carePlan) => {
-      return total + (carePlan.monthly_price || 0);
+    const total = carePlanDetails.reduce((total, carePlan) => {
+      // Chỉ tính care plans hợp lệ có monthly_price và thuộc assignment hiện tại
+      if (carePlan && 
+          typeof carePlan.monthly_price === 'number' && 
+          carePlan.monthly_price > 0 &&
+          carePlan._id) {
+        
+        // Kiểm tra xem care plan có thuộc assignment hiện tại không
+        const isInCurrentAssignment = assignment?.care_plan_ids?.some((plan: any) => {
+          const planId = plan._id || plan;
+          return planId === carePlan._id;
+        });
+        
+        if (isInCurrentAssignment) {
+          console.log(`Adding care plan ${carePlan.plan_name} with price ${carePlan.monthly_price}`);
+          return total + carePlan.monthly_price;
+        }
+      }
+      return total;
     }, 0);
+    
+    console.log('Care plan details for calculation:', carePlanDetails);
+    console.log('Total service cost calculated:', total);
+    
+    return total;
+  };
+
+  // Helper function để filter care plans hợp lệ từ assignment hiện tại
+  const getValidCarePlans = () => {
+    const validPlans = carePlanDetails.filter((carePlan: any) => {
+      if (!carePlan || !carePlan._id || !carePlan.plan_name) return false;
+      
+      const isInCurrentAssignment = assignment?.care_plan_ids?.some((plan: any) => {
+        const planId = plan._id || plan;
+        return planId === carePlan._id;
+      });
+      
+      return isInCurrentAssignment;
+    });
+    
+    console.log('Valid care plans for current assignment:', validPlans);
+    return validPlans;
+  };
+
+  // Function để tính tổng tiền hàng tháng (phòng + dịch vụ)
+  const calculateTotalMonthlyCost = () => {
+    // Đảm bảo room_cost là số hợp lệ
+    const roomCost = (assignment?.room_monthly_cost && typeof assignment.room_monthly_cost === 'number' && assignment.room_monthly_cost > 0) 
+      ? assignment.room_monthly_cost 
+      : 0;
+    
+    const serviceCost = calculateTotalServiceCost();
+    const total = roomCost + serviceCost;
+    
+    console.log('Assignment data:', assignment);
+    console.log('Room cost:', roomCost);
+    console.log('Service cost:', serviceCost);
+    console.log('Total monthly cost:', total);
+    
+    return total;
   };
 
   // Show loading state while fetching data
@@ -731,7 +774,7 @@ export default function CarePlanAssignmentDetailPage() {
                   color: '#1d4ed8',
                   margin: '0 0 0.5rem 0'
                 }}>
-                  {formatCurrency(assignment?.total_monthly_cost || 0)}
+                  {formatCurrency(calculateTotalMonthlyCost())}
                 </p>
                 <p style={{
                   fontSize: '1rem',
@@ -842,13 +885,13 @@ export default function CarePlanAssignmentDetailPage() {
                     borderRadius: '9999px',
                     border: '1px solid rgba(14, 165, 233, 0.2)'
                   }}>
-                    Tổng: {carePlanDetails.length} gói dịch vụ
+                    Tổng: {getValidCarePlans().length} gói dịch vụ
                   </span>
             </div>
           </div>
 
               <div style={{ display: 'grid', gap: '1.5rem' }}>
-                {carePlanDetails.map((carePlan: any, index: number) => {
+                {getValidCarePlans().map((carePlan: any, index: number) => {
                   const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
                   return (
                   <div key={index} style={{
@@ -951,7 +994,7 @@ export default function CarePlanAssignmentDetailPage() {
                             color: '#1e293b',
                             margin: 0
                           }}>
-                            {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
+                            {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : (assignment?.start_date ? formatDate(assignment.start_date) : 'N/A')}
                           </p>
                         </div>
                         <div style={{ textAlign: 'center' }}>
@@ -977,7 +1020,7 @@ export default function CarePlanAssignmentDetailPage() {
                             color: '#1e293b',
                             margin: 0
                           }}>
-                            {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
+                            {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : (assignment?.end_date ? formatDate(assignment.end_date) : 'Không có thời hạn')}
                           </p>
                                 </div>
                                 </div>
@@ -1001,7 +1044,7 @@ export default function CarePlanAssignmentDetailPage() {
                         flexWrap: 'wrap',
                         gap: '0.75rem'
                       }}>
-                        {carePlan.services_included?.slice(0, expandedServices[index] ? undefined : 4).map((service: string, serviceIndex: number) => (
+                        {(carePlan.services_included || []).slice(0, expandedServices[index] ? undefined : 4).map((service: string, serviceIndex: number) => (
                                   <span key={serviceIndex} style={{
                             background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
                             color: '#1e40af',
@@ -1014,7 +1057,7 @@ export default function CarePlanAssignmentDetailPage() {
                                     {service}
                                   </span>
                                 ))}
-                        {carePlan.services_included?.length > 4 && !expandedServices[index] && (
+                        {(carePlan.services_included || []).length > 4 && !expandedServices[index] && (
                           <button
                             onClick={() => toggleServiceExpansion(index)}
                             style={{
@@ -1032,13 +1075,13 @@ export default function CarePlanAssignmentDetailPage() {
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            <span>+{carePlan.services_included.length - 4} dịch vụ khác</span>
+                            <span>+{(carePlan.services_included || []).length - 4} dịch vụ khác</span>
                             <svg style={{ width: '0.75rem', height: '0.75rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                           </button>
                         )}
-                        {carePlan.services_included?.length > 4 && expandedServices[index] && (
+                        {(carePlan.services_included || []).length > 4 && expandedServices[index] && (
                           <button
                             onClick={() => toggleServiceExpansion(index)}
                             style={{
@@ -1068,7 +1111,7 @@ export default function CarePlanAssignmentDetailPage() {
                 );
                 })}
                 
-                {carePlanDetails.length === 0 && (
+                {getValidCarePlans().length === 0 && (
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <DocumentTextIcon style={{
                       width: '3rem',

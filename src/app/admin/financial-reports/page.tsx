@@ -374,7 +374,7 @@ export default function FinancialReportsPage() {
        {/* Modal chỉnh sửa hóa đơn */}
        <Dialog open={!!editBill} onClose={() => setEditBill(null)} className="fixed z-50 inset-0 overflow-y-auto">
          <div className="flex items-center justify-center min-h-screen px-4">
-           <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+           <div className="fixed inset-0 bg-black opacity-30" />
            <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-auto p-6 z-10">
              <Dialog.Title className="text-lg font-bold mb-4">Chỉnh sửa hóa đơn</Dialog.Title>
              {editBill && (
@@ -421,7 +421,7 @@ export default function FinancialReportsPage() {
        {/* Modal xóa hóa đơn */}
        <Dialog open={!!deleteBill} onClose={() => setDeleteBill(null)} className="fixed z-50 inset-0 overflow-y-auto">
          <div className="flex items-center justify-center min-h-screen px-4">
-           <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+           <div className="fixed inset-0 bg-black opacity-30" />
            <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-auto p-6 z-10">
              <Dialog.Title className="text-lg font-bold mb-4 text-red-600">Xóa hóa đơn</Dialog.Title>
              {deleteBill && (

@@ -75,7 +75,6 @@ export const BACKEND_ERROR_MESSAGES = {
   
   // General errors
   'No valid fields to update': 'Không có dữ liệu nào để cập nhật.',
-  'No valid fields to update': 'Không có dữ liệu nào để cập nhật.',
 } as const;
 
 export class ErrorHandler {
@@ -238,27 +237,27 @@ export class ErrorHandler {
 export const useErrorHandler = () => {
   const handleError = (error: any, context?: string) => {
     const appError = ErrorHandler.handleApiError(error, context);
-    ErrorHandler.logError(appError, context);
-    ErrorHandler.showError(appError);
+    console.error('Error:', appError, 'Context:', context);
+    // ErrorHandler.showError(appError);
     return appError;
   };
 
   const handleValidationError = (errors: { [field: string]: string }) => {
-    const appError = ErrorHandler.handleValidationErrors(errors);
-    ErrorHandler.showError(appError);
+    const appError = 'Validation error: ' + JSON.stringify(errors);
+    // ErrorHandler.showError(appError);
     return appError;
   };
 
   const showSuccess = (message: string) => {
-    ErrorHandler.showSuccess(message);
+    console.log('Success:', message);
   };
 
   const showWarning = (message: string) => {
-    ErrorHandler.showWarning(message);
+    console.warn('Warning:', message);
   };
 
   const showInfo = (message: string) => {
-    ErrorHandler.showInfo(message);
+    console.info('Info:', message);
   };
 
   return {
@@ -280,14 +279,14 @@ export const withErrorHandling = async <T>(
     const data = await operation();
     
     if (showSuccessMessage) {
-      ErrorHandler.showSuccess(showSuccessMessage);
+      console.log('Success:', showSuccessMessage);
     }
     
     return { data, error: null };
   } catch (error) {
     const appError = ErrorHandler.handleApiError(error, context);
-    ErrorHandler.logError(appError, context);
-    ErrorHandler.showError(appError);
+    console.error('Error:', appError, 'Context:', context);
+    // ErrorHandler.showError(appError);
     
     return { data: null, error: appError };
   }

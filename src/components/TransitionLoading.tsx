@@ -29,9 +29,7 @@ export const TransitionLoading: React.FC<TransitionLoadingProps> = ({
         <LoadingSpinner size="large" />
         
         <div className="mt-8 space-y-4">
-          <h2 className="text-2xl font-bold text-gray-800">
-            Chào mừng bạn quay lại!
-          </h2>
+          
           
           {userName && (
             <p className="text-lg text-gray-600">

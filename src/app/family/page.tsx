@@ -1188,25 +1188,25 @@ useEffect(() => {
                     </h3>
                     <div className="flex gap-4 items-center flex-wrap">
                       {showActivityHistory && (
-                        <DatePicker
-                          selected={selectedActivityDate ? new Date(selectedActivityDate) : null}
-                          onChange={date => {
-                            if (!date) return;
-                            const iso = date.toISOString().slice(0,10);
-                            if (activityHistoryDates.includes(iso)) setSelectedActivityDate(iso);
-                          }}
-                          includeDates={activityHistoryDates.map(d=>new Date(d))}
-                          openToDate={selectedActivityDate ? new Date(selectedActivityDate) : undefined}
-                          dateFormat="EEEE, d 'tháng' M, yyyy"
-                          locale={vi}
-                          popperPlacement="bottom"
-                          showPopperArrow={false}
-                          customInput={
-                            <button className="px-4 py-2 rounded-xl border-2 border-blue-500 bg-white text-base font-semibold text-gray-700 cursor-pointer min-w-56 text-left shadow-lg">
-                              {formatDateDDMMYYYY(selectedActivityDate)}
-                            </button>
-                          }
-                        />
+                        <div className="relative">
+                          <DatePicker
+                            selected={selectedActivityDate ? new Date(selectedActivityDate) : null}
+                            onChange={date => {
+                              if (!date) return;
+                              const iso = date.toISOString().slice(0,10);
+                              if (activityHistoryDates.includes(iso)) setSelectedActivityDate(iso);
+                            }}
+                            includeDates={activityHistoryDates.map(d=>new Date(d))}
+                            openToDate={selectedActivityDate ? new Date(selectedActivityDate) : undefined}
+                            dateFormat="dd/MM/yyyy"
+                            locale={vi}
+                            popperPlacement="bottom"
+                            showPopperArrow={false}
+                            placeholderText="Chọn ngày"
+                            className="px-4 py-2 rounded-xl border-2 border-blue-500 bg-white text-base font-semibold text-gray-700 cursor-pointer min-w-56 text-left shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            wrapperClassName="w-full"
+                          />
+                        </div>
                       )}
                       <button
                         onClick={() => {

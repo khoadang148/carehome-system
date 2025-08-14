@@ -660,6 +660,31 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     });
   }, [user]);
 
+  // Auto refresh room numbers when care plan assignments change
+  useEffect(() => {
+    if (showSuccessModal && selectedResident) {
+      // Refresh room number for the selected resident after successful registration
+      const timer = setTimeout(() => {
+        refreshResidentRoomNumber(selectedResident);
+      }, 1000); // Delay 1 second to ensure backend has processed the data
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessModal, selectedResident]);
+
+  // Force refresh data when component mounts (in case user navigates back)
+  useEffect(() => {
+    const handleFocus = () => {
+      // Refresh room numbers when user returns to this page
+      if (residents.length > 0) {
+        refreshRoomNumbers();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [residents.length]);
+
   // Function để refresh room numbers
   const refreshRoomNumbers = async () => {
     if (residents.length === 0) return;
@@ -704,6 +729,45 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     }
     
     setRoomNumbers(newRoomNumbers);
+  };
+
+  // Function để refresh room number cho một resident cụ thể
+  const refreshResidentRoomNumber = async (residentId: string) => {
+    try {
+      // Kiểm tra xem resident có care plan active không
+      const carePlanAssignments = await carePlansAPI.getByResidentId(residentId);
+      const hasActiveCarePlan = Array.isArray(carePlanAssignments) && carePlanAssignments.some((a: any) => 
+        a.status === 'active' || a.status === 'pending' || a.status === 'pending_approval'
+      );
+      
+      if (!hasActiveCarePlan) {
+        setRoomNumbers(prev => ({ ...prev, [residentId]: 'Chưa hoàn tất đăng kí' }));
+        return;
+      }
+      
+      // Chỉ lấy thông tin phòng nếu có care plan active
+      const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+      const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+      
+      if (bedAssignment?.bed_id?.room_id) {
+        if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+          setRoomNumbers(prev => ({ ...prev, [residentId]: bedAssignment.bed_id.room_id.room_number }));
+        } else {
+          const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+          if (roomId) {
+            const room = await roomsAPI.getById(roomId);
+            setRoomNumbers(prev => ({ ...prev, [residentId]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
+          } else {
+            setRoomNumbers(prev => ({ ...prev, [residentId]: 'Chưa hoàn tất đăng kí' }));
+          }
+        }
+      } else {
+        setRoomNumbers(prev => ({ ...prev, [residentId]: 'Chưa hoàn tất đăng kí' }));
+      }
+    } catch (error) {
+      console.error('Error refreshing room number for resident:', residentId, error);
+      setRoomNumbers(prev => ({ ...prev, [residentId]: 'Chưa hoàn tất đăng kí' }));
+    }
   };
 
   // Lọc cư dân dựa trên loại gói dịch vụ
@@ -1163,7 +1227,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
   // Thêm kiểm tra trước khi gửi đăng ký
   const canSubmit = selectedResident && selectedPackage && startDate && endDate && 
     !validationWarning &&
-    (selectedPackage?.category === 'supplementary' || 
+    ((selectedPackage?.category === 'supplementary' && hasExistingRoom) || 
+     (selectedPackage?.category === 'supplementary' && !hasExistingRoom && roomType && selectedRoomId && selectedBedId) ||
      (selectedPackage?.category === 'main' && (hasExistingRoom || (roomType && selectedRoomId && selectedBedId))));
 
   
@@ -1383,6 +1448,11 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
       const result = await apiClient.post('/care-plan-assignments', payload);
       setShowConfirmation(false);
       setShowSuccessModal(true);
+      
+      // Refresh room number cho resident vừa đăng ký
+      if (selectedResident) {
+        await refreshResidentRoomNumber(selectedResident);
+      }
     } catch (error: any) {
       console.error('API error:', error?.response?.data || error);
       
@@ -1927,8 +1997,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
               </button>
               <button 
                 onClick={() => {
-                  // Nếu là gói bổ sung hoặc resident đã có phòng, bỏ qua các bước chọn phòng
-                  if (selectedPackage?.category === 'supplementary' || hasExistingRoom) {
+                  // Chỉ bỏ qua bước chọn phòng và giường khi resident đã có phòng và giường
+                  if (hasExistingRoom) {
                     setStep(6); // Chuyển thẳng đến bước thông tin bổ sung
                   } else {
                     setStep(3);
@@ -1986,6 +2056,28 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 Lựa chọn loại phòng phù hợp với nhu cầu và ngân sách
               </p>
             </div>
+
+            {/* Hiển thị thông báo cho gói bổ sung */}
+            {selectedPackage?.category === 'supplementary' && (
+              <div style={{
+                background: '#f0f9ff',
+                borderRadius: 12,
+                padding: '1rem',
+                marginBottom: '1.5rem',
+                border: '1px solid #0ea5e9'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
+                  <span style={{ fontWeight: 600, color: '#0c4a6e' }}>Gói bổ sung</span>
+                </div>
+                <div style={{ color: '#0369a1', fontSize: '0.95rem' }}>
+                  {hasExistingRoom 
+                    ? `Người cao tuổi đã có phòng ${roomNumbers[selectedResident]}. Gói bổ sung sẽ sử dụng phòng hiện có.`
+                    : 'Người cao tuổi chưa có phòng. Vui lòng chọn loại phòng phù hợp cho gói bổ sung.'
+                  }
+                </div>
+              </div>
+            )}
 
             <div style={{
               background: '#f9fafb',
@@ -2114,6 +2206,28 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 Lựa chọn phòng phù hợp với giới tính và loại phòng đã chọn
               </p>
             </div>
+
+            {/* Hiển thị thông báo cho gói bổ sung */}
+            {selectedPackage?.category === 'supplementary' && (
+              <div style={{
+                background: '#f0f9ff',
+                borderRadius: 12,
+                padding: '1rem',
+                marginBottom: '1.5rem',
+                border: '1px solid #0ea5e9'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
+                  <span style={{ fontWeight: 600, color: '#0c4a6e' }}>Gói bổ sung</span>
+                </div>
+                <div style={{ color: '#0369a1', fontSize: '0.95rem' }}>
+                  {hasExistingRoom 
+                    ? `Người cao tuổi đã có phòng ${roomNumbers[selectedResident]}. Gói bổ sung sẽ sử dụng phòng hiện có.`
+                    : 'Người cao tuổi chưa có phòng. Vui lòng chọn phòng cụ thể cho gói bổ sung.'
+                  }
+                </div>
+              </div>
+            )}
 
             {!residentGender ? (
               <div style={{
@@ -2258,6 +2372,28 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 Lựa chọn giường cụ thể trong phòng đã chọn
               </p>
             </div>
+
+            {/* Hiển thị thông báo cho gói bổ sung */}
+            {selectedPackage?.category === 'supplementary' && (
+              <div style={{
+                background: '#f0f9ff',
+                borderRadius: 12,
+                padding: '1rem',
+                marginBottom: '1.5rem',
+                border: '1px solid #0ea5e9'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
+                  <span style={{ fontWeight: 600, color: '#0c4a6e' }}>Gói bổ sung</span>
+                </div>
+                <div style={{ color: '#0369a1', fontSize: '0.95rem' }}>
+                  {hasExistingRoom 
+                    ? `Người cao tuổi đã có phòng ${roomNumbers[selectedResident]}. Gói bổ sung sẽ sử dụng phòng hiện có.`
+                    : 'Người cao tuổi chưa có phòng. Vui lòng chọn giường cụ thể cho gói bổ sung.'
+                  }
+                </div>
+              </div>
+            )}
 
             <div style={{
               background: '#f9fafb',
@@ -2635,8 +2771,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
             }}>
               <button 
                 onClick={() => {
-                  // Nếu là gói bổ sung hoặc đã có phòng, quay lại step 1 thay vì step 5
-                  if (selectedPackage?.category === 'supplementary' || hasExistingRoom) {
+                  // Chỉ quay lại step 1 khi resident đã có phòng và giường
+                  if (hasExistingRoom) {
                     setStep(1);
                   } else {
                     setStep(5);
@@ -2742,41 +2878,63 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                 <div><b style={{ color: '#374151' }}>Ngày bắt đầu:</b> {startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
                 <div><b style={{ color: '#374151' }}>Ngày kết thúc:</b> {endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
                 
-                {/* Hiển thị thông tin phòng cho gói chính */}
-                                 {selectedPackage?.category === 'main' && (
-                   <>
-                     {hasExistingRoom ? (
-                       <>
-                        <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {existingRoomInfo?.roomNumber || roomNumbers[selectedResident]}</div>
-                        <div><b style={{ color: '#374151' }}>Loại phòng:</b> {loadingExistingRoomInfo ? 'Đang tải...' : (existingRoomInfo?.roomTypeName || 'Không có thông tin')}</div>
-                        <div><b style={{ color: '#374151' }}>Giường hiện tại:</b> {currentBedInfo?.bedNumber || 'Không có thông tin'}</div>
-                         <div><b style={{ color: '#374151' }}>Ghi chú:</b> Sử dụng phòng hiện có</div>
-                       </>
-                     ) : (
-                       <>
-                         <div><b style={{ color: '#374151' }}>Loại phòng:</b> {roomTypeName}</div>
-                         <div><b style={{ color: '#374151' }}>Giới tính phòng:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
-                         <div><b style={{ color: '#374151' }}>Phòng:</b> {selectedRoomObj?.room_number}</div>
-                         <div><b style={{ color: '#374151' }}>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
-                       </>
-                     )}
-                   </>
-                 )}
-                
-                {/* Hiển thị thông tin phòng hiện tại cho gói bổ sung */}
-                {selectedPackage?.category === 'supplementary' && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí' && (
-                  <>
-                    <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {roomNumbers[selectedResident]}</div>
-                    <div><b style={{ color: '#374151' }}>Giường hiện tại:</b> {currentBedInfo?.bedNumber || 'Không có thông tin'}</div>
-                    <div><b style={{ color: '#374151' }}>Ghi chú:</b> Gói bổ sung - sử dụng phòng hiện có</div>
-                   </>
-                 )}
+                {/* Hiển thị thông tin phòng và giường cho tất cả các trường hợp */}
+                {(() => {
+                  if (selectedPackage?.category === 'main') {
+                    if (hasExistingRoom) {
+                      return (
+                        <>
+                          <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {existingRoomInfo?.roomNumber || roomNumbers[selectedResident]}</div>
+                          <div><b style={{ color: '#374151' }}>Loại phòng:</b> {loadingExistingRoomInfo ? 'Đang tải...' : (existingRoomInfo?.roomTypeName || 'Không có thông tin')}</div>
+                          <div><b style={{ color: '#374151' }}>Giường hiện tại:</b> {currentBedInfo?.bedNumber || 'Không có thông tin'}</div>
+                          <div><b style={{ color: '#374151' }}>Ghi chú:</b> Sử dụng phòng hiện có</div>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <div><b style={{ color: '#374151' }}>Loại phòng:</b> {roomTypeName}</div>
+                          <div><b style={{ color: '#374151' }}>Giới tính phòng:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
+                          <div><b style={{ color: '#374151' }}>Phòng:</b> {selectedRoomObj?.room_number}</div>
+                          <div><b style={{ color: '#374151' }}>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
+                        </>
+                      );
+                    }
+                  } else if (selectedPackage?.category === 'supplementary') {
+                    if (hasExistingRoom) {
+                      return (
+                        <>
+                          <div><b style={{ color: '#374151' }}>Phòng hiện tại:</b> {roomNumbers[selectedResident]}</div>
+                          <div><b style={{ color: '#374151' }}>Giường hiện tại:</b> {currentBedInfo?.bedNumber || 'Không có thông tin'}</div>
+                          <div><b style={{ color: '#374151' }}>Ghi chú:</b> Gói bổ sung - sử dụng phòng hiện có</div>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <div><b style={{ color: '#374151' }}>Loại phòng:</b> {roomTypeName}</div>
+                          <div><b style={{ color: '#374151' }}>Giới tính phòng:</b> {roomGender === 'male' ? 'Nam' : roomGender === 'female' ? 'Nữ' : ''}</div>
+                          <div><b style={{ color: '#374151' }}>Phòng:</b> {selectedRoomObj?.room_number}</div>
+                          <div><b style={{ color: '#374151' }}>Giường:</b> {beds.find(b => b._id === selectedBedId)?.bed_number}</div>
+                          <div><b style={{ color: '#374151' }}>Ghi chú:</b> Gói bổ sung - phòng mới</div>
+                        </>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
                 <div><b style={{ color: '#374151' }}>Yêu cầu đặc biệt:</b> {familyPreferences.special_requests || 'Không có'}</div>
                 <div><b style={{ color: '#374151' }}>Ghi chú:</b> {medicalNotes || 'Không có'}</div>
-                {/* Hiển thị tiền phòng cho gói chính */}
-                                 {selectedPackage?.category === 'main' && (
-                  <div><b style={{ color: '#374151' }}>Tiền phòng/tháng:</b> {(hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost).toLocaleString()} đ</div>
-                 )}
+                {/* Hiển thị tiền phòng cho gói chính và gói bổ sung khi chưa có phòng */}
+                {(() => {
+                  if (selectedPackage?.category === 'main') {
+                    const roomCost = hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost;
+                    return <div><b style={{ color: '#374151' }}>Tiền phòng/tháng:</b> {roomCost.toLocaleString()} đ</div>;
+                  } else if (selectedPackage?.category === 'supplementary' && !hasExistingRoom) {
+                    return <div><b style={{ color: '#374151' }}>Tiền phòng/tháng:</b> {roomMonthlyCost.toLocaleString()} đ</div>;
+                  }
+                  return null;
+                })()}
 
                  <div><b style={{ color: '#374151' }}>Tiền gói dịch vụ/tháng:</b> {selectedPackage?.monthly_price?.toLocaleString()} đ</div>
                 
@@ -2798,6 +2956,8 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
                       let total = selectedPackage?.monthly_price || 0;
                       if (selectedPackage?.category === 'main') {
                         total += hasExistingRoom ? (existingRoomInfo?.monthlyPrice || 0) : roomMonthlyCost;
+                      } else if (selectedPackage?.category === 'supplementary' && !hasExistingRoom) {
+                        total += roomMonthlyCost;
                       }
                       return total.toLocaleString();
                     })()} đ
@@ -2892,7 +3052,13 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
               <br/>Chúng tôi sẽ liên hệ lại để xác nhận trong thời gian sớm nhất.
             </div>
             <button 
-              onClick={() => router.push('/services')} 
+              onClick={async () => {
+                // Refresh room numbers trước khi chuyển trang
+                if (selectedResident) {
+                  await refreshResidentRoomNumber(selectedResident);
+                }
+                router.push('/services');
+              }} 
               style={{ 
                 background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                 color: '#fff',
@@ -2935,15 +3101,32 @@ export default function PurchaseServicePage({ params }: { params: Promise<{ pack
     }}>
       <div style={{ fontSize: 48, color: '#10b981', marginBottom: 16 }}>✔</div>
       <h3 style={{ fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Đăng ký thành công!</h3>
-      <div style={{ color: '#64748b', marginBottom: 24 }}>Thông tin đăng ký dịch vụ đã được gửi thành công.<br/>Chúng tôi sẽ liên hệ lại để xác nhận.</div>
+      <div style={{ color: '#64748b', marginBottom: 16 }}>Thông tin đăng ký dịch vụ đã được gửi thành công.<br/>Chúng tôi sẽ liên hệ lại để xác nhận.</div>
+      {selectedResident && roomNumbers[selectedResident] && roomNumbers[selectedResident] !== 'Chưa hoàn tất đăng kí' && (
+        <div style={{ 
+          background: '#f0fdf4', 
+          border: '1px solid #bbf7d0', 
+          borderRadius: 8, 
+          padding: '12px 16px', 
+          marginBottom: 24,
+          color: '#166534',
+          fontSize: '14px'
+        }}>
+          <strong>Phòng đã được phân bổ:</strong> Phòng {roomNumbers[selectedResident]}
+        </div>
+      )}
               <button
-                   onClick={() => {
+                   onClick={async () => {
                      setShowSuccessModal(false);
-          router.push('/services');
-        }}
-        style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}
-      >
-        Đóng & Về trang dịch vụ
+                     // Refresh room numbers trước khi chuyển trang
+                     if (selectedResident) {
+                       await refreshResidentRoomNumber(selectedResident);
+                     }
+                     router.push('/services');
+                   }}
+                   style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 2rem', fontWeight: 600 }}
+              >
+                Đóng & Về trang dịch vụ
               </button>
           </div>
         </div>

@@ -190,7 +190,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         }
       } catch (error) {
         console.error('Error fetching resident:', error);
-        router.push('/residents');
+        router.push('/staff/residents');
       } finally {
         setLoading(false);
         setVitalLoading(false);
@@ -200,7 +200,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   }, [residentId, router, refreshKey]);
   
   const handleEditClick = () => {
-    router.push(`/residents/${residentId}/edit`);
+    router.push(`/staff/residents/${residentId}/edit`);
   };
 
   const handleActionComplete = () => {
@@ -234,7 +234,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             người cao tuổi này có thể đã bị xóa hoặc không tồn tại
           </p>
           <Link
-            href="/residents"
+            href="/staff/residents"
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium no-underline"
           >
             <ArrowLeftIcon className="w-4 h-4" />

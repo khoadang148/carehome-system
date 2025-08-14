@@ -572,9 +572,7 @@ export default function AddStaffPage() {
                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
                     />
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Nhập ngày theo định dạng dd/mm/yyyy
-                  </p>
+                  
                 </div>
               </div>
             </div>
@@ -691,36 +689,36 @@ export default function AddStaffPage() {
       {/* Success Modal */}
       {showSuccessModal && createdAccount && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
             {/* Success Header */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-white text-center">
-              <CheckCircleIcon className="w-16 h-16 mx-auto mb-4 drop-shadow-lg" />
-              <h3 className="text-2xl font-bold mb-2">Hoàn thành!</h3>
-              <p className="text-green-100 text-lg">
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white text-center">
+              <CheckCircleIcon className="w-12 h-12 mx-auto mb-3 drop-shadow-lg" />
+              <h3 className="text-xl font-bold mb-2">Hoàn thành!</h3>
+              <p className="text-green-100 text-sm">
                 Nhân viên <strong>{createdAccount.full_name}</strong> đã được thêm vào hệ thống
               </p>
             </div>
 
             {/* Content */}
-            <div className="p-8">
+            <div className="p-6">
               {/* Staff Info */}
-              <div className="mb-8">
-                <h4 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <UserIcon className="w-6 h-6 text-indigo-600" />
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-indigo-600" />
                   Thông tin nhân viên
                 </h4>
-                <div className="bg-slate-50 rounded-lg p-6 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 font-medium">Tên:</span>
+                <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Tên:</span>
                     <span className="font-semibold text-slate-900">{createdAccount.full_name}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 font-medium">Vị trí:</span>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Vị trí:</span>
                     <span className="font-semibold text-slate-900">{createdAccount.position || 'Chưa cập nhật'}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 font-medium">Trạng thái:</span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Trạng thái:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       createdAccount.status === 'active' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-slate-100 text-slate-800'
@@ -732,26 +730,26 @@ export default function AddStaffPage() {
               </div>
 
               {/* Login Info */}
-              <div className="mb-8">
-                <h4 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <LockClosedIcon className="w-6 h-6 text-indigo-600" />
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <LockClosedIcon className="w-4 h-4 text-indigo-600" />
                   Thông tin đăng nhập
                 </h4>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {/* Email */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
                       Email
                     </label>
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                      <span className="flex-1 font-mono text-slate-900 font-medium">
+                    <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                      <span className="flex-1 font-mono text-slate-900 font-medium text-xs">
                         {createdAccount.email}
                       </span>
                       <button
                         onClick={() => copyToClipboard(createdAccount.email)}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-1.5 py-0.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs font-medium flex items-center gap-1"
                       >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        <ClipboardDocumentIcon className="w-3 h-3" />
                         Sao chép
                       </button>
                     </div>
@@ -759,18 +757,18 @@ export default function AddStaffPage() {
 
                   {/* Username */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
                       Tên đăng nhập
                     </label>
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                      <span className="flex-1 font-mono text-slate-900 font-medium">
+                    <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                      <span className="flex-1 font-mono text-slate-900 font-medium text-xs">
                         {createdAccount.username}
                       </span>
                       <button
                         onClick={() => copyToClipboard(createdAccount.username)}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-1.5 py-0.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs font-medium flex items-center gap-1"
                       >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        <ClipboardDocumentIcon className="w-3 h-3" />
                         Sao chép
                       </button>
                     </div>
@@ -778,18 +776,18 @@ export default function AddStaffPage() {
 
                   {/* Password - Hiển thị cả khi random và không random */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
                       Mật khẩu
                     </label>
-                    <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <span className="flex-1 font-mono text-slate-900 font-medium tracking-wider">
+                    <div className="flex items-center gap-2 p-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <span className="flex-1 font-mono text-slate-900 font-medium tracking-wider text-xs">
                         {createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}
                       </span>
                       <button
                         onClick={() => copyToClipboard(createdAccount.tempPassword || createdAccount.password || '')}
-                        className="px-3 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-1.5 py-0.5 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs font-medium flex items-center gap-1"
                       >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        <ClipboardDocumentIcon className="w-3 h-3" />
                         Sao chép
                       </button>
                     </div>
@@ -798,16 +796,16 @@ export default function AddStaffPage() {
               </div>
 
               {/* Important Notice */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-sm font-bold">!</span>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs font-bold">!</span>
                   </div>
                   <div>
-                    <h4 className="text-lg font-semibold text-yellow-800 mb-3">
+                    <h4 className="text-xs font-semibold text-yellow-800 mb-1">
                       Lưu ý quan trọng
                     </h4>
-                    <ul className="text-yellow-700 space-y-2 text-sm">
+                    <ul className="text-yellow-700 space-y-0.5 text-xs">
                       <li>• Vui lòng lưu lại thông tin đăng nhập này một cách an toàn</li>
                       <li>• Mật khẩu sẽ không thể xem lại sau khi đóng modal này</li>
                       <li>• Nhân viên nên đổi mật khẩu sau lần đăng nhập đầu tiên</li>
@@ -819,25 +817,25 @@ export default function AddStaffPage() {
 
               {/* Copy Success Message */}
               {copySuccess && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircleIcon className="w-5 h-5" />
-                    <span className="font-medium">✅ Đã sao chép thông tin vào clipboard!</span>
+                    <CheckCircleIcon className="w-3 h-3" />
+                    <span className="font-medium text-xs">✅ Đã sao chép thông tin vào clipboard!</span>
                   </div>
                 </div>
               )}
 
               {/* Actions */}
-              <div className="flex gap-4 justify-center">
+              <div className="flex gap-2 justify-center">
                 <button
                   type="button"
                   onClick={() => {
                     const loginInfo = `Thông tin đăng nhập:\nEmail: ${createdAccount.email}\nUsername: ${createdAccount.username}\nMật khẩu: ${createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}`;
                     copyToClipboard(loginInfo);
                   }}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-1 text-xs"
                 >
-                  <ClipboardDocumentIcon className="w-5 h-5" />
+                  <ClipboardDocumentIcon className="w-3 h-3" />
                   Sao chép tất cả
                 </button>
                 <button
@@ -846,7 +844,7 @@ export default function AddStaffPage() {
                     setShowSuccessModal(false);
                     router.push('/admin/staff-management');
                   }}
-                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                  className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-xs"
                 >
                   Hoàn tất
                 </button>
@@ -860,9 +858,9 @@ export default function AddStaffPage() {
                 setShowSuccessModal(false);
                 router.push('/admin/staff-management');
               }}
-              className="absolute top-4 right-4 text-white hover:text-slate-200 transition-colors p-2"
+              className="absolute top-3 right-3 text-white hover:text-slate-200 transition-colors p-1"
             >
-              <XMarkIcon className="w-6 h-6" />
+              <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
         </div>

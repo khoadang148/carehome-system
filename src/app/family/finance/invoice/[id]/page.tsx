@@ -635,14 +635,9 @@ export default function InvoiceDetailPage() {
                               color: '#1e293b',
                               marginBottom: '0.25rem'
                             }}>
-                              Phòng {invoice.billing_details.roomDetails.room_number} - {invoice.billing_details.roomDetails.room_type}
+                              Phòng {invoice.billing_details.roomDetails.room_number}
                             </div>
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: '#64748b'
-                            }}>
-                              Tầng {invoice.billing_details.roomDetails.floor}
-                            </div>
+                            
                           </div>
                           <div style={{
                             fontSize: '0.875rem',
