@@ -236,13 +236,13 @@ export default function TermsPage() {
         <div className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-center mb-8">
-              <button
-                onClick={() => router.back()}
-                title="Quay lại"
-                className="group p-3 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white hover:bg-white/30 transition-all duration-300 ease-out hover:scale-105 mr-6"
-              >
-                <ArrowLeftIcon className="w-6 h-6 group-hover:-translate-x-1 transition-transform duration-300" />
-              </button>
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-center leading-tight">
                 Điều Khoản & Quy Định
               </h1>

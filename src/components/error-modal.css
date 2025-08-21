@@ -1,0 +1,220 @@
+/* Error Modal Styles - Matching SuccessModal design */
+.error-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 41, 59, 0.25);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.error-modal-content {
+  border-radius: 24px;
+  padding: 2.5rem 2.5rem 2rem 2.5rem;
+  min-width: 340px;
+  box-shadow: 0 8px 40px 0 rgba(220, 38, 38, 0.18), 0 2px 8px 0 rgba(0, 0, 0, 0.08);
+  text-align: center;
+  position: relative;
+  animation: zoomIn 0.2s ease-out;
+}
+
+.error-icon-container {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.error-icon-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: pulseError 0.6s ease-out;
+}
+
+.error-icon-circle::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.3;
+  animation: ripple 1s ease-out infinite;
+}
+
+.error-icon {
+  width: 32px;
+  height: 32px;
+  z-index: 1;
+  animation: iconBounce 0.6s ease-out 0.2s both;
+}
+
+.error-title {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+
+.error-message {
+  font-size: 18px;
+  margin-bottom: 28px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.error-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+.error-primary-btn {
+  background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 2.2rem;
+  font-weight: 700;
+  font-size: 17px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.12);
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.error-primary-btn:hover {
+  background: var(--hover-bg) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+.error-primary-btn:active {
+  transform: translateY(0);
+}
+
+.error-secondary-btn {
+  background: transparent;
+  color: inherit;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  padding: 0.6rem 2.2rem;
+  font-weight: 700;
+  font-size: 17px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  opacity: 0.8;
+}
+
+.error-secondary-btn:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.error-secondary-btn:active {
+  transform: translateY(0);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulseError {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes iconBounce {
+  0% {
+    transform: scale(0.5) rotate(-10deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .error-modal-content {
+    min-width: 300px;
+    padding: 2rem 2rem 1.5rem 2rem;
+    margin: 1rem;
+  }
+  
+  .error-title {
+    font-size: 22px;
+  }
+  
+  .error-message {
+    font-size: 16px;
+  }
+  
+  .error-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .error-primary-btn,
+  .error-secondary-btn {
+    width: 100%;
+    min-width: auto;
+  }
+}

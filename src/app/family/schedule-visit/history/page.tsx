@@ -144,13 +144,12 @@ export default function VisitHistoryPage() {
         <div className="flex items-center justify-between gap-10 flex-wrap">
           {/* Left: Back button + Icon + Title */}
           <div className="flex items-center gap-8">
-            <button
-              onClick={() => router.push('/family/schedule-visit')}
+          <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
               title="Quay lại"
-              className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-200 rounded-xl text-slate-600 text-base font-semibold cursor-pointer transition-all duration-200 shadow-sm hover:from-slate-100 hover:to-slate-200 hover:border-slate-300 hover:text-slate-700"
             >
-              <ArrowLeftIcon className="w-5 h-5" />
-              <span></span>
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
             
             <div className="flex items-center gap-6">

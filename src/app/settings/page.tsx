@@ -201,16 +201,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      {/* Back Button - Sticky at top */}
-      <div className="sticky top-0 left-0 z-50 bg-gray-50 pt-6 pl-6">
-        <button
-          onClick={() => router.push('/')}
-          className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer shadow-sm hover:bg-gray-50 transition-colors"
-        >
-          <ArrowLeftIcon className="w-4 h-4" />
-          Quay lại
-        </button>
-      </div>
+      
 
       {/* Main Content */}
       <div className="min-h-screen bg-gray-50 px-4 pb-6">
@@ -218,15 +209,22 @@ export default function SettingsPage() {
           {/* Header Section */}
           <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
             <div className="flex items-center gap-4 mb-3">
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại trang trước"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
                 <CogIcon className="w-8 h-8 text-white" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-blue-800 leading-tight">
-                  Cài đặt hệ thống
+                  Đổi mật khẩu
                 </h1>
                 <p className="text-gray-600 mt-3 font-medium">
-                  Quản lý và thay đổi mật khẩu truy cập
+                  Thay đổi mật khẩu truy cập
                 </p>
               </div>
             </div>

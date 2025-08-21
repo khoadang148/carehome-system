@@ -226,7 +226,7 @@ export default function FamilyPhotosPage() {
 </div>
 
       {/* Filter resident dropdown */}
-      <div className="max-w-7xl mx-auto px-10 pb-2 flex items-start justify-start ml-40 mb-4">
+      <div className="max-w-7xl mx-auto px-10 pb-2 flex items-start justify-start mb-4">
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-emerald-200 rounded-2xl shadow-sm p-3 flex items-center gap-3 min-w-0 max-w-none w-auto m-0 flex-nowrap">
           <UsersIcon className="w-6 h-6 text-emerald-500 flex-shrink-0" />
           <label htmlFor="resident-filter" className="font-bold text-gray-800 text-lg tracking-tight mr-1 whitespace-nowrap">

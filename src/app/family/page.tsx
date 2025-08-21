@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { clientStorage } from '@/lib/utils/clientStorage';
+import { ChatProvider, useChat } from '@/lib/contexts/chat-provider';
+import ChatButton from '@/components/ChatButton';
+import ChatWidget from '@/components/ChatWidget';
 import { 
   CalendarDaysIcon, 
   DocumentTextIcon,
@@ -13,7 +16,8 @@ import {
   HeartIcon,
   UsersIcon,
   XMarkIcon,
-  XCircleIcon
+  XCircleIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 import { Tab } from '@headlessui/react';
 import DatePicker from 'react-datepicker';
@@ -74,9 +78,10 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
   return userAPI.getAvatarUrl(cleanPath);
 };
 
-export default function FamilyPortalPage() {
+function FamilyPortalPageContent() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { chatState, openChat, closeChat } = useChat();
 
   // Main state
   const [residents, setResidents] = useState<any[]>([]);
@@ -809,6 +814,7 @@ useEffect(() => {
                   </p>
                 </div>
               </div>
+              
             </div>
           </div>
           
@@ -1092,10 +1098,11 @@ useEffect(() => {
                   <div className="h-0.5 bg-blue-500 mb-4" />
                   
                   {/* Table header */}
-                  <div className="grid grid-cols-3 gap-4 mb-3 px-3">
+                  <div className="grid grid-cols-4 gap-4 mb-3 px-3">
                     <div className="text-xs text-blue-600 font-semibold text-center">Tên nhân viên</div>
                     <div className="text-xs text-blue-600 font-semibold text-center">Chức vụ</div>
                     <div className="text-xs text-blue-600 font-semibold text-center">Số điện thoại</div>
+                    <div className="text-xs text-blue-600 font-semibold text-center">Liên hệ</div>
                   </div>
                   
                   {/* Staff list */}
@@ -1106,7 +1113,7 @@ useEffect(() => {
                       const staffPosition = staff?.position || 'Nhân viên chăm sóc';
                       
                       return (
-                        <div key={assignment._id || index} className="grid grid-cols-3 gap-4 bg-blue-50 rounded-lg p-3">
+                        <div key={assignment._id || index} className="grid grid-cols-4 gap-4 bg-blue-50 rounded-lg p-3">
                           <div className="text-sm text-slate-800 font-bold text-center">
                             {staffName}
                           </div>
@@ -1115,6 +1122,16 @@ useEffect(() => {
                           </div>
                           <div className="text-sm text-slate-800 font-bold text-center">
                             {staff?.phone || 'Chưa hoàn tất đăng kí'}
+                          </div>
+                          <div className="flex justify-center">
+                            <ChatButton
+                              residentId={selectedResidentId}
+                              residentName={selectedResident?.full_name || 'Resident'}
+                              staffId={staff?._id || staff?.id}
+                              staffName={staffName}
+                              onChatOpen={openChat}
+                              className="w-8 h-8"
+                            />
                           </div>
                         </div>
                       );
@@ -1549,6 +1566,20 @@ useEffect(() => {
         </div>
         </div>
       </div>
+      
+      {/* Chat Widget */}
+      <ChatWidget
+        isOpen={chatState.isOpen}
+        onClose={closeChat}
+        residentId={chatState.currentResidentId || ''}
+        staffId={chatState.currentStaffId || undefined}
+        residentName={chatState.currentResidentName}
+        staffName={chatState.currentStaffName}
+      />
     </>
   );
+}
+
+export default function FamilyPortalPage() {
+  return <FamilyPortalPageContent />;
 } 

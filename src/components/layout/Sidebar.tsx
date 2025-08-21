@@ -49,6 +49,7 @@ const menuGroups: MenuGroup[] = [
       { name: 'Người cao tuổi', href: '/admin/residents', icon: UserIcon, roles: ['admin'], color: '#10b981' },
       { name: 'Nhân viên', href: '/admin/staff-management', icon: UsersIcon, roles: ['admin'], color: '#6366f1' },
       { name: 'Quản lý người cao tuổi', href: '/staff/residents', icon: UserGroupIcon, roles: ['staff'], color: '#6366f1' },
+      { name: 'Danh sách người cao tuổi', href: '/staff/residents/view', icon: UsersIcon, roles: ['staff'], color: '#6366f1' },
     ]
   },
   {

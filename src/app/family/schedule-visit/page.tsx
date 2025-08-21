@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDaysIcon, ClockIcon, HeartIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ClockIcon, HeartIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { ClockIcon as HistoryIcon } from '@heroicons/react/24/solid';
 import { residentAPI, visitsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+import VisitSuccessModal from '@/components/VisitSuccessModal';
+import VisitErrorModal from '@/components/VisitErrorModal';
 
 export default function ScheduleVisitPage() {
   const router = useRouter();
@@ -18,7 +20,7 @@ export default function ScheduleVisitPage() {
   const [visitPurpose, setVisitPurpose] = useState('');
   const [customPurpose, setCustomPurpose] = useState('');
   const [displayDate, setDisplayDate] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [scheduledResidents, setScheduledResidents] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -87,7 +89,7 @@ export default function ScheduleVisitPage() {
   }, [user]);
 
   useEffect(() => {
-    const hasModalOpen = showSuccess;
+    const hasModalOpen = showSuccessModal;
     if (hasModalOpen) {
       document.body.classList.add('hide-header');
       document.body.style.overflow = 'hidden';
@@ -99,17 +101,18 @@ export default function ScheduleVisitPage() {
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     };
-  }, [showSuccess]);
+  }, [showSuccessModal]);
 
   const submitVisitSchedule = async () => {
     setError(null);
+
     if (!visitDate || !visitTime || !visitPurpose) {
       setError('Vui lòng điền đầy đủ thông tin.');
       setShowErrorModal(true);
       return;
     }
     if (visitPurpose === 'Khác' && !customPurpose.trim()) {
-      setError('Vui lòng nhập lý do thăm  khi chọn "Khác".');
+      setError('Vui lòng nhập lý do thăm khi chọn "Khác".');
       setShowErrorModal(true);
       return;
     }
@@ -118,27 +121,16 @@ export default function ScheduleVisitPage() {
       setShowErrorModal(true);
       return;
     }
+    
     setLoading(true);
+    
     try {
-      // Kiểm tra trùng lịch cho từng resident: cùng resident_id, visit_date, visit_time
-      const duplicatedNames = residents.filter(resident =>
-        visitHistory.some((item) =>
-          (item.resident_id === resident._id) &&
-          (item.visit_date === new Date(visitDate).toISOString()) &&
-          (item.visit_time === visitTime)
-        )
-      ).map(r => r.fullName || r.name || 'Người thân');
-      if (duplicatedNames.length > 0) {
-        setError(`Người thân sau đã có lịch thăm vào khung giờ này: ${duplicatedNames.join(', ')}. Vui lòng chọn thời gian khác.`);
-        setShowErrorModal(true);
-        setLoading(false);
-        return;
-      }
+      // Validation thời gian nhanh
       const visitDateTime = new Date(`${visitDate}T${visitTime}:00`);
       const now = new Date();
       const timeDiff = visitDateTime.getTime() - now.getTime();
-      const minTimeDiff = 24 * 60 * 60 * 1000; // 24 giờ
-      const maxTimeDiff = 30 * 24 * 60 * 60 * 1000; // 30 ngày
+      const minTimeDiff = 24 * 60 * 60 * 1000; 
+      const maxTimeDiff = 30 * 24 * 60 * 60 * 1000; 
       
       if (timeDiff < minTimeDiff) {
         setError('Bạn chỉ được đặt lịch trước ít nhất 24 giờ so với thời điểm hiện tại.');
@@ -153,22 +145,53 @@ export default function ScheduleVisitPage() {
         setLoading(false);
         return;
       }
-      // Gọi API tạo lịch cho tất cả người thân
-      await Promise.all(residents.map(resident => {
-        if (!resident._id) return Promise.resolve(); // Bỏ qua resident không hợp lệ
-        const payload = {
-          resident_id: String(resident._id),
-          visit_date: new Date(visitDate).toISOString(),
-          visit_time: visitTime,
-          purpose: visitPurpose === 'Khác' ? customPurpose.trim() : visitPurpose,
-          duration: 60,
-          numberOfVisitors: 1
-        };
-        return visitsAPI.create(payload);
-      }));
+      
+      // Kiểm tra trùng lịch nhanh hơn - chỉ kiểm tra nếu có visitHistory
+      if (visitHistory.length > 0) {
+        const duplicatedNames = residents.filter(resident =>
+          visitHistory.some((item) =>
+            (item.resident_id === resident._id) &&
+            (item.visit_date === new Date(visitDate).toISOString()) &&
+            (item.visit_time === visitTime)
+          )
+        ).map(r => r.fullName || r.name || 'Người thân');
+        
+        if (duplicatedNames.length > 0) {
+          setError(`Người thân sau đã có lịch thăm vào khung giờ này: ${duplicatedNames.join(', ')}. Vui lòng chọn thời gian khác.`);
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Gọi API createMultiple để backend kiểm tra trùng lịch tập trung
+      const residentIds = residents.filter(resident => resident._id).map(r => String(r._id));
+      const payload = {
+        resident_ids: residentIds,
+        visit_date: new Date(visitDate).toISOString(),
+        visit_time: visitTime,
+        purpose: visitPurpose === 'Khác' ? customPurpose.trim() : visitPurpose,
+        duration: 60,
+        numberOfVisitors: 1
+      };
+
+      const result = await visitsAPI.createMultiple(payload);
+
+      // Nếu backend trả về trùng lịch
+      if (result && result.isDuplicate === true) {
+        setError(result.message || 'Đã có lịch thăm trùng thời gian. Vui lòng chọn thời điểm khác.');
+        setShowErrorModal(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Set success state ngay lập tức
       setScheduledResidents(residents.map(r => r.full_name || r.fullName || r.name || 'Người thân'));
-      setShowSuccess(true);
-      fetchVisits();
+      setShowSuccessModal(true);
+      
+      // Fetch visits trong background (không cần đợi)
+      setTimeout(() => fetchVisits(), 100);
+      
     } catch (err) {
       setError(String((err && (err as any).message) || err || 'Có lỗi xảy ra khi đặt lịch.'));
       setShowErrorModal(true);
@@ -202,7 +225,7 @@ export default function ScheduleVisitPage() {
               Lịch sử thăm
             </button>
           </div>
-          {!showSuccess ? (
+          {!showSuccessModal ? (
             <>
               {residents.length === 0 && !loadingResidents && (
                 <div className="text-red-500 font-semibold mb-4">
@@ -364,18 +387,27 @@ export default function ScheduleVisitPage() {
                 >
                   Hủy bỏ
                 </button>
-                <button
-                  onClick={submitVisitSchedule}
-                  disabled={!visitDate || !visitTime || !visitPurpose || (visitPurpose === 'Khác' && !customPurpose.trim()) || loading}
-                  className={`px-7 py-3.5 rounded-xl border-none text-white font-bold text-base flex items-center gap-2 transition-all duration-200 ${
-                    loading 
-                      ? 'bg-gradient-to-r from-gray-300 to-gray-400 cursor-not-allowed shadow-none' 
-                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                  }`}
-                >
-                  <CheckIcon className="w-4 h-4" />
-                  Đặt lịch
-                </button>
+                                 <button
+                   onClick={submitVisitSchedule}
+                   disabled={!visitDate || !visitTime || !visitPurpose || (visitPurpose === 'Khác' && !customPurpose.trim()) || loading}
+                   className={`px-7 py-3.5 rounded-xl border-none text-white font-bold text-base flex items-center gap-2 transition-all duration-200 ${
+                     loading 
+                       ? 'bg-gradient-to-r from-gray-300 to-gray-400 cursor-not-allowed shadow-none' 
+                       : 'bg-gradient-to-r from-emerald-500 to-emerald-600 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                   }`}
+                 >
+                   {loading ? (
+                     <>
+                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                       Đang xử lý...
+                     </>
+                   ) : (
+                     <>
+                       <CheckIcon className="w-4 h-4" />
+                       Đặt lịch
+                     </>
+                   )}
+                 </button>
               </div>
             </>
           ) : (
@@ -384,20 +416,9 @@ export default function ScheduleVisitPage() {
                 <CheckIcon className="w-10 h-10 text-white" />
               </div>
               <h2 className="text-2xl font-extrabold text-gray-900 m-0 mb-4">Đã đặt lịch thăm thành công!</h2>
-              {scheduledResidents.length > 0 ? (
-                <div className="text-lg text-gray-600 mb-6 leading-relaxed">
-                  Đã đặt lịch thăm cho các người thân:
-                  <ul className="mt-2 p-0 list-none text-emerald-600 font-semibold">
-                    {scheduledResidents.map(name => (
-                      <li key={name}>• {name}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                  Chúng tôi sẽ xác nhận lịch hẹn với bạn trong vòng 3 đến 12 tiếng. Vui lòng kiểm tra thông báo hoặc liên hệ nhân viên nếu cần hỗ trợ thêm.
-                </p>
-              )}
+              <p className="text-lg text-gray-600 mb-6 leading-relaxed">
+                Chúng tôi sẽ xác nhận lịch hẹn với bạn trong vòng 3 đến 12 tiếng. Vui lòng kiểm tra thông báo hoặc liên hệ nhân viên nếu cần hỗ trợ thêm.
+              </p>
               <button
                 onClick={() => router.push('/family')}
                 className="px-12 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-none rounded-xl text-lg font-bold cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 hover:from-emerald-600 hover:to-emerald-700 min-w-32"
@@ -408,23 +429,31 @@ export default function ScheduleVisitPage() {
           )}
         </div>
       </div>
-      {showErrorModal && (
-        <div className="fixed inset-0 bg-black/35 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-9 min-w-80 max-w-96 shadow-2xl border-2 border-red-200 text-center relative">
-            <div className="mb-4">
-              <XMarkIcon className="w-9 h-9 text-red-500 mb-2" />
-              <div className="font-bold text-lg text-red-700 mb-2">Không thể đặt lịch!</div>
-              <div className="text-red-800 text-base font-medium">{error}</div>
-            </div>
-            <button
-              onClick={() => setShowErrorModal(false)}
-              className="px-9 py-3 rounded-xl border-none bg-gradient-to-r from-red-500 to-red-300 text-white font-bold text-base cursor-pointer shadow-lg transition-all duration-200 hover:from-red-700 hover:to-red-500"
-            >
-              Đóng
-            </button>
-          </div>
-        </div>
-      )}
+      
+      {/* Visit Modals */}
+      <VisitSuccessModal 
+        open={showSuccessModal} 
+        onClose={() => {
+          setShowSuccessModal(false);
+          // Reset form after successful scheduling
+          setVisitDate('');
+          setVisitTime('');
+          setVisitPurpose('');
+          setCustomPurpose('');
+          setDisplayDate('');
+        }} 
+        scheduledResidents={scheduledResidents}
+      />
+      <VisitErrorModal 
+        open={showErrorModal} 
+        onClose={() => {
+          setShowErrorModal(false);
+          setError(null);
+        }} 
+        title="Không thể đặt lịch!"
+        message={error || 'Có lỗi xảy ra khi đặt lịch.'}
+        type="error"
+      />
     </div>
   );
 } 

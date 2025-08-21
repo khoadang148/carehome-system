@@ -70,9 +70,24 @@ const ROLE_DASHBOARDS = {
     ]
   },
   staff: {
-    title: 'Hệ thống Quản lý Chăm sóc',
+    title: 'Hệ thống quản lý chăm sóc',
     description: ' Công cụ điều hành cho đội ngũ y tế!',
     cards: [
+      {
+        title: 'Thêm người cao tuổi',
+        description: 'Thêm người cao tuổi và tạo tài khoản ',
+        icon: UserPlusIcon,
+        href: '/staff/residents/add',
+        gradient: 'linear-gradient(135deg,rgb(68, 145, 239) 0%,rgb(38, 214, 220) 100%)',
+      },
+      {
+        title: 'Đăng ký dịch vụ',
+        description: 'Đăng ký dịch vụ, phòng và giường cho người cao tuổi',
+        icon: UserPlusIcon,
+        href: '/services/purchase',
+        gradient: 'linear-gradient(135deg,rgb(26, 169, 36) 0%,rgb(38, 220, 150) 100%)',
+      },
+
       {
         title: 'Lịch Thăm Viếng',
         description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',

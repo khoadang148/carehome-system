@@ -1841,6 +1841,24 @@ export const visitsAPI = {
     }
   },
 
+  // Tạo nhiều lịch cho nhiều cư dân trong một lần gọi
+  createMultiple: async (data: {
+    resident_ids: string[];
+    visit_date: string; // ISO string
+    visit_time: string; // HH:mm
+    purpose: string;
+    duration?: number;
+    numberOfVisitors?: number;
+  }) => {
+    try {
+      const response = await apiClient.post(`${endpoints.visits}/multiple`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating multiple visits:', error);
+      throw error;
+    }
+  },
+
   update: async (id: string, visit: any) => {
     try {
       const response = await apiClient.put(`${endpoints.visits}/${id}`, visit);
@@ -2216,5 +2234,90 @@ export const paymentAPI = {
 
 export { apiClient };
 export { API_BASE_URL };
+
+// Messages API
+export const messagesAPI = {
+  // Send a message
+  sendMessage: async (messageData: {
+    receiver_id: string;
+    content: string;
+    resident_id?: string;
+    attachment?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/messages', messageData);
+      return response.data;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  },
+
+  // Get user conversations
+  getConversations: async () => {
+    try {
+      const response = await apiClient.get('/messages/conversations');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      throw error;
+    }
+  },
+
+  // Get conversation with specific user
+  getConversation: async (partnerId: string) => {
+    try {
+      const response = await apiClient.get(`/messages/conversation/${partnerId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching conversation:', error);
+      throw error;
+    }
+  },
+
+  // Get unread message count
+  getUnreadCount: async () => {
+    try {
+      const response = await apiClient.get('/messages/unread-count');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      throw error;
+    }
+  },
+
+  // Get message by ID
+  getMessage: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/messages/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching message with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Delete message
+  deleteMessage: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/messages/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting message with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Mark message as read
+  markAsRead: async (id: string) => {
+    try {
+      const response = await apiClient.post(`/messages/${id}/read`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error marking message as read with ID ${id}:`, error);
+      throw error;
+    }
+  },
+};
 
 

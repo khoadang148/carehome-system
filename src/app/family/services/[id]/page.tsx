@@ -349,7 +349,7 @@ export default function ServiceDetailsPage() {
             onClick={() => router.push('/family/services')}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Quay lại trang dịch vụ
+            Quay lại
           </button>
         </div>
       </div>
@@ -363,37 +363,12 @@ export default function ServiceDetailsPage() {
         <div className="flex items-center justify-between gap-10 flex-wrap">
           {/* Trái: Nút quay lại + Icon + Tiêu đề */}
           <div className="flex items-center gap-8">
-            <button
-              onClick={() => router.push('/family/services')}
+          <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
               title="Quay lại"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '12px 15px',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '12px',
-                color: '#64748b',
-                fontSize: '1rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.color = '#475569';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.color = '#64748b';
-              }}
             >
-              <ArrowLeftIcon style={{ width: 20, height: 20 }} />
-              <span></span>
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
             
             <div className="flex items-center gap-6">

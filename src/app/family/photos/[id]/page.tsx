@@ -213,8 +213,17 @@ export default function PhotoDetailPage() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
-          {/* Left: Icon + Title */}
+          {/* Left: Back button + Icon + Title */}
           <div className="flex items-center gap-8">
+            {/* Back button */}
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại trang trước"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
+            
             <div className="flex items-center gap-6">
               <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-lg">
                 <PhotoIcon className="w-8 h-8 text-white" />
@@ -315,6 +324,14 @@ export default function PhotoDetailPage() {
             {/* Photo Actions */}
             <div className="flex items-center justify-center gap-4">
               <button
+                onClick={() => router.back()}
+                className="flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-all duration-200"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                Quay lại
+              </button>
+              
+              <button
                 onClick={() => navigateToPhoto('prev')}
                 disabled={currentIndex <= 0}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
@@ -409,6 +426,7 @@ export default function PhotoDetailPage() {
                 <p>• Sử dụng phím mũi tên ← → để chuyển ảnh</p>
                 <p>• Nhấn ESC để quay lại trang ảnh</p>
                 <p>• Di chuột vào ảnh để hiện nút tải xuống</p>
+                <p>• Nhấn nút ← ở góc trái để quay lại trang trước</p>
               </div>
             </div>
           </div>

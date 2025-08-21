@@ -115,7 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       setLoading(false);
-      return null;
+      // Re-throw error để login page có thể catch và xử lý
+      throw error;
     }
   }, [router]);
 

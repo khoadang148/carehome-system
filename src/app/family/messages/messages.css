@@ -1,0 +1,654 @@
+/* Messages Page Styles */
+
+/* Ensure proper height and overflow handling */
+.h-screen {
+  height: 100vh;
+}
+
+.flex-1 {
+  flex: 1 1 0%;
+}
+
+.min-h-0 {
+  min-height: 0;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Messages container */
+.messages-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversations-list {
+  width: 33.333333%;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.messages-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.message-bubble {
+  max-width: 16rem;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.message-bubble.own {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.message-bubble.other {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+/* Ensure proper message spacing */
+.message-item {
+  margin-bottom: 0.5rem;
+}
+
+.message-item:last-child {
+  margin-bottom: 0;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.message-time.own {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.message-time.other {
+  color: #6b7280;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .conversations-list {
+    width: 40%;
+  }
+}
+
+@media (max-width: 768px) {
+  .messages-container {
+    flex-direction: column;
+  }
+  
+  .conversations-list {
+    width: 100%;
+    height: 40%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .messages-area {
+    height: 60%;
+  }
+  
+  .message-bubble {
+    max-width: 12rem;
+  }
+  
+  /* Ensure proper height on mobile */
+  .h-screen {
+    height: 100vh;
+  }
+  
+  /* Adjust padding on mobile */
+  .px-4 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  .py-6 {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .conversations-list {
+    height: 35%;
+  }
+  
+  .messages-area {
+    height: 65%;
+  }
+  
+  .message-bubble {
+    max-width: 10rem;
+    font-size: 0.75rem;
+  }
+  
+  /* Further reduce padding on small screens */
+  .px-4 {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  
+  .py-6 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* Light theme - Clean white background */
+.bg-white {
+  background-color: #ffffff !important;
+}
+
+.text-gray-900 {
+  color: #111827 !important;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+.text-gray-500 {
+  color: #6b7280 !important;
+}
+
+.border-gray-200 {
+  border-color: #e5e7eb !important;
+}
+
+.border-gray-300 {
+  border-color: #d1d5db !important;
+}
+
+.bg-gray-50 {
+  background-color: #f9fafb !important;
+}
+
+.bg-gray-100 {
+  background-color: #f3f4f6 !important;
+}
+
+.hover\:bg-gray-50:hover {
+  background-color: #f9fafb !important;
+}
+
+.hover\:bg-gray-100:hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Ensure clean white background */
+.h-screen {
+  background-color: #ffffff !important;
+}
+
+/* Clean message bubbles */
+.message-bubble.own {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+  color: white !important;
+}
+
+.message-bubble.other {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+/* Scrollbar Styling - Light theme */
+.conversations-list::-webkit-scrollbar,
+.messages-area::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversations-list::-webkit-scrollbar-track,
+.messages-area::-webkit-scrollbar-track,
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 3px;
+}
+
+.conversations-list::-webkit-scrollbar-thumb,
+.messages-area::-webkit-scrollbar-thumb,
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 3px;
+}
+
+.conversations-list::-webkit-scrollbar-thumb:hover,
+.messages-area::-webkit-scrollbar-thumb:hover,
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Smooth scrolling */
+.overflow-y-auto {
+  scroll-behavior: smooth;
+}
+
+/* Animation for new messages */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-bubble {
+  animation: slideInUp 0.3s ease-out;
+}
+
+/* Layout stability */
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* Ensure proper flex behavior */
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1 1 0%;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Hover effects */
+.conversation-item:hover {
+  background-color: #f9fafb;
+  transition: background-color 0.2s ease;
+}
+
+.conversation-item.selected {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* Conversation item styling - Light theme */
+.conversation-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+  background-color: #ffffff;
+}
+
+.conversation-item:hover {
+  background-color: #f9fafb;
+}
+
+.conversation-item.selected {
+  background-color: #f3f4f6;
+  border-left: 3px solid #8b5cf6;
+}
+
+/* Ensure conversations list has white background */
+.conversations-list {
+  background-color: #ffffff;
+}
+
+/* Ensure messages area has white background */
+.messages-area {
+  background-color: #ffffff;
+}
+
+/* Staff role and position badges */
+.staff-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.staff-badge.position {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.staff-badge.role {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+/* Animation for resident change notification */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Message bubble improvements */
+.message-bubble {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.message-content {
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Ensure proper spacing between messages */
+.messages-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Date separator improvements */
+.date-separator {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.date-separator span {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(to right, #e2e8f0, #cbd5e1);
+  color: #475569;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure proper conversation spacing */
+.conversation-item:last-child {
+  border-bottom: none;
+}
+
+/* Date separator styling - Light theme */
+.date-separator {
+  text-align: center;
+  margin: 1rem 0;
+  position: relative;
+}
+
+.date-separator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #e5e7eb;
+  z-index: 1;
+}
+
+.date-separator span {
+  background: #ffffff;
+  padding: 0 0.5rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+  position: relative;
+  z-index: 2;
+}
+
+/* Unread badge styling */
+.unread-badge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Message status icons */
+.message-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.status-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.status-icon.read {
+  color: #8b5cf6;
+}
+
+.status-icon.unread {
+  color: #9ca3af;
+}
+
+/* Avatar styling */
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e5e7eb;
+  transition: border-color 0.2s ease;
+}
+
+.avatar:hover {
+  border-color: #8b5cf6;
+}
+
+.avatar-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Tooltip styling */
+.tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.5rem;
+  background: #1f2937;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 50;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #1f2937;
+}
+
+/* Floating button styling */
+.floating-button {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 40;
+  transition: all 0.2s ease;
+}
+
+.floating-button:hover {
+  transform: scale(1.05);
+}
+
+.floating-button:active {
+  transform: scale(0.95);
+}
+
+/* Loading states */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* Empty states - Light theme */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6b7280;
+  text-align: center;
+  padding: 2rem;
+  background-color: #ffffff;
+}
+
+.empty-state-icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  color: #d1d5db;
+}
+
+/* Loading states with proper centering - Light theme */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  background-color: #ffffff;
+}
+
+/* Search input styling */
+.search-input {
+  position: relative;
+}
+
+.search-input input {
+  padding-left: 2.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #d1d5db;
+  transition: all 0.2s ease;
+}
+
+.search-input input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+/* Message input styling */
+.message-input {
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  transition: all 0.2s ease;
+}
+
+.message-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.send-button {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  transition: all 0.2s ease;
+}
+
+.send-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: scale(1.05);
+}
+
+.send-button:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Ensure message input stays at bottom - Light theme */
+.message-input-container {
+  position: sticky;
+  bottom: 0;
+  background: #f9fafb;
+  z-index: 10;
+}
+
+/* Ensure chat header stays at top - Light theme */
+.chat-header {
+  position: sticky;
+  top: 0;
+  background: #f9fafb;
+  z-index: 10;
+}
+
+/* Ensure search container stays at top - Light theme */
+.search-container {
+  position: sticky;
+  top: 0;
+  background: #f9fafb;
+  z-index: 10;
+}

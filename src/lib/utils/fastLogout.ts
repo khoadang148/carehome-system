@@ -3,9 +3,11 @@ import { clearSessionData } from './session';
 
 export const optimizedLogout = async (router: AppRouterInstance, logoutCallback?: () => Promise<void>) => {
   try {
-    // Gọi logout API
+    // Gọi logout API nhưng không chờ để UI điều hướng nhanh hơn
     if (logoutCallback) {
-      await logoutCallback();
+      Promise.resolve(logoutCallback()).catch(() => {
+        // Bỏ qua lỗi, vẫn tiếp tục quy trình đăng xuất phía client
+      });
     }
   } catch (error) {
     console.warn('Logout API call failed, but continuing with local logout:', error);

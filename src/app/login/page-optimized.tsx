@@ -1,10 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, startTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { LOGIN_REDIRECT_DELAY } from '@/lib/constants/app';
-import { clientStorage, getParsedItem } from '@/lib/utils/clientStorage';
+import { clientStorage } from '@/lib/utils/clientStorage';
 import { usePageTransition } from '@/lib/utils/pageTransition';
 import { redirectByRole } from '@/lib/utils/navigation';
 import LoginSpinner from '@/components/shared/LoginSpinner';
@@ -12,38 +11,29 @@ import {
   LockClosedIcon, 
   EnvelopeIcon, 
   ExclamationTriangleIcon,
-  UserIcon,
-  HomeIcon,
   EyeIcon,
   EyeSlashIcon,
   BuildingOffice2Icon,
   ShieldCheckIcon,
-  ClockIcon,
   HeartIcon,
-  UserGroupIcon,
-  AcademicCapIcon,
-  SparklesIcon
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import type { User } from '@/lib/contexts/auth-context';
-import { toast } from 'react-toastify';
 import React from 'react';
 import SuccessModal from '@/components/SuccessModal';
-import ErrorModal from '@/components/ErrorModal';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const hasRedirected = useRef(false);
-  const [sessionDebug, setSessionDebug] = useState({});
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [messageDisplayed, setMessageDisplayed] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const [userName, setUserName] = useState<string | undefined>(undefined);
 
   const router = useRouter();
@@ -52,7 +42,7 @@ export default function LoginPage() {
   const { login, user, loading } = useAuth();
   const { startTransition: startPageTransition } = usePageTransition();
 
-  // Preload các trang đích để tăng tốc độ chuyển trang
+  // Preload pages for faster navigation
   useEffect(() => {
     router.prefetch('/family');
     router.prefetch('/admin');
@@ -62,7 +52,7 @@ export default function LoginPage() {
     }
   }, [router, returnUrl]);
 
-  // Immediate redirect nếu user đã đăng nhập
+  // Immediate redirect if user is already logged in
   useEffect(() => {
     if (!user || loading) {
       hasRedirected.current = false;
@@ -90,7 +80,7 @@ export default function LoginPage() {
     }
   }, [user, loading, returnUrl]);
 
-  // Preload thêm khi user bắt đầu nhập thông tin để tăng tốc độ
+  // Preload when user starts typing
   useEffect(() => {
     if (email.length > 0 || password.length > 0) {
       router.prefetch('/family');
@@ -102,7 +92,7 @@ export default function LoginPage() {
     }
   }, [email, password, router, returnUrl]);
 
-  // Khôi phục lỗi và thông báo thành công từ  nếu có
+  // Restore error and success messages
   useEffect(() => {
     const savedError = clientStorage.getItem('login_error');
     const savedSuccess = clientStorage.getItem('login_success');
@@ -111,12 +101,11 @@ export default function LoginPage() {
     setShouldRedirect(false);
     hasRedirected.current = false;
     
-         if (!user && !loading && !messageDisplayed) {
-       if (savedError) {
-         setErrorMessage(savedError);
-         setShowErrorModal(true);
-         setMessageDisplayed(true);
-       }
+    if (!user && !loading && !messageDisplayed) {
+      if (savedError) {
+        setError(savedError);
+        setMessageDisplayed(true);
+      }
       if (savedSuccess) {
         setSuccess(savedSuccess);
         setMessageDisplayed(true);
@@ -124,17 +113,15 @@ export default function LoginPage() {
       if (savedAttempts) {
         setLoginAttempts(parseInt(savedAttempts));
       }
-         } else if (user) {
-       clientStorage.removeItem('login_error');
-       setErrorMessage('');
-       setShowErrorModal(false);
-       setLoginAttempts(0);
-     }
+    } else if (user) {
+      clientStorage.removeItem('login_error');
+      setError('');
+      setLoginAttempts(0);
+    }
   }, [user, loading]);
 
-  const setErrorWithModal = (errorMessage: string) => {
-    setErrorMessage(errorMessage);
-    setShowErrorModal(true);
+  const setErrorWithStorage = (errorMessage: string) => {
+    setError(errorMessage);
     setMessageDisplayed(true);
     if (errorMessage) {
       clientStorage.setItem('login_error', errorMessage);
@@ -147,8 +134,6 @@ export default function LoginPage() {
       clientStorage.removeItem('login_attempts');
     }
   };
-
-
 
   const setSuccessWithStorage = (successMessage: string) => {
     setSuccess(successMessage);
@@ -185,15 +170,7 @@ export default function LoginPage() {
     }
   }, [user, loading, returnUrl, shouldRedirect]);
 
-  useEffect(() => {
-    setSessionDebug({
-      access_token: clientStorage.getItem('access_token'),
-      user: clientStorage.getItem('user'),
-      session_start: clientStorage.getItem('session_start'),
-    });
-  }, [user, loading]);
-
-  // Xóa thông báo khi user logout
+  // Clear messages when user logs out
   useEffect(() => {
     if (!user && !loading) {
       const hasLoggedOut = clientStorage.getItem('has_logged_out');
@@ -206,35 +183,32 @@ export default function LoginPage() {
     }
   }, [user, loading]);
 
-     // Đảm bảo thông báo không bị mất khi component re-render
-   useEffect(() => {
-     if (messageDisplayed && !errorMessage && !success) {
-       const savedError = clientStorage.getItem('login_error');
-       const savedSuccess = clientStorage.getItem('login_success');
-       
-       if (savedError) {
-         setErrorMessage(savedError);
-         setShowErrorModal(true);
-       }
-       if (savedSuccess) {
-         setSuccess(savedSuccess);
-       }
-     }
-   }, [messageDisplayed, errorMessage, success]);
+  // Ensure messages don't disappear on re-render
+  useEffect(() => {
+    if (messageDisplayed && !error && !success) {
+      const savedError = clientStorage.getItem('login_error');
+      const savedSuccess = clientStorage.getItem('login_success');
+      
+      if (savedError) {
+        setError(savedError);
+      }
+      if (savedSuccess) {
+        setSuccess(savedSuccess);
+      }
+    }
+  }, [messageDisplayed, error, success]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔍 handleSubmit called - preventing default reload');
     
+    setError('');
     clientStorage.removeItem('login_error');
     
     if (!email.trim() || !password.trim()) {
-      console.log('❌ Validation failed - empty fields');
-      setErrorWithModal('Vui lòng nhập đầy đủ email và mật khẩu');
+      setErrorWithStorage('Vui lòng nhập đầy đủ email và mật khẩu');
       return;
     }
     
-    console.log('✅ Starting login process...');
     setIsLoading(true);
 
     const timeoutPromise = new Promise((_, reject) => {
@@ -242,62 +216,59 @@ export default function LoginPage() {
     });
 
     try {
-      console.log('🔄 Calling login API...');
       const user = await Promise.race([
         login(email, password),
         timeoutPromise
       ]);
       const typedUser = user as User | null;
-      
-      // Kiểm tra nếu user là null hoặc undefined (đăng nhập thất bại)
-      if (!typedUser) {
-        console.log('❌ Login failed: No user returned');
-        setIsLoading(false);
-        setShouldRedirect(false);
-        setSuccess('');
-        clientStorage.removeItem('login_success');
-        setErrorWithModal('Email hoặc mật khẩu không đúng');
-        // Clear form khi đăng nhập thất bại
-        setEmail('');
-        setPassword('');
-        return;
+      if (typedUser) {
+        setError('');
+        clientStorage.removeItem('login_error');
+        setUserName(typedUser.name);
+        
+        clientStorage.setItem('login_success', `${typedUser.name || 'bạn'}!`);
+        
+        setIsLoading(true);
+        
+        const redirectTo = (url: string) => {
+          const transitionId = startPageTransition(url, typedUser.role);
+          sessionStorage.setItem('current_transition_id', transitionId);
+          router.prefetch(url);
+          startTransition(() => {
+            router.push(url);
+          });
+        };
+
+        if (returnUrl && returnUrl !== '/login') {
+          redirectTo(returnUrl);
+        } else {
+          redirectByRole(router, typedUser.role);
+        }
       }
-      
-             console.log('✅ Login successful - user authenticated');
-       clientStorage.removeItem('login_error');
-      setUserName(typedUser.name);
-      
-      clientStorage.setItem('login_success', `${typedUser.name || 'bạn'}!`);
-      
-      // Không cần redirect ở đây vì auth context đã xử lý redirect
-      // Loading state sẽ được reset bởi auth context khi redirect
-      // Không cần setIsLoading(false) ở đây
     } catch (err: any) {
-      console.log('❌ Login failed:', err.message);
       setIsLoading(false);
       setShouldRedirect(false);
       setSuccess('');
       clientStorage.removeItem('login_success');
 
-      // Xử lý lỗi dựa trên message từ API
-      if (err.message?.includes('Email hoặc mật khẩu không chính xác')) {
-        setErrorWithModal('Email hoặc mật khẩu không đúng');
-      } else if (err.message?.includes('Kết nối chậm')) {
-        setErrorWithModal('Kết nối chậm, vui lòng thử lại');
-      } else if (err.message?.includes('Lỗi máy chủ')) {
-        setErrorWithModal('Lỗi máy chủ, vui lòng thử lại sau');
-      } else if (err.message?.includes('Không thể kết nối')) {
-        setErrorWithModal('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng');
+      if (err.response?.status === 401) {
+        setErrorWithStorage('Email hoặc mật khẩu không đúng');
+      } else if (err.response?.status === 403) {
+        setErrorWithStorage('Tài khoản không có quyền truy cập');
+      } else if (err.response?.status === 423) {
+        setErrorWithStorage('Tài khoản đã bị khóa');
+      } else if (err.response?.status === 404) {
+        setErrorWithStorage('Tài khoản không tồn tại');
+      } else if (err.message?.includes('timeout')) {
+        setErrorWithStorage('Kết nối chậm, vui lòng thử lại');
       } else {
-        setErrorWithModal('Email hoặc mật khẩu không đúng');
+        setErrorWithStorage('Email hoặc mật khẩu không đúng');
       }
-      
-      // Clear form khi có lỗi
-      setEmail('');
-      setPassword('');
 
       return;
     }
+
+    setIsLoading(false);
   };
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,37 +279,9 @@ export default function LoginPage() {
     setPassword(e.target.value);
   };
 
-  // Chặn mọi reload có thể xảy ra
-  useEffect(() => {
-    const handleUnload = () => {
-      console.log('🔄 Page unload detected');
-    };
-
-    window.addEventListener('unload', handleUnload);
-
-    return () => {
-      window.removeEventListener('unload', handleUnload);
-    };
-  }, []);
-
-  // Log khi component mount/unmount
-  useEffect(() => {
-    console.log('📱 LoginPage mounted');
-    return () => {
-      console.log('📱 LoginPage unmounted');
-    };
-  }, []);
-
   return (
     <>
       <SuccessModal open={showSuccessModal} onClose={() => setShowSuccessModal(false)} name={userName} />
-      <ErrorModal 
-        open={showErrorModal} 
-        onClose={() => setShowErrorModal(false)} 
-        title="Đăng nhập thất bại"
-        message={errorMessage}
-        type="error"
-      />
       <div style={{ 
         minHeight: '100vh',
         background: 'linear-gradient(120deg, #f9e7c4 0%, #fbc2eb 100%)',
@@ -487,7 +430,7 @@ export default function LoginPage() {
                   {
                     icon: UserGroupIcon,
                     title: 'Kết nối gia đình',
-                    description: 'Cập nhật thông tin thời gian thật cho người thân',
+                    description: 'Cập nhật thông tin real-time cho người thân',
                     color: '#8b5cf6'
                   },
                   {
@@ -672,7 +615,24 @@ export default function LoginPage() {
                   </div>
                 )}
                 
-                
+                {error && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '1rem 1.25rem',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    borderRadius: '8px',
+                    marginBottom: '1.5rem',
+                    fontSize: '0.875rem',
+                    border: '1px solid #fecaca',
+                    fontWeight: 500
+                  }}>
+                    <ExclamationTriangleIcon style={{ width: '20px', height: '20px', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 500 }}>{error}</span>
+                  </div>
+                )}
                 
                 <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}} noValidate>
                   {/* Email Input */}
@@ -716,14 +676,6 @@ export default function LoginPage() {
                           borderRadius: '10px',
                           border: '2px solid #e5e7eb',
                           boxSizing: 'border-box'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#10b981';
-                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                          e.currentTarget.style.boxShadow = 'none';
                         }}
                       />
                     </div>
@@ -771,14 +723,6 @@ export default function LoginPage() {
                           border: '2px solid #e5e7eb',
                           boxSizing: 'border-box'
                         }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#10b981';
-                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
                       />
                       <button
                         type="button"
@@ -794,14 +738,6 @@ export default function LoginPage() {
                           color: '#9ca3af',
                           padding: '4px',
                           borderRadius: '4px'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.color = '#6b7280';
-                          e.currentTarget.style.background = '#f3f4f6';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.color = '#9ca3af';
-                          e.currentTarget.style.background = 'none';
                         }}
                       >
                         {showPassword ? 
@@ -848,25 +784,27 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                                         style={{
-                       width: '100%',
-                       padding: '1rem',
-                       fontSize: '0.9rem',
-                       fontWeight: 600,
-                       color: 'white',
-                       background: isLoading 
-                         ? '#6b7280'
-                         : success
-                         ? '#22c55e'
-                         : '#10b981',
-                       borderRadius: '12px',
-                       border: 'none',
-                       cursor: isLoading ? 'not-allowed' : 'pointer',
-                       marginTop: '0.5rem',
-                       boxShadow: isLoading 
-                         ? 'none' 
-                         : '0 4px 12px rgba(0, 0, 0, 0.15)'
-                     }}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      color: 'white',
+                      background: isLoading 
+                        ? '#6b7280'
+                        : error 
+                        ? '#ef4444'
+                        : success
+                        ? '#22c55e'
+                        : '#10b981',
+                      borderRadius: '12px',
+                      border: 'none',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      marginTop: '0.5rem',
+                      boxShadow: isLoading 
+                        ? 'none' 
+                        : '0 4px 12px rgba(0, 0, 0, 0.15)'
+                    }}
                   >
                     {isLoading ? (
                       <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem'}}>
@@ -898,4 +836,4 @@ export default function LoginPage() {
       <LoginSpinner isLoading={isLoading} />
     </>
   );
-} 
+}
