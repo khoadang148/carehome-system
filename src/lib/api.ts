@@ -89,6 +89,12 @@ apiClient.interceptors.request.use(
       console.warn('No token found for request:', config.url);
     }
     
+    // Don't override Content-Type for FormData uploads
+    if (config.data instanceof FormData) {
+      console.log('FormData detected, removing Content-Type header to let browser set it');
+      delete config.headers['Content-Type'];
+    }
+    
     return config;
   },
   (error) => {
@@ -241,7 +247,7 @@ export const authAPI = {
 
       // Use AbortController to prevent hanging requests
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 second timeout for faster logout
       
       const response = await logoutClient.post(endpoints.auth.logout, {}, {
         signal: controller.signal
@@ -1755,15 +1761,43 @@ export const photosAPI = {
 
   upload: async (photoData: FormData) => {
     try {
+      // Debug: Log FormData content to ensure proper structure
+      console.log('Photo upload - FormData entries:');
+      for (let [key, value] of photoData.entries()) {
+        console.log(key, value);
+      }
+      
+      // Validate FormData contains file
+      const file = photoData.get('file');
+      console.log('File in FormData before API call:', file);
+      console.log('File instanceof File:', file instanceof File);
+      
+      if (!file || !(file instanceof File)) {
+        throw new Error('No valid file found in FormData');
+      }
+      
+      // Don't set Content-Type manually for FormData - let the browser set it with boundary
       const response = await apiClient.post('/resident-photos', photoData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        timeout: 30000, // 30 second timeout for file uploads
       });
+      
+      console.log('Photo upload successful:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading photo:', error);
-      throw error;
+      
+      // Provide more specific error messages
+      if (error.response?.status === 500) {
+        throw new Error('Lỗi máy chủ khi tải ảnh. Vui lòng thử lại sau.');
+      } else if (error.response?.status === 413) {
+        throw new Error('File quá lớn. Vui lòng chọn file nhỏ hơn.');
+      } else if (error.response?.status === 400) {
+        throw new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.');
+      } else if (error.code === 'ECONNABORTED') {
+        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+      } else {
+        throw new Error('Không thể tải ảnh. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      }
     }
   },
 
@@ -1967,7 +2001,71 @@ export const carePlansAPI = {
   },
 };
 
-// Care Plan Assignments API
+export const bedAssignmentsAPI = {
+  getAll: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/bed-assignments', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching bed assignments:', error);
+      throw error;
+    }
+  },
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/bed-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching bed assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  getByResidentId: async (residentId: string) => {
+    try {
+      const response = await apiClient.get(`/bed-assignments/by-resident`, { params: { resident_id: residentId } });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching bed assignments by residentId ${residentId}:`, error);
+      // Return empty array instead of throwing error when no bed assignments found
+      return [];
+    }
+  },
+  create: async (data: any) => {
+    try {
+      const response = await apiClient.post('/bed-assignments', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating bed assignment:', error);
+      throw error;
+    }
+  },
+  update: async (id: string, data: any) => {
+    try {
+      // Backend chỉ có endpoint /unassign, không có endpoint update chung
+      // Nếu có unassigned_date thì dùng /unassign, ngược lại dùng /update
+      if (data.unassigned_date) {
+        const response = await apiClient.patch(`/bed-assignments/${id}/unassign`, data);
+        return response.data;
+      } else {
+        // Nếu không có endpoint update chung, throw error
+        throw new Error('Backend does not support general bed assignment updates. Use /unassign endpoint for unassigning.');
+      }
+    } catch (error) {
+      console.error(`Error updating bed assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  delete: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/bed-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting bed assignment with ID ${id}:`, error);
+      throw error;
+    }
+  },
+};
+
 export const carePlanAssignmentsAPI = {
   getAll: async (params?: any) => {
     try {
@@ -1978,7 +2076,6 @@ export const carePlanAssignmentsAPI = {
       throw error;
     }
   },
-
   getById: async (id: string) => {
     try {
       const response = await apiClient.get(`/care-plan-assignments/${id}`);
@@ -1988,37 +2085,16 @@ export const carePlanAssignmentsAPI = {
       throw error;
     }
   },
-
   getByResidentId: async (residentId: string) => {
     try {
       const response = await apiClient.get(`/care-plan-assignments/by-resident/${residentId}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching care plan assignments by residentId ${residentId}:`, error);
-      throw error;
+      // Return empty array instead of throwing error when no care plan assignments found
+      return [];
     }
   },
-
-  getByFamilyMemberId: async (familyMemberId: string) => {
-    try {
-      const response = await apiClient.get(`/care-plan-assignments/by-family-member/${familyMemberId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching care plan assignments by familyMemberId ${familyMemberId}:`, error);
-      throw error;
-    }
-  },
-
-  getByStatus: async (status: string) => {
-    try {
-      const response = await apiClient.get(`/care-plan-assignments/by-status/${status}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching care plan assignments by status ${status}:`, error);
-      throw error;
-    }
-  },
-
   create: async (data: any) => {
     try {
       const response = await apiClient.post('/care-plan-assignments', data);
@@ -2028,59 +2104,30 @@ export const carePlanAssignmentsAPI = {
       throw error;
     }
   },
-
+  renew: async (data: any) => {
+    try {
+      const response = await apiClient.post('/care-plan-assignments', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error renewing care plan assignment:', error);
+      throw error;
+    }
+  },
+  removePackage: async (assignmentId: string) => {
+    try {
+      const response = await apiClient.delete(`/care-plan-assignments/${assignmentId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error removing care plan assignment:', error);
+      throw error;
+    }
+  },
   update: async (id: string, data: any) => {
     try {
       const response = await apiClient.patch(`/care-plan-assignments/${id}`, data);
       return response.data;
     } catch (error) {
       console.error(`Error updating care plan assignment with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  updateStatus: async (id: string, status: string) => {
-    try {
-      const response = await apiClient.patch(`/care-plan-assignments/${id}/status?status=${status}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error updating care plan assignment status with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  renew: async (id: string, newEndDate: string, newStartDate?: string, selectedCarePlanIds?: string[]) => {
-    try {
-      const response = await apiClient.patch(`/care-plan-assignments/${id}/renew`, {
-        newEndDate,
-        ...(newStartDate && { newStartDate }),
-        ...(selectedCarePlanIds && { selectedCarePlanIds })
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Error renewing care plan assignment with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  delete: async (id: string) => {
-    try {
-      const response = await apiClient.delete(`/care-plan-assignments/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error deleting care plan assignment with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  removePackage: async (id: string, packageId: string) => {
-    try {
-      const response = await apiClient.patch(`/care-plan-assignments/${id}/remove-package`, {
-        packageId
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Error removing package ${packageId} from assignment ${id}:`, error);
       throw error;
     }
   },
@@ -2186,37 +2233,6 @@ export const roomTypesAPI = {
       return [];
     }
   }
-};
-
-export const bedAssignmentsAPI = {
-  getAll: async (params?: any) => {
-    try {
-      const response = await apiClient.get('/bed-assignments', { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching bed assignments:', error);
-      throw error;
-    }
-  },
-  getById: async (id: string) => {
-    try {
-      const response = await apiClient.get(`/bed-assignments/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching bed assignment with ID ${id}:`, error);
-      throw error;
-    }
-  },
-  getByResidentId: async (residentId: string) => {
-    try {
-      const response = await apiClient.get(`/bed-assignments/by-resident`, { params: { resident_id: residentId } });
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching bed assignments by residentId ${residentId}:`, error);
-      // Return empty array instead of throwing error when no bed assignments found
-      return [];
-    }
-  },
 };
 
 export const paymentAPI = {

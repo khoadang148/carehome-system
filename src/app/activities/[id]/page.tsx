@@ -35,6 +35,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const [assigningStaff, setAssigningStaff] = useState(false);
   const [currentAssignedStaff, setCurrentAssignedStaff] = useState<any>(null);
   const [assignedStaffList, setAssignedStaffList] = useState<any[]>([]);
+  const [updatingData, setUpdatingData] = useState(false);
+  const [newResidentsAdded, setNewResidentsAdded] = useState<number>(0);
   
   // Confirm modal states
   const [confirmModal, setConfirmModal] = useState({
@@ -245,7 +247,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     };
     
     fetchParticipations();
-  }, [activity?.id, refreshTrigger]);
+  }, [activity?.id, refreshTrigger, staffList]);
 
   // Debug: Log when evaluations change
   useEffect(() => {
@@ -441,7 +443,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           // Update existing participation - only update necessary fields
           const updateData: any = {
             performance_notes: evaluation.participated ? 
-              'Tham gia tích cực, tinh thần tốt' : 
+              'Lý do sức khỏe' : 
               (evaluation.reason || 'Không có lý do cụ thể'),
             attendance_status: evaluation.participated ? 'attended' : 'absent'
           };
@@ -466,7 +468,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               resident_id: resident.id, // Use actual resident ID
               date: activity.date + "T00:00:00Z", // Send as ISO string
               performance_notes: evaluation.participated ? 
-                'Tham gia tích cực, tinh thần tốt' : 
+                'Lý do sức khỏe' : 
                 (evaluation.reason || 'Không có lý do cụ thể'),
               attendance_status: evaluation.participated ? 'attended' : 'absent'
             });
@@ -745,6 +747,7 @@ const activityResidents: ActivityResident[] = Object.values(
   const performRemoveStaff = async (staffId: string) => {
     setConfirmModal(prev => ({ ...prev, open: false }));
     
+    setUpdatingData(true);
     try {
       // Tìm tất cả participations của nhân viên này trong hoạt động hiện tại
       const currentActivityParticipations = participations.filter(p => {
@@ -808,6 +811,25 @@ const activityResidents: ActivityResident[] = Object.values(
       setAssignedStaffList(removeStaffAssigned ? [removeStaffAssigned] : []);
       setCurrentAssignedStaff(removeStaffAssigned);
       
+      // Cập nhật evaluations state với dữ liệu mới
+      const updatedEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+      participationsData.forEach((participation: any) => {
+        const residentId = participation.resident_id?._id || participation.resident_id;
+        const participated = participation.attendance_status === 'attended';
+        const reason = participation.performance_notes || '';
+        
+        if (residentId) {
+          updatedEvaluations[residentId] = {
+            participated,
+            reason
+          };
+        }
+      });
+      setEvaluations(updatedEvaluations);
+      
+      // Force re-render để cập nhật UI ngay lập tức
+      setRefreshTrigger(prev => prev + 1);
+      
       setNotificationModal({
         open: true,
         title: 'Thành công',
@@ -860,6 +882,7 @@ const activityResidents: ActivityResident[] = Object.values(
     }
     
     setAssigningStaff(true);
+    setUpdatingData(true);
     try {
       // Lấy danh sách cư dân được phân công cho staff này
       const staffAssignments = await staffAssignmentsAPI.getByStaff(selectedStaffId);
@@ -914,7 +937,7 @@ const activityResidents: ActivityResident[] = Object.values(
             resident_id: residentId,
             date: activity.date + 'T00:00:00Z',
             attendance_status: 'attended',
-            performance_notes: 'Tham gia tích cực, tinh thần tốt'
+            performance_notes: 'Lý do sức khỏe'
           });
           
           await activityParticipationsAPI.create({
@@ -923,9 +946,12 @@ const activityResidents: ActivityResident[] = Object.values(
             resident_id: residentId,
             date: activity.date + 'T00:00:00Z',
             attendance_status: 'attended',
-            performance_notes: 'Tham gia tích cực, tinh thần tốt'
+            performance_notes: 'Lý do sức khỏe'
           });
           addedCount++;
+          
+          // Cập nhật số lượng cư dân mới được thêm
+          setNewResidentsAdded(addedCount);
         } catch (error) {
           console.error(`Error adding resident ${residentId}:`, error);
           // Continue with other residents even if one fails
@@ -982,6 +1008,28 @@ const activityResidents: ActivityResident[] = Object.values(
       
       setAssignedStaffList(thirdAssignedStaff ? [thirdAssignedStaff] : []);
       
+      // Cập nhật evaluations state với dữ liệu mới
+      const updatedEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+      participationsData.forEach((participation: any) => {
+        const residentId = participation.resident_id?._id || participation.resident_id;
+        const participated = participation.attendance_status === 'attended';
+        const reason = participation.performance_notes || '';
+        
+        if (residentId) {
+          updatedEvaluations[residentId] = {
+            participated,
+            reason
+          };
+        }
+      });
+      setEvaluations(updatedEvaluations);
+      
+      // Force re-render để cập nhật UI ngay lập tức
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Reset số lượng cư dân mới
+      setNewResidentsAdded(0);
+      
       setAssignStaffModalOpen(false);
       setSelectedStaffId('');
       
@@ -1019,6 +1067,7 @@ const activityResidents: ActivityResident[] = Object.values(
       });
     } finally {
       setAssigningStaff(false);
+      setUpdatingData(false);
     }
   };
   
@@ -1780,8 +1829,47 @@ const activityResidents: ActivityResident[] = Object.values(
             borderRadius: '1rem',
             border: '1px solid #e5e7eb',
             padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+            position: 'relative'
           }}>
+            {updatingData && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(255, 255, 255, 0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+                borderRadius: '1rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{
+                    width: '2rem',
+                    height: '2rem',
+                    border: '2px solid #e5e7eb',
+                    borderTopColor: '#3b82f6',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <span style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    fontWeight: 500
+                  }}>
+                    Đang cập nhật dữ liệu...
+                  </span>
+                </div>
+              </div>
+            )}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -1808,6 +1896,20 @@ const activityResidents: ActivityResident[] = Object.values(
                       marginLeft: '0.5rem'
                     }}>
                       - Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                    </span>
+                  )}
+                  {newResidentsAdded > 0 && (
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#10b981',
+                      marginLeft: '0.5rem',
+                      background: '#d1fae5',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.375rem',
+                      animation: 'pulse 2s infinite'
+                    }}>
+                      +{newResidentsAdded} cư dân mới
                     </span>
                   )}
                 </h3>
@@ -2149,6 +2251,15 @@ const activityResidents: ActivityResident[] = Object.values(
         @keyframes spin {
           to {
             transform: rotate(360deg);
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
           }
         }
       `}</style>

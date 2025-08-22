@@ -58,6 +58,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     message: '',
     type: 'info'
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Function to show notification modal
   const showNotification = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -212,11 +213,29 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         // Initialize evaluations from existing participations
         // Sử dụng trực tiếp resident_id từ participation data
         const initialEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
-        participationsData.forEach((participation: any) => {
+        
+        // Process participations sequentially to handle async updates
+        for (const participation of participationsData) {
           // Extract resident_id from the nested object structure
           const residentId = participation.resident_id?._id || participation.resident_id;
           const participated = participation.attendance_status === 'attended';
-          const reason = participation.performance_notes || '';
+          let reason = participation.performance_notes || '';
+          
+          // Fix old data: if resident didn't participate but has "Tham gia tích cực" text, replace with "Lý do sức khỏe"
+          if (!participated && reason.includes('Tham gia tích cực')) {
+            reason = 'Lý do sức khỏe';
+            console.log('Fixed old data for resident:', residentId, 'reason changed to:', reason);
+            
+            // Update the database to fix the old data
+            try {
+              await activityParticipationsAPI.update(participation._id, {
+                performance_notes: 'Lý do sức khỏe'
+              });
+              console.log('Updated database for resident:', residentId);
+            } catch (error) {
+              console.error('Error updating database for resident:', residentId, error);
+            }
+          }
           
           if (residentId) {
             console.log('Processing participation for residentId:', residentId, 'name:', participation.resident_id?.full_name);
@@ -226,17 +245,50 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               reason
             };
           }
-        });
+        }
         console.log('Initialized evaluations:', initialEvaluations);
         console.log('Evaluations keys:', Object.keys(initialEvaluations));
         setEvaluations(initialEvaluations);
+        setIsRefreshing(false);
       } catch (error) {
         console.error('Error fetching participations:', error);
+        setIsRefreshing(false);
       }
     };
     
     fetchParticipations();
   }, [activity?.id, refreshTrigger]);
+
+  // Auto-refresh data every 30 seconds
+  useEffect(() => {
+    if (!activity?.id) return;
+    
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing data...');
+      setIsRefreshing(true);
+      setRefreshTrigger(prev => prev + 1);
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [activity?.id]);
+
+  // Auto-refresh when evaluation mode changes
+  useEffect(() => {
+    if (!evaluationMode && activity?.id) {
+      // Refresh data when exiting evaluation mode
+      console.log('Exiting evaluation mode, refreshing data...');
+      setRefreshTrigger(prev => prev + 1);
+    }
+  }, [evaluationMode, activity?.id]);
+
+  // Auto-refresh when add resident modal closes
+  useEffect(() => {
+    if (!addResidentModalOpen && activity?.id) {
+      // Refresh data when add resident modal closes
+      console.log('Add resident modal closed, refreshing data...');
+      setRefreshTrigger(prev => prev + 1);
+    }
+  }, [addResidentModalOpen, activity?.id]);
 
   // Debug: Log when evaluations change
   useEffect(() => {
@@ -361,14 +413,29 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
   // Evaluation functions
   const handleEvaluationChange = (residentId: string, participated: boolean) => {
-    setEvaluations(prev => ({
+    setEvaluations(prev => {
+      const currentEvaluation = prev[residentId] || {};
+      let newReason = currentEvaluation.reason || '';
+      
+      if (participated) {
+        // Nếu chọn "Có", xóa lý do vắng mặt
+        newReason = '';
+      } else {
+        // Nếu chọn "Không", kiểm tra và sửa lý do không phù hợp
+        if (!newReason || newReason.includes('Tham gia tích cực')) {
+          newReason = 'Lý do sức khỏe';
+        }
+      }
+      
+      return {
       ...prev,
       [residentId]: {
-        ...prev[residentId],
+          ...currentEvaluation,
         participated,
-        reason: participated ? '' : (prev[residentId]?.reason || '')
+          reason: newReason
       }
-    }));
+      };
+    });
   };
 
   const handleReasonChange = (residentId: string, reason: string) => {
@@ -385,11 +452,22 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     setEvaluations(prev => {
       const newEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
       filteredResidents.forEach(resident => {
+        const currentEvaluation = prev[resident.id] || {};
+        let newReason = currentEvaluation.reason || '';
+        
+        if (participated) {
+          // Nếu chọn "Có", xóa lý do vắng mặt
+          newReason = '';
+        } else {
+          // Nếu chọn "Không", kiểm tra và sửa lý do không phù hợp
+          if (!newReason || newReason.includes('Tham gia tích cực')) {
+            newReason = 'Lý do sức khỏe';
+          }
+        }
+        
         newEvaluations[resident.id] = {
           participated,
-          reason: participated
-            ? ''
-            : (prev[resident.id]?.reason || '')
+          reason: newReason
         };
       });
       return newEvaluations;
@@ -432,7 +510,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           const updateData: any = {
             performance_notes: evaluation.participated ? 
               'Tham gia tích cực, tinh thần tốt' : 
-              (evaluation.reason || 'Không có lý do cụ thể'),
+              (evaluation.reason || 'Lý do sức khỏe'),
             attendance_status: evaluation.participated ? 'attended' : 'absent'
           };
           
@@ -461,7 +539,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               date: activity.date + "T00:00:00Z", // Send as ISO string
               performance_notes: evaluation.participated ? 
                 'Tham gia tích cực, tinh thần tốt' : 
-                (evaluation.reason || 'Không có lý do cụ thể'),
+                 (evaluation.reason || 'Lý do sức khỏe'),
               attendance_status: evaluation.participated ? 'attended' : 'absent'
             });
           }
@@ -480,10 +558,28 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       
       // Cập nhật evaluations state với dữ liệu mới
       const updatedEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
-      cleanedParticipations.forEach((participation: any) => {
+      
+      // Process participations sequentially to handle async updates
+      for (const participation of cleanedParticipations) {
         const residentId = participation.resident_id?._id || participation.resident_id;
         const participated = participation.attendance_status === 'attended';
-        const reason = participation.performance_notes || '';
+        let reason = participation.performance_notes || '';
+        
+        // Fix old data: if resident didn't participate but has "Tham gia tích cực" text, replace with "Lý do sức khỏe"
+        if (!participated && reason.includes('Tham gia tích cực')) {
+          reason = 'Lý do sức khỏe';
+          console.log('Fixed old data for resident:', residentId, 'reason changed to:', reason);
+          
+          // Update the database to fix the old data
+          try {
+            await activityParticipationsAPI.update(participation._id, {
+              performance_notes: 'Lý do sức khỏe'
+            });
+            console.log('Updated database for resident:', residentId);
+          } catch (error) {
+            console.error('Error updating old data for resident:', residentId, error);
+          }
+        }
         
         if (residentId) {
           console.log('Processing participation for residentId:', residentId, 'name:', participation.resident_id?.full_name);
@@ -492,7 +588,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             reason
           };
         }
-      });
+      }
       console.log('Updated evaluations after save:', updatedEvaluations);
       console.log('Evaluations keys:', Object.keys(updatedEvaluations));
       setEvaluations(updatedEvaluations);
@@ -501,6 +597,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       setRefreshTrigger(prev => prev + 1);
       
       setEvaluationMode(false);
+       
+       // Auto-refresh data after saving
+       setTimeout(() => {
+         console.log('Auto-refreshing data after save...');
+         setRefreshTrigger(prev => prev + 1);
+       }, 1000);
+       
       showNotification(
         'Lưu đánh giá thành công',
         'Đánh giá tham gia hoạt động đã được lưu thành công!',
@@ -756,21 +859,14 @@ const activityResidents: ActivityResident[] = Object.values(
         'success'
       );
       
-      // Reload participations
-      const participationsData = await activityParticipationsAPI.getByActivityId(
-        activity.id, 
-        activity.date
-      );
-      
-      // Dọn dẹp duplicate participations (nếu có)
-      const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
-      setParticipations(cleanedParticipations);
-      
-      showNotification(
-        'Lưu đánh giá thành công',
-        'Đánh giá tham gia hoạt động đã được lưu thành công!',
-        'success'
-      );
+             // Force refresh data
+       setRefreshTrigger(prev => prev + 1);
+       
+       // Auto-refresh data after adding resident
+       setTimeout(() => {
+         console.log('Auto-refreshing data after adding resident...');
+         setRefreshTrigger(prev => prev + 1);
+       }, 1000);
     } catch (err: any) {
       console.error('Error adding resident:', err);
       let errorMessage = 'Không thể thêm người cao tuổi vào hoạt động. Vui lòng thử lại.';
@@ -1462,6 +1558,27 @@ const activityResidents: ActivityResident[] = Object.values(
                       - Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
                     </span>
                   )}
+                   {isRefreshing && (
+                     <span style={{
+                       fontSize: '0.75rem',
+                       fontWeight: 500,
+                       color: '#f59e0b',
+                       marginLeft: '0.5rem',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '0.25rem'
+                     }}>
+                       <div style={{
+                         width: '0.75rem',
+                         height: '0.75rem',
+                         border: '2px solid transparent',
+                         borderTopColor: '#f59e0b',
+                         borderRadius: '50%',
+                         animation: 'spin 1s linear infinite'
+                       }} />
+                       Đang cập nhật...
+                    </span>
+                  )}
                 </h3>
                 {residentsFromEvaluations.length > 0 && (
                   <div style={{
@@ -1592,28 +1709,11 @@ const activityResidents: ActivityResident[] = Object.values(
                           background: evaluation.participated ? '#f0fdf4' : '#fef2f2'
                         }}
                       >
-                        <div style={{
-                          width: '2.5rem',
-                          height: '2.5rem',
-                          borderRadius: '50%',
-                          background: '#6366f1',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '0.875rem',
-                          marginRight: '1rem'
-                        }}>
-                          {resident.name.charAt(0).toUpperCase()}
-                        </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
                             {resident.name}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                            Phòng: {resident.room || 'N/A'} | Tuổi: {resident.age || 'N/A'}
-                          </div>
+                          
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>

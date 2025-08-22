@@ -18,6 +18,27 @@ import {
 import { activitiesAPI } from '@/lib/api';
 import { format, parseISO } from 'date-fns';
 
+// Helper function chuyển đổi từ yyyy-mm-dd sang dd/mm/yyyy
+const convertToDisplayDate = (dateString: string): string => {
+  if (!dateString) return '';
+  const [year, month, day] = dateString.split('-');
+  if (year && month && day) {
+    return `${day}/${month}/${year}`;
+  }
+  return dateString;
+};
+
+// Helper function chuyển đổi từ dd/mm/yyyy sang yyyy-mm-dd
+const convertToApiDate = (dateString: string): string => {
+  if (!dateString) return '';
+  const parts = dateString.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return dateString;
+};
+
 type ActivityFormData = {
   name: string;
   description: string;
@@ -90,7 +111,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
             scheduledTime: apiActivity.schedule_time ? format(parseISO(apiActivity.schedule_time), 'HH:mm') : '',
             duration: apiActivity.duration || 0,
             capacity: apiActivity.capacity || 0,
-            date: apiActivity.schedule_time ? format(parseISO(apiActivity.schedule_time), 'yyyy-MM-dd') : '',
+            date: apiActivity.schedule_time ? convertToDisplayDate(format(parseISO(apiActivity.schedule_time), 'yyyy-MM-dd')) : '',
           });
         } else {
           router.push('/activities');
@@ -109,9 +130,10 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
     
     setIsSubmitting(true);
     try {
-      // Chuẩn hóa dữ liệu gửi lên backend - gửi local time string
-      const schedule_time = data.date && data.scheduledTime
-        ? `${data.date}T${data.scheduledTime}:00`
+      // Chuẩn hóa dữ liệu gửi lên backend - chuyển đổi ngày từ dd/mm/yyyy sang yyyy-mm-dd
+      const apiDate = convertToApiDate(data.date);
+      const schedule_time = apiDate && data.scheduledTime
+        ? `${apiDate}T${data.scheduledTime}:00`
         : '';
       const payload = {
         activity_name: data.name,
@@ -453,9 +475,28 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
                   </label>
                   <input
                     id="date"
-                    type="date"
+                    type="text"
+                    placeholder="dd/mm/yyyy"
                     className={`block w-full rounded-lg border ${errors.date ? 'border-red-400' : 'border-gray-300'} focus:ring-green-600 focus:border-green-600 shadow-sm py-2 px-3 text-sm`}
-                    {...register('date', { required: 'Ngày là bắt buộc' })}
+                    {...register('date', { 
+                      required: 'Ngày là bắt buộc',
+                      pattern: {
+                        value: /^(\d{2})\/(\d{2})\/(\d{4})$/,
+                        message: 'Ngày phải theo định dạng dd/mm/yyyy'
+                      },
+                      validate: (value) => {
+                        if (!value) return true;
+                        const [day, month, year] = value.split('/').map(Number);
+                        const date = new Date(year, month - 1, day);
+                        if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+                          return 'Ngày không hợp lệ';
+                        }
+                        if (date < new Date()) {
+                          return 'Ngày không thể trong quá khứ';
+                        }
+                        return true;
+                      }
+                    })}
                   />
                   {errors.date && (
                     <p className="mt-1 text-xs text-red-600">{errors.date.message}</p>

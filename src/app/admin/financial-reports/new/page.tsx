@@ -3,7 +3,7 @@ import { getUserFriendlyError } from '@/lib/utils/error-translations';
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { residentAPI, staffAPI, billsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { residentAPI, staffAPI, billsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
 import DatePicker from 'react-datepicker';
@@ -19,9 +19,7 @@ import {
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  XMarkIcon,
-  ChartBarIcon,
-  EyeIcon
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 interface ValidationErrors {
@@ -47,6 +45,7 @@ export default function NewBillPage() {
   const [loadingAssignments, setLoadingAssignments] = useState(false);
   const [care_plan_assignment_id, setCarePlanAssignmentId] = useState('');
   const [staff_id, setStaffId] = useState('');
+  const [currentAssignmentId, setCurrentAssignmentId] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [due_date, setDueDate] = useState('');
   const [title, setTitle] = useState('');
@@ -55,8 +54,6 @@ export default function NewBillPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [billingPreview, setBillingPreview] = useState<any>(null);
-  const [showBillingPreview, setShowBillingPreview] = useState(false);
   const [billingDetails, setBillingDetails] = useState<any>(null);
 
 
@@ -100,6 +97,25 @@ export default function NewBillPage() {
     if (user && (user.role === 'staff' || user.role === 'admin')) {
       setStaffId(user.id);
     }
+
+    // Auto-set due date to 5th of next month
+    const setDefaultDueDate = () => {
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 5);
+      const yyyy = nextMonth.getFullYear();
+      const mm = String(nextMonth.getMonth() + 1).padStart(2, '0');
+      const dd = String(nextMonth.getDate()).padStart(2, '0');
+      const defaultDueDate = `${yyyy}-${mm}-${dd}`;
+      setDueDate(defaultDueDate);
+      
+      // Auto-set title and notes based on default due date
+      const month = nextMonth.getMonth() + 1;
+      const year = nextMonth.getFullYear();
+      setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
+      setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
+    };
+
+    setDefaultDueDate();
   }, [user]);
 
   // Filter residents based on search term
@@ -123,6 +139,31 @@ export default function NewBillPage() {
   useEffect(() => {
     if (resident_id) {
       setLoadingAssignments(true);
+      
+      // Lấy assignment hiện tại của resident
+      const fetchCurrentAssignment = async () => {
+        try {
+          const assignments = await carePlanAssignmentsAPI.getByResidentId(resident_id);
+          if (Array.isArray(assignments) && assignments.length > 0) {
+            // Lấy assignment mới nhất (active)
+            const now = new Date();
+            const activeAssignment = assignments.find((a: any) => {
+              const notExpired = !a?.end_date || new Date(a.end_date) >= now;
+              const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
+              return notExpired && notCancelled;
+            });
+            
+            const currentAssignment = activeAssignment || assignments[0];
+            setCurrentAssignmentId(currentAssignment._id);
+            console.log('Current assignment ID:', currentAssignment._id);
+          }
+        } catch (error) {
+          console.error('Error fetching current assignment:', error);
+        }
+      };
+      
+      fetchCurrentAssignment();
+      
       // Tính tổng tiền từ BE
       billsAPI.calculateTotal(resident_id)
         .then(totalCalculation => {
@@ -141,13 +182,12 @@ export default function NewBillPage() {
           setNotes('');
         })
         .finally(() => setLoadingAssignments(false));
-      setCarePlanAssignmentId(''); // Không cần chọn assignment cụ thể
     } else {
       setAmount('');
       setBillingDetails(null);
       setTitle('');
       setNotes('');
-      setCarePlanAssignmentId('');
+      setCurrentAssignmentId('');
     }
   }, [resident_id, due_date]);
 
@@ -171,7 +211,9 @@ export default function NewBillPage() {
       errors.resident_id = 'Vui lòng chọn người cao tuổi';
     }
 
-    // Không cần validate care_plan_assignment_id nữa vì tính tổng tất cả
+    if (!currentAssignmentId) {
+      errors.care_plan_assignment_id = 'Không tìm thấy gói dịch vụ hiện tại cho người cao tuổi này';
+    }
 
     if (!staff_id) {
       errors.staff_id = 'Không thể xác định nhân viên hiện tại';
@@ -214,17 +256,24 @@ export default function NewBillPage() {
       return;
     }
 
-    try {
-      // Tạo bill với tổng tiền đã tính từ BE
-      await billsAPI.create({
-        resident_id,
-        care_plan_assignment_id: null, // Không cần assignment cụ thể
-        staff_id,
-        amount: Number(amount), // Sử dụng amount đã tính
-        due_date: due_date ? new Date(due_date).toISOString() : '',
-        title,
-        notes
-      });
+         try {
+       // Kiểm tra xem có assignment ID không
+       if (!currentAssignmentId) {
+         setError('Không tìm thấy gói dịch vụ hiện tại cho người cao tuổi này. Vui lòng kiểm tra lại.');
+         setLoading(false);
+         return;
+       }
+       
+       // Tạo bill với tổng tiền đã tính từ BE
+       await billsAPI.create({
+         resident_id,
+         care_plan_assignment_id: currentAssignmentId, // Sử dụng assignment ID hiện tại
+         staff_id,
+         amount: Number(amount), // Sử dụng amount đã tính
+         due_date: due_date ? new Date(due_date).toISOString() : '',
+         title,
+         notes
+       });
       
       // Hiển thị modal thành công
       setShowSuccessModal(true);
@@ -259,24 +308,6 @@ export default function NewBillPage() {
     router.push('/admin/financial-reports');
   };
 
-  const handlePreviewBill = async () => {
-    if (!resident_id) {
-      setError('Vui lòng chọn cư dân trước');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const totalCalculation = await billsAPI.calculateTotal(resident_id);
-      setBillingPreview(totalCalculation);
-      setShowBillingPreview(true);
-    } catch (err: any) {
-      setError(err?.message || 'Có lỗi xảy ra khi tính toán hóa đơn');
-    } finally {
-      setLoading(false);
-    }
-  };
-
       return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {/* Header */}
@@ -297,7 +328,7 @@ export default function NewBillPage() {
                     <ChartBarIcon className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Tạo hóa đơn mới</h1>
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Tạo hóa đơn</h1>
                     <p className="text-gray-600 text-base">Nhập thông tin hóa đơn cho người cao tuổi</p>
                   </div>
                 </div>
@@ -589,6 +620,10 @@ export default function NewBillPage() {
                       dropdownMode="select"
                       minDate={new Date()}
                     />
+                    <div className="mt-2 flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                      <CalendarIcon className="w-4 h-4" />
+                      <span>Tự động set ngày 5 hàng tháng tiếp theo</span>
+                    </div>
                     {validationErrors.due_date && (
                       <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
                         <ExclamationTriangleIcon className="w-4 h-4" />
@@ -644,51 +679,33 @@ export default function NewBillPage() {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
-                <button 
-                  type="button" 
-                  onClick={() => router.back()}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium"
-                >
-                  Hủy bỏ
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handlePreviewBill}
-                  disabled={loading || !resident_id}
-                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang tính...
-                    </>
-                  ) : (
-                    <>
-                      <EyeIcon className="w-4 h-4" />
-                      Xem trước
-                    </>
-                  )}
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || !amount || !staff_id}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang tạo...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircleIcon className="w-4 h-4" />
-                      Tạo hóa đơn
-                    </>
-                  )}
-                </button>
-              </div>
+                             {/* Action Buttons */}
+               <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
+                 <button 
+                   type="button" 
+                   onClick={() => router.back()}
+                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium"
+                 >
+                   Hủy bỏ
+                 </button>
+                 <button 
+                   type="submit" 
+                   disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || !amount || !staff_id || !currentAssignmentId}
+                   className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
+                 >
+                   {loading ? (
+                     <>
+                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                       Đang tạo...
+                     </>
+                   ) : (
+                     <>
+                       <CheckCircleIcon className="w-4 h-4" />
+                       Tạo hóa đơn
+                     </>
+                   )}
+                 </button>
+               </div>
             </form>
           </div>
         </div>
@@ -732,110 +749,7 @@ export default function NewBillPage() {
         </div>
       )}
 
-      {/* Billing Preview Modal */}
-      {showBillingPreview && billingPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl transform transition-all duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900">Xem trước hóa đơn</h3>
-              <button
-                onClick={() => setShowBillingPreview(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-6">
-              {/* Tổng tiền */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-semibold text-gray-900">Tổng tiền hóa đơn</h4>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-blue-600">
-                      {new Intl.NumberFormat('vi-VN').format(billingPreview.totalAmount)} ₫
-                    </p>
-                    <p className="text-sm text-gray-600">mỗi tháng</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chi tiết dịch vụ */}
-              {billingPreview.serviceDetails && billingPreview.serviceDetails.length > 0 && (
-                <div className="bg-gray-50 rounded-xl p-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Chi tiết dịch vụ</h4>
-                  <div className="space-y-3">
-                    {billingPreview.serviceDetails.map((service: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                        <div>
-                          <p className="font-medium text-gray-900">{service.plan_name}</p>
-                          <p className="text-sm text-gray-600">{service.description}</p>
-                        </div>
-                        <p className="font-semibold text-blue-600">
-                          {new Intl.NumberFormat('vi-VN').format(service.monthly_price)} ₫
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-gray-900">Tổng tiền dịch vụ:</p>
-                      <p className="font-semibold text-blue-600">
-                        {new Intl.NumberFormat('vi-VN').format(billingPreview.totalServiceCost)} ₫
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Chi tiết phòng */}
-              {billingPreview.roomDetails && (
-                <div className="bg-gray-50 rounded-xl p-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Chi tiết phòng</h4>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        Phòng {billingPreview.roomDetails.room_number} - {billingPreview.roomDetails.room_type}
-                      </p>
-                      <p className="text-sm text-gray-600">Tầng {billingPreview.roomDetails.floor}</p>
-                    </div>
-                    <p className="font-semibold text-green-600">
-                      {new Intl.NumberFormat('vi-VN').format(billingPreview.roomDetails.monthly_price)} ₫
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-gray-900">Tổng tiền phòng:</p>
-                      <p className="font-semibold text-green-600">
-                        {new Intl.NumberFormat('vi-VN').format(billingPreview.totalRoomCost)} ₫
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200">
-              <button
-                onClick={() => setShowBillingPreview(false)}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium"
-              >
-                Đóng
-              </button>
-              <button
-                onClick={() => {
-                  setShowBillingPreview(false);
-                  // Tự động điền amount vào form
-                  setAmount(billingPreview.totalAmount.toString());
-                }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium"
-              >
-                Sử dụng số tiền này
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 } 

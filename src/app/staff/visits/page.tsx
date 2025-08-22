@@ -24,15 +24,16 @@ import {
 } from '@heroicons/react/24/solid';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { format, isToday, isYesterday, isTomorrow, isAfter, isBefore, startOfDay } from 'date-fns';
+import { format, isToday, isYesterday, isTomorrow, isAfter, isBefore, startOfDay, addMinutes } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { visitsAPI } from '@/lib/api';
+import { visitsAPI, userAPI, API_BASE_URL } from '@/lib/api';
 
 interface Visit {
   _id: string;
   family_member_id: {
     _id: string;
     full_name: string;
+    avatar?: string;
   };
   visit_date: string;
   visit_time: string;
@@ -124,6 +125,77 @@ export default function StaffVisitsPage() {
     return configs[timeStatus] || configs.upcoming;
   };
 
+  // Tính giờ kết thúc từ ngày + giờ bắt đầu + duration
+  const getEndTimeString = (visit: Visit): string => {
+    try {
+      const [hoursStr, minutesStr] = (visit.visit_time || '00:00').split(':');
+      const startDate = new Date(visit.visit_date);
+      const hours = Number(hoursStr);
+      const minutes = Number(minutesStr);
+      if (!isNaN(hours) && !isNaN(minutes)) {
+        startDate.setHours(hours, minutes, 0, 0);
+      }
+      const endDate = addMinutes(startDate, Number(visit.duration || 0));
+      return format(endDate, 'HH:mm');
+    } catch {
+      return '';
+    }
+  };
+
+  // Lấy URL avatar cho family member (ưu tiên path, fallback theo id)
+  const getFamilyAvatarUrl = (family: Visit['family_member_id']): string => {
+    try {
+      const anyFm: any = family as any;
+      const a: any = anyFm?.avatar;
+      // Hỗ trợ nhiều kiểu avatar: string | object | array
+      let rawPath = '' as string;
+      if (typeof a === 'string' && a.trim()) {
+        rawPath = a;
+      } else if (Array.isArray(a) && a.length > 0) {
+        const first = a[0];
+        if (typeof first === 'string') rawPath = first;
+        else if (first && typeof first === 'object') rawPath = first.file_path || first.url || first.path || '';
+      } else if (a && typeof a === 'object') {
+        rawPath = a.file_path || a.url || a.path || '';
+      }
+
+      if (rawPath) return userAPI.getAvatarUrl(rawPath);
+
+      if (family?._id) {
+        // Ưu tiên endpoint avatar của family member
+        return `${API_BASE_URL}/family-members/${family._id}/avatar`;
+      }
+      // Thử endpoint users (fallback cũ)
+      if (family?._id) {
+        return userAPI.getAvatarUrlById(family._id);
+      }
+      return '';
+    } catch {
+      return '';
+    }
+  };
+
+  // Component nhỏ render avatar với fallback icon xám
+  const FamilyAvatar = ({ family }: { family: Visit['family_member_id'] }) => {
+    const [imgError, setImgError] = useState(false);
+    const src = getFamilyAvatarUrl(family);
+    if (imgError || !src) {
+      return (
+        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+          <UsersIcon className="w-5 h-5" />
+        </div>
+      );
+    }
+    return (
+      <img
+        src={src}
+        alt={family?.full_name || 'Avatar'}
+        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+        onError={() => setImgError(true)}
+      />
+    );
+  };
+
   // Filter and sort visits (newest first) - using useMemo for performance
   const filteredVisits = useMemo(() => {
     return visits
@@ -212,29 +284,28 @@ export default function StaffVisitsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Back Button */}
-        <button
-          onClick={() => router.push('/')}
-          className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer mb-4 shadow-sm hover:bg-gray-50 transition-colors"
-        >
-          <ArrowLeftIcon className="w-4 h-4" />
-          Quay lại
-        </button>
 
         {/* Header */}
         <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
           <div className="flex justify-between items-center">
             <div>
               <div className="flex items-center gap-4">
+              <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại trang trước"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
                 <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-4 flex items-center justify-center shadow-lg shadow-amber-500/30">
                   <CalendarDaysIconSolid className="w-8 h-8 text-white" />
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent mb-2">
-                    Quản Lý Lịch Thăm
+                    Danh Sách Lịch Thăm
                   </h1>
                   <p className="text-gray-500 m-0">
-                    Theo dõi và quản lý các lịch hẹn thăm viếng của gia đình
+                    Theo dõi và quản lý các lịch hẹn thăm của gia đình
                   </p>
                 </div>
               </div>
@@ -369,9 +440,7 @@ export default function StaffVisitsPage() {
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-semibold">
-                                {visit.family_member_id?.full_name?.charAt(0) || '?'}
-                              </div>
+                              <FamilyAvatar family={visit.family_member_id} />
                               <div>
                                 <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
                                   Người đặt lịch
@@ -401,7 +470,7 @@ export default function StaffVisitsPage() {
                             <div>
                               <div className="text-xs text-gray-500 font-medium">Ngày & Giờ</div>
                               <div className="text-sm font-semibold text-gray-800">
-                                {format(new Date(visit.visit_date), 'dd/MM/yyyy', { locale: vi })} - {visit.visit_time}
+                                {format(new Date(visit.visit_date), 'dd/MM/yyyy', { locale: vi })} - {visit.visit_time} - {getEndTimeString(visit)}
                               </div>
                             </div>
                           </div>

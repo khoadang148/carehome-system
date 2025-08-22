@@ -21,7 +21,9 @@ import {
   ClipboardDocumentCheckIcon,
   ArchiveBoxIcon,
   UserPlusIcon,
-  KeyIcon
+  KeyIcon,
+  ChatBubbleLeftRightIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 interface DashboardCard {
@@ -39,18 +41,18 @@ const ROLE_DASHBOARDS = {
     description: 'Hệ thống quản lý toàn diện viện dưỡng lão',
     cards: [
       {
+        title: 'Thống kê số liệu',
+        description: 'Thống kê số liệu về người cao tuổi, nhân viên, tài chính',
+        icon: ChartBarIcon,
+        href: '/admin/dashboard',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      },
+      {
         title: 'Quản lý phân công',
         description: 'Thiết lập và quản lý phân công nhân viên chăm sóc cho từng người cao tuổi',
         icon: UserPlusIcon,
         href: '/admin/staff-assignments',
         gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-      },
-      {
-        title: 'Lịch thăm viếng',
-        description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',
-        icon: CalendarDaysIcon,
-        href: '/admin/visits',
-        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       },
       {
         title: 'Quản lý phòng & giường',
@@ -83,7 +85,7 @@ const ROLE_DASHBOARDS = {
       {
         title: 'Đăng ký dịch vụ',
         description: 'Đăng ký dịch vụ, phòng và giường cho người cao tuổi',
-        icon: UserPlusIcon,
+        icon: ClipboardDocumentListIcon,
         href: '/services/purchase',
         gradient: 'linear-gradient(135deg,rgb(26, 169, 36) 0%,rgb(38, 220, 150) 100%)',
       },
@@ -101,7 +103,7 @@ const ROLE_DASHBOARDS = {
         icon: HeartIcon,
         href: '/staff/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-      },
+      }
     ]
   },
   family: {

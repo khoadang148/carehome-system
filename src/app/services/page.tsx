@@ -1317,58 +1317,7 @@ export default function ServicesPage() {
                   ))}
                 </div>
               </div>
-
-              {/* Action button */}
-              <div style={{marginTop: 'auto'}}>
-                {user?.role === 'staff' ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/services/purchase/${pkg._id}`);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '1rem 1.5rem',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '16px',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 12px 28px rgba(59, 130, 246, 0.4)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.3)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
-                    }}
-                  >
-                    <span style={{ position: 'relative', zIndex: 1 }}>
-                      Đăng ký cho cư dân
-                    </span>
-                    {/* Shine effect */}
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: '-100%',
-                      width: '100%',
-                      height: '100%',
-                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                      transition: 'left 0.5s ease'
-                    }} />
-                  </button>
-                ) : null}
-              </div>
-
+            
               {/* Admin action buttons */}
               {user?.role === 'admin' && (
                 <div style={{

@@ -1,0 +1,116 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { billsAPI } from '@/lib/api';
+
+export async function GET(request: NextRequest) {
+  try {
+    console.log('Payment stats API called');
+    
+    // Fetch all bills from the database
+    let bills = [];
+    try {
+      bills = await billsAPI.getAll();
+      console.log('Bills fetched successfully:', bills.length);
+    } catch (billsError) {
+      console.error('Error fetching bills:', billsError);
+      // Return default stats if bills API fails
+      return NextResponse.json({
+        totalRevenue: 0,
+        monthlyRevenue: 0,
+        pendingBills: 0,
+        paidBills: 0,
+        cancelledBills: 0,
+        pendingAmount: 0,
+        growthPercentage: 0,
+        totalBills: 0
+      });
+    }
+    
+    // If no bills data, return default stats
+    if (!bills || bills.length === 0) {
+      console.log('No bills data available, returning default stats');
+      return NextResponse.json({
+        totalRevenue: 0,
+        monthlyRevenue: 0,
+        pendingBills: 0,
+        paidBills: 0,
+        cancelledBills: 0,
+        pendingAmount: 0,
+        growthPercentage: 0,
+        totalBills: 0
+      });
+    }
+    
+    // Calculate statistics
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    // Filter bills by status
+    const paidBills = bills.filter((bill: any) => bill.status === 'paid');
+    const pendingBills = bills.filter((bill: any) => bill.status === 'pending');
+    const cancelledBills = bills.filter((bill: any) => bill.status === 'cancelled' || bill.status === 'failed');
+    
+    console.log('Bill status counts:', {
+      total: bills.length,
+      paid: paidBills.length,
+      pending: pendingBills.length,
+      cancelled: cancelledBills.length
+    });
+    
+    // Calculate total revenue from paid bills
+    const totalRevenue = paidBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
+    
+    // Calculate monthly revenue (current month)
+    const currentMonthBills = paidBills.filter((bill: any) => {
+      if (!bill.paid_date) return false;
+      const paidDate = new Date(bill.paid_date);
+      return paidDate.getFullYear() === currentYear && paidDate.getMonth() === currentMonth;
+    });
+    const monthlyRevenue = currentMonthBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
+    
+    // Calculate previous month revenue for growth comparison
+    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    
+    const previousMonthBills = paidBills.filter((bill: any) => {
+      if (!bill.paid_date) return false;
+      const paidDate = new Date(bill.paid_date);
+      return paidDate.getFullYear() === previousYear && paidDate.getMonth() === previousMonth;
+    });
+    const previousMonthRevenue = previousMonthBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
+    
+    // Calculate growth percentage
+    let growthPercentage = 0;
+    if (previousMonthRevenue > 0) {
+      growthPercentage = ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
+    } else if (monthlyRevenue > 0) {
+      growthPercentage = 100; // If no previous month revenue but current month has revenue
+    }
+    
+    // Calculate pending amount
+    const pendingAmount = pendingBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
+    
+    const stats = {
+      totalRevenue,
+      monthlyRevenue,
+      pendingBills: pendingBills.length,
+      paidBills: paidBills.length,
+      cancelledBills: cancelledBills.length,
+      pendingAmount,
+      growthPercentage: Math.round(growthPercentage * 100) / 100, 
+      totalBills: bills.length
+    };
+    
+    console.log('Calculated stats:', stats);
+    return NextResponse.json(stats);
+  } catch (error) {
+    console.error('Error calculating payment stats:', error);
+    return NextResponse.json(
+      { 
+        error: 'Failed to calculate payment statistics',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}

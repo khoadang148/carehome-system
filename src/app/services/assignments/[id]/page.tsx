@@ -22,6 +22,7 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI, bedAssignmentsAPI, roomsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
+import Avatar from '@/components/Avatar';
 
 export default function CarePlanAssignmentDetailPage() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function CarePlanAssignmentDetailPage() {
     fetchAssignmentDetails();
   }, [user, router, assignmentId]);
 
-  // Debug effect để theo dõi thay đổi của carePlanDetails
+  // Debug effect để theo dõi thay đổi của carePlanDetails và roomTypeDetails
   useEffect(() => {
     if (carePlanDetails.length > 0) {
       console.log('Care plan details updated:', carePlanDetails);
@@ -59,7 +60,17 @@ export default function CarePlanAssignmentDetailPage() {
       console.log('Calculated total service cost:', calculateTotalServiceCost());
       console.log('Calculated total monthly cost:', calculateTotalMonthlyCost());
     }
-  }, [carePlanDetails]);
+  }, [carePlanDetails, roomTypeDetails]);
+
+  // Debug effect để theo dõi thay đổi của assignment
+  useEffect(() => {
+    if (assignment) {
+      console.log('Assignment updated:', assignment);
+      console.log('Assignment room_monthly_cost:', assignment.room_monthly_cost);
+      console.log('Assignment selected_room_type:', assignment.selected_room_type);
+      console.log('Calculated room cost:', calculateRoomCost());
+    }
+  }, [assignment]);
 
   const fetchAssignmentDetails = async () => {
     if (!assignmentId) return;
@@ -231,6 +242,7 @@ export default function CarePlanAssignmentDetailPage() {
           const matchingRoomType = roomTypes.find((rt: any) => rt.room_type === data.selected_room_type);
           if (matchingRoomType) {
             console.log('Room type details found:', matchingRoomType);
+            console.log('Room type monthly price:', matchingRoomType.monthly_price);
             setRoomTypeDetails(matchingRoomType);
           } else {
             console.log('No matching room type found for:', data.selected_room_type);
@@ -365,17 +377,38 @@ export default function CarePlanAssignmentDetailPage() {
     return validPlans;
   };
 
+  // Function để tính tiền phòng
+  const calculateRoomCost = () => {
+    // Ưu tiên lấy từ assignment trước
+    if (assignment?.room_monthly_cost && typeof assignment.room_monthly_cost === 'number' && assignment.room_monthly_cost > 0) {
+      console.log('Room cost from assignment:', assignment.room_monthly_cost);
+      return assignment.room_monthly_cost;
+    }
+    
+    // Fallback: lấy từ room type details
+    if (roomTypeDetails?.monthly_price && typeof roomTypeDetails.monthly_price === 'number' && roomTypeDetails.monthly_price > 0) {
+      console.log('Room cost from room type details:', roomTypeDetails.monthly_price);
+      return roomTypeDetails.monthly_price;
+    }
+    
+    // Fallback: lấy từ assignment data khác
+    if (assignment?.selected_room_type) {
+      console.log('Selected room type:', assignment.selected_room_type);
+      // Có thể cần fetch room type price từ API
+    }
+    
+    console.log('No room cost found, returning 0');
+    return 0;
+  };
+
   // Function để tính tổng tiền hàng tháng (phòng + dịch vụ)
   const calculateTotalMonthlyCost = () => {
-    // Đảm bảo room_cost là số hợp lệ
-    const roomCost = (assignment?.room_monthly_cost && typeof assignment.room_monthly_cost === 'number' && assignment.room_monthly_cost > 0) 
-      ? assignment.room_monthly_cost 
-      : 0;
-    
+    const roomCost = calculateRoomCost();
     const serviceCost = calculateTotalServiceCost();
     const total = roomCost + serviceCost;
     
     console.log('Assignment data:', assignment);
+    console.log('Room type details:', roomTypeDetails);
     console.log('Room cost:', roomCost);
     console.log('Service cost:', serviceCost);
     console.log('Total monthly cost:', total);
@@ -528,49 +561,14 @@ export default function CarePlanAssignmentDetailPage() {
                 gap: '1.5rem'
               }}>
                 {/* Avatar */}
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  border: '3px solid #e5e7eb',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  flexShrink: 0
-                }}>
-                  {residentDetails?.avatar ? (
-                    <img
-                      src={userAPI.getAvatarUrl(residentDetails.avatar)}
-                      alt={`Avatar của ${residentDetails?.full_name || residentDetails?.name}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.textContent = (residentDetails?.full_name || residentDetails?.name || 'U').charAt(0).toUpperCase();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src="/default-avatar.svg"
-                      alt="Default avatar"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.textContent = (residentDetails?.full_name || residentDetails?.name || 'U').charAt(0).toUpperCase();
-                        }
-                      }}
-                    />
-                  )}
-                </div>
+                <Avatar
+                  src={residentDetails?.avatar ? userAPI.getAvatarUrl(residentDetails.avatar) : undefined}
+                  alt={`Avatar của ${residentDetails?.full_name || residentDetails?.name}`}
+                  size="xlarge"
+                  showInitials={true}
+                  name={residentDetails?.full_name || residentDetails?.name || 'N/A'}
+                  className="flex-shrink-0"
+                />
                 
                 {/* Thông tin cơ bản */}
                 <div style={{ flex: 1 }}>
@@ -806,11 +804,21 @@ export default function CarePlanAssignmentDetailPage() {
                       <p style={{
                         fontSize: '1.5rem',
                         fontWeight: 700,
-                        color: '#1e293b',
+                        color: calculateRoomCost() > 0 ? '#1e293b' : '#ef4444',
                         margin: 0
                       }}>
-                        {formatCurrency(assignment?.room_monthly_cost || 0)}
+                        {calculateRoomCost() > 0 ? formatCurrency(calculateRoomCost()) : 'Chưa cập nhật'}
                     </p>
+                    {calculateRoomCost() === 0 && (
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#ef4444',
+                        margin: '0.25rem 0 0 0',
+                        fontStyle: 'italic'
+                      }}>
+                        Cần cập nhật giá phòng trong assignment
+                      </p>
+                    )}
                   </div>
                     <div style={{ textAlign: 'center' }}>
                       <p style={{

@@ -32,8 +32,9 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
   // 3. Không ở trang login/register
   useEffect(() => {
     const shouldShow = Boolean(user && 
-      user.role === 'family' && 
+      (user.role === 'family' || user.role === 'staff') && 
       !pathname.includes('/family/messages') &&
+      !pathname.includes('/staff/messages') &&
       !pathname.includes('/login') &&
       !pathname.includes('/register'));
     
@@ -127,7 +128,8 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
       e.preventDefault();
       return;
     }
-    router.push('/family/messages');
+    const messagesPath = user?.role === 'staff' ? '/staff/messages' : '/family/messages';
+    router.push(messagesPath);
   };
 
   if (!isVisible) return null;
@@ -145,10 +147,10 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
         onTouchStart={startDrag}
         ref={buttonRef}
       >
-        {/* Background circle with shadow */}
-        <div className={`w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group-hover:scale-110 group-active:scale-95 fab-float ${isBumping ? 'fab-bounce' : ''}`}>
+        {/* Background circle with shadow - compact dark style */}
+        <div className={`w-12 h-12 md:w-14 md:h-14 bg-neutral-900 rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.35)] ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300 flex items-center justify-center group-hover:scale-110 group-active:scale-95 fab-float ${isBumping ? 'fab-bounce' : ''}`}>
           {/* Icon */}
-          <ChatBubbleLeftRightIcon className="w-6 h-6 text-white transition-transform duration-200 group-hover:rotate-12" />
+          <ChatBubbleLeftRightIcon className="w-5 h-5 md:w-6 md:h-6 text-white transition-transform duration-200 group-hover:rotate-12" />
         </div>
 
         {/* Unread badge */}
@@ -159,9 +161,9 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
         )}
 
         {/* Tooltip */}
-        <div className="absolute bottom-full right-0 mb-3 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap transform translate-y-2 group-hover:translate-y-0">
-          {totalUnread > 0 ? `${totalUnread} tin nhắn chưa đọc` : 'Liên hệ với nhân viên'}
-          <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+        <div className="absolute bottom-full right-0 mb-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap transform translate-y-2 group-hover:translate-y-0">
+          {totalUnread > 0 ? `${totalUnread} tin nhắn chưa đọc` : 'Trò chuyện'}
+          <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
         </div>
 
         {/* Ripple effect */}

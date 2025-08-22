@@ -206,7 +206,13 @@ export default function MessagesPage() {
       try {
         setIsLoadingMessages(true);
         const response = await messagesAPI.getConversation(selectedConversation.partner._id);
-        setMessages(response.messages || response || []);
+        const raw = (response?.messages || response || []) as any[];
+        const rid = (selectedConversation as any).resident_id;
+        const filtered = (Array.isArray(raw) ? raw : []).filter((m: any) => {
+          const mrid = typeof m?.resident_id === 'object' ? m?.resident_id?._id : m?.resident_id;
+          return String(mrid || '') === String(rid || '');
+        });
+        setMessages(filtered);
       } catch (error) {
         console.error('Error fetching messages:', error);
       } finally {
@@ -427,7 +433,7 @@ export default function MessagesPage() {
                     return (
                       <div
                         key={conversation._id || `conversation-${index}`}
-                        onClick={() => setSelectedConversation(conversation)}
+                        onClick={() => setSelectedConversation({ ...(conversation as any), resident_id: selectedResidentId })}
                         className={`
                           p-4 border-b border-slate-100 cursor-pointer transition-all duration-200
                           ${isSelected ? 'bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200 shadow-sm' : 'hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100'}

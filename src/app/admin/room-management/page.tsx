@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
-import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI } from "@/lib/api";
-import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI, carePlanAssignmentsAPI } from "@/lib/api";
+import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface Room {
   _id: string;
@@ -25,7 +25,12 @@ interface Bed {
 interface BedAssignment {
   _id: string;
   resident_id: { _id: string; full_name: string };
-  bed_id: { _id: string; bed_number: string; room_id: { _id: string; room_number: string } };
+  bed_id: { 
+    _id: string; 
+    bed_number: string; 
+    bed_type?: string;
+    room_id: { _id: string; room_number: string } 
+  };
   assigned_date: string;
   unassigned_date: string | null;
   assigned_by: { _id: string; full_name: string };
@@ -41,6 +46,8 @@ interface RoomType {
   amenities: string[];
 }
 
+
+
 export default function RoomManagementPage() {
   const router = useRouter();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -51,6 +58,8 @@ export default function RoomManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+
 
   useEffect(() => {
     setLoading(true);
@@ -61,6 +70,11 @@ export default function RoomManagementPage() {
       roomTypesAPI.getAll(),
     ])
       .then(([rooms, beds, assignments, types]) => {
+        console.log('🏠 Rooms data:', rooms);
+        console.log('🛏️ Beds data:', beds);
+        console.log('📋 Bed assignments data:', assignments);
+        console.log('🏢 Room types data:', types);
+        
         setRooms(rooms);
         setBeds(beds);
         setBedAssignments(assignments);
@@ -76,15 +90,87 @@ export default function RoomManagementPage() {
   const getRoomType = (room_type: string) =>
     roomTypes.find((t) => t.room_type === room_type);
 
-  const bedsOfRoom = (roomId: string) =>
-    beds.filter((b) => b.room_id === roomId);
-
-  const getResidentOfBed = (bedId: string) => {
-    const assignment = bedAssignments.find(
-      (a) => a && a.bed_id && a.bed_id._id === bedId && !a.unassigned_date
-    );
-    return assignment ? assignment.resident_id.full_name : null;
+  const bedsOfRoom = (roomId: string) => {
+    // Lấy tất cả bed assignments cho phòng này
+    const roomAssignments = bedAssignments.filter(assignment => {
+      if (!assignment.bed_id || !assignment.bed_id.room_id) return false;
+      
+      // Kiểm tra cả trường hợp room_id là string và object
+      const assignmentRoomId = typeof assignment.bed_id.room_id === 'string' 
+        ? assignment.bed_id.room_id 
+        : assignment.bed_id.room_id._id;
+      
+      return assignmentRoomId === roomId;
+    });
+    
+    console.log(`🏠 Room ${roomId} assignments:`, roomAssignments);
+    
+    // Tạo danh sách unique beds từ assignments
+    const uniqueBeds = roomAssignments.reduce((acc, assignment) => {
+      const bedId = assignment.bed_id._id;
+      if (!acc.find(bed => bed._id === bedId)) {
+        acc.push({
+          _id: bedId,
+          bed_number: assignment.bed_id.bed_number,
+          room_id: roomId,
+          bed_type: assignment.bed_id.bed_type || 'standard',
+          status: assignment.unassigned_date ? 'available' : 'occupied',
+          assignment: assignment
+        });
+      }
+      return acc;
+    }, [] as any[]);
+    
+    console.log(`🛏️ Unique beds for room ${roomId}:`, uniqueBeds);
+    return uniqueBeds;
   };
+
+  const getResidentOfBed = (bed: any) => {
+    // Nếu bed có assignment trực tiếp, sử dụng thông tin từ đó
+    if (bed.assignment && bed.assignment.resident_id) {
+      const residentName = bed.assignment.resident_id.full_name;
+      console.log('✅ Found resident from bed assignment:', residentName);
+      return residentName;
+    }
+    
+    // Fallback: tìm trong bedAssignments
+    console.log('🔍 Looking for resident of bed:', bed._id);
+    const assignment = bedAssignments.find(
+      (a) => {
+        if (!a || !a.bed_id) return false;
+        
+        const assignmentBedId = a.bed_id._id;
+        const isActive = !a.unassigned_date;
+        
+        console.log('🔍 Checking assignment:', {
+          assignmentBedId,
+          targetBedId: bed._id,
+          isActive,
+          matches: assignmentBedId === bed._id
+        });
+        
+        return assignmentBedId === bed._id && isActive;
+      }
+    );
+    
+    if (assignment) {
+      const residentName = assignment.resident_id.full_name;
+      console.log('✅ Found resident from assignments:', residentName);
+      return residentName;
+    }
+    
+    console.log('❌ No resident found for bed:', bed._id);
+    return null;
+  };
+
+  // Chức năng chuyển đổi phòng/giường
+  const openTransferPage = (bed: any, room: any) => {
+    router.push(`/admin/room-management/transfer?bedId=${bed._id}&roomId=${room._id}`);
+  };
+
+
+
+
 
   // Tìm kiếm phòng theo số phòng, loại phòng, tầng
   const filteredRooms = rooms.filter((room) => {
@@ -128,18 +214,17 @@ export default function RoomManagementPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
       <div className="max-w-7xl mx-auto p-6">
-        {/* Back Button */}
-        <button
-          onClick={() => router.push('/admin')}
-          className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl text-sm font-medium cursor-pointer mb-6 shadow-sm hover:bg-gray-50 hover:shadow-md transition-all duration-200 group"
-        >
-          <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Quay lại
-        </button>
 
         {/* Enhanced Header Section */}
         <div className="bg-gradient-to-r from-white to-blue-50 rounded-3xl p-8 mb-8 shadow-xl border border-blue-100">
           <div className="flex items-center gap-6">
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
               <BuildingOfficeIcon className="w-8 h-8 text-white" />
             </div>
@@ -402,6 +487,7 @@ export default function RoomManagementPage() {
                         <th className="px-6 py-4 text-left text-white font-bold text-base">Loại giường</th>
                         <th className="px-6 py-4 text-center text-white font-bold text-base">Trạng thái</th>
                         <th className="px-6 py-4 text-left text-white font-bold text-base">Người cao tuổi đang ở</th>
+                         <th className="px-6 py-4 text-center text-white font-bold text-base">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -432,9 +518,49 @@ export default function RoomManagementPage() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="font-medium text-gray-900">
-                              {getResidentOfBed(bed._id) || "-"}
-                            </span>
+                             {(() => {
+                               const residentName = getResidentOfBed(bed);
+                               console.log(`🛏️ Bed ${bed.bed_number} (${bed._id}):`, {
+                                 status: bed.status,
+                                 residentName,
+                                 hasAssignment: bed.assignment ? true : false
+                               });
+                               
+                               if (residentName) {
+                                 return (
+                                   <div className="flex items-center gap-2">
+                                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                     <span className="font-medium text-gray-900">{residentName}</span>
+                                   </div>
+                                 );
+                               } else if (bed.status === "occupied") {
+                                 return (
+                                   <div className="flex items-center gap-2">
+                                     <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                     <span className="text-orange-600 font-medium">Có người ở (chưa có thông tin)</span>
+                                   </div>
+                                 );
+                               } else {
+                                 return (
+                                   <div className="flex items-center gap-2">
+                                     <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                     <span className="text-gray-500 font-medium">Chưa có người</span>
+                                   </div>
+                                 );
+                               }
+                             })()}
+                           </td>
+                                                       <td className="px-6 py-4 text-center">
+                              {bed.status === "occupied" && bed.assignment && (
+                                <button
+                                  onClick={() => openTransferPage(bed, rooms.find(r => r._id === selectedRoomId))}
+                                  className="px-3 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 mx-auto shadow-lg shadow-orange-500/30 hover:shadow-orange-600/40"
+                                  title="Chuyển đổi phòng/giường"
+                                >
+                                  <ArrowPathIcon className="w-4 h-4" />
+                                  Chuyển
+                                </button>
+                              )}
                           </td>
                         </tr>
                       ))}
@@ -462,6 +588,8 @@ export default function RoomManagementPage() {
             </button>
           </div>
         )}
+
+
       </div>
     </div>
   );

@@ -6,9 +6,11 @@ import { UserCircleIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import ClientOnly from '@/components/ClientOnly';
+import { useFastLogout } from '@/hooks/useFastLogout';
 
 export default function Header() {
   const { user, logout, loading, isLoggingOut } = useAuth();
+  const { instantLogout } = useFastLogout();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   
@@ -16,9 +18,9 @@ export default function Header() {
     setMounted(true);
   }, []);
   
-  const handleLogout = async () => {
-    // Immediate logout for better UX
-    await logout();
+  const handleLogout = () => {
+    // Instant logout for maximum speed
+    instantLogout();
   };
 
   const handleLogin = () => {

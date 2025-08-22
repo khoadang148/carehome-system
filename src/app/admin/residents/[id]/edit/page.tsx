@@ -30,6 +30,7 @@ type ResidentFormData = {
   care_level: string;
   status: string;
   admission_date: string;
+  discharge_date: string;
   emergency_contact_name: string;
   emergency_contact_relationship: string;
   emergency_contact_phone: string;
@@ -97,6 +98,26 @@ const validationRules = {
       return true;
     }
   },
+  discharge_date: {
+    pattern: {
+      value: /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      message: 'Ngày xuất viện phải theo định dạng dd/mm/yyyy'
+    },
+    validate: (value: string) => {
+      if (!value) return true;
+      const [day, month, year] = value.split('/').map(Number);
+      const date = new Date(year, month - 1, day);
+      if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+        return 'Ngày xuất viện không hợp lệ';
+      }
+      // Ngày xuất viện không thể trong quá khứ xa (trước 2020)
+      const minDate = new Date(2020, 0, 1);
+      if (date < minDate) {
+        return 'Ngày xuất viện không hợp lệ (trước 2020)';
+      }
+      return true;
+    }
+  },
 
   medical_history: {},
   current_medications: {},
@@ -141,9 +162,19 @@ const convertToDisplayDate = (dateString: string): string => {
   return dateString;
 };
 
-// Helper function chuyển đổi từ dd/mm/yyyy sang yyyy-mm-dd
+// Helper function chuyển đổi từ dd/mm/yyyy hoặc yyyy-mm-dd sang ISO yyyy-mm-dd
 const convertToApiDate = (dateString: string): string => {
-  return convertDDMMYYYYToISO(dateString);
+  if (!dateString) return '';
+  const trimmed = dateString.trim();
+  // Support yyyy-mm-dd directly
+  const isoLike = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoLike.test(trimmed)) {
+    return `${trimmed}T00:00:00.000Z`;
+  }
+  // Support dd/mm/yyyy via existing util
+  const converted = convertDDMMYYYYToISO(trimmed);
+  if (!converted) return '';
+  return `${converted}T00:00:00.000Z`;
 };
 
 export default function EditResidentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -206,6 +237,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         care_level: residentData.care_level || '',
         status: residentData.status || 'active',
         admission_date: residentData.admission_date ? convertToDisplayDate(residentData.admission_date.slice(0, 10)) : '',
+        discharge_date: residentData.discharge_date ? convertToDisplayDate(residentData.discharge_date.slice(0, 10)) : '',
         emergency_contact_name: residentData.emergency_contact?.name || '',
         emergency_contact_relationship: residentData.emergency_contact?.relationship || '',
         emergency_contact_phone: residentData.emergency_contact?.phone || '',
@@ -250,7 +282,6 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       
       // Map dữ liệu form sang request body API chuẩn
       const body: any = {
-        _id: residentId, // Thêm ID vào payload
         full_name: data.full_name,
         date_of_birth: convertedDateOfBirth,
         gender: data.gender,
@@ -274,9 +305,46 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       if (convertedAdmissionDate) {
         body.admission_date = convertedAdmissionDate;
       }
-      // Không gửi admission_date nếu không có giá trị hợp lệ, để backend sử dụng default
       
-      await residentAPI.update(residentId, body);
+      // Xử lý discharge_date - cho phép user xóa ngày xuất viện
+      if (data.discharge_date && data.discharge_date.trim() !== '') {
+        const convertedDischargeDate = convertToApiDate(data.discharge_date);
+        if (convertedDischargeDate) {
+          body.discharge_date = convertedDischargeDate;
+          // Fallback for backends expecting camelCase
+          (body as any).dischargeDate = convertedDischargeDate;
+        }
+      } else {
+        // Nếu user xóa ngày xuất viện, gửi null để backend cập nhật
+        body.discharge_date = null;
+        (body as any).dischargeDate = null;
+      }
+      
+      // Validate discharge_date vs admission_date
+      if (body.discharge_date && convertedAdmissionDate) {
+        const admissionDate = new Date(convertedAdmissionDate);
+        const dischargeDate = new Date(body.discharge_date);
+        
+        if (dischargeDate < admissionDate) {
+          setModalMessage('Ngày xuất viện không thể trước ngày nhập viện');
+          setModalType('error');
+          setShowModal(true);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      // Debug: Log request body
+      console.log('🚀 Sending update request with body:', JSON.stringify(body, null, 2));
+      console.log('📅 discharge_date value:', body.discharge_date);
+      console.log('📅 discharge_date type:', typeof body.discharge_date);
+      console.log('🔍 Request body keys:', Object.keys(body));
+      console.log('🔍 discharge_date in body keys:', 'discharge_date' in body);
+      
+      const updateResponse = await residentAPI.update(residentId, body);
+      console.log('✅ Update response:', updateResponse);
+      console.log('🔍 discharge_date in response:', updateResponse.discharge_date);
+      console.log('🔍 All response fields:', Object.keys(updateResponse));
       
       // Refresh dữ liệu sau khi update thành công
       try {
@@ -753,6 +821,12 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                   <FormInput
                     label="Ngày nhập viện"
                     name="admission_date"
+                    type="text"
+                    placeholder="dd/mm/yyyy"
+                  />
+                  <FormInput
+                    label="Ngày xuất viện"
+                    name="discharge_date"
                     type="text"
                     placeholder="dd/mm/yyyy"
                   />

@@ -10,7 +10,7 @@ import {
 } from '@/lib/utils/session';
 import { clientStorage } from '@/lib/utils/clientStorage';
 import { redirectByRole, preloadRolePages, navigateToLogin } from '@/lib/utils/navigation';
-import { optimizedLogout } from '@/lib/utils/fastLogout';
+import { optimizedLogout, instantLogout } from '@/lib/utils/fastLogout';
 
 export type UserRole = 'admin' | 'staff' | 'family';
 
@@ -122,12 +122,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setIsLoggingOut(true);
-    optimizedLogout(router, async () => {
-      await authAPI.logout();
-    }).then(() => {
-      setUser(null);
-      setIsLoggingOut(false);
-      navigateToLogin(router);
+    
+    // Sử dụng instantLogout để logout nhanh nhất có thể
+    instantLogout(router);
+    
+    // Clear user state ngay lập tức
+    setUser(null);
+    setIsLoggingOut(false);
+    
+    // Gọi API logout trong background (không chờ)
+    Promise.resolve(authAPI.logout()).catch(() => {
+      console.warn('Logout API call failed, but user already logged out');
     });
   }, [router]);
 

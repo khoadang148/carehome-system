@@ -1,4 +1,5 @@
 import React from 'react';
+import { getAvatarUrlWithFallback } from '@/lib/utils/avatarUtils';
 
 interface AvatarProps {
   src?: string | null;
@@ -27,19 +28,7 @@ const Avatar: React.FC<AvatarProps> = ({
   };
 
   const getAvatarUrl = (avatarPath: string | null | undefined) => {
-    // Nếu không có avatar hoặc avatar rỗng, trả về avatar mặc định
-    if (!avatarPath || avatarPath.trim() === '' || avatarPath === 'null' || avatarPath === 'undefined') {
-      return fallbackSrc;
-    }
-    
-    // Nếu là URL hoặc data URL, trả về nguyên bản
-    if (avatarPath.startsWith('http') || avatarPath.startsWith('data:')) {
-      return avatarPath;
-    }
-    
-    // Nếu là đường dẫn local, làm sạch và trả về
-    const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
-    return cleanPath;
+    return getAvatarUrlWithFallback(avatarPath, fallbackSrc);
   };
 
   const getInitials = (name: string) => {

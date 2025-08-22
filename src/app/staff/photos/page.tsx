@@ -8,7 +8,7 @@ import {
   XMarkIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI, activitiesAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
 
@@ -29,6 +29,8 @@ export default function PhotoUploadPage() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [shareWithFamily, setShareWithFamily] = useState(true);
   const [residents, setResidents] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState('');
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const [autoCloseTimeout, setAutoCloseTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -144,6 +146,35 @@ export default function PhotoUploadPage() {
     
     if (user) {
       fetchResidents();
+    }
+  }, [user]);
+
+  // Load activities from API
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const data = await activitiesAPI.getAll();
+        const activitiesArray = Array.isArray(data) ? data : [];
+        setActivities(activitiesArray);
+        console.log('Activities loaded for photos:', activitiesArray);
+        
+        // Debug: Check if activities have valid MongoDB IDs
+        activitiesArray.forEach((activity, index) => {
+          console.log(`Activity ${index}:`, {
+            _id: activity._id,
+            activity_name: activity.activity_name,
+            idType: typeof activity._id,
+            isValidMongoId: activity._id && /^[0-9a-fA-F]{24}$/.test(activity._id)
+          });
+        });
+      } catch (err) {
+        console.error('Error fetching activities:', err);
+        setActivities([]);
+      }
+    };
+    
+    if (user) {
+      fetchActivities();
     }
   }, [user]);
   
@@ -290,8 +321,31 @@ export default function PhotoUploadPage() {
     setCurrentUploading(0);
     let successCount = 0;
     let errorCount = 0;
+    const errors: string[] = [];
 
     try {
+      // Validate selectedFiles before starting upload
+      console.log('selectedFiles before upload:', selectedFiles);
+      console.log('selectedFiles length:', selectedFiles.length);
+      
+      if (!selectedFiles || selectedFiles.length === 0) {
+        throw new Error('No files selected for upload');
+      }
+      
+      // Validate each file
+      selectedFiles.forEach((file, index) => {
+        console.log(`File ${index}:`, {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified
+        });
+        
+        if (!file || file.size === 0) {
+          throw new Error(`File ${file.name} is empty or invalid`);
+        }
+      });
+      
       // Lấy resident object từ danh sách residents (so sánh kiểu string)
       const residentObj = residents.find(r => String(r._id) === String(selectedResident));
       console.log('residentObj:', residentObj);
@@ -305,23 +359,66 @@ export default function PhotoUploadPage() {
       // Kiểm tra familyId - có thể không cần thiết cho staff upload ảnh
       const familyId = (residentObj as any).family_member_id || (residentObj as any).familyId || (residentObj as any).family_id;
       console.log('familyId:', familyId);
+      console.log('residentObj:', residentObj);
       
       // Nếu là staff và không có familyId, vẫn cho phép upload (có thể là cư dân mới chưa có family)
       if (user?.role === 'staff' && !familyId) {
         console.log('Staff upload without familyId - allowed');
-      } else if (!familyId) {
+      } else if (!familyId && user?.role !== 'staff') {
         setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người thân (familyId)'}));
         setIsUploading(false);
         return;
       }
-      // Upload song song tất cả ảnh
-      const uploadPromises = selectedFiles.map((file, i) => {
+      
+      // Upload từng ảnh một thay vì song song để tránh quá tải database
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setCurrentUploading(i + 1);
+        
+        try {
         const formData = new FormData();
-        formData.append('file', file); // Đảm bảo đúng key 'file'
-        formData.append('resident_id', residentObj._id); // Đúng key snake_case cho backend
+          
+          // Validate file before appending
+          console.log('File to upload:', file);
+          console.log('File name:', file.name);
+          console.log('File size:', file.size);
+          console.log('File type:', file.type);
+          
+          if (!file || file.size === 0) {
+            throw new Error(`File ${file.name} is empty or invalid`);
+          }
+          
+          formData.append('file', file);
+          formData.append('resident_id', residentObj._id);
+          
+          // Chỉ thêm các field cần thiết
+          if (photoDescription.trim()) {
         formData.append('caption', photoDescription.trim());
-        formData.append('activity_type', activityType === 'Khác' ? customActivityType.trim() : activityType);
+          }
+          
+          if (activityType && activityType !== 'Khác') {
+            formData.append('activity_type', activityType);
+          } else if (customActivityType.trim()) {
+            formData.append('activity_type', customActivityType.trim());
+          }
+          
+          // Thêm related_activity_id nếu có chọn activity và có giá trị hợp lệ
+          if (selectedActivity && 
+              selectedActivity.trim() !== '' && 
+              selectedActivity !== 'null' && 
+              selectedActivity !== 'undefined' &&
+              /^[0-9a-fA-F]{24}$/.test(selectedActivity)) {
+            formData.append('related_activity_id', selectedActivity);
+            console.log('Adding related_activity_id:', selectedActivity);
+          } else if (selectedActivity) {
+            console.warn('Invalid related_activity_id format:', selectedActivity);
+          }
+          
+          // Chỉ append tags nếu có
+          if (photoTags.length > 0) {
         photoTags.forEach(tag => formData.append('tags', tag));
+          }
+          
         formData.append('taken_date', new Date().toISOString());
         
         // Truyền thêm tên người gửi
@@ -333,48 +430,131 @@ export default function PhotoUploadPage() {
         }
         formData.append('staff_notes', String(senderName));
         
-        // Thêm familyId nếu có (cho admin) hoặc để trống (cho staff)
-        if (familyId) {
-          formData.append('family_id', familyId);
-        }
-        // formData.append('related_activity_id', '');
-        return photosAPI.upload(formData)
-          .then(() => {
+          // Thêm familyId nếu có và không rỗng - chỉ cho admin, không cho staff
+          // Note: Backend gets family_id from resident data, not from form
+          // if (familyId && familyId.toString().trim() !== '' && user?.role !== 'staff') {
+          //   formData.append('family_id', familyId.toString());
+          // }
+          
+          // Thêm user_id để backend biết ai upload (nếu cần)
+          // Note: Backend expects uploaded_by from JWT token, not user_id
+          // if (user && 'id' in user && user.id) {
+          //   formData.append('user_id', user.id);
+          // }
+          
+          // Debug: Log FormData content
+          console.log('FormData content for', file.name, ':');
+          const formDataEntries: [string, any][] = [];
+          for (let [key, value] of formData.entries()) {
+            console.log(key, ':', value);
+            formDataEntries.push([key, value]);
+          }
+          
+          // Validate that file is in FormData
+          const fileInFormData = formData.get('file');
+          console.log('File in FormData after appending:', fileInFormData);
+          console.log('File in FormData type:', typeof fileInFormData);
+          console.log('File in FormData instanceof File:', fileInFormData instanceof File);
+          
+          if (!fileInFormData || !(fileInFormData instanceof File)) {
+            throw new Error(`File not properly added to FormData for ${file.name}`);
+          }
+          
+          // Debug: Log selectedActivity specifically
+          console.log('selectedActivity value:', selectedActivity);
+          console.log('selectedActivity type:', typeof selectedActivity);
+          
+          // Check if related_activity_id is being sent
+          const hasRelatedActivityId = formDataEntries.some(([key, value]) => key === 'related_activity_id');
+          console.log('FormData contains related_activity_id:', hasRelatedActivityId);
+          
+          // Validate that we're only sending expected fields
+          const expectedFields = ['file', 'resident_id', 'caption', 'activity_type', 'tags', 'taken_date', 'staff_notes', 'related_activity_id'];
+          const unexpectedFields = formDataEntries.filter(([key, value]) => !expectedFields.includes(key));
+          if (unexpectedFields.length > 0) {
+            console.warn('Unexpected fields in FormData:', unexpectedFields);
+          }
+          
+          console.log(`Uploading file ${i + 1}/${selectedFiles.length}:`, file.name);
+          
+          // Thử upload với retry logic
+          let retryCount = 0;
+          const maxRetries = 2;
+          let uploadSuccess = false;
+          
+          while (retryCount <= maxRetries && !uploadSuccess) {
+            try {
+              await photosAPI.upload(formData);
             successCount++;
-          })
-          .catch((err) => {
+              uploadSuccess = true;
+              console.log(`✅ Successfully uploaded: ${file.name}`);
+            } catch (uploadError: any) {
+              retryCount++;
+              console.error(`❌ Upload attempt ${retryCount} failed for ${file.name}:`, uploadError);
+              
+              if (uploadError.message?.includes('cơ sở dữ liệu') || uploadError.message?.includes('Database')) {
+                if (retryCount <= maxRetries) {
+                  console.log(`🔄 Retrying upload for ${file.name} (attempt ${retryCount + 1}/${maxRetries + 1})`);
+                  // Wait 2 seconds before retry
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  continue;
+                } else {
+                  errors.push(`${file.name}: Lỗi cơ sở dữ liệu sau ${maxRetries + 1} lần thử`);
+                }
+              } else {
+                errors.push(`${file.name}: ${uploadError.message || 'Lỗi không xác định'}`);
+                break; // Don't retry for non-database errors
+              }
+            }
+          }
+          
+          if (!uploadSuccess) {
             errorCount++;
-            console.error('Upload error:', err);
-          })
-          .finally(() => {
-            setCurrentUploading(prev => prev + 1);
-            setUploadProgress(prev => {
-              const done = prev + Math.round(100 / selectedFiles.length);
-              return done > 100 ? 100 : done;
-            });
-          });
-      });
-      await Promise.all(uploadPromises);
-      setUploadProgress(100);
+          }
+          
+        } catch (fileError: any) {
+          errorCount++;
+          console.error(`❌ Failed to upload ${file.name}:`, fileError);
+          errors.push(`${file.name}: ${fileError.message || 'Lỗi không xác định'}`);
+        }
+        
+        // Update progress
+        setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
+      }
       
-      // Hiển thị modal thành công ngay lập tức
-      setResultMessage(`✅ Đã tải lên ${successCount}/${selectedFiles.length} ảnh thành công!${errorCount > 0 ? ' Có ' + errorCount + ' ảnh lỗi.' : ''}`);
+      // Hiển thị kết quả
+      if (successCount > 0) {
+        const errorMessage = errorCount > 0 ? `\n\n❌ ${errorCount} ảnh lỗi:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n... và ${errors.length - 3} lỗi khác` : ''}` : '';
+        setResultMessage(`✅ Đã tải lên ${successCount}/${selectedFiles.length} ảnh thành công!${errorMessage}`);
+      } else {
+        setResultMessage(`❌ Không thể tải lên ảnh nào. Lỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... và ${errors.length - 5} lỗi khác` : ''}`);
+      }
+      
       setShowResultModal(true);
       
-      // Chuyển hướng nhanh hơn sau 1 giây
+      // Chuyển hướng nhanh hơn sau 2 giây nếu có ít nhất 1 ảnh thành công
+      if (successCount > 0) {
       if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
       const timeout = setTimeout(() => {
         setShowResultModal(false);
         router.push('/staff/photos/gallery');
-      }, 1000);
+        }, 2000);
       setAutoCloseTimeout(timeout);
-    } catch (error) {
-      setResultMessage('❌ Có lỗi xảy ra khi tải ảnh. Vui lòng thử lại.');
+      } else {
+        if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
+        const timeout = setTimeout(() => {
+          setShowResultModal(false);
+        }, 5000);
+        setAutoCloseTimeout(timeout);
+      }
+    } catch (error: any) {
+      console.error('General upload error:', error);
+      setResultMessage(`❌ Có lỗi xảy ra khi tải ảnh: ${error.message || 'Lỗi không xác định'}`);
       setShowResultModal(true);
       if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
       const timeout = setTimeout(() => {
         setShowResultModal(false);
-      }, 2000);
+      }, 3000);
       setAutoCloseTimeout(timeout);
     } finally {
       setIsUploading(false);
@@ -403,6 +583,7 @@ export default function PhotoUploadPage() {
     setActivityType('');
     setCustomActivityType('');
     setPhotoTags([]);
+    setSelectedActivity('');
     setValidationErrors({});
     setShareWithFamily(true);
   };
@@ -492,6 +673,45 @@ export default function PhotoUploadPage() {
                 {validationErrors.selectedResident}
               </p>
             )}
+          </div>
+
+          {/* Activity Selection */}
+          <div style={{marginBottom: '1.5rem'}}>
+            <label style={{
+              display: 'block', 
+              fontWeight: 600, 
+              marginBottom: '0.5rem', 
+              color: '#374151',
+              fontSize: '0.95rem'
+            }}>
+              Liên kết với hoạt động (tùy chọn)
+            </label>
+            <select
+              value={selectedActivity}
+              onChange={(e) => {
+                setSelectedActivity(e.target.value);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.875rem',
+                borderRadius: '0.75rem',
+                border: '2px solid #e5e7eb',
+                fontSize: '0.95rem',
+                background: 'white',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+            >
+              <option value="">-- Chọn hoạt động (không bắt buộc) --</option>
+              {activities.map((activity: any) => (
+                <option key={activity._id} value={activity._id}>
+                  {activity.activity_name} - {activity.activity_type || 'Không phân loại'}
+                </option>
+              ))}
+            </select>
+            <p style={{color: '#6b7280', fontSize: '0.8rem', margin: '0.5rem 0 0 0'}}>
+              Chọn hoạt động nếu ảnh này liên quan đến một hoạt động cụ thể
+            </p>
           </div>
 
           {/* Activity Type */}
@@ -1034,8 +1254,28 @@ export default function PhotoUploadPage() {
             transform: scale(1);
           }
         }
+         
+         @keyframes zoomIn {
+           from {
+             opacity: 0;
+             transform: scale(0.95);
+           }
+           to {
+             opacity: 1;
+             transform: scale(1);
+           }
+         }
+         
+         @keyframes checkmark {
+           0% {
+             stroke-dashoffset: 40;
+           }
+           100% {
+             stroke-dashoffset: 0;
+           }
+         }
       `}</style>
-      {/* Modal kết quả upload chuyên nghiệp */}
+             {/* Modal kết quả upload đồng bộ với login success modal */}
       {showResultModal && (
         <div style={{
           position: 'fixed',
@@ -1043,77 +1283,114 @@ export default function PhotoUploadPage() {
           left: 0,
           width: '100vw',
           height: '100vh',
-          background: 'rgba(0,0,0,0.5)',
-          zIndex: 9999,
+           background: 'rgba(30, 41, 59, 0.25)',
+           backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          animation: 'fadeIn 0.3s ease-out'
+           zIndex: 9999,
+           animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1.5rem',
-            padding: '2.5rem 3rem',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-            minWidth: 400,
-            maxWidth: 500,
+             background: resultMessage.startsWith('✅') 
+               ? 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)'
+               : 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
+             borderRadius: '24px',
+             padding: '2.5rem 2.5rem 2rem 2.5rem',
+             minWidth: 340,
+             boxShadow: resultMessage.startsWith('✅')
+               ? '0 8px 40px 0 rgba(16, 185, 129, 0.18), 0 2px 8px 0 rgba(0, 0, 0, 0.08)'
+               : '0 8px 40px 0 rgba(239, 68, 68, 0.18), 0 2px 8px 0 rgba(0, 0, 0, 0.08)',
             textAlign: 'center',
             position: 'relative',
-            animation: 'slideIn 0.4s ease-out',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
+             animation: 'zoomIn 0.2s ease-out'
           }}>
-            {/* Success/Error Icon */}
+             {/* Animated checkmark SVG for success */}
+             {resultMessage.startsWith('✅') && (
             <div style={{
-              width: '4rem',
-              height: '4rem',
-              borderRadius: '50%',
-              margin: '0 auto 1.5rem',
+                 marginBottom: '18px',
               display: 'flex',
-              alignItems: 'center',
               justifyContent: 'center',
-              background: resultMessage.startsWith('✅') 
-                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-                : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              boxShadow: resultMessage.startsWith('✅')
-                ? '0 8px 25px rgba(34, 197, 94, 0.3)'
-                : '0 8px 25px rgba(239, 68, 68, 0.3)',
-              animation: 'bounceIn 0.6s ease-out'
-            }}>
-              <span style={{
-                fontSize: '2rem',
-                color: 'white',
-                fontWeight: 'bold'
-              }}>
-                {resultMessage.startsWith('✅') ? '✓' : '✕'}
-              </span>
+                 alignItems: 'center'
+               }}>
+                 <svg width="64" height="64" viewBox="0 0 64 64" style={{ display: 'block', margin: '0 auto' }}>
+                   <circle cx="32" cy="32" r="32" fill="#22c55e" opacity="0.15" />
+                   <circle cx="32" cy="32" r="24" fill="#22c55e" />
+                   <polyline
+                     points="22,34 30,42 44,26"
+                     fill="none"
+                     stroke="#fff"
+                     strokeWidth="4"
+                     strokeLinecap="round"
+                     strokeLinejoin="round"
+                     style={{
+                       strokeDasharray: 40,
+                       strokeDashoffset: 40,
+                       animation: 'checkmark 0.3s cubic-bezier(0.77, 0, 0.18, 1) forwards',
+                       animationDelay: '0.1s'
+                     }}
+                   />
+                 </svg>
+               </div>
+             )}
+             
+             {/* Error icon for failure */}
+             {!resultMessage.startsWith('✅') && (
+               <div style={{
+                 marginBottom: '18px',
+                 display: 'flex',
+                 justifyContent: 'center',
+                 alignItems: 'center'
+               }}>
+                 <svg width="64" height="64" viewBox="0 0 64 64" style={{ display: 'block', margin: '0 auto' }}>
+                   <circle cx="32" cy="32" r="32" fill="#ef4444" opacity="0.15" />
+                   <circle cx="32" cy="32" r="24" fill="#ef4444" />
+                   <path
+                     d="M24 24L40 40M40 24L24 40"
+                     fill="none"
+                     stroke="#fff"
+                     strokeWidth="4"
+                     strokeLinecap="round"
+                     strokeLinejoin="round"
+                     style={{
+                       strokeDasharray: 40,
+                       strokeDashoffset: 40,
+                       animation: 'checkmark 0.3s cubic-bezier(0.77, 0, 0.18, 1) forwards',
+                       animationDelay: '0.1s'
+                     }}
+                   />
+                 </svg>
             </div>
+             )}
             
             {/* Title */}
-            <h3 style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: '#1f2937',
-              margin: '0 0 0.75rem 0',
-              lineHeight: 1.2
-            }}>
-              {resultMessage.startsWith('✅') ? 'Tải lên thành công!' : 'Có lỗi xảy ra'}
-            </h3>
+             <h2 style={{
+               fontSize: '26px',
+               fontWeight: 800,
+               marginBottom: '10px',
+               color: resultMessage.startsWith('✅') ? '#166534' : '#dc2626',
+               letterSpacing: '-0.01em'
+             }}>
+               {resultMessage.startsWith('✅') ? 'Tải lên thành công! 🎉' : 'Có lỗi xảy ra! ❌'}
+             </h2>
             
             {/* Message */}
-            <p style={{
-              fontSize: '1rem',
-              color: '#6b7280',
-              margin: '0 0 2rem 0',
-              lineHeight: 1.5
+             <div style={{
+               fontSize: '18px',
+               color: resultMessage.startsWith('✅') ? '#166534' : '#dc2626',
+               marginBottom: '28px',
+               fontWeight: 500,
+               lineHeight: 1.4
             }}>
               {resultMessage.replace(/^✅|^❌/, '')}
-            </p>
+             </div>
             
             {/* Action Buttons */}
             <div style={{
               display: 'flex',
               gap: '1rem',
-              justifyContent: 'center'
+               justifyContent: 'center',
+               flexWrap: 'wrap'
             }}>
               {resultMessage.startsWith('✅') && (
                 <button
@@ -1122,27 +1399,29 @@ export default function PhotoUploadPage() {
                     router.push('/staff/photos/gallery');
                   }}
                   style={{
-                    padding: '0.875rem 2rem',
-                    borderRadius: '0.75rem',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                     background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
                     color: 'white',
                     border: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.95rem',
+                     borderRadius: '999px',
+                     padding: '0.6rem 2.2rem',
+                     fontWeight: 700,
+                     fontSize: '17px',
                     cursor: 'pointer',
+                     boxShadow: '0 2px 8px rgba(34, 197, 94, 0.12)',
                     transition: 'all 0.2s ease',
-                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
+                     e.currentTarget.style.background = 'linear-gradient(90deg, #16a34a 0%, #15803d 100%)';
+                     e.currentTarget.style.transform = 'translateY(-1px)';
+                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.2)';
                   }}
                   onMouseOut={(e) => {
+                     e.currentTarget.style.background = 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)';
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(34, 197, 94, 0.12)';
                   }}
                 >
                   <PhotoIcon style={{width: '1.25rem', height: '1.25rem'}} />
@@ -1158,48 +1437,43 @@ export default function PhotoUploadPage() {
                   }
                 }}
                 style={{
-                  padding: '0.875rem 2rem',
-                  borderRadius: '0.75rem',
-                  background: 'white',
-                  color: '#6b7280',
-                  border: '2px solid #e5e7eb',
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
+                   background: resultMessage.startsWith('✅') 
+                     ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
+                     : 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+                   color: 'white',
+                   border: 'none',
+                   borderRadius: '999px',
+                   padding: '0.6rem 2.2rem',
+                   fontWeight: 700,
+                   fontSize: '17px',
                   cursor: 'pointer',
+                   boxShadow: resultMessage.startsWith('✅')
+                     ? '0 2px 8px rgba(34, 197, 94, 0.12)'
+                     : '0 2px 8px rgba(239, 68, 68, 0.12)',
                   transition: 'all 0.2s ease'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#f9fafb';
-                  e.currentTarget.style.borderColor = '#d1d5db';
+                   e.currentTarget.style.background = resultMessage.startsWith('✅')
+                     ? 'linear-gradient(90deg, #16a34a 0%, #15803d 100%)'
+                     : 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)';
+                   e.currentTarget.style.transform = 'translateY(-1px)';
+                   e.currentTarget.style.boxShadow = resultMessage.startsWith('✅')
+                     ? '0 4px 12px rgba(34, 197, 94, 0.2)'
+                     : '0 4px 12px rgba(239, 68, 68, 0.2)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'white';
-                  e.currentTarget.style.borderColor = '#e5e7eb';
+                   e.currentTarget.style.background = resultMessage.startsWith('✅')
+                     ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
+                     : 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)';
+                   e.currentTarget.style.transform = 'translateY(0)';
+                   e.currentTarget.style.boxShadow = resultMessage.startsWith('✅')
+                     ? '0 2px 8px rgba(34, 197, 94, 0.12)'
+                     : '0 2px 8px rgba(239, 68, 68, 0.12)';
                 }}
               >
                 {resultMessage.startsWith('✅') ? 'Tiếp tục tải lên' : 'Đóng'}
               </button>
             </div>
-            
-            {/* Progress indicator for auto-close */}
-            {resultMessage.startsWith('✅') && (
-              <div style={{
-                marginTop: '1.5rem',
-                padding: '0.5rem',
-                background: 'rgba(34, 197, 94, 0.1)',
-                borderRadius: '0.5rem',
-                border: '1px solid rgba(34, 197, 94, 0.2)'
-              }}>
-                <p style={{
-                  fontSize: '0.85rem',
-                  color: '#22c55e',
-                  margin: 0,
-                  fontWeight: 500
-                }}>
-                  ⏱️ Tự động chuyển hướng sau 1 giây...
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}

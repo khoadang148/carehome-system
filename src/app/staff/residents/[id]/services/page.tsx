@@ -14,7 +14,8 @@ import {
   ExclamationTriangleIcon,
   HomeIcon,
   ShieldCheckIcon,
-  HeartIcon
+  HeartIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedsAPI } from '@/lib/api';
@@ -43,9 +44,30 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
   const [roomLoading, setRoomLoading] = useState(false);
   const [bedLoading, setBedLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   // Get residentId from params
   const residentId = React.use(params).id;
+
+  // Auto-refresh data every 30 seconds
+  useEffect(() => {
+    if (!autoRefreshEnabled || !residentId) return;
+
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing resident services data...');
+      setLastRefresh(new Date());
+      // Trigger re-fetch by updating dependencies
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, residentId]);
+
+  // Manual refresh function
+  const refreshData = () => {
+    console.log('Manual refresh triggered');
+    setLastRefresh(new Date());
+  };
 
   // Check access permissions - staff only
   useEffect(() => {
@@ -95,7 +117,7 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
     if (residentId) {
       loadResident();
     }
-  }, [residentId, router]);
+  }, [residentId, router, lastRefresh]);
 
   // Load care plan assignments and details
   useEffect(() => {
@@ -104,16 +126,34 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
 
       try {
         const assignments = await carePlansAPI.getByResidentId(residentId);
-        const validAssignments = Array.isArray(assignments) 
-          ? assignments.filter(assignment => assignment && assignment._id)
-          : [];
+        const allAssignments = Array.isArray(assignments) ? assignments : [];
+        
+        // Chỉ lấy assignment hiện tại (active) thay vì tất cả lịch sử
+        const now = new Date();
+        const sortedByStart = [...allAssignments].sort((a: any, b: any) => {
+          const da = new Date(a?.start_date || a?.createdAt || 0).getTime();
+          const db = new Date(b?.start_date || b?.createdAt || 0).getTime();
+          return db - da;
+        });
+        
+        const activeAssignmentOnly = sortedByStart.find((a: any) => {
+          const notExpired = !a?.end_date || new Date(a.end_date) >= now;
+          const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
+          return notExpired && notCancelled;
+        });
+        
+        const currentAssignment = activeAssignmentOnly || sortedByStart[0];
+        const validAssignments = currentAssignment ? [currentAssignment] : [];
+        
         setCarePlanAssignments(validAssignments);
         
         // Load care plan details for all assignments
         const allCarePlans: any[] = [];
         for (const assignment of validAssignments) {
-          if (assignment.care_plan_ids && assignment.care_plan_ids.length > 0) {
-            const carePlanPromises = assignment.care_plan_ids.map(async (plan: any) => {
+          // Chỉ lấy care_plan_ids của assignment hiện tại
+          const currentCarePlanIds = assignment.care_plan_ids || [];
+          if (currentCarePlanIds.length > 0) {
+            const carePlanPromises = currentCarePlanIds.map(async (plan: any) => {
               const planId = plan._id || plan;
               try {
                 const planData = await carePlansAPI.getById(planId);
@@ -146,7 +186,7 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
     };
 
     loadCarePlanAssignments();
-  }, [residentId]);
+  }, [residentId, lastRefresh]);
 
   // Load room and bed information
   useEffect(() => {
@@ -358,13 +398,43 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
               <DocumentTextIcon className="w-6 h-6 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-2xl font-bold text-slate-800 m-0">
                 Tổng quan gói dịch vụ
               </h2>
               <p className="text-base text-slate-600 mt-1">
                 Thông tin chi tiết về tất cả gói dịch vụ đang sử dụng
               </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Auto-refresh indicator */}
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <div className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                <span>{autoRefreshEnabled ? 'Tự động cập nhật' : 'Tắt cập nhật'}</span>
+              </div>
+              
+              {/* Refresh button */}
+              <button
+                onClick={refreshData}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200"
+                title="Làm mới dữ liệu"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                <span className="text-sm font-medium">Làm mới</span>
+              </button>
+              
+              {/* Toggle auto-refresh */}
+              <button
+                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  autoRefreshEnabled 
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                title={autoRefreshEnabled ? 'Tắt tự động cập nhật' : 'Bật tự động cập nhật'}
+              >
+                {autoRefreshEnabled ? 'Tắt' : 'Bật'}
+              </button>
             </div>
           </div>
         </div>

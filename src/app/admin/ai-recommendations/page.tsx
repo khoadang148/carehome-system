@@ -501,7 +501,7 @@ export default function AIRecommendationsPage() {
             setNotification({ 
               open: true, 
               type: 'success', 
-              message: 'Hoạt động đã được tạo thành công và tự động thêm người cao tuổi vào hoạt động với staff được phân công! Bạn sẽ được chuyển đến trang danh sách hoạt động.' 
+              message: 'Hoạt động đã được tạo thành công và tự động thêm người cao tuổi vào hoạt động với nhân viên được phân công! Bạn sẽ được chuyển đến trang danh sách hoạt động.' 
             });
           } else {
             setNotification({ 
@@ -1537,7 +1537,34 @@ export default function AIRecommendationsPage() {
                   .replace(/(\d{2}\/\d{2}\/\d{4})/g, '<span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600; font-size: 0.8rem;">$1</span>')
                   
                   // Format tên người - chỉ khi đứng sau "cụ", "bà", "ông"
-                  .replace(/(cụ|bà|ông)\s+([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]+)/g, '<span style="color: #dc2626; font-weight: 600;">$1 $2</span>')
+                  .replace(/(cụ|bà|ông)\s+([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]+)/g, (match, prefix, name) => {
+                    // Kiểm tra xem tên này có phải là resident được chọn không
+                    const selectedResidentName = selectedResident ? residents.find(r => r.id === selectedResident)?.full_name : '';
+                    if (selectedResidentName && name.toLowerCase().includes(selectedResidentName.toLowerCase())) {
+                      return `<span style="color: #dc2626; font-weight: 600; background: rgba(220, 38, 38, 0.1); padding: 0.125rem 0.25rem; border-radius: 0.25rem;">${prefix} ${name}</span>`;
+                    }
+                    return `<span style="color: #dc2626; font-weight: 600;">${prefix} ${name}</span>`;
+                  })
+                  
+                  // Format tên resident được chọn trước tiên
+                  .replace(new RegExp(`(${selectedResident ? residents.find(r => r.id === selectedResident)?.full_name?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') || '' : ''})`, 'gi'), (match) => {
+                    if (match && selectedResident) {
+                      return `<span style="color: #dc2626; font-weight: 600; background: rgba(220, 38, 38, 0.1); padding: 0.125rem 0.25rem; border-radius: 0.25rem;">${match}</span>`;
+                    }
+                    return match;
+                  })
+                  
+                  // Format tên resident cụ thể - tìm kiếm tên đầy đủ với pattern "Nguyễn Văn Nam" hoặc tương tự
+                  .replace(/([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+(?:\s+[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+)*)/g, (match) => {
+                    // Kiểm tra xem tên này có trong danh sách residents không
+                    const foundResident = residents.find(r => 
+                      r.full_name && r.full_name.toLowerCase().includes(match.toLowerCase())
+                    );
+                    if (foundResident) {
+                      return `<span style="color: #dc2626; font-weight: 600;">${match}</span>`;
+                    }
+                    return match;
+                  })
                   
                   // Format các bệnh lý - chỉ trong context y tế
                   .replace(/(bệnh lý|tiểu đường|bệnh thận|huyết áp|tim mạch)(?=\s*\)|\s*,|\s*\.|\s*$)/g, '<span style="background: #fee2e2; color: #dc2626; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 500;">$1</span>')

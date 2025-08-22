@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI, userAPI, apiClient } from '@/lib/api';
+import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, carePlanAssignmentsAPI, userAPI, apiClient } from '@/lib/api';
 import { useOptimizedCarePlansAll, useOptimizedResidentsByRole, useOptimizedRooms, useOptimizedBeds, useOptimizedRoomTypes, useResidentsAssignmentStatus } from '@/hooks/useOptimizedData';
 import { ArrowLeftIcon, CheckCircleIcon, UserIcon, MagnifyingGlassIcon, FunnelIcon, CalendarIcon, PhoneIcon, MapPinIcon, GiftIcon, PlusIcon } from '@heroicons/react/24/outline';
 import DatePicker from 'react-datepicker';
@@ -65,8 +65,8 @@ export default function SelectPackagesPage() {
 
   const residentId = searchParams.get('residentId') || '';
 
-  // Filter và sort residents - chỉ hiển thị những resident chưa đăng ký dịch vụ
-  const [residentsWithAssignmentStatus, setResidentsWithAssignmentStatus] = useState<{[key: string]: boolean}>({});
+  // Filter và sort residents - hiển thị những resident chưa đăng ký dịch vụ hoặc đã hết hạn
+  const [residentsWithAssignmentStatus, setResidentsWithAssignmentStatus] = useState<{[key: string]: { hasAssignment: boolean; isExpired: boolean; endDate?: string }}>({});
   const [loadingAssignmentStatus, setLoadingAssignmentStatus] = useState(false);
 
   // Tự động tính ngày kết thúc khi thay đổi ngày bắt đầu hoặc thời gian đăng ký
@@ -117,21 +117,29 @@ export default function SelectPackagesPage() {
       });
     }
     
-    // Chỉ filter khi đã có assignment status
+    // Filter khi đã có assignment status
     let filtered = residents.filter(resident => {
       const residentId = resident._id || resident.id;
+      const assignmentStatus = residentsWithAssignmentStatus[residentId];
       
-      // Kiểm tra resident chưa có phòng giường (chưa đăng ký dịch vụ)
-      const hasAssignment = residentsWithAssignmentStatus[residentId];
+      console.log(`🔍 Processing resident: ${resident.full_name || resident.name} (${residentId})`);
+      console.log(`📊 Assignment status:`, assignmentStatus);
+      
+      // Hiển thị resident nếu:
+      // 1. Chưa có assignment (chưa đăng ký dịch vụ)
+      // 2. Có assignment nhưng đã hết hạn
+      const shouldShow = !assignmentStatus?.hasAssignment || assignmentStatus?.isExpired;
       
       console.log(`👤 Resident ${resident.full_name || resident.name} (${residentId}):`, {
-        hasAssignment: hasAssignment,
-        willShow: !hasAssignment
+        hasAssignment: assignmentStatus?.hasAssignment,
+        isExpired: assignmentStatus?.isExpired,
+        endDate: assignmentStatus?.endDate,
+        willShow: shouldShow,
+        reason: !assignmentStatus?.hasAssignment ? 'no assignment' : assignmentStatus?.isExpired ? 'expired assignment' : 'active assignment'
       });
       
-      // Nếu có assignment thì loại bỏ
-      if (hasAssignment) {
-        console.log(`❌ Excluding ${resident.full_name || resident.name} - has assignment`);
+      if (!shouldShow) {
+        console.log(`❌ Excluding ${resident.full_name || resident.name} - has active assignment`);
         return false;
       }
       
@@ -140,12 +148,12 @@ export default function SelectPackagesPage() {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = name.includes(searchLower);
       
-      console.log(`✅ Including ${resident.full_name || resident.name} - no assignment, search match: ${matchesSearch}`);
+      console.log(`✅ Including ${resident.full_name || resident.name} - ${!assignmentStatus?.hasAssignment ? 'no assignment' : 'expired assignment'}, search match: ${matchesSearch}`);
       return matchesSearch;
     });
     
     console.log('📋 Final filtered count:', filtered.length);
-    return filtered;
+    console.log('📋 Filtered residents:', filtered.map(r => ({ name: r.full_name || r.name, id: r._id || r.id })));
 
     // Sort
     filtered.sort((a, b) => {
@@ -431,6 +439,15 @@ export default function SelectPackagesPage() {
     try {
       const finalResidentId = residentId || selectedResidentId;
       
+      // Kiểm tra xem resident có dịch vụ hết hạn không
+      const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
+      const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
+      
+      if (isReRegistering) {
+        console.log('🔄 Re-registering for resident with expired services:', finalResidentId);
+        console.log('📅 Expired date:', residentAssignmentStatus?.endDate);
+      }
+      
       // Xử lý assigned_bed_id - chỉ gửi MongoDB ID thực tế
       let assignedBedId: string | null = null;
       
@@ -484,7 +501,10 @@ export default function SelectPackagesPage() {
       };
 
       console.log('Submitting payload:', payload);
-      await apiClient.post('/care-plan-assignments', payload);
+      console.log('🔄 Re-registration mode:', isReRegistering);
+      
+      // Backend sẽ tự động xử lý việc xóa gói hết hạn khi tạo assignment mới
+      await carePlanAssignmentsAPI.create(payload);
       setStep(8); // Hoàn tất
     } catch (error: any) {
       console.error('Error submitting:', error);
@@ -619,7 +639,26 @@ export default function SelectPackagesPage() {
                   {/* Results Count */}
                   <div className="mt-4 bg-indigo-50 p-3 rounded-lg border border-indigo-200">
                     <p className="text-sm text-indigo-600 m-0 font-semibold">
-                      Hiển thị: {paginatedResidents.length} trong tổng số {filteredAndSortedResidents.length} người thụ hưởng chưa đăng ký dịch vụ
+                      Hiển thị: {paginatedResidents.length} trong tổng số {filteredAndSortedResidents.length} người thụ hưởng 
+                      {(() => {
+                        const unregisteredCount = filteredAndSortedResidents.filter(r => {
+                          const status = residentsWithAssignmentStatus[r._id || r.id];
+                          return status && !status.hasAssignment;
+                        }).length;
+                        const expiredCount = filteredAndSortedResidents.filter(r => {
+                          const status = residentsWithAssignmentStatus[r._id || r.id];
+                          return status && status.hasAssignment && status.isExpired;
+                        }).length;
+                        
+                        if (unregisteredCount > 0 && expiredCount > 0) {
+                          return ` (${unregisteredCount} chưa đăng ký, ${expiredCount} hết hạn)`;
+                        } else if (unregisteredCount > 0) {
+                          return ` (${unregisteredCount} chưa đăng ký)`;
+                        } else if (expiredCount > 0) {
+                          return ` (${expiredCount} hết hạn)`;
+                        }
+                        return '';
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -663,10 +702,10 @@ export default function SelectPackagesPage() {
                             <>
                               <UserIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                               <h3 className="text-lg font-semibold mb-2 text-gray-700">
-                                Tất cả người thụ hưởng đã được đăng ký dịch vụ
+                                Tất cả người thụ hưởng đã có dịch vụ hợp lệ
                               </h3>
                               <p className="m-0 text-sm text-gray-500">
-                                Không có người thụ hưởng nào chưa được phân phòng giường.
+                                Không có người thụ hưởng nào chưa đăng ký hoặc có dịch vụ hết hạn.
                               </p>
                             </>
                           )}
@@ -724,6 +763,27 @@ export default function SelectPackagesPage() {
                                  <div className="flex-1 min-w-0 overflow-hidden">
                                    <div className="flex items-center gap-2">
                                      <div className="font-semibold text-gray-900 text-base truncate">{r.full_name || r.name}</div>
+                                     {/* Assignment Status Badge */}
+                                     {(() => {
+                                       const residentId = r._id || r.id;
+                                       const assignmentStatus = residentsWithAssignmentStatus[residentId];
+                                       if (!assignmentStatus) return null;
+                                       
+                                       if (!assignmentStatus.hasAssignment) {
+                                         return (
+                                           <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+                                             Chưa đăng ký
+                                           </span>
+                                         );
+                                       } else if (assignmentStatus.isExpired) {
+                                         return (
+                                           <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                                             Hết hạn
+                                           </span>
+                                         );
+                                       }
+                                       return null;
+                                     })()}
                                    </div>
                                    
                                    {/* Date of Birth, Gender & Age */}
@@ -754,6 +814,21 @@ export default function SelectPackagesPage() {
                                        <span className="truncate">{r.phone}</span>
                                      </div>
                                    )}
+                                   
+                                   {/* Expired Date Info */}
+                                   {(() => {
+                                     const residentId = r._id || r.id;
+                                     const assignmentStatus = residentsWithAssignmentStatus[residentId];
+                                     if (assignmentStatus?.hasAssignment && assignmentStatus?.isExpired && assignmentStatus?.endDate) {
+                                       return (
+                                         <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                                           <CalendarIcon className="w-3 h-3 flex-shrink-0" />
+                                           <span>Hết hạn: {new Date(assignmentStatus.endDate).toLocaleDateString('vi-VN')}</span>
+                                         </div>
+                                       );
+                                     }
+                                     return null;
+                                   })()}
                                  </div>
                                  
                                  {/* Selection indicator */}
@@ -877,6 +952,47 @@ export default function SelectPackagesPage() {
                 {error}
               </div>
             )}
+
+            {/* Re-registration Notification */}
+            {(() => {
+              const finalResidentId = residentId || selectedResidentId;
+              const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
+              const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
+              
+              if (isReRegistering) {
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 shadow-md">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                          <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-amber-800 mb-2">
+                          Đăng ký lại dịch vụ
+                        </h3>
+                        <p className="text-amber-700 mb-3">
+                          Người thụ hưởng này đã có dịch vụ hết hạn vào ngày{' '}
+                          <span className="font-semibold">
+                            {residentAssignmentStatus?.endDate ? new Date(residentAssignmentStatus.endDate).toLocaleDateString('vi-VN') : 'không xác định'}
+                          </span>.
+                          Khi đăng ký gói dịch vụ mới, gói cũ sẽ được tự động xóa bỏ.
+                        </p>
+                        <div className="bg-amber-100 rounded-lg p-3">
+                          <p className="text-sm text-amber-800 m-0">
+                            <strong>Lưu ý:</strong> Việc đăng ký lại sẽ tạo ra một gói dịch vụ mới hoàn toàn với thời hạn và điều khoản mới.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Search and Statistics Section */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
@@ -1865,6 +1981,46 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
+            {/* Re-registration Notification */}
+            {(() => {
+              const finalResidentId = residentId || selectedResidentId;
+              const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
+              const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
+              
+              if (isReRegistering) {
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 shadow-md">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                          <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-amber-800 mb-2">
+                          ⚠️ Đăng ký lại dịch vụ
+                        </h3>
+                        <p className="text-amber-700 mb-3">
+                          Bạn đang đăng ký lại dịch vụ cho người thụ hưởng có dịch vụ hết hạn vào ngày{' '}
+                          <span className="font-semibold">
+                            {residentAssignmentStatus?.endDate ? new Date(residentAssignmentStatus.endDate).toLocaleDateString('vi-VN') : 'không xác định'}
+                          </span>.
+                        </p>
+                        <div className="bg-amber-100 rounded-lg p-3">
+                          <p className="text-sm text-amber-800 m-0">
+                            <strong>Xác nhận:</strong> Gói dịch vụ cũ sẽ được tự động xóa bỏ và thay thế bằng gói dịch vụ mới này.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Registration Information Card */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
@@ -2185,16 +2341,35 @@ export default function SelectPackagesPage() {
                 
                 {/* Success Title */}
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent mb-4">
-                  Đăng ký thành công!
+                  {(() => {
+                    const finalResidentId = residentId || selectedResidentId;
+                    const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
+                    const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
+                    return isReRegistering ? 'Đăng ký lại thành công!' : 'Đăng ký thành công!';
+                  })()}
                 </h2>
                 
                 {/* Success Message */}
                 <div className="text-gray-600 text-base leading-relaxed mb-6 max-w-xl mx-auto">
                   <p className="mb-2 font-medium">
-                    Thông tin đăng ký dịch vụ đã được gửi thành công.
+                    {(() => {
+                      const finalResidentId = residentId || selectedResidentId;
+                      const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
+                      const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
+                      return isReRegistering 
+                        ? 'Thông tin đăng ký lại dịch vụ đã được gửi thành công.'
+                        : 'Thông tin đăng ký dịch vụ đã được gửi thành công.';
+                    })()}
                   </p>
                   <p className="text-sm text-gray-500">
-                    Gói dịch vụ đã được đăng kí thành công và lưu vào hệ thống.
+                    {(() => {
+                      const finalResidentId = residentId || selectedResidentId;
+                      const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
+                      const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
+                      return isReRegistering 
+                        ? 'Gói dịch vụ cũ đã được thay thế bằng gói dịch vụ mới và lưu vào hệ thống.'
+                        : 'Gói dịch vụ đã được đăng kí thành công và lưu vào hệ thống.';
+                    })()}
                   </p>
                 </div>
                 

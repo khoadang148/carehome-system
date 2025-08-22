@@ -501,20 +501,20 @@ export default function StaffVitalSignsPage() {
       
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Back Button */}
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer mb-4 shadow-sm hover:bg-gray-50 transition-colors"
-          >
-            <ArrowLeftIcon className="w-4 h-4" />
-            Quay lại
-          </button>
+         
 
           {/* Header */}
           <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
             <div className="flex justify-between items-center">
               <div>
                 <div className="flex items-center gap-4">
+                  <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại trang trước"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
                   <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-4 flex items-center justify-center shadow-lg">
                     <HeartIconSolid className="w-8 h-8 text-white" />
                   </div>
@@ -569,7 +569,7 @@ export default function StaffVitalSignsPage() {
           {/* Filters */}
           <div className="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-sm">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-800">Bộ lọc</h3>
+              
               {(selectedResident || selectedDate) && (
                 <button
                   onClick={() => {
@@ -856,9 +856,7 @@ export default function StaffVitalSignsPage() {
                                 <div className="font-medium text-gray-900 truncate">
                                   {ensureString(vs.residentName)}
                                 </div>
-                                <div className="text-xs text-gray-500 truncate">
-                                  ID: {ensureString(vs.residentId)}
-                                </div>
+                                
                               </div>
                             </div>
                           </td>

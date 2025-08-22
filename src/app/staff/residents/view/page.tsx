@@ -325,13 +325,7 @@ export default function ResidentsPage() {
                           }}>
                             {resident.name}
                           </p>
-                          <p style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280',
-                            margin: 0
-                          }}>
-                            ID: {resident.id}
-                          </p>
+                          
                         </div>
                       </div>
                     </td>
@@ -415,54 +409,8 @@ export default function ResidentsPage() {
                         >
                           <EyeIcon style={{width: '1rem', height: '1rem'}} />
                         </button>
-                        <button
-                          onClick={() => handleEditResident(resident.id)}
-                          title="Chỉnh sửa thông tin người cao tuổi"
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '0.375rem',
-                            border: 'none',
-                            background: 'rgba(245, 158, 11, 0.1)',
-                            color: '#f59e0b',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#f59e0b';
-                            e.currentTarget.style.color = 'white';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
-                            e.currentTarget.style.color = '#f59e0b';
-                          }}
-                        >
-                          <PencilIcon style={{width: '1rem', height: '1rem'}} />
-                        </button>
-                        {user?.role === 'admin' && (
-                          <button
-                            onClick={() => handleDeleteClick(resident.id)}
-                            title="Xóa người cao tuổi khỏi hệ thống"
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.375rem',
-                              border: 'none',
-                              background: 'rgba(239, 68, 68, 0.1)',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#ef4444';
-                              e.currentTarget.style.color = 'white';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                              e.currentTarget.style.color = '#ef4444';
-                            }}
-                          >
-                            <TrashIcon style={{width: '1rem', height: '1rem'}} />
-                          </button>
-                        )}
+                       
+                       
                       </div>
                     </td>
                   </tr>

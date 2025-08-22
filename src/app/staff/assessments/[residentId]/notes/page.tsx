@@ -41,6 +41,9 @@ export default function ResidentNotesPage() {
   const [notesPerPage] = useState(10);
   const [editNote, setEditNote] = useState<CareNote | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [editRecommendations, setEditRecommendations] = useState('');
+  const [originalContent, setOriginalContent] = useState('');
+  const [originalRecommendations, setOriginalRecommendations] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ note: CareNote } | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -121,7 +124,7 @@ export default function ResidentNotesPage() {
       const updateData = {
         assessment_type: note.assessment_type || 'Đánh giá tổng quát',
         notes: editContent,
-        recommendations: note.recommendations || '',
+        recommendations: editRecommendations,
         resident_id: typeof note.resident_id === 'object' ? note.resident_id._id : String(note.resident_id),
         conducted_by: typeof note.conducted_by === 'object' ? (note.conducted_by._id || note.conducted_by.full_name) : note.conducted_by,
       };
@@ -132,11 +135,20 @@ export default function ResidentNotesPage() {
       
       await loadResidentNotes();
       setEditNote(null);
+      setEditContent('');
+      setEditRecommendations('');
+      setOriginalContent('');
+      setOriginalRecommendations('');
       showNotification('Cập nhật ghi chú thành công!', 'success');
     } catch (err) {
       console.error('Error updating note:', err);
       showNotification('Cập nhật ghi chú thất bại!', 'error');
     }
+  };
+
+  // Kiểm tra xem có thay đổi nào không
+  const hasChanges = () => {
+    return editContent !== originalContent || editRecommendations !== originalRecommendations;
   };
 
   const handleDeleteNote = async (note: CareNote) => {
@@ -308,6 +320,9 @@ export default function ResidentNotesPage() {
                           onClick={() => {
                             setEditNote(note);
                             setEditContent(note.notes || '');
+                            setEditRecommendations(note.recommendations || '');
+                            setOriginalContent(note.notes || '');
+                            setOriginalRecommendations(note.recommendations || '');
                           }}
                           className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all duration-200 hover:scale-110"
                           title="Sửa ghi chú"
@@ -394,7 +409,13 @@ export default function ResidentNotesPage() {
             <div className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl relative animate-slideUp">
               <button 
                 title="Đóng"
-                onClick={() => setEditNote(null)} 
+                onClick={() => {
+                  setEditNote(null);
+                  setEditContent('');
+                  setEditRecommendations('');
+                  setOriginalContent('');
+                  setOriginalRecommendations('');
+                }} 
                 className="absolute top-4 right-4 w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-blue-600 transition-colors duration-200 text-2xl"
                 aria-label="Đóng"
               >
@@ -424,8 +445,8 @@ export default function ResidentNotesPage() {
                 <div>
                   <label className="font-semibold block mb-2 text-gray-700">Khuyến nghị:</label>
                   <textarea
-                    value={editNote.recommendations || ''}
-                    onChange={e => setEditNote({ ...editNote, recommendations: e.target.value })}
+                    value={editRecommendations}
+                    onChange={e => setEditRecommendations(e.target.value)}
                     rows={4}
                     className="w-full p-3 border border-gray-300 rounded-xl text-base focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 resize-none placeholder-gray-400"
                     placeholder="Nhập khuyến nghị (nếu có)..."
@@ -435,18 +456,26 @@ export default function ResidentNotesPage() {
               
               <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
                 <button
-                  onClick={() => setEditNote(null)}
+                  onClick={() => {
+                    setEditNote(null);
+                    setEditContent('');
+                    setEditRecommendations('');
+                    setOriginalContent('');
+                    setOriginalRecommendations('');
+                  }}
                   className="px-5 py-2.5 bg-gray-100 text-gray-700 border-none rounded-xl text-base font-semibold cursor-pointer hover:bg-gray-200 transition-colors duration-200"
                 >
                   Hủy
                 </button>
-                <button
-                  onClick={() => handleEditNote(editNote)}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-none rounded-xl text-base font-semibold cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md flex items-center gap-2"
-                >
-                  <PencilIcon className="w-5 h-5" />
-                  Lưu thay đổi
-                </button>
+                {hasChanges() && (
+                  <button
+                    onClick={() => handleEditNote(editNote)}
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-none rounded-xl text-base font-semibold cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md flex items-center gap-2"
+                  >
+                    <PencilIcon className="w-5 h-5" />
+                    Lưu thay đổi
+                  </button>
+                )}
               </div>
             </div>
           </div>

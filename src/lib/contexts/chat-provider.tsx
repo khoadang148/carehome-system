@@ -124,7 +124,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Poll for unread counts
   useEffect(() => {
-    if (!user) return;
+    if (!user || (user.role !== 'family' && user.role !== 'staff')) return;
 
     const pollUnreadCounts = async () => {
       try {
@@ -134,9 +134,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           (response && (response.totalUnread ?? response.total ?? response.count)) || 0
         );
 
+        let computedTotal = Number.isFinite(total) ? total : 0;
+        // If response has per-conversation unread counts, compute total to be safe
+        if (!computedTotal && response && typeof response === 'object') {
+          const possibleMaps = [response.unreadCounts, response.perConversations, response.byResident];
+          for (const m of possibleMaps) {
+            if (m && typeof m === 'object') {
+              computedTotal = Object.values(m as Record<string, number>).reduce((s, v) => s + Number(v || 0), 0);
+              break;
+            }
+          }
+        }
+
         setChatState(prev => ({
           ...prev,
-          totalUnread: Number.isFinite(total) ? total : 0,
+          totalUnread: computedTotal,
         }));
       } catch (error) {
         console.error('Error polling unread counts:', error);

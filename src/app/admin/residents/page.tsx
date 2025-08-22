@@ -37,7 +37,7 @@ export default function ResidentsPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
-  const [activeTab, setActiveTab] = useState<'assigned' | 'unassigned'>('assigned');
+  const [activeTab, setActiveTab] = useState<'assigned' | 'unassigned' | 'discharged'>('assigned');
   
 
   
@@ -73,6 +73,8 @@ export default function ResidentsPage() {
           contactPhone: r.emergency_contact?.phone || '',
           avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
           gender: (r.gender || '').toLowerCase(),
+          status: r.status || 'active',
+          discharge_date: r.discharge_date || null,
         }));
         setResidentsData(mapped);
         console.log('Mapped residents:', mapped);
@@ -156,12 +158,14 @@ export default function ResidentsPage() {
                          residentRoom.toLowerCase().includes(searchValue.toLowerCase());
   });
 
-  // Separate residents by room assignment status
-  const residentsWithRooms = filteredResidents.filter(resident => 
+  // Separate by discharge status first, then by room assignment
+  const dischargedResidents = filteredResidents.filter(resident => resident.status === 'discharged');
+  const activeResidents = filteredResidents.filter(resident => resident.status !== 'discharged');
+  const residentsWithRooms = activeResidents.filter(resident => 
     roomNumbers[resident.id] && roomNumbers[resident.id] !== 'Chưa hoàn tất đăng kí'
   );
   
-  const residentsWithoutRooms = filteredResidents.filter(resident => 
+  const residentsWithoutRooms = activeResidents.filter(resident => 
     !roomNumbers[resident.id] || roomNumbers[resident.id] === 'Chưa hoàn tất đăng kí'
   );
   
@@ -586,39 +590,6 @@ export default function ResidentsPage() {
                 </p>
               </div>
             </div>
-            
-            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
-              {user?.role === 'admin' && (
-                <Link 
-                  href="/admin/residents/add" 
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    padding: '0.875rem 1.5rem',
-                    borderRadius: '0.75rem',
-                    textDecoration: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                    transition: 'all 0.3s ease',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
-                  }}
-                >
-                  <PlusCircleIcon style={{width: '1.125rem', height: '1.125rem', marginRight: '0.5rem'}} />
-                  Thêm Người cao tuổi
-                </Link>
-              )}
-            </div>
           </div>
         </div>
 
@@ -688,7 +659,7 @@ export default function ResidentsPage() {
                 margin: 0,
                 fontWeight: 600
               }}>
-                Hiển thị: {activeTab === 'assigned' ? residentsWithRooms.length : residentsWithoutRooms.length} người cao tuổi
+                Hiển thị: {activeTab === 'assigned' ? residentsWithRooms.length : activeTab === 'unassigned' ? residentsWithoutRooms.length : dischargedResidents.length} người cao tuổi
               </p>
             </div>
           </div>
@@ -752,13 +723,33 @@ export default function ResidentsPage() {
               <ExclamationTriangleIcon style={{width: '1.125rem', height: '1.125rem'}} />
               Chưa phân phòng ({residentsWithoutRooms.length} người)
             </button>
+            <button
+              onClick={() => setActiveTab('discharged')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                background: activeTab === 'discharged' ? 'linear-gradient(135deg, #6b7280 0%, #374151 100%)' : 'transparent',
+                color: activeTab === 'discharged' ? 'white' : '#6b7280',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                transition: 'all 0.2s ease',
+                boxShadow: activeTab === 'discharged' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : 'none'
+              }}
+            >
+              Đã xuất viện ({dischargedResidents.length} người)
+            </button>
           </div>
 
 
         </div>
 
         {/* Residents Table based on active tab */}
-        {activeTab === 'assigned' ? renderResidentsTable(residentsWithRooms, true) : renderResidentsTable(residentsWithoutRooms, false)}
+        {activeTab === 'assigned' ? renderResidentsTable(residentsWithRooms, true) : activeTab === 'unassigned' ? renderResidentsTable(residentsWithoutRooms, false) : renderResidentsTable(dischargedResidents, false)}
 
       </div>
 

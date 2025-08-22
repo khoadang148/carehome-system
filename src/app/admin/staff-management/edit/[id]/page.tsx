@@ -423,18 +423,15 @@ export default function EditStaffPage() {
       <div className="relative z-10 max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <Link
-              href="/admin/staff-management"
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors duration-200"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-              <span className="font-medium">Quay lại</span>
-            </Link>
-          </div>
-          
           <div className="bg-white rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-8">
             <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại trang trước"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
               <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <UserIcon className="w-8 h-8 text-white" />
               </div>

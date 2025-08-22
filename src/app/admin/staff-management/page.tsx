@@ -33,6 +33,7 @@ export default function StaffManagementPage() {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -70,6 +71,10 @@ export default function StaffManagementPage() {
       const matchesStatus = statusFilter === 'all' || staff.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
+
+  // Tách nhân viên theo trạng thái
+  const activeStaff = filteredStaff.filter(staff => staff.status === 'active');
+  const inactiveStaff = filteredStaff.filter(staff => staff.status === 'inactive');
 
   // Xử lý xóa nhân viên
   const handleDelete = (id: string) => {
@@ -255,6 +260,14 @@ export default function StaffManagementPage() {
                 }}>
                   Tổng số: {filteredStaff.length} nhân viên
                 </p>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#667eea',
+                  margin: 0,
+                  fontWeight: 600
+                }}>
+                  Hiển thị: {activeTab === 'active' ? activeStaff.length : inactiveStaff.length} nhân viên
+                </p>
               </div>
             </div>
             
@@ -385,11 +398,73 @@ export default function StaffManagementPage() {
                 margin: 0,
                 fontWeight: 600
               }}>
-                Hiển thị: {filteredStaff.length} nhân viên
+                Hiển thị: {activeTab === 'active' ? activeStaff.length : inactiveStaff.length} nhân viên
               </p>
             </div>
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '1rem',
+          padding: '1.5rem',
+          marginBottom: '2rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.2)'
+        }}>
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            borderBottom: '1px solid #e5e7eb',
+            paddingBottom: '1rem',
+            marginBottom: '1rem'
+          }}>
+            <button
+              onClick={() => setActiveTab('active')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                background: activeTab === 'active' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                color: activeTab === 'active' ? 'white' : '#6b7280',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                transition: 'all 0.2s ease',
+                boxShadow: activeTab === 'active' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
+              }}
+            >
+              <CheckCircleIcon style={{width: '1.125rem', height: '1.125rem'}} />
+              Đang làm việc ({activeStaff.length} người)
+            </button>
+            <button
+              onClick={() => setActiveTab('inactive')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                background: activeTab === 'inactive' ? 'linear-gradient(135deg, #6b7280 0%, #374151 100%)' : 'transparent',
+                color: activeTab === 'inactive' ? 'white' : '#6b7280',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                transition: 'all 0.2s ease',
+                boxShadow: activeTab === 'inactive' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : 'none'
+              }}
+            >
+              <XMarkIcon style={{width: '1.125rem', height: '1.125rem'}} />
+              Đã nghỉ việc ({inactiveStaff.length} người)
+            </button>
+          </div>
+        </div>
+
         {/* Staff Table */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -415,17 +490,21 @@ export default function StaffManagementPage() {
               <tbody>
                 {loadingData ? (
                   <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>Đang tải dữ liệu...</td></tr>
-                ) : filteredStaff.length === 0 ? (
+                ) : (activeTab === 'active' ? activeStaff : inactiveStaff).length === 0 ? (
                   <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
                     <UsersIcon style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem', color: '#d1d5db' }} />
-                    <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#374151' }}>Không tìm thấy nhân viên</h3>
-                    <p style={{ margin: 0, fontSize: '0.875rem' }}>Thử thay đổi tiêu chí tìm kiếm hoặc bộ lọc</p>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#374151' }}>
+                      {activeTab === 'active' ? 'Không có nhân viên đang làm việc' : 'Không có nhân viên đã nghỉ việc'}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.875rem' }}>
+                      {activeTab === 'active' ? 'Tất cả nhân viên đều đã nghỉ việc' : 'Tất cả nhân viên đều đang làm việc'}
+                    </p>
                   </td></tr>
-                ) : filteredStaff.map((staff, index) => (
+                ) : (activeTab === 'active' ? activeStaff : inactiveStaff).map((staff, index) => (
                   <tr
                     key={staff._id}
                     style={{
-                      borderBottom: index < filteredStaff.length - 1 ? '1px solid #f3f4f6' : 'none',
+                      borderBottom: index < (activeTab === 'active' ? activeStaff : inactiveStaff).length - 1 ? '1px solid #f3f4f6' : 'none',
                       transition: 'all 0.2s ease'
                     }}
                     onMouseOver={e => {

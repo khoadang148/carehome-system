@@ -25,6 +25,7 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAPI } from '@/lib/api';
 import { UserFriendlyErrorHandler } from '@/lib/utils/user-friendly-errors';
+import '@/components/success-modal.css';
 
 export default function AddStaffPage() {
   const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ export default function AddStaffPage() {
   const [createdAccount, setCreatedAccount] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -99,13 +101,13 @@ export default function AddStaffPage() {
 
 
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, field: string) => {
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 3000);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 2000);
         return;
       }
       
@@ -121,8 +123,8 @@ export default function AddStaffPage() {
       
       try {
         document.execCommand('copy');
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 3000);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 2000);
       } catch (err) {
         console.error('Fallback copy failed:', err);
         toast.error('❌ Không thể copy tự động. Vui lòng copy thủ công:\n\n' + text);
@@ -327,18 +329,16 @@ export default function AddStaffPage() {
       <div className="relative z-10 max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <Link
-              href="/admin/staff-management"
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors duration-200"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-              <span className="font-medium">Quay lại</span>
-            </Link>
-          </div>
           
           <div className="bg-white rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-8">
             <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại trang trước"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
               <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <UserIcon className="w-8 h-8 text-white" />
               </div>
@@ -347,7 +347,7 @@ export default function AddStaffPage() {
                   Thêm nhân viên mới
                 </h1>
                 <p className="text-slate-600 mt-1">
-                  Tạo nhân viên và tài khoản đăng nhập trong hệ thống
+                  Thêm nhân viên và tài khoản đăng nhập trong hệ thống
                 </p>
               </div>
             </div>
@@ -616,20 +616,7 @@ export default function AddStaffPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Trạng thái
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
-                  >
-                    <option value="active">Đang làm việc</option>
-                    <option value="inactive">Nghỉ việc</option>
-                  </select>
-                </div>
+
               </div>
             </div>
 
@@ -688,180 +675,174 @@ export default function AddStaffPage() {
 
       {/* Success Modal */}
       {showSuccessModal && createdAccount && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-            {/* Success Header */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white text-center">
-              <CheckCircleIcon className="w-12 h-12 mx-auto mb-3 drop-shadow-lg" />
-              <h3 className="text-xl font-bold mb-2">Hoàn thành!</h3>
-              <p className="text-green-100 text-sm">
-                Nhân viên <strong>{createdAccount.full_name}</strong> đã được thêm vào hệ thống
-              </p>
+        <div className="success-modal-overlay" style={{ justifyContent: 'center' }}>
+          <div className="success-modal-content" style={{ minWidth: 520, maxWidth: 640, textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                borderRadius: '0.75rem',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)'
+              }}>
+                <CheckCircleIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+              </div>
+              <h2 className="success-title" style={{ margin: 0 }}>Tạo thành công!</h2>
             </div>
+            <p className="success-message" style={{ marginTop: 0 }}>
+              Nhân viên <b>{createdAccount.full_name}</b> đã được thêm vào hệ thống
+            </p>
 
-            {/* Content */}
-            <div className="p-6">
-              {/* Staff Info */}
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <UserIcon className="w-4 h-4 text-indigo-600" />
-                  Thông tin nhân viên
-                </h4>
-                <div className="bg-slate-50 rounded-lg p-3 space-y-1">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">Tên:</span>
-                    <span className="font-semibold text-slate-900">{createdAccount.full_name}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">Vị trí:</span>
-                    <span className="font-semibold text-slate-900">{createdAccount.position || 'Chưa cập nhật'}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">Trạng thái:</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      createdAccount.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-slate-100 text-slate-800'
-                    }`}>
-                      {createdAccount.status === 'active' ? 'Đang làm việc' : 'Nghỉ việc'}
+            <div style={{
+              background: 'white',
+              borderRadius: '0.75rem',
+              border: '1px solid #e5e7eb',
+              padding: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', color: '#374151', fontWeight: 600 }}>Tên đăng nhập</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.6rem 0.75rem',
+                    background: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    position: 'relative'
+                  }}>
+                    <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: '#111827' }}>
+                      {createdAccount.username}
                     </span>
+                                         <button
+                       onClick={() => copyToClipboard(createdAccount.username, 'username')}
+                       style={{
+                         width: '1.9rem',
+                         height: '1.9rem',
+                         display: 'inline-flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         background: copiedField === 'username' ? '#dcfce7' : '#eef2ff',
+                         color: copiedField === 'username' ? '#16a34a' : '#2563eb',
+                         border: `1px solid ${copiedField === 'username' ? '#86efac' : '#c7d2fe'}`,
+                         borderRadius: '0.5rem',
+                         cursor: 'pointer'
+                       }}
+                       title="Sao chép"
+                     >
+                       {copiedField === 'username' ? (
+                         <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                       ) : (
+                         <ClipboardDocumentIcon style={{ width: '1rem', height: '1rem' }} />
+                       )}
+                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Login Info */}
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <LockClosedIcon className="w-4 h-4 text-indigo-600" />
-                  Thông tin đăng nhập
-                </h4>
-                <div className="space-y-2">
-                  {/* Email */}
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Email
-                    </label>
-                    <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                      <span className="flex-1 font-mono text-slate-900 font-medium text-xs">
-                        {createdAccount.email}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(createdAccount.email)}
-                        className="px-1.5 py-0.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs font-medium flex items-center gap-1"
-                      >
-                        <ClipboardDocumentIcon className="w-3 h-3" />
-                        Sao chép
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Username */}
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Tên đăng nhập
-                    </label>
-                    <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                      <span className="flex-1 font-mono text-slate-900 font-medium text-xs">
-                        {createdAccount.username}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(createdAccount.username)}
-                        className="px-1.5 py-0.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs font-medium flex items-center gap-1"
-                      >
-                        <ClipboardDocumentIcon className="w-3 h-3" />
-                        Sao chép
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Password - Hiển thị cả khi random và không random */}
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Mật khẩu
-                    </label>
-                    <div className="flex items-center gap-2 p-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <span className="flex-1 font-mono text-slate-900 font-medium tracking-wider text-xs">
-                        {createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(createdAccount.tempPassword || createdAccount.password || '')}
-                        className="px-1.5 py-0.5 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs font-medium flex items-center gap-1"
-                      >
-                        <ClipboardDocumentIcon className="w-3 h-3" />
-                        Sao chép
-                      </button>
-                    </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', color: '#374151', fontWeight: 600 }}>Mật khẩu</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.6rem 0.75rem',
+                    background: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    position: 'relative'
+                  }}>
+                    <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: '#111827', letterSpacing: '0.08em' }}>
+                      {createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}
+                    </span>
+                                         <button
+                       onClick={() => copyToClipboard(createdAccount.tempPassword || createdAccount.password || '', 'password')}
+                       style={{
+                         width: '1.9rem',
+                         height: '1.9rem',
+                         display: 'inline-flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         background: copiedField === 'password' ? '#dcfce7' : '#eef2ff',
+                         color: copiedField === 'password' ? '#16a34a' : '#2563eb',
+                         border: `1px solid ${copiedField === 'password' ? '#86efac' : '#c7d2fe'}`,
+                         borderRadius: '0.5rem',
+                         cursor: 'pointer'
+                       }}
+                       title="Sao chép"
+                     >
+                       {copiedField === 'password' ? (
+                         <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                       ) : (
+                         <ClipboardDocumentIcon style={{ width: '1rem', height: '1rem' }} />
+                       )}
+                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Important Notice */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <div className="flex items-start gap-2">
-                  <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-xs font-bold">!</span>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-yellow-800 mb-1">
-                      Lưu ý quan trọng
-                    </h4>
-                    <ul className="text-yellow-700 space-y-0.5 text-xs">
-                      <li>• Vui lòng lưu lại thông tin đăng nhập này một cách an toàn</li>
-                      <li>• Mật khẩu sẽ không thể xem lại sau khi đóng modal này</li>
-                      <li>• Nhân viên nên đổi mật khẩu sau lần đăng nhập đầu tiên</li>
-                      <li>• Nếu quên mật khẩu, liên hệ quản trị viên để được hỗ trợ</li>
-                    </ul>
+                <div>
+                  <label style={{ fontSize: '0.85rem', color: '#374151', fontWeight: 600 }}>Email</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.6rem 0.75rem',
+                    background: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    position: 'relative'
+                  }}>
+                    <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: '#111827' }}>
+                      {createdAccount.email}
+                    </span>
+                                         <button
+                       onClick={() => copyToClipboard(createdAccount.email, 'email')}
+                       style={{
+                         width: '1.9rem',
+                         height: '1.9rem',
+                         display: 'inline-flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         background: copiedField === 'email' ? '#dcfce7' : '#eef2ff',
+                         color: copiedField === 'email' ? '#16a34a' : '#2563eb',
+                         border: `1px solid ${copiedField === 'email' ? '#86efac' : '#c7d2fe'}`,
+                         borderRadius: '0.5rem',
+                         cursor: 'pointer'
+                       }}
+                       title="Sao chép"
+                     >
+                       {copiedField === 'email' ? (
+                         <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                       ) : (
+                         <ClipboardDocumentIcon style={{ width: '1rem', height: '1rem' }} />
+                       )}
+                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Copy Success Message */}
-              {copySuccess && (
-                <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircleIcon className="w-3 h-3" />
-                    <span className="font-medium text-xs">✅ Đã sao chép thông tin vào clipboard!</span>
+                <div>
+                  <label style={{ fontSize: '0.85rem', color: '#374151', fontWeight: 600 }}>Vai trò</label>
+                  <div style={{ padding: '0.6rem 0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '0.5rem', fontWeight: 600, color: '#111827' }}>
+                    Nhân viên
                   </div>
                 </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2 justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const loginInfo = `Thông tin đăng nhập:\nEmail: ${createdAccount.email}\nUsername: ${createdAccount.username}\nMật khẩu: ${createdAccount.tempPassword || createdAccount.password || 'Không có mật khẩu'}`;
-                    copyToClipboard(loginInfo);
-                  }}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-1 text-xs"
-                >
-                  <ClipboardDocumentIcon className="w-3 h-3" />
-                  Sao chép tất cả
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    router.push('/admin/staff-management');
-                  }}
-                  className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-xs"
-                >
-                  Hoàn tất
-                </button>
               </div>
             </div>
 
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowSuccessModal(false);
-                router.push('/admin/staff-management');
-              }}
-              className="absolute top-3 right-3 text-white hover:text-slate-200 transition-colors p-1"
-            >
-              <XMarkIcon className="w-5 h-5" />
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button 
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  router.push('/admin/staff-management');
+                }} 
+                className="success-close-btn"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

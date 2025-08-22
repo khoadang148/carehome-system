@@ -31,6 +31,7 @@ interface ChatWidgetProps {
   staffId?: string;
   residentName: string;
   staffName?: string;
+  userRole?: 'family' | 'staff';
 }
 
 export default function ChatWidget({
@@ -39,7 +40,8 @@ export default function ChatWidget({
   residentId,
   staffId,
   residentName,
-  staffName
+  staffName,
+  userRole = 'family'
 }: ChatWidgetProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -171,10 +173,10 @@ export default function ChatWidget({
             </div>
             <div>
               <h3 className="font-semibold text-sm">
-                {staffName || 'Nhân viên'}
+                {userRole === 'staff' ? (staffName || 'Gia đình') : (staffName || 'Nhân viên')}
               </h3>
               <p className="text-xs text-blue-100">
-                phụ trách {residentName}
+                {userRole === 'staff' ? `Gia đình của ${residentName}` : `phụ trách ${residentName}`}
               </p>
             </div>
           </div>

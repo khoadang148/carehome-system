@@ -273,9 +273,7 @@ export default function StaffResidentsPage() {
                             <p className="text-sm font-semibold text-gray-900 m-0">
                               {resident.name}
                             </p>
-                            <p className="text-xs text-gray-500 m-0">
-                              ID: {resident.id}
-                            </p>
+                           
                           </div>
                         </div>
                       </td>

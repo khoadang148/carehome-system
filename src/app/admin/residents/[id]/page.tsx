@@ -27,6 +27,7 @@ import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
+import Avatar from '@/components/Avatar';
 
 
 export default function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -398,49 +399,15 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 marginBottom: '1rem'
               }}>
                 {/* Avatar */}
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  border: '3px solid #e5e7eb',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  flexShrink: 0
-                }}>
-                  {resident.avatar ? (
-                    <img
-                      src={userAPI.getAvatarUrl(resident.avatar)}
-                      alt={`Avatar của ${resident.name}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.textContent = resident.name ? resident.name.charAt(0).toUpperCase() : 'U';
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src="/default-avatar.svg"
-                      alt="Default avatar"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.textContent = resident.name ? resident.name.charAt(0).toUpperCase() : 'U';
-                        }
-                      }}
-                    />
-                  )}
-                </div>
+                <Avatar
+                  src={resident.avatar}
+                  alt={resident.name}
+                  size="large"
+                  className="w-20 h-20"
+                  showInitials={true}
+                  name={resident.name}
+                  fallbackSrc="/default-avatar.svg"
+                />
                 
                 {/* Thông tin cơ bản */}
                 <div style={{ flex: 1 }}>

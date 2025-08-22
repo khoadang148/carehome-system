@@ -57,37 +57,41 @@ export default function ServiceAssignmentsPage() {
               return [];
             }
             
-                          // Gộp tất cả gói dịch vụ của resident này thành một assignment duy nhất
-              const mergedAssignment = {
-                _id: assignments[0]._id, // Sử dụng ID của assignment đầu tiên
-                resident_id: residentId,
-                resident: r,
-                status: assignments[0].status,
-                start_date: assignments[0].start_date,
-                end_date: assignments[0].end_date,
-                notes: assignments[0].notes,
-                consultation_notes: assignments[0].consultation_notes,
-                family_preferences: assignments[0].family_preferences,
-                // Tính tổng chi phí từ tất cả assignments
-                care_plans_monthly_cost: assignments.reduce((total: number, assignment: any) => {
-                  return total + (assignment.care_plans_monthly_cost || 0);
-                }, 0),
-                total_monthly_cost: assignments.reduce((total: number, assignment: any) => {
-                  return total + (assignment.total_monthly_cost || 0);
-                }, 0),
-                room_monthly_cost: assignments[0].room_monthly_cost || 0,
-                selected_room_type: assignments[0].selected_room_type,
-                assigned_room_id: assignments[0].assigned_room_id,
-                assigned_bed_id: assignments[0].assigned_bed_id,
-                additional_medications: assignments[0].additional_medications,
-                // Gộp tất cả care_plan_ids từ các assignments
-                care_plan_ids: assignments.reduce((allPlans: any[], assignment: any) => {
-                  if (Array.isArray(assignment.care_plan_ids)) {
-                    allPlans.push(...assignment.care_plan_ids);
-                  }
-                  return allPlans;
-                }, [])
-              };
+            // Chỉ hiển thị gói dịch vụ hiện tại (không trộn lịch sử)
+            const now = new Date();
+            const sortedByStart = [...assignments].sort((a: any, b: any) => {
+              const da = new Date(a?.start_date || a?.createdAt || 0).getTime();
+              const db = new Date(b?.start_date || b?.createdAt || 0).getTime();
+              return db - da;
+            });
+            const activeAssignmentOnly = sortedByStart.find((a: any) => {
+              const notExpired = !a?.end_date || new Date(a.end_date) >= now;
+              const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
+              return notExpired && notCancelled;
+            });
+            const currentAssignment = activeAssignmentOnly || sortedByStart[0];
+
+            const mergedAssignment = {
+              _id: currentAssignment?._id || assignments[0]._id,
+              resident_id: residentId,
+              resident: r,
+              status: currentAssignment?.status,
+              start_date: currentAssignment?.start_date,
+              end_date: currentAssignment?.end_date,
+              notes: currentAssignment?.notes,
+              consultation_notes: currentAssignment?.consultation_notes,
+              family_preferences: currentAssignment?.family_preferences,
+              // Tổng chi phí vẫn lấy theo tất cả đăng ký (nếu muốn chỉ hiện hiện tại thì đổi sang currentAssignment)
+              care_plans_monthly_cost: assignments.reduce((total: number, a: any) => total + (a.care_plans_monthly_cost || 0), 0),
+              total_monthly_cost: assignments.reduce((total: number, a: any) => total + (a.total_monthly_cost || 0), 0),
+              room_monthly_cost: currentAssignment?.room_monthly_cost || 0,
+              selected_room_type: currentAssignment?.selected_room_type,
+              assigned_room_id: currentAssignment?.assigned_room_id,
+              assigned_bed_id: currentAssignment?.assigned_bed_id,
+              additional_medications: currentAssignment?.additional_medications,
+              // Chỉ hiển thị các gói hiện tại thay vì toàn bộ lịch sử
+              care_plan_ids: Array.isArray(currentAssignment?.care_plan_ids) ? currentAssignment.care_plan_ids : []
+            };
             
             return [mergedAssignment];
           } catch {
@@ -266,38 +270,7 @@ export default function ServiceAssignmentsPage() {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Back Button */}
-        <div style={{ marginBottom: '1rem' }}>
-          <button
-            onClick={() => router.push('/services')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1rem',
-              borderRadius: '0.75rem',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              color: '#6b7280',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.borderColor = '#9ca3af';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'white';
-              e.currentTarget.style.borderColor = '#d1d5db';
-            }}
-          >
-            <ArrowLeftIcon style={{ width: '1rem', height: '1rem' }} />
-            Quay lại
-          </button>
-        </div>
+        
 
         {/* Header Section */}
         <div style={{
@@ -310,6 +283,14 @@ export default function ServiceAssignmentsPage() {
           backdropFilter: 'blur(10px)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
+            
             <div style={{
               width: '3rem',
               height: '3rem',
@@ -338,7 +319,8 @@ export default function ServiceAssignmentsPage() {
             fontSize: '1rem',
             color: '#64748b',
             margin: '0.25rem 0 0 0',
-            fontWeight: 500
+            fontWeight: 500,
+            marginLeft: '7rem'
           }}>
             Tổng số đăng ký: {filteredAssignments.length} | Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length}
           </p>

@@ -8,7 +8,6 @@ import {
   HeartIcon,
   ScaleIcon,
   FireIcon,
-  HeartIcon,
   BeakerIcon,
   PlusIcon,
   CalendarDaysIcon,

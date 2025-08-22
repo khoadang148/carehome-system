@@ -117,7 +117,7 @@ export function useActivityEvaluation({
           await activityParticipationsAPI.update(existingParticipation._id, {
             attendance_status: evaluation.participated ? 'attended' : 'absent',
             performance_notes: evaluation.participated ?
-              'Tham gia tích cực, tinh thần tốt' :
+              'Lý do sức khỏe' :
               (evaluation.reason || 'Không có lý do cụ thể')
           });
         } else {
@@ -134,7 +134,7 @@ export function useActivityEvaluation({
               resident_id: resident.id,
               date: activity.date + "T00:00:00Z",
               performance_notes: evaluation.participated ?
-                'Tham gia tích cực, tinh thần tốt' :
+                'Lý do sức khỏe' :
                 (evaluation.reason || 'Không có lý do cụ thể'),
               attendance_status: evaluation.participated ? 'attended' : 'absent'
             });
