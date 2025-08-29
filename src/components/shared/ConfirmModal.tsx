@@ -192,7 +192,6 @@ export default function ConfirmModal({
         animation: 'slideUp 0.3s ease-out',
         position: 'relative'
       }}>
-        {/* Close button for success/error modals */}
         {type !== 'confirm' && (
           <button
             onClick={onCancel}
@@ -221,10 +220,8 @@ export default function ConfirmModal({
           </button>
         )}
 
-        {/* Icon */}
         {getIcon()}
 
-        {/* Title */}
         <h2 style={{
           fontSize: '1.5rem',
           fontWeight: 700,
@@ -234,7 +231,6 @@ export default function ConfirmModal({
           {title}
         </h2>
 
-        {/* Message */}
         <p style={{
           fontSize: '1rem',
           color: '#6b7280',
@@ -243,8 +239,7 @@ export default function ConfirmModal({
         }}>
           {message}
         </p>
-
-        {/* Buttons */}
+          
         <div style={{
           display: 'flex',
           gap: '1rem',

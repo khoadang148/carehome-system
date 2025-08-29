@@ -77,7 +77,6 @@ export default function NewCareNotePage() {
   const onSubmit = async (data: CareNoteData) => {
     setIsSubmitting(true);
     try {
-      // Gộp date và time thành ISO string
       const dateTimeISO = new Date(`${data.date}T${data.time}:00`).toISOString();
       const payload = {
         assessment_type: data.category || 'Đánh giá tổng quát',
@@ -108,7 +107,6 @@ export default function NewCareNotePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 mb-6 shadow-xl border border-white/40">
           <div className="flex items-center gap-4">
             <button
@@ -130,11 +128,8 @@ export default function NewCareNotePage() {
             </div>
           </div>
         </div>
-
-        {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-xl border border-white/40 mb-6">
-            {/* Basic Info */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -166,7 +161,6 @@ export default function NewCareNotePage() {
               </div>
             </div>
 
-            {/* Quick Templates */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                 <LightBulbIcon className="w-6 h-6 text-amber-500" />
@@ -191,7 +185,6 @@ export default function NewCareNotePage() {
               </div>
             </div>
 
-            {/* Note Content */}
             <div className="mb-8">
               <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <LightBulbIcon className="w-5 h-5 text-blue-500" />
@@ -225,7 +218,6 @@ export default function NewCareNotePage() {
               </div>
             </div>
 
-            {/* Recommendations */}
             <div className="mb-8">
               <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <LightBulbIcon className="w-5 h-5 text-amber-500" />
@@ -250,7 +242,6 @@ export default function NewCareNotePage() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4 border-t border-gray-100">
               <button
                 type="button"
@@ -283,8 +274,6 @@ export default function NewCareNotePage() {
             </div>
           </div>
         </form>
-
-        {/* Success Modal */}
         {showSuccess && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-md animate-fadeIn">
             <div className="bg-white rounded-3xl p-8 max-w-md text-center shadow-2xl animate-slideUp border border-white/20">

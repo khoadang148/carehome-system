@@ -12,15 +12,12 @@ export default function ServicesPage() {
   const router = useRouter();
   const { user } = useAuth();
   
-  // Care plans state from API
   const [carePlans, setCarePlans] = useState<any[]>([]);
   const [loadingCarePlans, setLoadingCarePlans] = useState(true);
   const [carePlansError, setCarePlansError] = useState<string | null>(null);
   
-  // Relatives state
   const [relatives, setRelatives] = useState<any[]>([]);
   
-  // Check access permissions - family only
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -33,7 +30,6 @@ export default function ServicesPage() {
     }
   }, [user, router]);
   
-  // Fetch care plans from API
   useEffect(() => {
     setLoadingCarePlans(true);
     setCarePlansError(null);
@@ -49,7 +45,6 @@ export default function ServicesPage() {
       });
   }, []);
 
-  // Fetch relatives when user changes
   useEffect(() => {
     if (!user?.id) return;
     residentAPI.getByFamilyMemberId(user.id)
@@ -61,7 +56,6 @@ export default function ServicesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600">
-      {/* Hero Section */}
       <div className="bg-gradient-to-br from-indigo-600/90 to-purple-600/90 text-white py-16 px-4 text-center">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-5xl font-bold mb-4 text-shadow-lg">
@@ -74,7 +68,6 @@ export default function ServicesPage() {
             }
           </p>
 
-          {/* Action Buttons */}
           <div className="flex gap-4 justify-center flex-wrap mt-8">
             <button
               onClick={() => router.push('/family/services/terms')}
@@ -97,9 +90,7 @@ export default function ServicesPage() {
         </div>
       </div>
 
-      {/* Packages Section */}
       <div className="max-w-7xl mx-auto px-8 py-16 -mt-8">
-        {/* Informational message for Family users */}
         {user?.role === 'family' && (
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-500 rounded-xl p-6 mb-8 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
@@ -168,21 +159,18 @@ export default function ServicesPage() {
                   : 'border-gray-200/80'
               }`}
             >
-              {/* Background decoration */}
               <div className={`absolute -top-12 -right-12 w-36 h-36 rounded-full z-0 ${
                 pkg.category === 'main'
                   ? 'bg-gradient-to-br from-red-500/10 to-red-600/5'
                   : 'bg-gradient-to-br from-blue-500/10 to-blue-600/5'
               }`} />
               
-              {/* Top accent line */}
               <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-3xl ${
                 pkg.category === 'main' 
                   ? 'bg-gradient-to-r from-red-500 to-red-600'
                   : 'bg-gradient-to-r from-blue-500 to-blue-600'
               }`} />
               
-              {/* Header */}
               <div className="flex items-start gap-4 mb-6 pt-2 relative z-10">
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg relative ${
                   pkg.category === 'main'
@@ -192,7 +180,6 @@ export default function ServicesPage() {
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  {/* Shine effect */}
                   <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white/30 rounded-full blur-sm" />
                 </div>
                 <div className="flex-1">
@@ -208,13 +195,12 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              {/* Price section */}
               <div className={`rounded-2xl p-4 mb-5 text-center relative overflow-hidden ${
                 pkg.category === 'main'
                   ? 'bg-gradient-to-br from-red-50 to-red-100 border border-red-200'
                   : 'bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200'
               }`}>
-                {/* Background pattern */}
+              
                 <div className={`absolute -top-4 -right-4 w-15 h-15 rounded-full ${
                   pkg.category === 'main'
                     ? 'bg-red-500/8'
@@ -239,12 +225,10 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              {/* Description */}
               <div className="text-sm text-gray-600 leading-relaxed mb-6 p-4 bg-gray-50/80 rounded-xl border border-gray-200/50">
                 {pkg.description}
               </div>
 
-              {/* Features list */}
               <div className="flex-1 mb-6">
                 <div className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2 p-2 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
                   Dịch vụ bao gồm:
@@ -265,7 +249,6 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              {/* Package badges */}
               {pkg.category === 'main' ? (
                 <div className="absolute top-2 right-3 bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg z-10 border-2 border-white uppercase tracking-wide max-w-24 text-center leading-tight truncate">
                   Gói chính
@@ -279,9 +262,7 @@ export default function ServicesPage() {
           ))}
         </div>
 
-        {/* Additional Info Section */}
         <div className="mt-16 text-center p-12 bg-gradient-to-br from-white/95 to-gray-50/95 rounded-3xl backdrop-blur-xl border border-white/20 shadow-2xl relative overflow-hidden">
-          {/* Background decoration */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full" />
           <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full" />
           
@@ -342,15 +323,11 @@ export default function ServicesPage() {
         </div>
       </div>
 
-      {/* Business Rules Section */}
       <div className="mt-12 max-w-4xl mx-auto bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-2xl p-10 border border-gray-200 text-base text-gray-700 relative overflow-hidden">
-        {/* Background decoration */}
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full opacity-5 z-0" />
         <div className="absolute -bottom-8 -left-8 w-36 h-36 bg-gradient-to-br from-green-500 to-green-600 rounded-full opacity-5 z-0" />
 
-        {/* Content */}
         <div className="relative z-10">
-          {/* Header */}
           <div className="text-center mb-8 pb-6 border-b-2 border-gray-200">
             <h3 className="font-bold text-2xl mb-2 text-gray-800 bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
               Quy Tắc & Điều Khoản Dịch Vụ
@@ -361,9 +338,7 @@ export default function ServicesPage() {
             </p>
           </div>
 
-          {/* Rules Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Rule 1 */}
             <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-500 rounded-2xl p-6 relative">
               <div className="absolute -top-2.5 left-5 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                 Quy tắc 1
@@ -379,7 +354,6 @@ export default function ServicesPage() {
               </p>
             </div>
 
-            {/* Rule 2 */}
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-500 rounded-2xl p-6 relative">
               <div className="absolute -top-2.5 left-5 bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                 Quy tắc 2
@@ -393,7 +367,6 @@ export default function ServicesPage() {
               </p>
             </div>
 
-            {/* Rule 3 */}
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-500 rounded-2xl p-6 relative">
               <div className="absolute -top-2.5 left-5 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                 Quy tắc 3
@@ -406,7 +379,6 @@ export default function ServicesPage() {
               </p>
             </div>
 
-            {/* Rule 4 */}
             <div className="bg-gradient-to-br from-red-50 to-pink-50 border border-red-500 rounded-2xl p-6 relative">
               <div className="absolute -top-2.5 left-5 bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                 Quy tắc 4
@@ -420,7 +392,6 @@ export default function ServicesPage() {
             </div>
           </div>
 
-          {/* CTA Button */}
           <div className="text-center p-8 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-500 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/10 z-0" />
             <div className="relative z-10">

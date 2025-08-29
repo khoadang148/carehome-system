@@ -15,18 +15,14 @@ export function useActiveConversation() {
   } = useChat();
 
   const selectConversation = useCallback(async (conversation: ChatConversation) => {
-    // Leave current conversation if any
     if (activeConversation) {
       await leaveConversation(activeConversation._id);
     }
 
-    // Set new active conversation
     setActiveConversation(conversation);
     
-    // Join new conversation
     await joinConversation(conversation._id);
     
-    // Mark all messages as read
     await markAllAsRead(conversation._id);
   }, [activeConversation, setActiveConversation, joinConversation, leaveConversation, markAllAsRead]);
 
@@ -60,12 +56,10 @@ export function useMessageSender() {
       startTyping(activeConversation._id);
     }
 
-    // Clear existing timeout
     if (typingTimeout) {
       clearTimeout(typingTimeout);
     }
 
-    // Set new timeout to stop typing
     const timeout = setTimeout(() => {
       setIsTyping(false);
       stopTyping(activeConversation._id);
@@ -89,7 +83,6 @@ export function useMessageSender() {
   const sendMessageWithTyping = useCallback(async (content: string, messageType: 'text' | 'image' | 'file' = 'text') => {
     if (!activeConversation || !content.trim()) return;
 
-    // Stop typing indicator
     handleStopTyping();
 
     try {
@@ -104,7 +97,6 @@ export function useMessageSender() {
     }
   }, [activeConversation, sendMessage, handleStopTyping]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (typingTimeout) {
@@ -158,8 +150,6 @@ export function useUnreadMessages() {
   const { unreadCount, conversations } = useChat();
 
   const getConversationUnreadCount = useCallback((conversationId: string) => {
-    // Này có thể implement sau khi backend cung cấp API
-    // Hiện tại return 0
     return 0;
   }, []);
 
@@ -168,10 +158,8 @@ export function useUnreadMessages() {
   }, [unreadCount]);
 
   const getUnreadConversations = useCallback(() => {
-    // Implement logic để lấy conversations có tin nhắn chưa đọc
     return conversations.filter(conv => {
-      // Logic để check unread messages
-      return false; // Placeholder
+      return false; 
     });
   }, [conversations]);
 
@@ -183,9 +171,6 @@ export function useUnreadMessages() {
   };
 }
 
-/**
- * Hook để quản lý tìm kiếm và lọc conversations
- */
 export function useConversationSearch() {
   const { conversations } = useChat();
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,16 +184,13 @@ export function useConversationSearch() {
 
     const query = searchQuery.toLowerCase();
     const filtered = conversations.filter(conversation => {
-      // Tìm kiếm theo tên participant
       const hasMatchingParticipant = conversation.participants.some(participant =>
         participant.full_name.toLowerCase().includes(query) ||
         participant.email.toLowerCase().includes(query)
       );
 
-      // Tìm kiếm theo title (nếu có)
       const hasMatchingTitle = conversation.title?.toLowerCase().includes(query);
 
-      // Tìm kiếm theo topic (nếu có)
       const hasMatchingTopic = conversation.topic?.toLowerCase().includes(query);
 
       return hasMatchingParticipant || hasMatchingTitle || hasMatchingTopic;
@@ -243,8 +225,7 @@ export function useMessagePagination(conversationId?: string) {
       
       await loadMessages(conversationId, nextPage);
       
-      // Check if we got new messages
-      // If message count didn't change much, we probably reached the end
+
       const newMessageCount = messages.length;
       if (newMessageCount - currentMessageCount < 50) {
         setHasMoreMessages(false);
@@ -258,7 +239,7 @@ export function useMessagePagination(conversationId?: string) {
     }
   }, [conversationId, currentPage, hasMoreMessages, isLoading, loadMessages, messages.length]);
 
-  // Reset pagination when conversation changes
+  
   useEffect(() => {
     setCurrentPage(1);
     setHasMoreMessages(true);

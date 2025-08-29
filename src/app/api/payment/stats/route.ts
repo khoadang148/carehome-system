@@ -5,14 +5,12 @@ export async function GET(request: NextRequest) {
   try {
     console.log('Payment stats API called');
     
-    // Fetch all bills from the database
     let bills = [];
     try {
       bills = await billsAPI.getAll();
       console.log('Bills fetched successfully:', bills.length);
     } catch (billsError) {
       console.error('Error fetching bills:', billsError);
-      // Return default stats if bills API fails
       return NextResponse.json({
         totalRevenue: 0,
         monthlyRevenue: 0,
@@ -25,7 +23,6 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // If no bills data, return default stats
     if (!bills || bills.length === 0) {
       console.log('No bills data available, returning default stats');
       return NextResponse.json({
@@ -40,12 +37,10 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Calculate statistics
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
     
-    // Filter bills by status
     const paidBills = bills.filter((bill: any) => bill.status === 'paid');
     const pendingBills = bills.filter((bill: any) => bill.status === 'pending');
     const cancelledBills = bills.filter((bill: any) => bill.status === 'cancelled' || bill.status === 'failed');
@@ -57,10 +52,8 @@ export async function GET(request: NextRequest) {
       cancelled: cancelledBills.length
     });
     
-    // Calculate total revenue from paid bills
     const totalRevenue = paidBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
     
-    // Calculate monthly revenue (current month)
     const currentMonthBills = paidBills.filter((bill: any) => {
       if (!bill.paid_date) return false;
       const paidDate = new Date(bill.paid_date);
@@ -68,7 +61,6 @@ export async function GET(request: NextRequest) {
     });
     const monthlyRevenue = currentMonthBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
     
-    // Calculate previous month revenue for growth comparison
     const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     
@@ -79,15 +71,13 @@ export async function GET(request: NextRequest) {
     });
     const previousMonthRevenue = previousMonthBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
     
-    // Calculate growth percentage
     let growthPercentage = 0;
     if (previousMonthRevenue > 0) {
       growthPercentage = ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
     } else if (monthlyRevenue > 0) {
-      growthPercentage = 100; // If no previous month revenue but current month has revenue
+      growthPercentage = 100; 
     }
     
-    // Calculate pending amount
     const pendingAmount = pendingBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
     
     const stats = {

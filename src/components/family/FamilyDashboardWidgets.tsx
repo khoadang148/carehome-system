@@ -39,14 +39,12 @@ export default function FamilyDashboardWidgets() {
   useEffect(() => {
     loadFamilyData();
     
-    // Lắng nghe sự kiện cập nhật
     const handleDataUpdate = () => {
       setRefreshKey(prev => prev + 1);
     };
     
     window.addEventListener('dataUpdated', handleDataUpdate);
     
-    // Auto-refresh mỗi 30 giây
     const interval = setInterval(() => {
       loadFamilyData();
     }, 30000);
@@ -66,18 +64,15 @@ export default function FamilyDashboardWidgets() {
 
       const residents = JSON.parse(savedResidents);
       
-      // Mô phỏng dữ liệu gia đình (có thể cần cấu hình riêng)
-      const familyMemberIds = [1, 2]; // Giả sử user family có quyền xem resident ID 1, 2
+      const familyMemberIds = [1, 2];
       const userFamily = residents.filter((resident: any) => 
         familyMemberIds.includes(resident.id)
       );
 
-      // Thông tin người thân
       const members: FamilyMember[] = userFamily.map((member: any) => {
         let status = 'Ổn định';
         let lastUpdate = 'Hôm nay';
         
-        // Kiểm tra ghi chú gần nhất
         if (member.careNotes && member.careNotes.length > 0) {
           const latestNote = member.careNotes[0];
           if (latestNote.priority === 'high') {
@@ -97,11 +92,9 @@ export default function FamilyDashboardWidgets() {
 
       setFamilyMembers(members);
 
-      // Hoạt động gần đây
       const activities: FamilyActivity[] = [];
       
       userFamily.forEach((member: any) => {
-        // Từ appointments
         if (member.appointments) {
           member.appointments.slice(0, 3).forEach((apt: any) => {
             activities.push({
@@ -116,7 +109,6 @@ export default function FamilyDashboardWidgets() {
 
       setRecentActivities(activities.slice(0, 5));
 
-      // Ghi chú quan trọng
       const notes: FamilyNote[] = [];
       
       userFamily.forEach((member: any) => {
@@ -124,7 +116,7 @@ export default function FamilyDashboardWidgets() {
           member.careNotes.slice(0, 2).forEach((note: any) => {
             notes.push({
               memberName: member.name,
-              note: note.note.replace(/^\[.*?\]\s*/, ''), // Xóa tag danh mục
+              note: note.note.replace(/^\[.*?\]\s*/, ''),
               date: note.date || note.timestamp,
               priority: note.priority || 'medium'
             });
@@ -162,7 +154,6 @@ export default function FamilyDashboardWidgets() {
       gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
       gap: '1.5rem'
     }}>
-      {/* Family Members Status Widget */}
       <div style={{
         background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
         borderRadius: '1.5rem',
@@ -259,7 +250,6 @@ export default function FamilyDashboardWidgets() {
         </div>
       </div>
 
-      {/* Recent Activities Widget */}
       <div style={{
         background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
         borderRadius: '1.5rem',
@@ -337,7 +327,6 @@ export default function FamilyDashboardWidgets() {
         </div>
       </div>
 
-      {/* Important Notes Widget */}
       <div style={{
         background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
         borderRadius: '1.5rem',

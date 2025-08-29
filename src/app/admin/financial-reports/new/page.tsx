@@ -66,7 +66,7 @@ export default function NewBillPage() {
       try {
         const residentsData = await residentAPI.getAll();
         
-        // Chỉ lấy cư dân chính thức (có phòng và giường)
+        // Chỉ lấy người cao tuổi chính thức (có phòng và giường)
         const officialResidents = await filterOfficialResidents(residentsData);
         console.log('Official residents for financial reports:', officialResidents);
         
@@ -144,44 +144,82 @@ export default function NewBillPage() {
       const fetchCurrentAssignment = async () => {
         try {
           const assignments = await carePlanAssignmentsAPI.getByResidentId(resident_id);
+          console.log('🔍 All care plan assignments:', assignments);
+          
           if (Array.isArray(assignments) && assignments.length > 0) {
-            // Lấy assignment mới nhất (active)
+            // Lấy assignment mới nhất (active) - chỉ tính những assignment chưa hết hạn
             const now = new Date();
             const activeAssignment = assignments.find((a: any) => {
               const notExpired = !a?.end_date || new Date(a.end_date) >= now;
               const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
-              return notExpired && notCancelled;
+              const isActive = a?.status === 'active' || !a?.status;
+              
+              console.log(`📅 Assignment ${a._id}:`, {
+                end_date: a?.end_date,
+                status: a?.status,
+                notExpired,
+                notCancelled,
+                isActive,
+                isValid: notExpired && notCancelled && isActive
+              });
+              
+              return notExpired && notCancelled && isActive;
             });
             
-            const currentAssignment = activeAssignment || assignments[0];
-            setCurrentAssignmentId(currentAssignment._id);
-            console.log('Current assignment ID:', currentAssignment._id);
+            if (activeAssignment) {
+              setCurrentAssignmentId(activeAssignment._id);
+              console.log('✅ Active assignment ID:', activeAssignment._id);
+              
+              // Tính tổng tiền từ BE - chỉ khi có assignment active
+              billsAPI.calculateTotal(resident_id)
+                .then(totalCalculation => {
+                  console.log('💰 Total calculation result:', totalCalculation);
+                  setAmount(totalCalculation.totalAmount.toString());
+                  setBillingDetails(totalCalculation);
+                  // Gợi ý title/notes tự động
+                  const month = due_date ? new Date(due_date).getMonth() + 1 : '';
+                  const year = due_date ? new Date(due_date).getFullYear() : '';
+                  setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
+                  setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
+                })
+                .catch((error) => {
+                  console.error('❌ Error calculating total:', error);
+                  setAmount('');
+                  setBillingDetails(null);
+                  setTitle('');
+                  setNotes('');
+                })
+                .finally(() => setLoadingAssignments(false));
+            } else {
+              console.log('⚠️ No active assignment found - all assignments are expired/cancelled');
+              setCurrentAssignmentId('');
+              setAmount('0');
+              setBillingDetails(null);
+              setTitle('');
+              setNotes('');
+              setLoadingAssignments(false);
+            }
+          } else {
+            console.log('⚠️ No assignments found');
+            setCurrentAssignmentId('');
+            setAmount('0');
+            setBillingDetails(null);
+            setTitle('');
+            setNotes('');
+            setLoadingAssignments(false);
           }
         } catch (error) {
-          console.error('Error fetching current assignment:', error);
+          console.error('❌ Error fetching current assignment:', error);
+          setCurrentAssignmentId('');
+          setAmount('0');
+          setBillingDetails(null);
+          setTitle('');
+          setNotes('');
+          setLoadingAssignments(false);
         }
       };
       
       fetchCurrentAssignment();
-      
-      // Tính tổng tiền từ BE
-      billsAPI.calculateTotal(resident_id)
-        .then(totalCalculation => {
-          setAmount(totalCalculation.totalAmount.toString());
-          setBillingDetails(totalCalculation);
-          // Gợi ý title/notes tự động
-          const month = due_date ? new Date(due_date).getMonth() + 1 : '';
-          const year = due_date ? new Date(due_date).getFullYear() : '';
-          setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
-          setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
-        })
-        .catch(() => {
-          setAmount('');
-          setBillingDetails(null);
-          setTitle('');
-          setNotes('');
-        })
-        .finally(() => setLoadingAssignments(false));
     } else {
       setAmount('');
       setBillingDetails(null);
@@ -622,7 +660,7 @@ export default function NewBillPage() {
                     />
                     <div className="mt-2 flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
                       <CalendarIcon className="w-4 h-4" />
-                      <span>Tự động set ngày 5 hàng tháng tiếp theo</span>
+                      <span>Hạn thanh toán là ngày 5 tháng tiếp theo</span>
                     </div>
                     {validationErrors.due_date && (
                       <p className="text-red-600 text-sm mt-1 flex items-center gap-1">

@@ -15,7 +15,6 @@ export default function VisitHistoryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Helper functions
   function getTimeRange(startTime: string) {
     const [hour, minute] = startTime.split(':').map(Number);
     const endHour = hour + 1;
@@ -95,7 +94,6 @@ export default function VisitHistoryPage() {
     return grouped;
   }
 
-  // Fetch residents
   useEffect(() => {
     if (user?.id) {
       residentAPI.getByFamilyMemberId(user.id)
@@ -109,7 +107,6 @@ export default function VisitHistoryPage() {
     }
   }, [user]);
 
-  // Fetch visits
   useEffect(() => {
     setLoading(true);
     visitsAPI.getAll()
@@ -120,8 +117,7 @@ export default function VisitHistoryPage() {
       .catch(() => setVisitHistory([]))
       .finally(() => setLoading(false));
   }, []);
-
-  // Reset page when data changes
+  
   useEffect(() => {
     setCurrentPage(1);
   }, [visitHistory]);
@@ -139,10 +135,9 @@ export default function VisitHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
-          {/* Left: Back button + Icon + Title */}
+          
           <div className="flex items-center gap-8">
           <button
               onClick={() => router.back()}
@@ -167,16 +162,13 @@ export default function VisitHistoryPage() {
             </div>
           </div>
 
-          {/* Right: Empty or can add other info */}
           <div className="flex items-center justify-end">
           </div>
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-          {/* Header */}
           <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-6">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -189,7 +181,6 @@ export default function VisitHistoryPage() {
             </div>
           </div>
 
-                     {/* Color legend and controls */}
            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 border-b border-emerald-200">
              <div className="flex flex-wrap gap-6 items-center justify-between">
                <div className="flex flex-wrap gap-6 items-center">
@@ -207,27 +198,9 @@ export default function VisitHistoryPage() {
                  </div>
                </div>
                
-               {/* Expand/Collapse button */}
-               <button
-                 onClick={() => setIsExpanded(!isExpanded)}
-                 className="flex items-center gap-2 px-4 py-2 bg-white border border-emerald-200 rounded-lg text-emerald-600 font-medium text-sm hover:bg-emerald-50 transition-all duration-200 shadow-sm"
-               >
-                 {isExpanded ? (
-                   <>
-                     <ChevronUpIcon className="w-4 h-4" />
-                     Thu gọn
-                   </>
-                 ) : (
-                   <>
-                     <ChevronDownIcon className="w-4 h-4" />
-                     Mở rộng
-                   </>
-                 )}
-               </button>
              </div>
            </div>
 
-                     {/* Table */}
            <div className="overflow-x-auto">
              <table className="w-full">
                <thead>
@@ -298,7 +271,6 @@ export default function VisitHistoryPage() {
              </table>
            </div>
 
-           {/* Pagination and summary */}
            {(() => {
              const sortedHistory = groupVisitHistory([...visitHistory], residents);
              const totalPages = Math.ceil(sortedHistory.length / itemsPerPage);
@@ -311,12 +283,10 @@ export default function VisitHistoryPage() {
              return (
                <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                   {/* Summary */}
                    <div className="text-sm text-gray-600">
                      Hiển thị {startIndex + 1}-{Math.min(endIndex, sortedHistory.length)} trong tổng số {sortedHistory.length} lịch hẹn
                    </div>
 
-                   {/* Pagination */}
                    {!isExpanded && totalPages > 1 && (
                      <div className="flex items-center gap-2">
                        <button
@@ -345,7 +315,6 @@ export default function VisitHistoryPage() {
              );
            })()}
 
-          {/* Empty state */}
           {groupVisitHistory([...visitHistory], residents).length === 0 && (
             <div className="text-center py-12">
               <CalendarDaysIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />

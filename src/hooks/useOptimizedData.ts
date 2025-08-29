@@ -42,7 +42,6 @@ export function useOptimizedResidentsByRole(role?: string, userId?: string): Fet
         const res = await residentAPI.getByFamilyMemberId(userId);
         result = Array.isArray(res) ? res : (res ? [res] : []);
       } else {
-        // Admin/Staff: lấy toàn bộ residents
         const res = await residentAPI.getAll?.({});
         result = Array.isArray(res) ? res : [];
       }
@@ -102,7 +101,6 @@ export function useOptimizedBeds(): FetchResult<any[]> {
   return { data, fetch };
 }
 
-// Trả về map residentId -> thông tin assignment status
 export function useResidentsAssignmentStatus(residents: any[]): FetchResult<Record<string, { hasAssignment: boolean; isExpired: boolean; endDate?: string }>> {
   const [data, setData] = useState<Record<string, { hasAssignment: boolean; isExpired: boolean; endDate?: string }> | null>(null);
 
@@ -111,7 +109,6 @@ export function useResidentsAssignmentStatus(residents: any[]): FetchResult<Reco
     console.log('🔐 Authentication check - localStorage token:', typeof window !== 'undefined' ? localStorage.getItem('access_token')?.substring(0, 20) + '...' : 'no window');
     
     try {
-      // Test: Get all care plan assignments first to see if the API is working
       try {
         const allAssignments = await carePlanAssignmentsAPI.getAll();
         console.log('🧪 TEST: All care plan assignments:', allAssignments);
@@ -148,8 +145,7 @@ export function useResidentsAssignmentStatus(residents: any[]): FetchResult<Reco
               return [residentId, { hasAssignment: false, isExpired: false }] as const;
             }
             
-            // Kiểm tra assignment gần nhất
-            const latestAssignment = activeAssignments[0]; // Giả sử API trả về theo thứ tự mới nhất
+            const latestAssignment = activeAssignments[0]; 
             console.log(`📅 Latest assignment for ${r.full_name || r.name}:`, latestAssignment);
             console.log(`📅 Latest assignment keys:`, Object.keys(latestAssignment || {}));
             console.log(`📅 Latest assignment end_date field:`, latestAssignment?.end_date);
@@ -180,9 +176,8 @@ export function useResidentsAssignmentStatus(residents: any[]): FetchResult<Reco
               isValidNow: !isNaN(now.getTime())
             });
             
-            // Debug: Test with a hardcoded expired date to verify logic
             if (residentId === 'test-expired') {
-              const testEndDate = '2024-01-01'; // Past date
+              const testEndDate = '2024-01-01'; 
               const testEnd = new Date(testEndDate);
               const testIsExpired = testEnd < now;
               console.log('🧪 TEST: Hardcoded expired date test:', {
@@ -225,7 +220,7 @@ export function useResidentsAssignmentStatus(residents: any[]): FetchResult<Reco
         if (id) map[id] = status;
       }
       
-      // Summary statistics
+      
       const totalResidents = residents.length;
       const residentsWithAssignments = Object.values(map).filter(s => s.hasAssignment).length;
       const expiredResidents = Object.values(map).filter(s => s.hasAssignment && s.isExpired).length;

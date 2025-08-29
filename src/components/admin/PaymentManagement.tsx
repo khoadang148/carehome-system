@@ -28,6 +28,7 @@ interface PaymentTransaction {
   completedAt?: string;
   residentName: string;
   billId: string;
+  dueDate?: string;
 }
 
 interface PaymentStats {
@@ -65,7 +66,6 @@ export default function PaymentManagement() {
     month: new Date().getMonth() + 1
   });
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -97,7 +97,6 @@ export default function PaymentManagement() {
   }, [transactions, filters]);
 
   useEffect(() => {
-    // Reset to first page when filters change
     setCurrentPage(1);
   }, [filters]);
 
@@ -105,22 +104,17 @@ export default function PaymentManagement() {
     try {
       setLoading(true);
       
-      // Fetch bills from API
       const bills = await billsAPI.getAll();
       console.log('✅ Bills loaded:', bills?.length || 0);
       console.log('📋 Sample bill:', bills?.[0]);
       
-      // Fetch residents to get names
       const residents = await residentAPI.getAll();
       console.log('✅ Residents loaded:', residents?.length || 0);
       console.log('👤 Sample resident:', residents?.[0]);
       
-      // Create residents map with multiple possible field names
       const residentsMap = new Map();
       residents.forEach((r: any) => {
-        // Try different possible field names for ID
         const id = r._id || r.id;
-        // Try different possible field names for name
         const name = r.full_name || r.name || r.fullName || r.resident_name || 'Không xác định';
         residentsMap.set(id, name);
       });
@@ -128,12 +122,9 @@ export default function PaymentManagement() {
       console.log('✅ Residents mapped:', residentsMap.size);
       console.log('🗺️ Sample mapping:', Array.from(residentsMap.entries()).slice(0, 3));
       
-      // Transform bills to payment transactions
       const transactions: PaymentTransaction[] = bills.map((bill: any) => {
-        // Handle resident_id that might be an object
         let residentId = bill.resident_id || bill.residentId || bill.resident;
         
-        // If resident_id is an object, try to extract the _id field
         if (typeof residentId === 'object' && residentId !== null) {
           residentId = residentId._id || residentId.id || residentId;
         }
@@ -153,7 +144,8 @@ export default function PaymentManagement() {
           createdAt: bill.created_at,
           completedAt: bill.paid_date,
           residentName: residentName,
-          billId: bill._id
+          billId: bill._id,
+          dueDate: bill.due_date || bill.dueDate
         };
       });
 
@@ -163,7 +155,6 @@ export default function PaymentManagement() {
       console.error('❌ Error fetching payment data:', error);
       setTransactions([]);
       
-      // Add user-friendly error handling
       if (error instanceof Error) {
         console.error('Error details:', error.message);
       }
@@ -175,19 +166,16 @@ export default function PaymentManagement() {
   const applyFilters = () => {
     let filtered = [...transactions];
 
-    // Filter by status
     if (filters.status !== 'all') {
       filtered = filtered.filter(t => t.status === filters.status);
     }
 
-    // Filter by year and month
     if (filters.month > 0) {
       filtered = filtered.filter(t => {
         const date = new Date(t.createdAt);
         return date.getFullYear() === filters.year && date.getMonth() + 1 === filters.month;
       });
     } else {
-      // Filter by year only
       filtered = filtered.filter(t => {
         const date = new Date(t.createdAt);
         return date.getFullYear() === filters.year;
@@ -197,7 +185,6 @@ export default function PaymentManagement() {
     setFilteredTransactions(filtered);
     calculateStats(filtered);
     
-    // Calculate total pages
     const total = Math.ceil(filtered.length / itemsPerPage);
     setTotalPages(total);
   };
@@ -210,12 +197,11 @@ export default function PaymentManagement() {
     const totalRevenue = completedTransactions.reduce((sum, t) => sum + t.amount, 0);
     const pendingAmount = pendingTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-    // Calculate growth percentage (simplified)
-    const growthPercentage = 0; // This would need historical data to calculate properly
+    const growthPercentage = 0;
 
     setStats({
       totalRevenue,
-      monthlyRevenue: totalRevenue, // For filtered view
+      monthlyRevenue: totalRevenue,
       pendingAmount,
       completedCount: completedTransactions.length,
       pendingCount: pendingTransactions.length,
@@ -224,7 +210,6 @@ export default function PaymentManagement() {
     });
   };
 
-  // Get current page transactions
   const getCurrentPageTransactions = () => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -299,7 +284,6 @@ export default function PaymentManagement() {
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, currentPage + 2);
 
-    // Previous button
     pages.push(
       <button
         key="prev"
@@ -319,7 +303,6 @@ export default function PaymentManagement() {
       </button>
     );
 
-    // Page numbers
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
         <button
@@ -341,7 +324,6 @@ export default function PaymentManagement() {
       );
     }
 
-    // Next button
     pages.push(
       <button
         key="next"
@@ -403,53 +385,102 @@ export default function PaymentManagement() {
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
       border: '1px solid rgba(255, 255, 255, 0.2)'
     }}>
-      {/* Header */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '2rem'
+        background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+        borderRadius: '1rem',
+        padding: '2rem',
+        marginBottom: '2rem',
+        color: 'white',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <div>
-          <h2 style={{
-            fontSize: '1.75rem',
-            fontWeight: 700,
-            margin: '0 0 0.5rem 0',
-            color: '#1e293b'
-          }}>
-            Quản lý thanh toán
-          </h2>
-          <p style={{
-            fontSize: '1rem',
-            color: '#64748b',
-            margin: 0
-          }}>
-            Theo dõi và phân tích chi tiết tất cả giao dịch thanh toán
-          </p>
-        </div>
+         
+        <div style={{
+          position: 'absolute',
+          bottom: '-30px',
+          left: '-30px',
+          width: '150px',
+          height: '150px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderRadius: '50%'
+        }} />
         
         <div style={{
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '1rem'
+          position: 'relative',
+          zIndex: 1
         }}>
+          <div>
+            <h2 style={{
+              fontSize: '1.875rem',
+              fontWeight: 800,
+              margin: '0 0 0.75rem 0',
+              color: 'white',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            }}>
+              Quản lý thanh toán
+            </h2>
+            <p style={{
+              fontSize: '1.125rem',
+              color: 'rgba(255, 255, 255, 0.9)',
+              margin: 0,
+              fontWeight: 400
+            }}>
+              Theo dõi và phân tích chi tiết tất cả giao dịch thanh toán
+            </p>
+          </div>
+          
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            borderRadius: '0.75rem',
-            color: 'white',
-            fontWeight: 600
+            gap: '1.5rem'
           }}>
-            <CurrencyDollarIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-            <span>Tổng thu: {formatCurrency(stats.totalRevenue)}</span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '1.25rem 1.75rem',
+              background: 'rgba(255, 255, 255, 0.25)',
+              borderRadius: '1rem',
+              backdropFilter: 'blur(15px)',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(255, 255, 255, 0.1) inset',
+              transform: 'scale(1.02)'
+            }}>
+              <div style={{
+                padding: '0.75rem',
+                background: 'rgba(16, 185, 129, 0.3)',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+              }}>
+                <CurrencyDollarIcon style={{ width: '1.75rem', height: '1.75rem', color: '#d1fae5' }} />
+              </div>
+              <div>
+                <div style={{ 
+                  fontSize: '1.625rem', 
+                  fontWeight: 800, 
+                  color: 'white',
+                  lineHeight: 1,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+                }}>
+                  {formatCurrency(stats.totalRevenue)}
+                </div>
+                <div style={{ 
+                  fontSize: '0.9rem', 
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontWeight: 600,
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+                }}>
+                  Tổng doanh thu
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Advanced Filters */}
       <div style={{
         background: '#f8fafc',
         borderRadius: '1rem',
@@ -465,7 +496,6 @@ export default function PaymentManagement() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '1rem'
         }}>
-          {/* Status Filter */}
           <div>
             <label style={{
               display: 'block',
@@ -496,7 +526,6 @@ export default function PaymentManagement() {
             </select>
           </div>
 
-          {/* Year Filter */}
           <div>
             <label style={{
               display: 'block',
@@ -525,7 +554,6 @@ export default function PaymentManagement() {
             </select>
           </div>
 
-          {/* Month Filter */}
           <div>
             <label style={{
               display: 'block',
@@ -556,7 +584,6 @@ export default function PaymentManagement() {
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -690,7 +717,6 @@ export default function PaymentManagement() {
         
       </div>
 
-      {/* Transactions Table */}
       <div style={{
         background: 'white',
         borderRadius: '1rem',
@@ -706,26 +732,72 @@ export default function PaymentManagement() {
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            marginBottom: '1.5rem'
           }}>
-            <h3 style={{
-              fontSize: '1.25rem',
-              fontWeight: 600,
-              color: '#1e293b',
-              margin: 0
-            }}>
-              Danh sách giao dịch
-            </h3>
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              color: '#64748b'
+              gap: '0.75rem'
             }}>
-              <span>Tổng: {filteredTransactions.length} giao dịch</span>
+              <div style={{
+                width: '4px',
+                height: '24px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                borderRadius: '2px'
+              }} />
+              <h3 style={{
+                fontSize: '1.375rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                margin: 0,
+                letterSpacing: '-0.025em'
+              }}>
+                Danh sách giao dịch
+              </h3>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+              borderRadius: '0.75rem',
+              border: '1px solid rgba(59, 130, 246, 0.1)',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                color: '#374151',
+                fontWeight: 500
+              }}>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  background: '#10b981',
+                  borderRadius: '50%',
+                  boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)'
+                }} />
+                <span>Tổng: {filteredTransactions.length} giao dịch</span>
+              </div>
               {totalPages > 1 && (
-                <span>• Trang {currentPage}/{totalPages}</span>
+                <>
+                  <div style={{
+                    width: '1px',
+                    height: '16px',
+                    background: '#d1d5db'
+                  }} />
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    fontWeight: 500
+                  }}>
+                    Trang {currentPage}/{totalPages}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -738,51 +810,85 @@ export default function PaymentManagement() {
           }}>
             <thead>
               <tr style={{
-                background: '#f8fafc',
-                borderBottom: '1px solid #e2e8f0'
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                borderBottom: '2px solid #e2e8f0'
               }}>
                 <th style={{
-                  padding: '1rem 1.5rem',
+                  padding: '1.25rem 1.5rem',
                   textAlign: 'left',
-                  fontWeight: 600,
-                  color: '#374151',
-                  fontSize: '0.875rem'
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.025em',
+                  textTransform: 'uppercase',
+                  position: 'relative'
                 }}>
-                  Mã giao dịch
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{
+                      width: '3px',
+                      height: '16px',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                      borderRadius: '2px'
+                    }} />
+                    Mã giao dịch
+                  </div>
                 </th>
                 <th style={{
-                  padding: '1rem 1.5rem',
+                  padding: '1.25rem 1.5rem',
                   textAlign: 'left',
-                  fontWeight: 600,
-                  color: '#374151',
-                  fontSize: '0.875rem'
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.025em',
+                  textTransform: 'uppercase'
                 }}>
                   Người cao tuổi
                 </th>
                 <th style={{
-                  padding: '1rem 1.5rem',
+                  padding: '1.25rem 1.5rem',
                   textAlign: 'left',
-                  fontWeight: 600,
-                  color: '#374151',
-                  fontSize: '0.875rem'
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.025em',
+                  textTransform: 'uppercase'
                 }}>
                   Mô tả
                 </th>
                 <th style={{
-                  padding: '1rem 1.5rem',
+                  padding: '1.25rem 1.5rem',
+                  textAlign: 'left',
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.025em',
+                  textTransform: 'uppercase'
+                }}>
+                  Hạn thanh toán
+                </th>
+                <th style={{
+                  padding: '1.25rem 1.5rem',
                   textAlign: 'right',
-                  fontWeight: 600,
-                  color: '#374151',
-                  fontSize: '0.875rem'
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.025em',
+                  textTransform: 'uppercase'
                 }}>
                   Số tiền
                 </th>
                 <th style={{
-                  padding: '1rem 1.5rem',
+                  padding: '1.25rem 1.5rem',
                   textAlign: 'center',
-                  fontWeight: 600,
-                  color: '#374151',
-                  fontSize: '0.875rem'
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.025em',
+                  textTransform: 'uppercase'
                 }}>
                   Trạng thái
                 </th>
@@ -825,6 +931,13 @@ export default function PaymentManagement() {
                   </td>
                   <td style={{
                     padding: '1rem 1.5rem',
+                    fontSize: '0.875rem',
+                    color: '#374151'
+                  }}>
+                    {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString('vi-VN') : '—'}
+                  </td>
+                  <td style={{
+                    padding: '1rem 1.5rem',
                     textAlign: 'right',
                     fontSize: '0.875rem',
                     fontWeight: 600,
@@ -843,8 +956,7 @@ export default function PaymentManagement() {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination */}
+              
         {renderPagination()}
 
         {filteredTransactions.length === 0 && (

@@ -208,24 +208,7 @@ export default function AccountManagementPage() {
   };
 
   const handleView = async (account: User) => {
-    setSelectedAccount(account);
-    setShowDetailModal(true);
-    
-    // Nếu là tài khoản gia đình, lấy thông tin người cao tuổi được liên kết
-    if (account.role === 'family') {
-      setLoadingLinkedResidents(true);
-      try {
-        const residents = await residentAPI.getByFamilyMemberId(account._id);
-        setLinkedResidents(Array.isArray(residents) ? residents : [residents]);
-      } catch (error) {
-        console.error('Error fetching linked residents:', error);
-        setLinkedResidents([]);
-      } finally {
-        setLoadingLinkedResidents(false);
-      }
-    } else {
-      setLinkedResidents([]);
-    }
+    router.push(`/admin/account-management/${account._id}`);
   };
 
   const closeDetailModal = () => {
@@ -254,17 +237,8 @@ export default function AccountManagementPage() {
           setLoadingData(false);
           return;
         }
-        // TODO: Gọi API xóa user khi có endpoint phù hợp
-        // await userAPI.delete(String(selectedAccount._id));
-        // const data = await userAPI.getAll();
-        // setStaffUsers(data);
-        // toast.success(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
       } else {
-        // TODO: Gọi API xóa user khi có endpoint phù hợp
-        // await userAPI.delete(String(selectedAccount._id));
-        // const data = await userAPI.getAll();
-        // setFamilyAccounts(data);
-        // toast.success(`Đã xóa tài khoản ${selectedAccount.full_name} thành công!`);
+        
       }
       setShowDeleteModal(false);
       setSelectedAccount(null);
@@ -933,7 +907,7 @@ export default function AccountManagementPage() {
       {/* Modals */}
       {showCreateModal && <CreateAccountModal />}
       {showEditModal && <EditAccountModal />}
-      {showDetailModal && <DetailModal />}
+      {/* Chi tiết đã chuyển sang trang riêng */}
       {showDeleteModal && <DeleteConfirmModal />}
       {showResetPasswordModal && (
         <div style={{

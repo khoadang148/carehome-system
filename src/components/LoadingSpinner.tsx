@@ -1,54 +1,63 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 interface LoadingSpinnerProps {
-  size?: 'small' | 'medium' | 'large';
-  color?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  color?: 'primary' | 'secondary' | 'white' | 'gray';
+  className?: string;
   text?: string;
 }
 
-export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
-  size = 'medium', 
-  color = '#3b82f6',
-  text 
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = memo(({
+  size = 'md',
+  color = 'primary',
+  className = '',
+  text
 }) => {
   const sizeClasses = {
-    small: 'w-4 h-4',
-    medium: 'w-8 h-8',
-    large: 'w-12 h-12'
+    sm: 'w-4 h-4',
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12',
+    xl: 'w-16 h-16'
+  };
+
+  const colorClasses = {
+    primary: 'border-emerald-500',
+    secondary: 'border-blue-500',
+    white: 'border-white',
+    gray: 'border-gray-400'
   };
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <div className={`${sizeClasses[size]} animate-spin`}>
-        <svg
-          className="w-full h-full"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray="31.416"
-            strokeDashoffset="31.416"
-            style={{
-              color,
-              animation: 'spin 1s linear infinite',
-            }}
-          />
-        </svg>
-      </div>
+    <div className={`flex flex-col items-center justify-center ${className}`}>
+      <div
+        className={`
+          ${sizeClasses[size]}
+          border-2 border-gray-200 rounded-full animate-spin
+          ${colorClasses[color]} border-t-transparent
+        `}
+        style={{
+          animation: 'spin 1s linear infinite',
+        }}
+      />
       {text && (
-        <p className="mt-2 text-sm text-gray-600 animate-pulse">
+        <p className="mt-2 text-sm text-gray-500 animate-pulse">
           {text}
         </p>
       )}
+      <style jsx>{`
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
-};
+});
+
+LoadingSpinner.displayName = 'LoadingSpinner';
 
 export default LoadingSpinner; 

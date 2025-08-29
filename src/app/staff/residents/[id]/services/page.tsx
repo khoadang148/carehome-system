@@ -20,7 +20,6 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedsAPI } from '@/lib/api';
 
-// Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return '/default-avatar.svg';
   
@@ -47,29 +46,22 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
-  // Get residentId from params
   const residentId = React.use(params).id;
 
-  // Auto-refresh data every 30 seconds
   useEffect(() => {
     if (!autoRefreshEnabled || !residentId) return;
 
     const interval = setInterval(() => {
-      console.log('Auto-refreshing resident services data...');
       setLastRefresh(new Date());
-      // Trigger re-fetch by updating dependencies
-    }, 30000); // 30 seconds
+    }, 30000); 
 
     return () => clearInterval(interval);
   }, [autoRefreshEnabled, residentId]);
 
-  // Manual refresh function
   const refreshData = () => {
-    console.log('Manual refresh triggered');
     setLastRefresh(new Date());
   };
 
-  // Check access permissions - staff only
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -82,7 +74,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
     }
   }, [user, router]);
 
-  // Load resident data
   useEffect(() => {
     const loadResident = async () => {
       try {
@@ -107,7 +98,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
         };
         setResident(mapped);
       } catch (error) {
-        console.error('Error loading resident:', error);
         router.push('/staff/residents');
       } finally {
         setLoading(false);
@@ -119,7 +109,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
     }
   }, [residentId, router, lastRefresh]);
 
-  // Load care plan assignments and details
   useEffect(() => {
     const loadCarePlanAssignments = async () => {
       if (!residentId) return;
@@ -128,7 +117,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
         const assignments = await carePlansAPI.getByResidentId(residentId);
         const allAssignments = Array.isArray(assignments) ? assignments : [];
         
-        // Chỉ lấy assignment hiện tại (active) thay vì tất cả lịch sử
         const now = new Date();
         const sortedByStart = [...allAssignments].sort((a: any, b: any) => {
           const da = new Date(a?.start_date || a?.createdAt || 0).getTime();
@@ -147,10 +135,8 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
         
         setCarePlanAssignments(validAssignments);
         
-        // Load care plan details for all assignments
         const allCarePlans: any[] = [];
         for (const assignment of validAssignments) {
-          // Chỉ lấy care_plan_ids của assignment hiện tại
           const currentCarePlanIds = assignment.care_plan_ids || [];
           if (currentCarePlanIds.length > 0) {
             const carePlanPromises = currentCarePlanIds.map(async (plan: any) => {
@@ -164,7 +150,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                   assignment_end_date: assignment.end_date
                 };
               } catch (err) {
-                console.error('Error fetching care plan with ID', planId, ':', err);
                 return { 
                   ...plan, 
                   assignment_id: assignment._id,
@@ -178,17 +163,14 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
             allCarePlans.push(...carePlanData);
           }
         }
-        console.log('Care plan details with dates:', allCarePlans);
         setCarePlanDetails(allCarePlans);
       } catch (error) {
-        console.error('Error loading care plan assignments:', error);
       }
     };
 
     loadCarePlanAssignments();
   }, [residentId, lastRefresh]);
 
-  // Load room and bed information
   useEffect(() => {
     const loadRoomAndBedInfo = async () => {
       if (carePlanAssignments.length === 0) return;
@@ -197,10 +179,8 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
       setBedLoading(true);
 
       try {
-        // Use first assignment for room/bed info
         const firstAssignment = carePlanAssignments[0];
         
-        // Load room information
         const assignedRoomId = firstAssignment.bed_id?.room_id || firstAssignment.assigned_room_id;
         const roomIdString = typeof assignedRoomId === 'object' && assignedRoomId?._id ? assignedRoomId._id : assignedRoomId;
         if (roomIdString) {
@@ -210,7 +190,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
 
-        // Load bed information
         const assignedBedId = firstAssignment.assigned_bed_id;
         const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
         if (bedIdString) {
@@ -220,7 +199,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
           setBedNumber('Chưa hoàn tất đăng kí');
         }
       } catch (error) {
-        console.error('Error loading room/bed info:', error);
         setRoomNumber('Chưa hoàn tất đăng kí');
         setBedNumber('Chưa hoàn tất đăng kí');
       } finally {
@@ -288,9 +266,8 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
     }));
   };
 
-  // Calculate total costs
   const totalMonthlyCost = carePlanDetails.reduce((total, plan) => total + (plan.monthly_price || 0), 0);
-  const roomMonthlyCost = 0; // This would need to be fetched from room data
+  const roomMonthlyCost = 0; 
   const carePlansMonthlyCost = totalMonthlyCost;
 
   if (loading) {
@@ -332,7 +309,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20">
           <div className="flex items-center gap-4 mb-6">
             <Link
@@ -344,7 +320,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
             
             <div className="flex-1">
               <div className="flex items-center gap-6">
-                {/* Avatar */}
                 <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-gray-200 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
                   {resident.avatar ? (
                     <img
@@ -375,7 +350,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                   )}
                 </div>
                 
-                {/* Thông tin cơ bản */}
                 <div className="flex-1">
                   <div className="mb-2">
                     <span className="text-sm font-medium text-slate-600 block mb-1">
@@ -393,7 +367,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
             </div>
           </div>
           
-          {/* Page Title */}
           <div className="flex items-center gap-4 pt-6 border-t border-slate-200">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
               <DocumentTextIcon className="w-6 h-6 text-white" />
@@ -407,13 +380,11 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* Auto-refresh indicator */}
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 <div className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                 <span>{autoRefreshEnabled ? 'Tự động cập nhật' : 'Tắt cập nhật'}</span>
               </div>
               
-              {/* Refresh button */}
               <button
                 onClick={refreshData}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200"
@@ -423,7 +394,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                 <span className="text-sm font-medium">Làm mới</span>
               </button>
               
-              {/* Toggle auto-refresh */}
               <button
                 onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
@@ -439,12 +409,10 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
           </div>
         </div>
         
-        {/* Content */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 shadow-lg border border-white/20">
           <div className="grid gap-8">
             
             
-            {/* Service Packages */}
             <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-2xl p-8 border border-cyan-300">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center">
@@ -468,14 +436,12 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
               <div className="grid gap-6">
                 {carePlanDetails.map((carePlan: any, index: number) => (
                   <div key={index} className="bg-white/90 rounded-2xl p-6 border border-cyan-200 shadow-md transition-all duration-200 hover:shadow-lg">
-                    {/* Header with name and price */}
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="text-xl font-bold text-slate-800 m-0">
                             {carePlan.plan_name}
                           </h4>
-                          {/* Status Badge */}
                           {carePlan.assignment_end_date && (
                             isExpired(carePlan.assignment_end_date) ? (
                               <span className="bg-red-100 text-red-800 text-xs font-semibold px-3 py-1 rounded-full border border-red-200 flex items-center gap-1">
@@ -517,7 +483,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                       </div>
                     </div>
                     
-                    {/* Time Information */}
                     <div className={`rounded-xl p-4 mb-6 border ${
                       carePlan.assignment_end_date && isExpired(carePlan.assignment_end_date)
                         ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
@@ -557,7 +522,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                           }`}>
                             {carePlan.assignment_end_date ? formatDate(carePlan.assignment_end_date) : 'Không có thời hạn'}
                           </p>
-                          {/* Expiry Warning */}
                           {carePlan.assignment_end_date && isExpired(carePlan.assignment_end_date) && (
                             <p className="text-xs text-red-600 mt-1 font-medium">
                               ⚠️ Gói dịch vụ đã hết hạn
@@ -578,7 +542,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                       </div>
                     </div>
                     
-                    {/* Services Included */}
                     <div className="border-t border-slate-200 pt-6">
                       <p className="text-sm font-semibold text-gray-700 mb-4">
                         Dịch vụ bao gồm:

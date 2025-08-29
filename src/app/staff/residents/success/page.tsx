@@ -23,7 +23,6 @@ export default function ResidentSuccessPage() {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    // Lấy thông tin từ URL params
     const residentName = searchParams.get('residentName');
     const username = searchParams.get('username');
     const password = searchParams.get('password');
@@ -35,7 +34,6 @@ export default function ResidentSuccessPage() {
 
     if (residentName) {
       if (existingAccount === 'true' && familyName && familyUsername) {
-        // Trường hợp gán vào tài khoản hiện có
         setAccountInfo({
           residentName,
           username: familyUsername,
@@ -48,23 +46,19 @@ export default function ResidentSuccessPage() {
         });
         setShowModal(true);
       } else if (username && password && email && role) {
-        // Trường hợp tạo tài khoản mới
         setAccountInfo({ residentName, username, password, email, role });
         setShowModal(true);
       } else {
-        // Nếu không có param
         const storedInfo = clientStorage.getItem('newResidentAccount');
         if (storedInfo) {
           setAccountInfo(JSON.parse(storedInfo));
           setShowModal(true);
           clientStorage.removeItem('newResidentAccount');
         } else {
-          // Nếu không có thông tin, chuyển về trang residents
           router.push('/staff/residents/view');
         }
       }
     } else {
-      // Nếu không có thông tin, chuyển về trang residents
       router.push('/staff/residents/view');
     }
   }, [searchParams, router]);

@@ -76,7 +76,6 @@ export default function CareNotesModal({ residentId, residentName, onClose, onCo
         overflow: 'auto',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
       }}>
-        {/* Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -131,7 +130,6 @@ export default function CareNotesModal({ residentId, residentName, onClose, onCo
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ padding: '1.5rem' }}>
           <div style={{ marginBottom: '1rem' }}>
             <label style={{
@@ -159,8 +157,7 @@ export default function CareNotesModal({ residentId, residentName, onClose, onCo
               }}
             />
           </div>
-
-          {/* Actions */}
+                
           <div style={{
             display: 'flex',
             justifyContent: 'flex-end',

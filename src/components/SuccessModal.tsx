@@ -13,7 +13,6 @@ export default function SuccessModal({
 }) {
   useEffect(() => {
     if (open) {
-      // Tối ưu: Giảm thời gian hiển thị modal xuống 2s để user có đủ thời gian đọc
       const timer = setTimeout(onClose, 2000);
       return () => clearTimeout(timer);
     }
@@ -24,7 +23,6 @@ export default function SuccessModal({
   return (
     <div className="success-modal-overlay">
       <div className="success-modal-content">
-        {/* Animated checkmark SVG */}
         <div className="checkmark-container">
           <svg width="64" height="64" viewBox="0 0 64 64" className="checkmark-svg">
             <circle cx="32" cy="32" r="32" fill="#22c55e" opacity="0.15" />

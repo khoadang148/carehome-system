@@ -824,12 +824,6 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     type="text"
                     placeholder="dd/mm/yyyy"
                   />
-                  <FormInput
-                    label="Ngày xuất viện"
-                    name="discharge_date"
-                    type="text"
-                    placeholder="dd/mm/yyyy"
-                  />
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
                       Ảnh đại diện

@@ -301,8 +301,12 @@ export const withFormErrorHandling = async <T>(
 ): Promise<{ data: T | null; error: AppError | null }> => {
   // Check validation errors first
   if (Object.keys(validationErrors).length > 0) {
-    const validationError = ErrorHandler.handleValidationErrors(validationErrors);
-    ErrorHandler.showError(validationError);
+    const validationError = ErrorHandler.createError(
+      ERROR_CODES.VALIDATION_ERROR,
+      'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.',
+      validationErrors,
+      context
+    );
     return { data: null, error: validationError };
   }
 

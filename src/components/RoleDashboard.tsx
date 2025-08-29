@@ -181,22 +181,21 @@ const ROLE_DASHBOARDS = {
 export default function RoleDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  // Thêm state cho số lượng ghi nhận chỉ số sức khỏe hôm nay
+
   const [vitalSignsToday, setVitalSignsToday] = useState<number | null>(null);
 
   useEffect(() => {
-    // Chỉ fetch nếu là staff
+
     if (user?.role === 'staff') {
-      // Giả sử API trả về tất cả ghi nhận, lọc theo ngày hôm nay
+
       vitalSignsAPI.getAll()
         .then((data: any[]) => {
-          console.log('Vital signs data:', data); // Thêm log để kiểm tra dữ liệu thực tế
-          // Log chi tiết trường ngày của từng bản ghi
+          console.log('Vital signs data:', data);
           data.forEach(item => console.log('Ngày:', item.date, item.recordedAt, item.createdAt));
-          // Lọc các ghi nhận có ngày là hôm nay
+
           const today = new Date();
-          const todayStr = today.toISOString().slice(0, 10); // yyyy-mm-dd
-          // Ưu tiên các trường ngày phổ biến
+          const todayStr = today.toISOString().slice(0, 10);
+
           const count = data.filter(item => {
             const dateStr = (item.date || item.recordedAt || item.createdAt || '').slice(0, 10);
             return dateStr === todayStr;
@@ -216,7 +215,7 @@ export default function RoleDashboard() {
     dashboard = { ...ROLE_DASHBOARDS['staff'] };
     dashboard.cards = dashboard.cards.map(card => {
       if (card.title === 'Chỉ số sức khỏe') {
-        // Xóa stats khỏi card này
+
         const { stats, ...rest } = card;
         return rest;
       }
@@ -243,7 +242,7 @@ export default function RoleDashboard() {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Header */}
+        
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -300,17 +299,13 @@ export default function RoleDashboard() {
           </div>
         </div>
 
-        {/* Staff Widgets - Moved to top */}
-        {/* {user.role === 'staff' && (
-          <StaffDashboardWidgets />
-        )} */}
 
-        {/* Family Widgets */}
+        
         {user.role === 'family' && (
           <FamilyDashboardWidgets />
         )}
 
-        {/* Dashboard Cards */}
+        
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
@@ -340,7 +335,7 @@ export default function RoleDashboard() {
                 e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
               }}
             >
-              {/* Icon */}
+              
               <div style={{
                 width: '4rem',
                 height: '4rem',
@@ -355,7 +350,7 @@ export default function RoleDashboard() {
                 <card.icon style={{ width: '2rem', height: '2rem', color: 'white' }} />
               </div>
 
-              {/* Content */}
+              
               <h3 style={{
                 fontSize: '1.25rem',
                 fontWeight: 700,
@@ -373,8 +368,8 @@ export default function RoleDashboard() {
                 {card.description}
               </p>
 
-              {/* Stats */}
-              {/* Chỉ render stats nếu không phải staff hoặc card này không phải 'Chỉ số sức khỏe' */}
+              
+              
               {card.stats && !(user?.role === 'staff' && card.title === 'Chỉ sức khỏe') && (
                 <div style={{
                   padding: '0.5rem 1rem',
@@ -392,7 +387,6 @@ export default function RoleDashboard() {
                 </div>
               )}
 
-              {/* Decorative gradient */}
               <div style={{
                 position: 'absolute',
                 top: 0,

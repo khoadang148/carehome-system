@@ -21,7 +21,6 @@ export default function TransferSuccessModal({
 }) {
   useEffect(() => {
     if (open) {
-      // Hiển thị modal trong 3 giây để user đọc thông tin
       const timer = setTimeout(onClose, 3000);
       return () => clearTimeout(timer);
     }
@@ -32,7 +31,6 @@ export default function TransferSuccessModal({
   return (
     <div className="success-modal-overlay">
       <div className="success-modal-content">
-        {/* Animated checkmark SVG */}
         <div className="checkmark-container">
           <svg width="64" height="64" viewBox="0 0 64 64" className="checkmark-svg">
             <circle cx="32" cy="32" r="32" fill="#22c55e" opacity="0.15" />
@@ -55,13 +53,13 @@ export default function TransferSuccessModal({
         
         <div className="success-message">
           <div style={{ marginBottom: '8px' }}>
-            <b>{residentName}</b> đã được chuyển thành công
+            <b>{residentName}</b> đã được chuyển phòng/giường thành công
           </div>
           <div style={{ fontSize: '16px', opacity: 0.8 }}>
-            Từ: <b>{fromRoom}</b> - <b>{fromBed}</b>
+            Từ: Phòng <b>{fromRoom}</b> - Giường <b>{fromBed}</b>
           </div>
           <div style={{ fontSize: '16px', opacity: 0.8 }}>
-            Đến: <b>{toRoom}</b> - <b>{toBed}</b>
+            Đến: Phòng <b>{toRoom}</b> - Giường <b>{toBed}</b>
           </div>
         </div>
         

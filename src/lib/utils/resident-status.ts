@@ -10,8 +10,8 @@ export interface ResidentStatus {
 }
 
 /**
- * Kiểm tra xem resident có phải là cư dân chính thức hay không
- * Cư dân chính thức = có phòng và giường được phân công
+ * Kiểm tra xem resident có phải là người cao tuổi chính thức hay không
+ * người cao tuổi chính thức = có phòng và giường được phân công
  */
 export const checkResidentStatus = async (residentId: string): Promise<ResidentStatus> => {
   try {
@@ -96,10 +96,10 @@ export const checkResidentStatus = async (residentId: string): Promise<ResidentS
 };
 
 /**
- * Lọc danh sách residents chỉ lấy những cư dân chính thức
+ * Lọc danh sách residents chỉ lấy những người cao tuổi chính thức
  */
 export const filterOfficialResidents = async (residents: any[]): Promise<any[]> => {
-  const officialResidents = [];
+  const officialResidents: any[] = [];
   
   for (const resident of residents) {
     const status = await checkResidentStatus(resident.id || resident._id);
@@ -116,10 +116,10 @@ export const filterOfficialResidents = async (residents: any[]): Promise<any[]> 
 };
 
 /**
- * Lọc danh sách residents chỉ lấy những cư dân chưa chính thức
+ * Lọc danh sách residents chỉ lấy những người cao tuổi chưa chính thức
  */
 export const filterUnofficialResidents = async (residents: any[]): Promise<any[]> => {
-  const unofficialResidents = [];
+  const unofficialResidents: any[] = [];
   
   for (const resident of residents) {
     const status = await checkResidentStatus(resident.id || resident._id);
@@ -132,7 +132,7 @@ export const filterUnofficialResidents = async (residents: any[]): Promise<any[]
 }; 
 
 /**
- * Lấy danh sách tất cả resident đã hoàn tất đăng ký (có phòng)
+ * Lấy danh sách tất cả resident đã hoàn tất đăng ký (có phòng) và chưa xuất viện
  */
 export const getCompletedResidents = async (): Promise<Array<any>> => {
   try {
@@ -143,6 +143,11 @@ export const getCompletedResidents = async (): Promise<Array<any>> => {
     
     for (const resident of residents) {
       try {
+        // Chỉ xử lý residents có status 'active' (chưa xuất viện)
+        if (resident.status !== 'active') {
+          continue;
+        }
+        
         // Kiểm tra bed assignment trước
         const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
         const bedAssignment = Array.isArray(bedAssignments) ? 
@@ -196,7 +201,7 @@ export const getCompletedResidents = async (): Promise<Array<any>> => {
       }
     }
     
-    console.log('Completed residents with rooms:', completedResidents);
+    console.log('Completed residents with rooms (active only):', completedResidents);
     return completedResidents;
   } catch (error) {
     console.error('Error fetching completed residents:', error);

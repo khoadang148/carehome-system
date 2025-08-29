@@ -46,19 +46,16 @@ export default function AdminStatistics() {
     try {
       setLoading(true);
       
-      // Fetch residents with active status (đang nằm viện)
       const residents = await residentAPI.getAll();
       const hospitalizedResidents = residents.filter((resident: any) => 
         resident.status === 'active'
       ).length;
 
-      // Fetch active staff
       const users = await userAPI.getAll();
       const activeStaff = users.filter((user: any) => 
         user.role === 'staff' && user.status === 'active'
       ).length;
 
-      // Fetch payment statistics from API
       const response = await fetch('/api/payment/stats', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -80,7 +77,6 @@ export default function AdminStatistics() {
         });
       } else {
         console.error('Failed to fetch payment stats:', response.status);
-        // Set default values if API fails
         setStats({
           hospitalizedResidents,
           activeStaff,
@@ -133,7 +129,6 @@ export default function AdminStatistics() {
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Icon */}
       <div style={{
         width: '3.5rem',
         height: '3.5rem',
@@ -148,7 +143,6 @@ export default function AdminStatistics() {
         <Icon style={{ width: '1.75rem', height: '1.75rem', color: 'white' }} />
       </div>
 
-      {/* Content */}
       <h3 style={{
         fontSize: '1.125rem',
         fontWeight: 600,
@@ -200,7 +194,6 @@ export default function AdminStatistics() {
         </div>
       )}
 
-      {/* Decorative gradient */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -258,7 +251,6 @@ export default function AdminStatistics() {
     );
   }
 
-  // Check if all stats are zero (no data)
   const hasNoData = stats.hospitalizedResidents === 0 && 
                    stats.activeStaff === 0 && 
                    stats.totalRevenue === 0 && 
@@ -284,16 +276,14 @@ export default function AdminStatistics() {
       gap: '1.5rem',
       marginBottom: '2rem'
     }}>
-      {/* Người cao tuổi đang nằm viện */}
       <StatCard
         title="Người cao tuổi đang nằm viện"
         value={stats.hospitalizedResidents}
         icon={UsersIcon}
         gradient="linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
-        subtitle="Cư dân đang được chăm sóc"
+        subtitle="người cao tuổi đang được chăm sóc"
       />
 
-      {/* Nhân viên đang làm việc */}
       <StatCard
         title="Nhân viên đang làm việc"
         value={stats.activeStaff}
@@ -302,7 +292,6 @@ export default function AdminStatistics() {
         subtitle="Đội ngũ y tế hoạt động"
       />
 
-      {/* Doanh thu tháng */}
       <StatCard
         title="Doanh thu tháng này"
         value={formatCurrency(stats.monthlyRevenue)}
@@ -313,7 +302,6 @@ export default function AdminStatistics() {
         trendValue={stats.revenueChange}
       />
 
-      {/* Thanh toán đang chờ */}
       <StatCard
         title="Thanh toán đang chờ"
         value={stats.pendingPayments}

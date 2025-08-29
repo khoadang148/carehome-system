@@ -536,7 +536,7 @@ export default function StaffManagementPage() {
                         </div>
                         <div>
                           <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>{staff.full_name}</p>
-                          <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>ID: {staff._id}</p>
+                          
                         </div>
                       </div>
                     </td>
@@ -594,29 +594,7 @@ export default function StaffManagementPage() {
                         >
                           <PencilIcon style={{ width: '1rem', height: '1rem' }} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(staff._id)}
-                          title="Xóa nhân viên"
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '0.375rem',
-                            border: 'none',
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={e => {
-                            e.currentTarget.style.background = '#ef4444';
-                            e.currentTarget.style.color = 'white';
-                          }}
-                          onMouseOut={e => {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                            e.currentTarget.style.color = '#ef4444';
-                          }}
-                        >
-                          <TrashIcon style={{ width: '1rem', height: '1rem' }} />
-                        </button>
+                        
                       </div>
                     </td>
                   </tr>
@@ -704,20 +682,7 @@ export default function StaffManagementPage() {
                 >
                   Hủy bỏ
                 </button>
-                <button
-                  onClick={confirmDelete}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}
-                >
-                  Xóa
-                </button>
+                
               </div>
             </div>
           </div>
@@ -844,14 +809,7 @@ export default function StaffManagementPage() {
                   boxShadow: '0 2px 8px rgba(15,23,42,0.08)'
                 }}>
                   <IdentificationIcon style={{ width: '1rem', height: '1rem', color: '#6366f1' }} />
-                  <span style={{ 
-                    color: '#334155', 
-                    fontSize: '0.75rem', 
-                    fontWeight: 600,
-                    letterSpacing: '0.025em'
-                  }}>
-                    ID: {selectedStaff._id}
-                  </span>
+                  
                 </div>
               </div>
 

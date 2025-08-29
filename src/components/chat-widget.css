@@ -1,15 +1,13 @@
-/* Chat Widget Styles */
+
 .chat-widget {
   animation: slideInUp 0.3s ease-out;
-  /* Force light theme */
   background: #ffffff !important;
-  border-color: #e5e7eb !important; /* gray-200 */
+  border-color: #e5e7eb !important;
 }
 
 .chat-widget-messages {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
-  /* Force light theme */
   background-color: #ffffff !important;
 }
 
@@ -92,7 +90,6 @@
   }
 }
 
-/* Responsive design */
 @media (max-width: 640px) {
   .chat-widget {
     width: calc(100vw - 32px) !important;
@@ -101,5 +98,3 @@
     right: 16px !important;
   }
 }
-
-/* Removed dark mode overrides to keep light theme consistently */

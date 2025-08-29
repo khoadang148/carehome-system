@@ -12,7 +12,6 @@ interface ClientLayoutProps {
   children: ReactNode;
 }
 
-// Memoize background pattern để tránh re-render
 const BackgroundPattern = memo(() => (
   <div style={{
     position: 'fixed',
@@ -33,7 +32,6 @@ const BackgroundPattern = memo(() => (
 
 BackgroundPattern.displayName = 'BackgroundPattern';
 
-// Memoize loading component
 const LoadingComponent = memo(({ isLoggingOut }: { isLoggingOut: boolean }) => (
   <div style={{
     minHeight: '100vh',
@@ -59,10 +57,8 @@ function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   
-  // Use session timeout hook
   const { showWarning, remainingTime, extendSession, handleLogout } = useSessionTimeout();
   
-  // Memoize computed values để tránh re-calculate
   const layoutConfig = useMemo(() => {
     const isLoginPage = pathname === "/login";
     const isPaymentSpecialPage = ["/payment/cancel", "/payment/success"].includes(pathname);
@@ -77,17 +73,14 @@ function ClientLayout({ children }: ClientLayoutProps) {
     };
   }, [pathname]);
   
-  // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
   
-  // Show loading state until mounted or during logout
   if (!mounted || isLoggingOut) {
     return <LoadingComponent isLoggingOut={isLoggingOut} />;
   }
   
-  // For login page, or when user is not authenticated (and not loading)
   if (layoutConfig.isLoginPage || (!user && !loading) || layoutConfig.isPaymentSpecialPage) {
     return (
       <div style={{
@@ -100,8 +93,7 @@ function ClientLayout({ children }: ClientLayoutProps) {
       </div>
     );
   }
-  
-  // Main layout with sidebar and header for authenticated users
+    
   return (
     <>
       <div style={{ 
@@ -132,7 +124,6 @@ function ClientLayout({ children }: ClientLayoutProps) {
         </div>
       </div>
       
-      {/* Session Timeout Modal */}
       <SessionTimeoutModal
         isOpen={showWarning}
         onExtend={extendSession}

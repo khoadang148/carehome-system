@@ -80,14 +80,11 @@ export default function AddStaffPage() {
     setIsSubmitting(true);
     
     try {
-      // Get existing staff data
       const existingStaff = clientStorage.getItem('nurseryHomeStaff');
       const staffList = existingStaff ? JSON.parse(existingStaff) : [];
       
-      // Generate new ID
       const newId = staffList.length > 0 ? Math.max(...staffList.map((s: any) => s.id)) + 1 : 1;
       
-      // Create new staff member object
       const newStaff = {
         id: newId,
         name: `${data.firstName} ${data.lastName}`,
@@ -113,22 +110,16 @@ export default function AddStaffPage() {
         status: 'active'
       };
       
-      // Add to staff list
       staffList.push(newStaff);
       
-      // Save toStorage
       clientStorage.setItem('nurseryHomeStaff', JSON.stringify(staffList));
       
-      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Reset form
       reset();
       
-      // Redirect to staff list
       router.push('/staff');
     } catch (error) {
-      console.error('Error adding staff:', error);
       toast.error('Có lỗi xảy ra khi thêm nhân viên. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
@@ -161,7 +152,6 @@ export default function AddStaffPage() {
           Quay lại
         </button>
       
-      {/* Header lớn */}
       <div style={{
         background: 'linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%)',
         borderRadius: '1.5rem',
@@ -190,7 +180,6 @@ export default function AddStaffPage() {
         </div>
       </div>
       <form onSubmit={handleSubmit(onSubmit)} style={{display: 'flex', flexDirection: 'column', gap: '2.5rem'}}>
-        {/* Section: Thông tin cá nhân */}
         <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(99,102,241,0.06)', marginBottom: 24}}>
           <div style={{
             background: 'linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%)',
@@ -295,7 +284,6 @@ export default function AddStaffPage() {
             </div>
           </div>
             </div>
-        {/* Section: Thông tin công việc */}
         <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(16,185,129,0.06)', marginBottom: 24}}>
           <div style={{
             background: 'linear-gradient(90deg, #10b981 0%, #6ee7b7 100%)',
@@ -370,7 +358,6 @@ export default function AddStaffPage() {
             </div>
           </div>
         </div>
-        {/* Section: Thông tin liên hệ khẩn cấp */}
         <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(59,130,246,0.06)', marginBottom: 24}}>
           <div style={{
             background: 'linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%)',
@@ -413,7 +400,6 @@ export default function AddStaffPage() {
             </div>
           </div>
         </div>
-        {/* Section: Thông tin bổ sung */}
         <div style={{borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 2px 12px 0 rgba(139,92,246,0.06)', marginBottom: 24}}>
           <div style={{
             background: 'linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%)',
@@ -462,7 +448,6 @@ export default function AddStaffPage() {
             </div>
           </div>
         </div>
-        {/* Nút hành động */}
         <div style={{display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 24}}>
             <button
               type="submit"

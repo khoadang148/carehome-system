@@ -207,7 +207,6 @@ export default function TermsPage() {
   const { user } = useAuth();
   const [expandedTerm, setExpandedTerm] = useState<string | null>(null);
 
-  // Check access permissions - family only
   React.useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -226,38 +225,36 @@ export default function TermsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.15)_1px,transparent_0)] bg-[length:20px_20px]"></div>
-        </div>
-        
-        <div className="relative z-10 px-4 py-16 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-center mb-8">
+      <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
+        <div className="flex items-center justify-between gap-10 flex-wrap">
+          <div className="flex items-center gap-8">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/family/services')}
               className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
               title="Quay lại"
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-center leading-tight">
-                Điều Khoản & Quy Định
-              </h1>
+            
+            <div className="flex items-center gap-6">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+                <DocumentPlusIcon className="w-8 h-8 text-white" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent leading-tight tracking-tight">
+                  Điều Khoản & Quy Định
+                </span>
+                <span className="text-lg text-slate-500 font-medium">
+                  Tìm hiểu đầy đủ các điều khoản và cam kết dịch vụ
+                </span>
+              </div>
             </div>
-            <p className="text-xl md:text-2xl text-center max-w-4xl mx-auto opacity-90 leading-relaxed">
-              Tìm hiểu đầy đủ các điều khoản, quy định và cam kết dịch vụ của chúng tôi
-            </p>
           </div>
         </div>
       </div>
 
-      {/* Content Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 -mt-8 relative z-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 p-8 lg:p-12">
-          {/* Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-6 shadow-lg">
               <DocumentPlusIcon className="w-10 h-10 text-white" />
@@ -271,7 +268,6 @@ export default function TermsPage() {
             </p>
           </div>
 
-          {/* Terms Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             {termsData.map((term) => (
               <div
@@ -279,15 +275,12 @@ export default function TermsPage() {
                 className={`group relative bg-gradient-to-br ${term.bgColor} border border-gray-200 rounded-2xl p-6 transition-all duration-500 ease-out hover:shadow-xl hover:-translate-y-2 cursor-pointer overflow-hidden`}
                 onClick={() => toggleTerm(term.id)}
               >
-                {/* Background decoration */}
                 <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${term.color} opacity-5 rounded-full -translate-y-16 translate-x-16`}></div>
                 
-                {/* Header */}
                 <div className={`inline-flex items-center px-4 py-2 bg-gradient-to-r ${term.color} text-white rounded-full text-sm font-semibold mb-4 shadow-lg`}>
                   {term.title}
                 </div>
                 
-                {/* Content */}
                 <div className="space-y-4">
                   {term.content.map((item, itemIndex) => (
                     <div
@@ -313,7 +306,6 @@ export default function TermsPage() {
                   ))}
                 </div>
                 
-                {/* Expand indicator */}
                 <div className={`absolute bottom-4 right-4 transition-transform duration-300 ${
                   expandedTerm === term.id ? 'rotate-180' : ''
                 }`}>
@@ -327,7 +319,6 @@ export default function TermsPage() {
             ))}
           </div>
 
-          {/* Rules Section */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-3xl p-8 lg:p-12 border-2 border-blue-200 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5"></div>
             <div className="relative z-10">
@@ -396,7 +387,6 @@ export default function TermsPage() {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="text-center mt-12 pt-8 border-t border-gray-200">
             <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-6 mb-6 border border-green-200">
               <div className="flex items-center justify-center space-x-2 mb-3">

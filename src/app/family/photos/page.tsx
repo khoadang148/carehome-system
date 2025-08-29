@@ -25,14 +25,12 @@ export default function FamilyPhotosPage() {
 
 
 
-
   useEffect(() => {
     staffAPI.getAll().then(data => {
       setStaffList(Array.isArray(data) ? data : []);
     }).catch(() => setStaffList([]));
   }, []);
 
-  // Load photos sau khi staffList đã được load
   useEffect(() => {
     if (!user) return;
     
@@ -50,11 +48,9 @@ export default function FamilyPhotosPage() {
     setLoading(true);
     setError(null);
     
-    // Sử dụng API helper để lấy tất cả photos của family member
     photosAPI.getAll({ family_member_id: user.id })
       .then(async (allPhotosData) => {
         
-        // Map photos data
         const mapped = await Promise.all(allPhotosData.map(async item => {
           let senderName = item.uploadedByName;
           let senderPosition = '';
@@ -189,7 +185,6 @@ export default function FamilyPhotosPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-0 font-sans">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
           <div className="flex items-center gap-8">
@@ -225,7 +220,6 @@ export default function FamilyPhotosPage() {
   </div>
 </div>
 
-      {/* Filter resident dropdown */}
       <div className="max-w-7xl mx-auto px-10 pb-2 flex items-start justify-start mb-4">
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-emerald-200 rounded-2xl shadow-sm p-3 flex items-center gap-3 min-w-0 max-w-none w-auto m-0 flex-nowrap">
           <UsersIcon className="w-6 h-6 text-emerald-500 flex-shrink-0" />
@@ -248,7 +242,6 @@ export default function FamilyPhotosPage() {
         </div>
       </div>
 
-      {/* Gallery */}
       <div className="max-w-7xl mx-auto px-10 pb-12">
         {sortedDates.length === 0 ? (
           <div className="text-center text-gray-500 text-xl my-10">Không tìm thấy ảnh phù hợp.</div>
@@ -310,7 +303,6 @@ export default function FamilyPhotosPage() {
         )}
       </div>
 
-      {/* Lightbox */}
       {lightboxIndex !== null && filteredPhotos[lightboxIndex] && (
         <div className="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center animate-fadeIn" onClick={closeLightbox}>
           <button 

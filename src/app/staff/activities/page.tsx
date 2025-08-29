@@ -30,31 +30,22 @@ import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
 import 'react-datepicker/dist/react-datepicker.css';
 
-// Map API data to match component expectations
 const mapActivityFromAPI = (apiActivity: any) => {
   try {
-    // Validate schedule_time
     if (!apiActivity.schedule_time || typeof apiActivity.schedule_time !== 'string') {
-      console.warn('Invalid schedule_time for activity:', apiActivity._id);
       return null;
     }
 
-    // Parse schedule_time as local time, do NOT add Z or treat as UTC
     const scheduleTime = new Date(apiActivity.schedule_time);
 
-    // Check if date is valid
     if (isNaN(scheduleTime.getTime())) {
-      console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
       return null;
     }
 
-    // Calculate end time safely
     const durationInMinutes = typeof apiActivity.duration === 'number' ? apiActivity.duration : 0;
     const endTime = new Date(scheduleTime.getTime() + durationInMinutes * 60000);
 
-    // Check if end time is valid
     if (isNaN(endTime.getTime())) {
-      console.error('Invalid end time calculated for activity:', apiActivity._id);
       return null;
     }
 
@@ -63,11 +54,11 @@ const mapActivityFromAPI = (apiActivity: any) => {
       name: apiActivity.activity_name,
       description: apiActivity.description,
       activity_type: apiActivity.activity_type,
-      category: getCategoryLabel(apiActivity.activity_type), // dùng cho hiển thị màu sắc
+      category: getCategoryLabel(apiActivity.activity_type),
       duration: apiActivity.duration,
       startTime: scheduleTime.toTimeString().slice(0, 5),
       endTime: endTime.toTimeString().slice(0, 5),
-      date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
+      date: scheduleTime.toLocaleDateString('en-CA'),
       location: apiActivity.location,
       capacity: apiActivity.capacity,
       participants: 0,
@@ -75,7 +66,6 @@ const mapActivityFromAPI = (apiActivity: any) => {
       recurring: 'Không lặp lại'
     };
   } catch (error) {
-    console.error('Error mapping activity:', apiActivity._id, error);
     return null;
   }
 };
@@ -106,13 +96,11 @@ export default function StaffActivitiesPage() {
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [evaluationResidents, setEvaluationResidents] = useState<any[]>([]);
   
-  // API state
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activityParticipantCounts, setActivityParticipantCounts] = useState<{[id: string]: number}>({});
   
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -125,14 +113,12 @@ export default function StaffActivitiesPage() {
     }
   }, [user, router]);
   
-  // Fetch activities from API - same logic as main activities page
   useEffect(() => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Get all activity participations where this staff is assigned
         if (!user?.id) {
           setError('Không tìm thấy thông tin người dùng');
           return;
@@ -140,20 +126,16 @@ export default function StaffActivitiesPage() {
         
         const participations = await activityParticipationsAPI.getByStaffId(user.id);
         
-        // Extract unique activity IDs from participations
         const activityIds = [...new Set(participations.map((p: any) => p.activity_id?._id || p.activity_id))].filter(Boolean);
         
-        // Fetch activity details for each unique activity
         const activityPromises = activityIds.map(async (activityId: any) => {
           try {
             if (!activityId) {
-              console.warn('Skipping null/undefined activity ID');
               return null;
             }
             const activityData = await activitiesAPI.getById(activityId);
             return mapActivityFromAPI(activityData);
           } catch (error) {
-            console.error(`Error fetching activity ${activityId}:`, error);
             return null;
           }
         });
@@ -161,7 +143,6 @@ export default function StaffActivitiesPage() {
         const activityResults = await Promise.all(activityPromises);
         const validActivities = activityResults.filter(Boolean);
         
-        // Sort activities by date (newest first)
         validActivities.sort((a, b) => {
           if (!a || !b) return 0;
           return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -169,7 +150,6 @@ export default function StaffActivitiesPage() {
         
         setActivities(validActivities);
       } catch (err: any) {
-        console.error('Error fetching activities:', err);
         setError('Không thể tải danh sách hoạt động. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
@@ -188,7 +168,6 @@ export default function StaffActivitiesPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedWeek, setSelectedWeek] = useState(0);
   
-  // Get current week's dates
   const getWeekDates = (weekOffset: number = 0): Date[] => {
     const today = new Date();
     const currentDay = today.getDay();
@@ -206,16 +185,13 @@ export default function StaffActivitiesPage() {
 
   const weekDates = getWeekDates(selectedWeek);
   
-  // Filter activities based on search term and filters
   const filteredActivities = activities.filter((activity) => {
     const name = activity.name || '';
     const description = activity.description || '';
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLocation = filterLocation === 'Tất cả' || activity.location === filterLocation;
-    // Filter theo activity_type (không phải category hiển thị)
     const matchesCategory = filterCategory === 'Tất cả' || activity.activity_type === filterCategory;
-    // Convert selectedDate (Date) to yyyy-MM-dd for comparison
     let filterDate = '';
     if (selectedDate && isValid(selectedDate)) {
       filterDate = format(selectedDate, 'yyyy-MM-dd');
@@ -225,7 +201,6 @@ export default function StaffActivitiesPage() {
     return matchesSearch && matchesLocation && matchesSelectedDate && matchesCategory;
   });
 
-  // Filter activities for current week when in calendar view
   const weekActivities = filteredActivities.filter(activity => {
     if (viewMode === 'list') return true;
     
@@ -235,7 +210,6 @@ export default function StaffActivitiesPage() {
     );
   });
 
-  // Get activities for a specific date
   const getActivitiesForDate = (date: Date) => {
     return weekActivities.filter(activity => {
       const activityDate = new Date(activity.date);
@@ -272,7 +246,6 @@ export default function StaffActivitiesPage() {
     }
   };
 
-  // Đổi tên cho rõ nghĩa: lấy màu theo activity_type
   const getCategoryColor = (activityType: string) => {
     switch (activityType) {
       case 'Thể chất': return '#10b981';
@@ -304,7 +277,6 @@ export default function StaffActivitiesPage() {
         return participationDate === activity.date;
       });
       
-      // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
       const uniqueParticipations = filteredParticipations.reduce((acc: any[], current: any) => {
         const residentId = current.resident_id?._id || current.resident_id;
         const existingIndex = acc.findIndex(item => 
@@ -312,10 +284,8 @@ export default function StaffActivitiesPage() {
         );
         
         if (existingIndex === -1) {
-          // Chưa có, thêm vào
           acc.push(current);
         } else {
-          // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
           const existing = acc[existingIndex];
           const existingTime = new Date(existing.updated_at || existing.created_at || 0);
           const currentTime = new Date(current.updated_at || current.created_at || 0);
@@ -338,7 +308,6 @@ export default function StaffActivitiesPage() {
     }
   };
 
-  // Fetch participant counts for each activity
   useEffect(() => {
     const fetchCounts = async () => {
       const counts: {[id: string]: number} = {};
@@ -349,14 +318,12 @@ export default function StaffActivitiesPage() {
             activity_id: activity.id
           });
           
-          // Lọc participations cho hoạt động này và đúng ngày
           const filtered = participations.filter((p: any) => {
             const participationActivityId = p.activity_id?._id || p.activity_id;
             const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
             return participationActivityId === activity.id && participationDate === activity.date;
           });
           
-          // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
           const joined = filtered.reduce((acc: any[], current: any) => {
             const residentId = current.resident_id?._id || current.resident_id;
             const existingIndex = acc.findIndex(item => 
@@ -364,10 +331,8 @@ export default function StaffActivitiesPage() {
             );
             
             if (existingIndex === -1) {
-              // Chưa có, thêm vào
               acc.push(current);
             } else {
-              // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
               const existing = acc[existingIndex];
               const existingTime = new Date(existing.updated_at || existing.created_at || 0);
               const currentTime = new Date(current.updated_at || current.created_at || 0);
@@ -379,15 +344,8 @@ export default function StaffActivitiesPage() {
             return acc;
           }, []);
           
-          console.log(`Activity ${activity.name} (${activity.id}):`, {
-            totalParticipations: participations.length,
-            filteredParticipations: joined.length,
-            activityDate: activity.date
-          });
-          
           counts[activity.id] = joined.length;
         } catch (error) {
-          console.error(`Error fetching participations for activity ${activity.id}:`, error);
           counts[activity.id] = 0;
         }
       }));
@@ -462,133 +420,43 @@ export default function StaffActivitiesPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      position: 'relative',
-      zIndex: 1
-    }}>
-      <div style={{
-        maxWidth: '1400px', 
-        margin: '0 auto', 
-        padding: '2rem 1.5rem',
-        position: 'relative',
-        zIndex: 1
-      }}>
-          {/* Header */}
-          <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{
-                width: '3.5rem',
-                height: '3.5rem',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                borderRadius: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-              }}>
-                <SparklesIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
+    <div className="min-h-screen relative z-[1]">
+      <div className="max-w-[1400px] mx-auto px-6 py-8 relative z-[1]">
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),0_0_0_1px_rgba(255,255,255,0.05)] border border-white/20 backdrop-blur">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-amber-700 rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(245,158,11,0.3)]">
+                <SparklesIcon className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 style={{
-                  fontSize: 'clamp(1.4rem, 3vw, 2rem)',
-                  fontWeight: 700, 
-                  margin: 0,
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.025em'
-                }}>
+                <h1 className="text-[clamp(1.4rem,3vw,2rem)] font-bold m-0 bg-gradient-to-br from-amber-500 to-amber-700 bg-clip-text text-transparent tracking-tight">
                   Quản lý Chương trình sinh hoạt
                 </h1>
-                <p style={{
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: 500
-                }}>
+                <p className="text-base text-slate-600 mt-1 font-medium">
                   Tổng số: {filteredActivities.length} chương trình
                 </p>
                 {viewMode === 'calendar' && (
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#94a3b8',
-                    margin: '0.5rem 0 0 0',
-                    fontWeight: 500
-                  }}>
-                    Hôm nay: {new Date().toLocaleDateString('vi-VN', { 
-                      weekday: 'long', 
-                      day: '2-digit', 
-                      month: '2-digit', 
-                      year: 'numeric' 
-                    })}
+                  <p className="text-sm text-slate-400 mt-2 font-medium">
+                    Hôm nay: {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </p>
                 )}
               </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {/* View Mode Toggle */}
-              <div style={{
-                display: 'flex',
-                background: '#f1f5f9',
-                borderRadius: '0.75rem',
-                padding: '0.25rem',
-                border: '1px solid #e2e8f0'
-              }}>
+            <div className="flex gap-3 flex-wrap">
+              <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
                 <button
                   onClick={() => setViewMode('list')}
-            style={{
-                    display: 'flex',
-              alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    background: viewMode === 'list' ? '#8b5cf6' : 'transparent',
-                    color: viewMode === 'list' ? 'white' : '#64748b',
-                    fontSize: '0.875rem',
-                  fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border-0 text-sm font-semibold transition ${viewMode === 'list' ? 'bg-violet-500 text-white' : 'bg-transparent text-slate-500'}`}
                 >
-                  <ListBulletIcon style={{ width: '1rem', height: '1rem' }} />
+                  <ListBulletIcon className="w-4 h-4" />
                   Danh sách
                 </button>
                 <button
                   onClick={() => setViewMode('calendar')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    background: viewMode === 'calendar' ? '#3b82f6' : 'transparent',
-                    color: viewMode === 'calendar' ? 'white' : '#64748b',
-                  fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border-0 text-sm font-semibold transition ${viewMode === 'calendar' ? 'bg-blue-500 text-white' : 'bg-transparent text-slate-500'}`}
                 >
-                  <CalendarDaysIcon style={{ width: '1rem', height: '1rem' }} />
+                  <CalendarDaysIcon className="w-4 h-4" />
             Lịch hoạt động
                 </button>
               </div>
@@ -596,68 +464,26 @@ export default function StaffActivitiesPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem',
-            alignItems: 'end'
-          }}>
+        <div className="bg-white rounded-xl p-6 mb-8 shadow-md border border-white/20">
+          <div className="grid [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] gap-4 items-end">
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Tìm kiếm chương trình
               </label>
-              <div style={{ position: 'relative' }}>
-                <MagnifyingGlassIcon style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '1rem',
-                  height: '1rem',
-                  color: '#9ca3af'
-                }} />
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                   placeholder="Tìm kiếm chương trình..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                    paddingLeft: '2.5rem',
-                    paddingRight: '1rem',
-                    paddingTop: '0.75rem',
-                    paddingBottom: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem'
-                  }}
+                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 text-sm bg-white"
                 />
               </div>
             </div>
 
             <div>
-                <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Ngày
                 </label>
                 <DatePicker
@@ -670,39 +496,20 @@ export default function StaffActivitiesPage() {
   customInput={
     <input
       type="text"
-      style={{
-        width: '100%',
-        padding: '0.75rem',
-        borderRadius: '0.5rem',
-        border: '1px solid #d1d5db',
-        fontSize: '0.875rem'
-      }}
+      className="w-full p-3 rounded-lg border border-gray-300 text-sm"
     />
   }
 />
-              {/* Optionally, show a warning if the date is invalid */}
             </div>
 
             <div>
-                <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Loại hoạt động
                 </label>
                 <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                  style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                  className="w-full p-3 rounded-lg border border-gray-300 text-sm"
               >
                 {categories.map((category) => (
                   <option key={category} value={category}>
@@ -713,25 +520,13 @@ export default function StaffActivitiesPage() {
             </div>
 
             <div>
-                <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.5rem'
-                }}>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Địa điểm
                 </label>
                 <select
                 value={filterLocation}
                 onChange={(e) => setFilterLocation(e.target.value)}
-                  style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                  className="w-full p-3 rounded-lg border border-gray-300 text-sm"
               >
                 {locations.map((location) => (
                   <option key={location} value={location}>
@@ -745,93 +540,39 @@ export default function StaffActivitiesPage() {
           
         </div>
 
-        {/* Calendar View Week Navigation */}
         {viewMode === 'calendar' && (
-          <div style={{
-            background: 'white',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1rem'
-            }}>
+          <div className="bg-white rounded-xl p-6 mb-8 shadow-md border border-white/20">
+            <div className="flex justify-between items-center mb-4">
               <button
                 onClick={() => navigateWeek('prev')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
-                  color: '#374151',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50"
               >
-                <ChevronLeftIcon style={{ width: '1rem', height: '1rem' }} />
+                <ChevronLeftIcon className="w-4 h-4" />
                 Tuần trước
               </button>
 
-              <div style={{ textAlign: 'center' }}>
-                <h2 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: '0 0 0.25rem 0'
-                }}>
+              <div className="text-center">
+                <h2 className="text-xl font-semibold text-gray-900 mb-1">
                   {selectedWeek === 0 && 'Tuần này'}
                   {selectedWeek === 1 && 'Tuần sau'}
                   {selectedWeek === -1 && 'Tuần trước'}
                   {Math.abs(selectedWeek) > 1 && `${selectedWeek > 0 ? '+' : ''}${selectedWeek} tuần`}
                 </h2>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  margin: 0,
-                  fontWeight: 500
-                }}>
+                <p className="text-sm text-gray-600 font-medium m-0">
                   {weekDates[0].toLocaleDateString('vi-VN')} - {weekDates[6].toLocaleDateString('vi-VN')}
                 </p>
               </div>
 
               <button
                 onClick={() => navigateWeek('next')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
-                  color: '#374151',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                  }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50"
               >
                 Tuần sau
-                <ChevronRightIcon style={{ width: '1rem', height: '1rem' }} />
+                <ChevronRightIcon className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Week Calendar */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7, 1fr)',
-              gap: '1rem'
-            }}>
+            <div className="grid [grid-template-columns:repeat(7,1fr)] gap-4">
               {weekDates.map((date) => {
                 const dayActivities = getActivitiesForDate(date);
                 const today = isToday(date);
@@ -839,62 +580,30 @@ export default function StaffActivitiesPage() {
                 return (
                   <div
                     key={date.toISOString()}
-                    style={{
-                      background: today ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#f8fafc',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      border: today ? 'none' : '1px solid #e2e8f0',
-                      color: today ? 'white' : '#374151',
-                      minHeight: '140px'
-                    }}
+                    className={`${today ? 'bg-gradient-to-br from-amber-500 to-amber-700 border-none text-white' : 'bg-slate-50 text-slate-700 border border-slate-200'} rounded-xl p-4 min-h-[140px]`}
                   >
-                    <div style={{
-                      textAlign: 'center',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <div style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        opacity: today ? 1 : 0.7,
-                        marginBottom: '0.25rem'
-                      }}>
+                    <div className="text-center mb-3">
+                      <div className={`text-[0.75rem] font-semibold ${today ? 'opacity-100' : 'opacity-70'} mb-1`}>
                         {getDayLabel(date)}
                       </div>
-                      <div style={{
-                        fontSize: '1.25rem',
-                        fontWeight: 700
-                      }}>
+                      <div className="text-xl font-bold">
                         {date.getDate()}
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div className="flex flex-col gap-1">
                       {dayActivities.slice(0, 3).map((activity, index) => (
                         <div
                           key={activity.id || `activity-${index}-${date.toISOString()}`}
-                          style={{
-                            background: today ? 'rgba(255, 255, 255, 0.2)' : getCategoryColor(activity.activity_type),
-                            color: today ? 'white' : 'white',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.25rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            textAlign: 'center',
-                            cursor: activity.id ? 'pointer' : 'not-allowed',
-                            opacity: activity.id ? 1 : 0.5
-                          }}
+                          className={`${today ? 'bg-white/20 text-white' : 'text-white'} px-2 py-1 rounded text-[0.75rem] font-semibold text-center ${activity.id ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                          style={{ background: today ? undefined : getCategoryColor(activity.activity_type) }}
                           onClick={() => activity.id && handleViewActivity(activity.id)}
                         >
                           {activity.name}
                         </div>
                       ))}
                       {dayActivities.length > 3 && (
-                        <div key={date.toISOString() + '-more'} style={{
-                          fontSize: '0.75rem',
-                          textAlign: 'center',
-                          opacity: 0.7,
-                          marginTop: '0.25rem'
-                        }}>
+                        <div key={date.toISOString() + '-more'} className="text-[0.75rem] text-center opacity-70 mt-1">
                           +{dayActivities.length - 3} khác
                         </div>
                       )}
@@ -906,14 +615,7 @@ export default function StaffActivitiesPage() {
           </div>
         )}
 
-        {/* Activities Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: viewMode === 'calendar' ? 
-            'repeat(auto-fit, minmax(350px, 1fr))' : 
-            'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '1.5rem'
-        }}>
+        <div className={`grid ${viewMode === 'calendar' ? '[grid-template-columns:repeat(auto-fit,minmax(350px,1fr))]' : '[grid-template-columns:repeat(auto-fit,minmax(400px,1fr))]'} gap-6`}>
           {(viewMode === 'calendar' ? weekActivities : filteredActivities)
             .sort((a, b) => {
               if (viewMode === 'calendar') {
@@ -930,347 +632,123 @@ export default function StaffActivitiesPage() {
               return (
                 <div
                   key={activity.id || `activity-${index}`}
-                  style={{
-                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                    borderRadius: '1rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                  }}
+                  className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-md border border-white/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  {/* Header with Activity Name and Status */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: '1rem',
-                    paddingBottom: '0.75rem',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
+                  <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-200">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[0.75rem] font-semibold text-gray-500 uppercase tracking-wide">
                           Tên hoạt động:
                         </span>
                       </div>
-                      <h3 style={{
-                        fontSize: '1.25rem',
-                        fontWeight: 700,
-                        color: '#111827',
-                        margin: '0 0 0.5rem 0',
-                        lineHeight: 1.3
-                      }}>
+                      <h3 className="text-xl font-bold text-gray-900 m-0 mb-2 leading-snug">
                         {activity.name}
                       </h3>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[0.75rem] font-semibold text-gray-500 uppercase tracking-wide">
                           Loại:
                         </span>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          background: categoryColor + '15',
-                          color: categoryColor,
-                          fontWeight: 600,
-                          fontSize: '0.75rem',
-                          border: `1px solid ${categoryColor}30`
-                        }}>
+                        <span className="inline-block px-3 py-1 rounded-full text-[0.75rem] font-semibold border" style={{ color: categoryColor, background: categoryColor + '15', borderColor: categoryColor + '30' }}>
                           {activity.category}
                         </span>
                       </div>
                     </div>
-                    <div style={{ flexShrink: 0 }}>
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-end',
-                        gap: '0.25rem'
-                      }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          Trạng thái:
-                        </span>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          background: statusColor.bg,
-                          color: statusColor.text,
-                          border: `1px solid ${statusColor.border}`,
-                          whiteSpace: 'nowrap'
-                        }}>
+                    <div className="shrink-0">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[0.75rem] font-semibold text-gray-500 uppercase tracking-wide">Trạng thái:</span>
+                        <span className="inline-flex items-center px-4 py-2 rounded-full text-[0.75rem] font-semibold whitespace-nowrap" style={{ background: statusColor.bg, color: statusColor.text, border: `1px solid ${statusColor.border}` }}>
                           {activity.status}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Description */}
                   {activity.description && (
-                    <div style={{
-                      marginBottom: '1rem',
-                      padding: '0.75rem',
-                      background: '#f9fafb',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #f3f4f6'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
+                    <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[0.75rem] font-semibold text-gray-500 uppercase tracking-wide">
                           Mô tả:
                         </span>
                       </div>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#4b5563',
-                        margin: 0,
-                        lineHeight: 1.5,
-                        fontStyle: 'italic'
-                      }}>
+                      <p className="text-sm text-slate-700 m-0 leading-6 italic">
                         {activity.description}
                       </p>
                     </div>
                   )}
 
-                  {/* Key Information Grid */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '1rem',
-                    marginBottom: '1rem'
-                  }}>
-                    {/* Time */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.75rem',
-                      background: '#f0f9ff',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e0f2fe'
-                    }}>
-                      <div style={{
-                        width: '2rem',
-                        height: '2rem',
-                        borderRadius: '50%',
-                        background: '#3b82f6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <ClockIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="flex items-center gap-3 p-3 bg-sky-50 rounded-lg border border-sky-100">
+                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                        <ClockIcon className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Thời gian:</div>
-                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                        <div className="text-[0.75rem] text-gray-500 font-medium mb-0.5">Thời gian:</div>
+                        <div className="text-sm text-gray-900 font-semibold">
                           {activity.startTime} - {activity.endTime}
                         </div>
-                        <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>({activity.duration} phút)</div>
+                        <div className="text-[0.75rem] text-gray-500">({activity.duration} phút)</div>
                       </div>
                     </div>
                     
-                    {/* Date */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.75rem',
-                      background: '#fef3c7',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #fde68a'
-                    }}>
-                      <div style={{
-                        width: '2rem',
-                        height: '2rem',
-                        borderRadius: '50%',
-                        background: '#f59e0b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <CalendarIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                    <div className="flex items-center gap-3 p-3 bg-amber-100 rounded-lg border border-amber-200">
+                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+                        <CalendarIcon className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Ngày:</div>
-                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                        <div className="text-[0.75rem] text-gray-500 font-medium mb-0.5">Ngày:</div>
+                        <div className="text-sm text-gray-900 font-semibold">
                           {activity.date ? new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN') : '-'}
                         </div>
                       </div>
                     </div>
                     
-                    {/* Location */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.75rem',
-                      background: '#ecfdf5',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #d1fae5'
-                    }}>
-                      <div style={{
-                        width: '2rem',
-                        height: '2rem',
-                        borderRadius: '50%',
-                        background: '#10b981',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <MapPinIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                    <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <MapPinIcon className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Địa điểm:</div>
-                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                        <div className="text-[0.75rem] text-gray-500 font-medium mb-0.5">Địa điểm:</div>
+                        <div className="text-sm text-gray-900 font-semibold">
                           {activity.location}
                         </div>
                       </div>
                     </div>
                     
-                    {/* Participants */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.75rem',
-                      background: '#fef3c7',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #fde68a'
-                    }}>
-                      <div style={{
-                        width: '2rem',
-                        height: '2rem',
-                        borderRadius: '50%',
-                        background: '#f59e0b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <UserGroupIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                    <div className="flex items-center gap-3 p-3 bg-amber-100 rounded-lg border border-amber-200">
+                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+                        <UserGroupIcon className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng người cao tuổi tham gia:</div>
-                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
+                        <div className="text-[0.75rem] text-gray-500 font-medium mb-0.5">Số lượng người cao tuổi tham gia:</div>
+                        <div className="text-sm text-gray-900 font-semibold">
                           {(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    justifyContent: 'flex-end'
-                  }}>
+                  <div className="flex gap-2 justify-end">
                     <button
                       onClick={() => activity.id && handleViewActivity(activity.id)}
                       disabled={!activity.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        background: 'white',
-                        color: '#374151',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                        cursor: activity.id ? 'pointer' : 'not-allowed',
-                        transition: 'all 0.2s ease',
-                        opacity: activity.id ? 1 : 0.5
-                      }}
+                      className={`flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium transition ${activity.id ? 'hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}
                     >
-                      <EyeIcon style={{ width: '1rem', height: '1rem' }} />
+                      <EyeIcon className="w-4 h-4" />
                       Xem chi tiết
                     </button>
                   </div>
                   </div>
-               
               );
             })}
         </div>
 
-        {/* Empty State */}
         {filteredActivities.length === 0 && !loading && (
-          <div style={{
-            textAlign: 'center',
-            padding: '4rem 2rem',
-            background: 'white',
-            borderRadius: '1rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            border: '1px solid #e5e7eb'
-          }}>
-            <SparklesIcon style={{
-              width: '4rem',
-              height: '4rem',
-              color: '#9ca3af',
-              margin: '0 auto 1rem auto'
-            }} />
-            <h3 style={{
-              fontSize: '1.25rem',
-              fontWeight: 600,
-              color: '#374151',
-              margin: '0 0 0.5rem 0'
-            }}>
+          <div className="text-center p-16 bg-white rounded-xl shadow-md border border-gray-200">
+            <SparklesIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">
               Không có hoạt động nào
             </h3>
-            <p style={{
-              fontSize: '1rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
+            <p className="text-base text-gray-500 m-0">
               {searchTerm || filterCategory !== 'Tất cả' || filterLocation !== 'Tất cả' || selectedDate
                 ? 'Không tìm thấy hoạt động nào phù hợp với bộ lọc hiện tại.'
                 : 'Bạn chưa được phân công phụ trách hoạt động nào.'}
@@ -1279,7 +757,6 @@ export default function StaffActivitiesPage() {
         )}
       </div>
 
-      {/* Evaluation Modal */}
       {evaluationModalOpen && selectedActivity && (
         <ResidentEvaluationModal
           open={evaluationModalOpen}
@@ -1287,7 +764,6 @@ export default function StaffActivitiesPage() {
             setEvaluationModalOpen(false);
             setSelectedActivity(null);
             setEvaluationResidents([]);
-            // Refresh participant counts after closing
             const fetchCounts = async () => {
               const counts: {[id: string]: number} = {};
               await Promise.all(activities.map(async (activity) => {
@@ -1297,7 +773,6 @@ export default function StaffActivitiesPage() {
                     activity_id: activity.id
                   });
                   
-                  // Lọc participations cho hoạt động này và đúng ngày
                   const joined = participations.filter((p: any) => {
                     const participationActivityId = p.activity_id?._id || p.activity_id;
                     const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
@@ -1306,7 +781,6 @@ export default function StaffActivitiesPage() {
                   
                   counts[activity.id] = joined.length;
                 } catch (error) {
-                  console.error(`Error fetching participations for activity ${activity.id}:`, error);
                   counts[activity.id] = 0;
                 }
               }));

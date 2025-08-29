@@ -118,7 +118,12 @@ export default function AdminVitalSignsPage() {
         );
         
         // Filter only residents who have completed registration (have room assigned)
-        const completedResidents = residentsWithRooms.filter((resident: any) => resident.hasRoom);
+        // and are still active (not discharged/deleted)
+        const completedResidents = residentsWithRooms.filter((resident: any) => {
+          const status = resident.status || resident.resident_status;
+          const isDeleted = Boolean(resident.deleted || resident.isDeleted);
+          return resident.hasRoom && status === 'active' && !isDeleted;
+        });
         
         // Map residents with their assignment status
         const mappedResidents = completedResidents.map((resident: any) => {
@@ -188,7 +193,7 @@ export default function AdminVitalSignsPage() {
       return {
         id: vs._id,
         residentId: vs.resident_id,
-        residentName: resident?.name || 'Cư dân không tồn tại',
+        residentName: resident?.name || 'người cao tuổi không tồn tại',
         residentAvatar: resident?.avatar,
         assignmentStatus: resident?.assignmentStatus || 'unknown',
         date: formatDateDDMMYYYYWithTimezone(dateTime),
@@ -223,6 +228,10 @@ export default function AdminVitalSignsPage() {
       });
     }
     
+    // Keep only records of residents currently active in the list
+    const activeResidentIds = new Set(residents.map(r => r.id));
+    filtered = filtered.filter(vs => activeResidentIds.has(vs.resident_id));
+
     // Sort by date (newest first)
     filtered.sort((a, b) => {
       const dateA = new Date(a.date_time || a.date);
@@ -327,19 +336,18 @@ export default function AdminVitalSignsPage() {
       
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-6">
-          {/* Back Button */}
-          <button
-            onClick={() => router.push('/admin')}
-            className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl text-sm font-medium cursor-pointer mb-6 shadow-sm hover:bg-gray-50 hover:shadow-md transition-all duration-200 group"
-          >
-            <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Quay lại
-          </button>
 
           {/* Enhanced Header */}
           <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg border border-gray-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
+              <button
+              onClick={() => router.push('/admin')}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
                 <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center shadow-lg">
                   <HeartIconSolid className="w-8 h-8 text-white" />
                 </div>
@@ -538,23 +546,15 @@ export default function AdminVitalSignsPage() {
                         >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center text-white text-sm font-semibold overflow-hidden flex-shrink-0 shadow-lg">
-                                {vs.residentAvatar ? (
-                                  <img
-                                    src={userAPI.getAvatarUrl(vs.residentAvatar)}
-                                    alt={ensureString(vs.residentName)}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const parent = e.currentTarget.parentElement;
-                                      if (parent) {
-                                        parent.textContent = ensureString(vs.residentName).charAt(0).toUpperCase();
-                                      }
-                                    }}
-                                  />
-                                ) : (
-                                  ensureString(vs.residentName).charAt(0).toUpperCase()
-                                )}
+                              <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-lg bg-transparent">
+                                <img
+                                  src={vs.residentAvatar ? userAPI.getAvatarUrl(vs.residentAvatar) : '/default-avatar.svg'}
+                                  alt={ensureString(vs.residentName)}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = '/default-avatar.svg';
+                                  }}
+                                />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="font-semibold text-gray-900 truncate text-base">

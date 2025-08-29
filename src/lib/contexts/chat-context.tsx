@@ -5,7 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from './auth-context';
 import { useNotification } from '@/hooks/useNotification';
 
-// Types
+
 export interface ChatMessage {
   _id: string;
   conversation_id: string;
@@ -65,23 +65,23 @@ export interface TypingUser {
 }
 
 interface ChatContextType {
-  // Socket connection
+  
   socket: Socket | null;
   isConnected: boolean;
   
-  // Conversations
+  
   conversations: ChatConversation[];
   activeConversation: ChatConversation | null;
   
-  // Messages
+  
   messages: ChatMessage[];
   unreadCount: number;
   
-  // Online users and typing
+  
   onlineUsers: string[];
   typingUsers: TypingUser[];
   
-  // Actions
+  
   sendMessage: (data: SendMessageData) => Promise<void>;
   joinConversation: (conversationId: string) => Promise<void>;
   leaveConversation: (conversationId: string) => Promise<void>;
@@ -90,13 +90,13 @@ interface ChatContextType {
   startTyping: (conversationId: string) => void;
   stopTyping: (conversationId: string) => void;
   
-  // Conversation management
+  
   setActiveConversation: (conversation: ChatConversation | null) => void;
   loadConversations: () => Promise<void>;
   loadMessages: (conversationId: string, page?: number) => Promise<void>;
   createDirectConversation: (userId: string) => Promise<ChatConversation>;
   
-  // Utility
+  
   getOtherParticipant: (conversation: ChatConversation) => any;
   isUserOnline: (userId: string) => boolean;
   isUserTyping: (userId: string, conversationId: string) => boolean;
@@ -114,21 +114,21 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   
-  // Socket state
+  
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   
-  // Chat state
+  
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<ChatConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   
-  // Online state
+  
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
 
-  // Initialize socket connection
+  
   useEffect(() => {
     if (!user) return;
 
@@ -144,7 +144,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
     setSocket(newSocket);
 
-    // Connection events
+    
     newSocket.on('connect', () => {
       console.log('Connected to chat server');
       setIsConnected(true);
@@ -160,16 +160,16 @@ export function ChatProvider({ children }: ChatProviderProps) {
       showNotification({ title: 'Lỗi', message: 'Lỗi kết nối chat: ' + error.message, type: 'error' });
     });
 
-    // Chat events
+    
     newSocket.on('newMessage', (data: { message: ChatMessage; conversationId: string }) => {
       const { message, conversationId } = data;
       
-      // Add message to current conversation if it's active
+      
       if (activeConversation?._id === conversationId) {
         setMessages(prev => [...prev, message]);
       }
       
-      // Update conversations list
+      
       setConversations(prev => 
         prev.map(conv => 
           conv._id === conversationId 
@@ -178,7 +178,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         )
       );
       
-      // Show notification if not from current user and not in active conversation
+      
       if (message.sender_id._id !== user.id && activeConversation?._id !== conversationId) {
         showNotification({
           title: 'Tin nhắn mới',
@@ -230,7 +230,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     };
   }, [user, activeConversation, showNotification]);
 
-  // Load conversations
+  
   const loadConversations = useCallback(async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/chat/conversations`, {
@@ -248,7 +248,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, []);
 
-  // Load messages for a conversation
+  
   const loadMessages = useCallback(async (conversationId: string, page = 1) => {
     try {
       const response = await fetch(
@@ -273,7 +273,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, []);
 
-  // Send message
+
   const sendMessage = useCallback(async (data: SendMessageData) => {
     if (!socket || !isConnected) {
       throw new Error('Không có kết nối chat');
@@ -282,7 +282,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     socket.emit('sendMessage', data);
   }, [socket, isConnected]);
 
-  // Join conversation
+  
   const joinConversation = useCallback(async (conversationId: string) => {
     if (!socket || !isConnected) return;
     
@@ -290,14 +290,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
     await loadMessages(conversationId);
   }, [socket, isConnected, loadMessages]);
 
-  // Leave conversation
+  
   const leaveConversation = useCallback(async (conversationId: string) => {
     if (!socket || !isConnected) return;
     
     socket.emit('leaveConversation', { conversationId });
   }, [socket, isConnected]);
 
-  // Mark all messages as read
+  
   const markAllAsRead = useCallback(async (conversationId: string) => {
     try {
       await fetch(`${BACKEND_URL}/chat/conversations/${conversationId}/mark-read`, {
@@ -311,14 +311,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, []);
 
-  // Update message status
+  
   const updateMessageStatus = useCallback(async (messageId: string, status: 'sent' | 'delivered' | 'read') => {
     if (!socket || !isConnected) return;
     
     socket.emit('updateMessageStatus', { messageId, status: { status } });
   }, [socket, isConnected]);
 
-  // Typing indicators
+  
   const startTyping = useCallback((conversationId: string) => {
     if (!socket || !isConnected) return;
     socket.emit('typing', { conversationId, isTyping: true });
@@ -329,7 +329,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     socket.emit('typing', { conversationId, isTyping: false });
   }, [socket, isConnected]);
 
-  // Create direct conversation
+  
   const createDirectConversation = useCallback(async (userId: string): Promise<ChatConversation> => {
     const response = await fetch(`${BACKEND_URL}/chat/conversations/direct/${userId}`, {
       method: 'POST',
@@ -345,7 +345,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     const result = await response.json();
     const conversation = result.data;
     
-    // Add to conversations list if not exists
+
     setConversations(prev => {
       const exists = prev.find(conv => conv._id === conversation._id);
       if (exists) return prev;
@@ -355,25 +355,24 @@ export function ChatProvider({ children }: ChatProviderProps) {
     return conversation;
   }, []);
 
-  // Get other participant in direct conversation
+  
   const getOtherParticipant = useCallback((conversation: ChatConversation) => {
     if (!user || conversation.type !== 'direct') return null;
     return conversation.participants.find(p => p._id !== user.id) || null;
   }, [user]);
 
-  // Check if user is online
+  
   const isUserOnline = useCallback((userId: string) => {
     return onlineUsers.includes(userId);
   }, [onlineUsers]);
 
-  // Check if user is typing
+  
   const isUserTyping = useCallback((userId: string, conversationId: string) => {
     return typingUsers.some(
       user => user.userId === userId && user.conversationId === conversationId && user.isTyping
     );
   }, [typingUsers]);
 
-  // Load initial data
   useEffect(() => {
     if (user && isConnected) {
       loadConversations();

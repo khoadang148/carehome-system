@@ -1,4 +1,4 @@
-// Vital Signs Constants and Configuration
+
 export const VITAL_SIGNS_THRESHOLDS = {
   HEART_RATE: {
     CRITICAL_HIGH: 100,

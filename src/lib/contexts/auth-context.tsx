@@ -45,9 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
 
-  // Memoize session check function
+  
   const checkUserSession = useCallback(() => {
-    // Skip session check if logging out
+    
     if (isLoggingOut) {
       return;
     }
@@ -75,13 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoggingOut]);
 
   useEffect(() => {
-    // Immediate session check for faster loading
+
     checkUserSession();
   }, [checkUserSession]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      // Gọi API login
+      
       const response = await authAPI.login(email, password);
       
       if (response.access_token) {
@@ -96,26 +96,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
-          // Xử lý song song: session init và set user state
-          const sessionPromise = initializeSession(response.access_token, userObj);
+          
           setUser(userObj);
           setLoading(false);
           
-          // Preload pages based on role
-          preloadRolePages(router, userRole);
           
-          // Redirect based on role
-          await sessionPromise;
-          redirectByRole(router, userRole);
+          Promise.all([
+            initializeSession(response.access_token, userObj),
+            preloadRolePages(router, userRole)
+          ]).then(() => {
+            redirectByRole(router, userRole);
+          }).catch((error) => {
+            
+          });
           
           return userObj;
         }
       }
       return null;
     } catch (error) {
-      console.error('Login error:', error);
+      
       setLoading(false);
-      // Re-throw error để login page có thể catch và xử lý
+      
+      throw error;
+    }
+  }, [router]);
+
+  const loginWithOtp = useCallback(async (phone: string, otp: string) => {
+    try {
+      
+      const response = await authAPI.verifyOtp(phone, otp);
+      
+      if (response.access_token) {
+        const userProfile = response.user;
+        const userRole = userProfile.role;
+        
+        if (userRole === 'family' || userRole === 'staff' || userRole === 'admin') {
+          const userObj = {
+            id: userProfile.id,
+            name: userProfile.full_name || userProfile.fullName || userProfile.username || userProfile.email,
+            email: userProfile.email,
+            role: userRole,
+          };
+          
+          
+          setUser(userObj);
+          setLoading(false);
+          
+          
+          Promise.all([
+            initializeSession(response.access_token, userObj),
+            preloadRolePages(router, userRole)
+          ]).then(() => {
+            redirectByRole(router, userRole);
+          }).catch((error) => {
+            
+          });
+          
+          return userObj;
+        }
+      }
+      return null;
+    } catch (error) {
+            
+      setLoading(false);
+      
       throw error;
     }
   }, [router]);
@@ -123,14 +168,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setIsLoggingOut(true);
     
-    // Sử dụng instantLogout để logout nhanh nhất có thể
+    
     instantLogout(router);
     
-    // Clear user state ngay lập tức
+    
     setUser(null);
     setIsLoggingOut(false);
     
-    // Gọi API logout trong background (không chờ)
+    
     Promise.resolve(authAPI.logout()).catch(() => {
       console.warn('Logout API call failed, but user already logged out');
     });
@@ -138,22 +183,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      // Implement user refresh logic here if needed
+
       checkUserSession();
     } catch (error) {
       console.error('Refresh user error:', error);
     }
   }, [checkUserSession]);
 
-  // Memoize context value để tránh re-render không cần thiết
+  
   const contextValue = useMemo(() => ({
     user,
     login,
+    loginWithOtp,
     logout,
     loading,
     isLoggingOut,
     refreshUser,
-  }), [user, login, logout, loading, isLoggingOut, refreshUser]);
+  }), [user, login, loginWithOtp, logout, loading, isLoggingOut, refreshUser]);
 
   return (
     <AuthContext.Provider value={contextValue}>

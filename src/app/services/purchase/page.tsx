@@ -22,19 +22,16 @@ export default function SelectPackagesPage() {
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>('');
   
-  // State cho search và filter
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name'); // 'name', 'age', 'gender'
+  const [sortBy, setSortBy] = useState('name');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
   
-  // State cho search và filter gói dịch vụ
   const [packageSearchTerm, setPackageSearchTerm] = useState('');
-  const [packageSortBy, setPackageSortBy] = useState('name'); // 'name', 'price', 'type'
+  const [packageSortBy, setPackageSortBy] = useState('name');
   const [packageCurrentPage, setPackageCurrentPage] = useState(1);
   const [packageItemsPerPage] = useState(4);
   
-  // Thêm state cho phòng và giường
   const [step, setStep] = useState(1);
   const [roomType, setRoomType] = useState('');
   const [selectedRoomId, setSelectedRoomId] = useState('');
@@ -46,10 +43,9 @@ export default function SelectPackagesPage() {
   const [loadingBeds, setLoadingBeds] = useState(false);
   const [loadingRoomTypes, setLoadingRoomTypes] = useState(false);
   
-  // State cho thông tin bổ sung
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [registrationPeriod, setRegistrationPeriod] = useState('6'); // 6 tháng hoặc 12 tháng
+  const [registrationPeriod, setRegistrationPeriod] = useState('6');
   const [medicalNotes, setMedicalNotes] = useState('');
   const [familyPreferences, setFamilyPreferences] = useState({ 
     preferred_room_gender: '', 
@@ -57,7 +53,6 @@ export default function SelectPackagesPage() {
     special_requests: '' 
   });
   
-  // State cho validation
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupplementaryDetails, setShowSupplementaryDetails] = useState(false);
@@ -65,11 +60,9 @@ export default function SelectPackagesPage() {
 
   const residentId = searchParams.get('residentId') || '';
 
-  // Filter và sort residents - hiển thị những resident chưa đăng ký dịch vụ hoặc đã hết hạn
   const [residentsWithAssignmentStatus, setResidentsWithAssignmentStatus] = useState<{[key: string]: { hasAssignment: boolean; isExpired: boolean; endDate?: string }}>({});
   const [loadingAssignmentStatus, setLoadingAssignmentStatus] = useState(false);
 
-  // Tự động tính ngày kết thúc khi thay đổi ngày bắt đầu hoặc thời gian đăng ký
   useEffect(() => {
     if (startDate && registrationPeriod) {
       const start = new Date(startDate);
@@ -81,13 +74,12 @@ export default function SelectPackagesPage() {
 
   const { data: assignmentMap, fetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
   
-  // Use a ref to track if we've already fetched for the current residents
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
   
   useEffect(() => {
     if (residents.length === 0) return;
-    if (residentsRef.current === currentResidentsKey) return; // Already fetched for these residents
+    if (residentsRef.current === currentResidentsKey) return;
     
     setLoadingAssignmentStatus(true);
     fetchAssignmentMap()
@@ -107,7 +99,6 @@ export default function SelectPackagesPage() {
     console.log('👥 Total residents:', residents.length);
     console.log('⏳ Loading assignment status:', loadingAssignmentStatus);
     
-    // Nếu đang loading assignment status, hiển thị tất cả residents
     if (loadingAssignmentStatus) {
       console.log('⏳ Still loading assignment status, showing all residents');
       return residents.filter(resident => {
@@ -117,7 +108,6 @@ export default function SelectPackagesPage() {
       });
     }
     
-    // Filter khi đã có assignment status
     let filtered = residents.filter(resident => {
       const residentId = resident._id || resident.id;
       const assignmentStatus = residentsWithAssignmentStatus[residentId];
@@ -125,9 +115,6 @@ export default function SelectPackagesPage() {
       console.log(`🔍 Processing resident: ${resident.full_name || resident.name} (${residentId})`);
       console.log(`📊 Assignment status:`, assignmentStatus);
       
-      // Hiển thị resident nếu:
-      // 1. Chưa có assignment (chưa đăng ký dịch vụ)
-      // 2. Có assignment nhưng đã hết hạn
       const shouldShow = !assignmentStatus?.hasAssignment || assignmentStatus?.isExpired;
       
       console.log(`👤 Resident ${resident.full_name || resident.name} (${residentId}):`, {
@@ -143,7 +130,6 @@ export default function SelectPackagesPage() {
         return false;
       }
       
-      // Filter theo search term
       const name = (resident.full_name || resident.name || '').toLowerCase();
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = name.includes(searchLower);
@@ -155,7 +141,6 @@ export default function SelectPackagesPage() {
     console.log('📋 Final filtered count:', filtered.length);
     console.log('📋 Filtered residents:', filtered.map(r => ({ name: r.full_name || r.name, id: r._id || r.id })));
 
-    // Sort
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -172,14 +157,12 @@ export default function SelectPackagesPage() {
     return filtered;
   }, [residents, searchTerm, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredAndSortedResidents.length / itemsPerPage);
   const paginatedResidents = filteredAndSortedResidents.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Steps array
   const steps = [
     'Chọn người thụ hưởng',
     'Chọn gói dịch vụ',
@@ -215,7 +198,6 @@ export default function SelectPackagesPage() {
       .finally(() => setLoading(false));
   }, [fetchCarePlans]);
 
-  // Load residents when user is available and residentId is not preselected
   const { data: residentsData, fetch: fetchResidents } = useOptimizedResidentsByRole(user?.role, user?.id);
   useEffect(() => {
     if (!user) return;
@@ -232,7 +214,6 @@ export default function SelectPackagesPage() {
       .catch(() => setResidents([]));
   }, [user, residentId, fetchResidents]);
 
-  // Load rooms, beds, room types
   const { data: roomTypesData, fetch: fetchRoomTypes } = useOptimizedRoomTypes();
   useEffect(() => {
     setLoadingRoomTypes(true);
@@ -272,7 +253,6 @@ export default function SelectPackagesPage() {
   const mainPlans = useMemo(() => carePlans.filter((p) => p?.category === 'main' && p?.is_active !== false), [carePlans]);
   const supplementaryPlans = useMemo(() => carePlans.filter((p) => p?.category !== 'main' && p?.is_active !== false), [carePlans]);
 
-  // Filter và sort packages
   const filteredAndSortedMainPlans = useMemo(() => {
     let filtered = mainPlans.filter(plan => 
       plan.plan_name?.toLowerCase().includes(packageSearchTerm.toLowerCase()) ||
@@ -315,7 +295,6 @@ export default function SelectPackagesPage() {
     return filtered;
   }, [supplementaryPlans, packageSearchTerm, packageSortBy]);
 
-  // Pagination cho packages
   const paginatedMainPlans = useMemo(() => {
     const startIndex = (packageCurrentPage - 1) * packageItemsPerPage;
     return filteredAndSortedMainPlans.slice(startIndex, startIndex + packageItemsPerPage);
@@ -329,23 +308,18 @@ export default function SelectPackagesPage() {
   const totalMainPages = Math.ceil(filteredAndSortedMainPlans.length / packageItemsPerPage);
   const totalSupplementaryPages = Math.ceil(filteredAndSortedSupplementaryPlans.length / packageItemsPerPage);
 
-  // Function to validate avatar URL
   const isValidAvatarUrl = (avatar: string) => {
     if (!avatar || avatar === '' || avatar === 'null') return false;
     if (avatar.includes('default') || avatar.includes('placeholder') || avatar.includes('generic')) return false;
     if (avatar.startsWith('data:')) return true;
     
-    // Check if it's a valid URL format
     try {
       const url = new URL(avatar);
       return url.protocol === 'http:' || url.protocol === 'https:';
     } catch {
-      // If it's not a valid URL, it might be a relative path
       return avatar.startsWith('/') || avatar.startsWith('./');
     }
   };
-
-  // Function to get beds for a specific room with gender filtering
   const getBedsForRoom = (roomId: string, residentGender?: string) => {
     console.log('Getting beds for room:', roomId, 'with gender:', residentGender);
     console.log('All beds:', beds);
@@ -354,23 +328,19 @@ export default function SelectPackagesPage() {
     const selectedRoom = rooms.find(r => r._id === roomId);
     console.log('Selected room:', selectedRoom);
     
-    // First try to get beds from API by room_id
     let apiBeds = beds.filter(b => b.room_id === roomId);
     console.log('API beds for room by room_id:', roomId, apiBeds);
     
-    // If no beds found in API, try matching by room_number
     if (apiBeds.length === 0 && selectedRoom?.room_number) {
       apiBeds = beds.filter(b => b.room_number === selectedRoom.room_number);
       console.log('API beds by room_number:', selectedRoom.room_number, apiBeds);
     }
     
-    // If still no beds from API, use room data as fallback
     if (apiBeds.length === 0 && selectedRoom?.bed_info) {
       console.log('Using room data as fallback for beds');
       const totalBeds = selectedRoom.bed_info.total_beds || selectedRoom.bed_count || 0;
       const availableBeds = selectedRoom.bed_info.available_beds || totalBeds;
       
-      // Generate bed objects from room data
       const generatedBeds: any[] = [];
       for (let i = 1; i <= totalBeds; i++) {
         generatedBeds.push({
@@ -386,13 +356,11 @@ export default function SelectPackagesPage() {
       return generatedBeds.filter((b: any) => b.status === 'available');
     }
     
-    // Filter by gender if specified
     let filteredBeds = apiBeds.filter(b => b.status === 'available');
     
     if (residentGender && selectedRoom?.gender) {
       console.log('Filtering beds by gender:', residentGender, 'vs room gender:', selectedRoom.gender);
       
-      // Only show beds if resident gender matches room gender
       if (residentGender.toLowerCase() !== selectedRoom.gender.toLowerCase()) {
         console.log('Gender mismatch - no beds available');
         return [];
@@ -403,34 +371,27 @@ export default function SelectPackagesPage() {
     return filteredBeds;
   };
 
-  // Function to format bed name properly
   const formatBedName = (bed: any, roomNumber?: string) => {
-    // If bed_number is already in the correct format (like '101-A'), use it directly
     if (bed.bed_number && typeof bed.bed_number === 'string' && bed.bed_number.includes('-')) {
       return bed.bed_number;
     }
     
-    // If bed_name exists, use it
     if (bed.bed_name) {
       return bed.bed_name;
     }
     
-    // If we have room number and bed number, format it properly
     if (roomNumber && bed.bed_number) {
-      const roomNum = roomNumber.replace(/\D/g, ''); // Extract only numbers from room number
-      const bedLetter = String.fromCharCode(64 + parseInt(bed.bed_number)); // Convert 1->A, 2->B, etc.
+      const roomNum = roomNumber.replace(/\D/g, '');
+      const bedLetter = String.fromCharCode(64 + parseInt(bed.bed_number));
       return `${roomNum}-${bedLetter}`;
     }
     
-    // Fallback to bed_number or bed._id
     return bed.bed_number || `Giường ${bed._id}`;
   };
 
   const toggleSupplementary = (id: string) => {
     setSupplementaryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
-
-  // Hàm handleContinue không còn cần thiết vì mỗi step có logic riêng
 
   const handleSubmit = async () => {
     if (!mainPackageId || (!residentId && !selectedResidentId)) return;
@@ -439,7 +400,6 @@ export default function SelectPackagesPage() {
     try {
       const finalResidentId = residentId || selectedResidentId;
       
-      // Kiểm tra xem resident có dịch vụ hết hạn không
       const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
       const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
       
@@ -448,23 +408,17 @@ export default function SelectPackagesPage() {
         console.log('📅 Expired date:', residentAssignmentStatus?.endDate);
       }
       
-      // Xử lý assigned_bed_id - chỉ gửi MongoDB ID thực tế
       let assignedBedId: string | null = null;
       
-      // Kiểm tra xem selectedBedId có phải là MongoDB ID thực tế không
       if (selectedBedId && !selectedBedId.includes('_bed_')) {
-        // Đây là MongoDB ID thực tế
         assignedBedId = selectedBedId;
       } else if (selectedBedId && selectedBedId.includes('_bed_')) {
-        // Đây là generated bed ID, cần tìm MongoDB ID thực tế
         const selectedRoom = rooms.find(r => r._id === selectedRoomId);
         const resident = residents.find(r => r._id === finalResidentId);
         const residentGender = resident?.gender;
         
-        // Lấy beds cho room này từ API
         const availableBeds = getBedsForRoom(selectedRoomId, residentGender);
         
-        // Tìm bed có cùng bed_number
         const bedNumber = selectedBedId.split('_bed_')[1];
         const actualBed = availableBeds.find(b => b.bed_number == bedNumber && !b._id.includes('_bed_'));
         
@@ -475,11 +429,9 @@ export default function SelectPackagesPage() {
         }
       }
       
-      // Lấy thông tin resident để xác định gender
       const resident = residents.find(r => r._id === finalResidentId);
       const residentGender = resident?.gender || '';
 
-      // Lấy room type từ selected room
       const selectedRoom = rooms.find(r => r._id === selectedRoomId);
       const selectedRoomType = selectedRoom?.room_type || '';
 
@@ -490,25 +442,23 @@ export default function SelectPackagesPage() {
         end_date: endDate,
         consultation_notes: medicalNotes || "",
         family_preferences: {
-          preferred_room_gender: residentGender || "any", // Sử dụng gender của resident hoặc "any"
+          preferred_room_gender: residentGender || "any",
           preferred_floor: Number(familyPreferences.preferred_floor) || 0,
           special_requests: familyPreferences.special_requests || ""
         },
         assigned_room_id: selectedRoomId,
-        selected_room_type: selectedRoomType, // Thêm room type
-        ...(assignedBedId ? { assigned_bed_id: assignedBedId } : {}), // Chỉ gửi nếu có MongoDB ID thực tế
+        selected_room_type: selectedRoomType,
+        ...(assignedBedId ? { assigned_bed_id: assignedBedId } : {}),
         status: "active"
       };
 
       console.log('Submitting payload:', payload);
       console.log('🔄 Re-registration mode:', isReRegistering);
       
-      // Backend sẽ tự động xử lý việc xóa gói hết hạn khi tạo assignment mới
       await carePlanAssignmentsAPI.create(payload);
-      setStep(8); // Hoàn tất
+      setStep(8);
     } catch (error: any) {
       console.error('Error submitting:', error);
-      // Handle error
     } finally {
       setIsSubmitting(false);
     }
@@ -517,12 +467,10 @@ export default function SelectPackagesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
       <div className="max-w-6xl mx-auto p-8">
-        {/* Stepper Header */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-white/20 p-8 mb-8 shadow-lg">
           <div className="flex justify-between items-center max-w-5xl mx-auto">
             {steps.map((label, idx) => (
               <div key={label} className="text-center flex-1 relative">
-                {/* Step Number */}
                 <div className={`
                   w-14 h-14 rounded-full inline-flex items-center justify-center font-bold text-lg mb-4 transition-all duration-300 shadow-md
                   ${idx + 1 === step 
@@ -535,7 +483,6 @@ export default function SelectPackagesPage() {
                   {idx + 1 < step ? '✓' : idx + 1}
                 </div>
                 
-                {/* Step Label */}
                 <div className={`
                   text-sm font-semibold leading-tight min-h-[2.5rem] flex items-center justify-center px-1
                   ${idx + 1 === step 
@@ -548,7 +495,6 @@ export default function SelectPackagesPage() {
                   {label}
                 </div>
                 
-                {/* Connector Line */}
                 {idx < steps.length - 1 && (
                   <div className={`
                     absolute top-7 left-full w-full h-0.5 transform -translate-y-1/2 z-0
@@ -560,10 +506,8 @@ export default function SelectPackagesPage() {
           </div>
         </div>
 
-        {/* Step Content */}
         {step === 1 && (
           <div>
-            {/* Header Section */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -596,10 +540,8 @@ export default function SelectPackagesPage() {
 
             {!residentId && (
               <>
-                {/* Search and Filter Section */}
                 <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-md border border-white/20">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                    {/* Search Input */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Tìm kiếm
@@ -619,7 +561,6 @@ export default function SelectPackagesPage() {
                       </div>
                     </div>
 
-                    {/* Sort Dropdown */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Sắp xếp
@@ -636,7 +577,6 @@ export default function SelectPackagesPage() {
                     </div>
                   </div>
                   
-                  {/* Results Count */}
                   <div className="mt-4 bg-indigo-50 p-3 rounded-lg border border-indigo-200">
                     <p className="text-sm text-indigo-600 m-0 font-semibold">
                       Hiển thị: {paginatedResidents.length} trong tổng số {filteredAndSortedResidents.length} người thụ hưởng 
@@ -651,11 +591,11 @@ export default function SelectPackagesPage() {
                         }).length;
                         
                         if (unregisteredCount > 0 && expiredCount > 0) {
-                          return ` (${unregisteredCount} chưa đăng ký, ${expiredCount} hết hạn)`;
+                          return ` (${unregisteredCount} chưa đăng ký gói dịch vụ, ${expiredCount} hết hạn gói dịch vụ)`;
                         } else if (unregisteredCount > 0) {
-                          return ` (${unregisteredCount} chưa đăng ký)`;
+                          return ` (${unregisteredCount} chưa đăng ký gói dịch vụ)`;
                         } else if (expiredCount > 0) {
-                          return ` (${expiredCount} hết hạn)`;
+                          return ` (${expiredCount} hết hạn gói dịch vụ)`;
                         }
                         return '';
                       })()}
@@ -663,7 +603,6 @@ export default function SelectPackagesPage() {
                   </div>
                 </div>
 
-                {/* Residents List */}
                 <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl overflow-hidden shadow-md border border-white/20">
                   <div className="p-6">
                                       {loadingAssignmentStatus ? (
@@ -734,7 +673,7 @@ export default function SelectPackagesPage() {
                               />
                               
                                                              <div className="flex items-center gap-3 w-full">
-                                 {/* Avatar */}
+                             
                                  <div className="relative">
                                    {isValidAvatarUrl(r.avatar) ? (
                                      <img 
@@ -742,13 +681,11 @@ export default function SelectPackagesPage() {
                                        alt={r.full_name || r.name || 'Avatar'}
                                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-md"
                                        onError={(e) => {
-                                         // Fallback to default avatar if image fails to load
                                          const target = e.target as HTMLImageElement;
                                          target.style.display = 'none';
                                          target.nextElementSibling?.classList.remove('hidden');
                                        }}
                                        onLoad={(e) => {
-                                         // Hide default avatar when image loads successfully
                                          const target = e.target as HTMLImageElement;
                                          target.nextElementSibling?.classList.add('hidden');
                                        }}
@@ -759,11 +696,9 @@ export default function SelectPackagesPage() {
                                    </div>
                                  </div>
                                  
-                                 {/* Main Info */}
                                  <div className="flex-1 min-w-0 overflow-hidden">
                                    <div className="flex items-center gap-2">
                                      <div className="font-semibold text-gray-900 text-base truncate">{r.full_name || r.name}</div>
-                                     {/* Assignment Status Badge */}
                                      {(() => {
                                        const residentId = r._id || r.id;
                                        const assignmentStatus = residentsWithAssignmentStatus[residentId];
@@ -772,13 +707,13 @@ export default function SelectPackagesPage() {
                                        if (!assignmentStatus.hasAssignment) {
                                          return (
                                            <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
-                                             Chưa đăng ký
+                                             Chưa đăng ký gói dịch vụ
                                            </span>
                                          );
                                        } else if (assignmentStatus.isExpired) {
                                          return (
                                            <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                                             Hết hạn
+                                             Hết hạn gói dịch vụ
                                            </span>
                                          );
                                        }
@@ -786,7 +721,6 @@ export default function SelectPackagesPage() {
                                      })()}
                                    </div>
                                    
-                                   {/* Date of Birth, Gender & Age */}
                                    <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
                                      {r.date_of_birth && (
                                        <div className="flex items-center gap-1">
@@ -807,7 +741,6 @@ export default function SelectPackagesPage() {
                                      )}
                                    </div>
                                    
-                                   {/* Contact Info - Compact */}
                                    {r.phone && (
                                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
                                        <PhoneIcon className="w-3 h-3 flex-shrink-0" />
@@ -815,7 +748,6 @@ export default function SelectPackagesPage() {
                                      </div>
                                    )}
                                    
-                                   {/* Expired Date Info */}
                                    {(() => {
                                      const residentId = r._id || r.id;
                                      const assignmentStatus = residentsWithAssignmentStatus[residentId];
@@ -831,7 +763,6 @@ export default function SelectPackagesPage() {
                                    })()}
                                  </div>
                                  
-                                 {/* Selection indicator */}
                                  <div className={`
                                    w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
                                    ${selectedResidentId === (r._id || r.id)
@@ -848,7 +779,6 @@ export default function SelectPackagesPage() {
                           ))}
                         </div>
 
-                        {/* Pagination */}
                         {totalPages > 1 && (
                           <div className="mt-6 flex justify-center">
                             <nav className="flex items-center gap-2">
@@ -893,7 +823,6 @@ export default function SelectPackagesPage() {
               </>
             )}
 
-            {/* Action Buttons */}
             <div className="flex justify-end mt-8 gap-4">
               <button
                 onClick={() => router.push('/services')}
@@ -919,10 +848,8 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 2: Chọn gói dịch vụ */}
         {step === 2 && (
           <div>
-            {/* Header Section */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -953,7 +880,6 @@ export default function SelectPackagesPage() {
               </div>
             )}
 
-            {/* Re-registration Notification */}
             {(() => {
               const finalResidentId = residentId || selectedResidentId;
               const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
@@ -1342,10 +1268,10 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 3: Chọn loại phòng */}
+       
         {step === 3 && (
           <div>
-            {/* Header Section */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -1372,11 +1298,11 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Room Type Selection */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-lg border border-white/20">
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  🏠 Loại phòng
+                  Loại phòng
                 </label>
                 <select 
                   value={roomType} 
@@ -1403,7 +1329,6 @@ export default function SelectPackagesPage() {
                         return false;
                       }
                       
-                      // Kiểm tra giới tính phòng phù hợp với resident
                       if (residentGender && r.gender && residentGender.toLowerCase() !== r.gender.toLowerCase()) {
                         return false;
                       }
@@ -1421,10 +1346,10 @@ export default function SelectPackagesPage() {
                     return (
                       <div>
                         <p className="text-sm text-indigo-600 m-0 font-medium">
-                          ✅ Đã chọn: <span className="font-semibold">{roomTypes.find(rt => rt.room_type === roomType)?.type_name || roomType}</span>
+                          Đã chọn: <span className="font-semibold">{roomTypes.find(rt => rt.room_type === roomType)?.type_name || roomType}</span>
                         </p>
                         <p className="text-sm text-indigo-500 m-0 mt-1">
-                          📊 Có {availableRooms.length} phòng trống cho {genderText} với {totalAvailableBeds} giường có sẵn
+                          Có {availableRooms.length} phòng trống cho {genderText} với {totalAvailableBeds} giường có sẵn
                         </p>
                       </div>
                     );
@@ -1433,7 +1358,7 @@ export default function SelectPackagesPage() {
               )}
             </div>
 
-            {/* Action Buttons */}
+           
             <div className="flex justify-end mt-8 gap-4">
               <button
                 onClick={() => setStep(2)}
@@ -1459,10 +1384,10 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 4: Chọn phòng */}
+       
         {step === 4 && (
           <div>
-            {/* Header Section */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -1490,11 +1415,11 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Room Selection */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-lg border border-white/20">
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  🚪 Phòng
+                  Phòng
                 </label>
                 <select 
                   value={selectedRoomId} 
@@ -1507,17 +1432,14 @@ export default function SelectPackagesPage() {
                     const residentGender = selectedResident?.gender;
                     
                     return rooms.filter(r => {
-                      // Chỉ hiển thị phòng có loại đúng và status available
                       if (r.room_type !== roomType || r.status !== 'available') {
                         return false;
                       }
                       
-                      // Kiểm tra giới tính phòng phù hợp với resident
                       if (residentGender && r.gender && residentGender.toLowerCase() !== r.gender.toLowerCase()) {
                         return false;
                       }
                       
-                      // Kiểm tra xem phòng có giường trống không
                       const availableBedsInRoom = getBedsForRoom(r._id, residentGender);
                       return availableBedsInRoom.length > 0;
                     }).map(room => {
@@ -1542,7 +1464,7 @@ export default function SelectPackagesPage() {
                      return false;
                    }
                    
-                   // Kiểm tra giới tính phòng phù hợp với resident
+                   
                    if (residentGender && r.gender && residentGender.toLowerCase() !== r.gender.toLowerCase()) {
                      return false;
                    }
@@ -1556,7 +1478,7 @@ export default function SelectPackagesPage() {
                    return (
                      <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
                        <p className="text-sm text-yellow-700 m-0 font-medium">
-                         ⚠️ Không có phòng nào có giường trống cho {genderText} trong loại phòng này
+                          Không có phòng nào có giường trống cho {genderText} trong loại phòng này
                        </p>
                      </div>
                    );
@@ -1569,7 +1491,7 @@ export default function SelectPackagesPage() {
                    return (
                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
                        <p className="text-sm text-indigo-600 m-0 font-medium">
-                         ✅ Đã chọn: <span className="font-semibold">Phòng {selectedRoom?.room_number} ({genderText})</span> 
+                         Đã chọn: <span className="font-semibold">Phòng {selectedRoom?.room_number} ({genderText})</span> 
                          <span className="text-indigo-500 ml-2">({availableBedsCount} giường trống)</span>
                        </p>
                      </div>
@@ -1580,7 +1502,7 @@ export default function SelectPackagesPage() {
                })()}
             </div>
 
-            {/* Action Buttons */}
+           
             <div className="flex justify-end mt-8 gap-4">
               <button
                 onClick={() => setStep(3)}
@@ -1620,10 +1542,10 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 5: Chọn giường */}
+        
         {step === 5 && (
           <div>
-            {/* Header Section */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -1635,7 +1557,7 @@ export default function SelectPackagesPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12h.01M8 12h.01M16 12h.01" />
                     </svg>
@@ -1652,11 +1574,11 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Bed Selection */}
+            
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-lg border border-white/20">
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  🛏️ Giường
+                  Giường
                 </label>
                                   <select 
                     value={selectedBedId} 
@@ -1689,15 +1611,12 @@ export default function SelectPackagesPage() {
                   console.log('Debug - selectedBedId:', selectedBedId);
                   console.log('Debug - all beds:', beds);
                   
-                  // Tìm bed từ beds array
                   let selectedBed = beds.find(b => b._id === selectedBedId);
                   
-                  // Nếu không tìm thấy trong beds array, có thể là generated bed
                   if (!selectedBed && selectedRoomId) {
                     const selectedRoom = rooms.find(r => r._id === selectedRoomId);
                     if (selectedRoom?.bed_info) {
-                      // Tạo bed object từ room data
-                      const bedNumber = selectedBedId.split('_bed_')[1]; // Lấy số từ ID
+                        const bedNumber = selectedBedId.split('_bed_')[1];
                       if (bedNumber) {
                         selectedBed = {
                           _id: selectedBedId,
@@ -1719,7 +1638,7 @@ export default function SelectPackagesPage() {
                     return (
                       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
                         <p className="text-sm text-indigo-600 m-0 font-medium">
-                          ✅ Đã chọn: <span className="font-semibold">{formatBedName(selectedBed, selectedRoom?.room_number)} ({genderText})</span>
+                          Đã chọn: <span className="font-semibold">{formatBedName(selectedBed, selectedRoom?.room_number)} ({genderText})</span>
                         </p>
                       </div>
                     );
@@ -1728,18 +1647,16 @@ export default function SelectPackagesPage() {
                   }
                 }
                 
-                // Hiển thị thông báo khi chưa chọn giường
                 return (
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <p className="text-sm text-gray-600 m-0 font-medium">
-                      ⚠️ Vui lòng chọn giường
+                        Vui lòng chọn giường
                     </p>
                   </div>
                 );
               })()}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end mt-8 gap-4">
               <button
                 onClick={() => setStep(4)}
@@ -1765,10 +1682,8 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 6: Thông tin bổ sung */}
         {step === 6 && (
           <div>
-            {/* Header Section */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -1795,7 +1710,6 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Registration Information Card */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1805,7 +1719,6 @@ export default function SelectPackagesPage() {
               </h3>
               
               <div className="space-y-6">
-                {/* Thời gian đăng ký */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">Thời gian đăng ký:</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1875,7 +1788,6 @@ export default function SelectPackagesPage() {
                   </div>
                 </div>
 
-                {/* Ngày bắt đầu */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Ngày bắt đầu:</label>
                   <DatePicker
@@ -1888,7 +1800,6 @@ export default function SelectPackagesPage() {
                   />
                 </div>
 
-                {/* Ngày kết thúc - tự động tính */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Ngày kết thúc:</label>
                   <div className="relative">
@@ -1910,7 +1821,6 @@ export default function SelectPackagesPage() {
                   </p>
                 </div>
 
-                {/* Ghi chú */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú y tế (tùy chọn):</label>
                   <textarea 
@@ -1923,7 +1833,6 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end mt-8 gap-4">
               <button
                 onClick={() => setStep(5)}
@@ -1951,10 +1860,8 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 7: Xem lại & xác nhận */}
         {step === 7 && (
           <div>
-            {/* Header Section */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <button
@@ -1981,7 +1888,6 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Re-registration Notification */}
             {(() => {
               const finalResidentId = residentId || selectedResidentId;
               const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
@@ -2021,7 +1927,6 @@ export default function SelectPackagesPage() {
               return null;
             })()}
 
-            {/* Registration Information Card */}
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2077,7 +1982,7 @@ export default function SelectPackagesPage() {
                         </button>
                       </div>
                       
-                      {/* Detailed Supplementary Packages */}
+                            
                       {showSupplementaryDetails && (
                         <div className="ml-11 space-y-2">
                           {supplementaryPlans.filter(p => supplementaryIds.includes(p._id)).map((plan, index) => (
@@ -2175,7 +2080,7 @@ export default function SelectPackagesPage() {
                       </button>
                     </div>
                     
-                    {/* Detailed Time Information */}
+                   
                     {showTimeDetails && (
                       <div className="ml-11 space-y-2">
                         <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-100">
@@ -2203,7 +2108,7 @@ export default function SelectPackagesPage() {
                 </div>
               </div>
               
-              {/* Pricing Information */}
+             
               <div className="mt-8 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
                 <h4 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2216,17 +2121,16 @@ export default function SelectPackagesPage() {
                   const mainPlan = mainPlans.find(p => p._id === mainPackageId);
                   const supplementaryPlansList = supplementaryPlans.filter(p => supplementaryIds.includes(p._id));
                   
-                  // Tính giá gói dịch vụ
                   const mainPlanPrice = mainPlan?.monthly_price || 0;
                   const supplementaryPlansPrice = supplementaryPlansList.reduce((total, plan) => total + (plan.monthly_price || 0), 0);
                   const totalServicePrice = mainPlanPrice + supplementaryPlansPrice;
                   
-                  // Tính giá phòng
+                 
                   const selectedRoom = rooms.find(r => r._id === selectedRoomId);
                   const roomTypeObj = roomTypes.find(rt => rt.room_type === selectedRoom?.room_type);
                   const roomPrice = roomTypeObj?.monthly_price || 0;
                   
-                  // Tổng cộng
+                 
                   const totalPrice = totalServicePrice + roomPrice;
                   
                   return (
@@ -2243,7 +2147,7 @@ export default function SelectPackagesPage() {
                             <span className="font-semibold text-gray-900">{new Intl.NumberFormat('vi-VN').format(supplementaryPlansPrice)} đ/tháng</span>
                           </div>
                           
-                          {/* Chi tiết từng gói bổ sung */}
+                         
                           {supplementaryPlansList.map((plan, index) => (
                             <div key={plan._id} className="flex justify-between items-center py-1 px-3 bg-indigo-50 rounded-lg">
                               <div className="flex items-center gap-2">
@@ -2273,7 +2177,7 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
+           
             <div className="flex justify-end mt-8 gap-4">
               <button
                 onClick={() => setStep(6)}
@@ -2301,10 +2205,10 @@ export default function SelectPackagesPage() {
           </div>
         )}
 
-        {/* Step 8: Hoàn tất */}
+       
         {step === 8 && (
           <div>
-            {/* Header Section */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-4">
@@ -2325,21 +2229,21 @@ export default function SelectPackagesPage() {
               </div>
             </div>
 
-            {/* Success Card */}
+           
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-sm">
               <div className="text-center max-w-2xl mx-auto">
-                {/* Success Icon */}
+               
                 <div className="relative mb-6">
                   <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
                     <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  {/* Animated rings */}
+                 
                   <div className="absolute inset-0 w-20 h-20 border-2 border-emerald-200 rounded-full mx-auto animate-ping opacity-20"></div>
                 </div>
                 
-                {/* Success Title */}
+               
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent mb-4">
                   {(() => {
                     const finalResidentId = residentId || selectedResidentId;
@@ -2349,7 +2253,7 @@ export default function SelectPackagesPage() {
                   })()}
                 </h2>
                 
-                {/* Success Message */}
+               
                 <div className="text-gray-600 text-base leading-relaxed mb-6 max-w-xl mx-auto">
                   <p className="mb-2 font-medium">
                     {(() => {
@@ -2373,9 +2277,6 @@ export default function SelectPackagesPage() {
                   </p>
                 </div>
                 
-
-                
-                {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <button 
                     onClick={() => router.push('/services')} 

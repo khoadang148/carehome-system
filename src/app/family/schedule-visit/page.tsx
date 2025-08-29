@@ -12,7 +12,7 @@ export default function ScheduleVisitPage() {
   const router = useRouter();
   const { user } = useAuth();
   
-  // State
+  
   const [residents, setResidents] = useState<any[]>([]);
   const [visitHistory, setVisitHistory] = useState<any[]>([]);
   const [visitDate, setVisitDate] = useState('');
@@ -29,21 +29,20 @@ export default function ScheduleVisitPage() {
   const [loadingVisits, setLoadingVisits] = useState(false);
   const datePickerRef = useRef<HTMLInputElement>(null);
 
-  // Helper functions
   function getTimeRange(startTime: string) {
     const [hour, minute] = startTime.split(':').map(Number);
     const endHour = hour + 1;
     return `${startTime} - ${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   }
 
-  // Fetch residents
   useEffect(() => {
     setLoadingResidents(true);
     if (user?.id) {
       residentAPI.getByFamilyMemberId(user.id)
         .then((data) => {
           const arr = Array.isArray(data) ? data : [data];
-          setResidents(arr && arr.filter(r => r && r._id));
+          const activeResidents = arr && arr.filter(r => r && r._id && r.status === 'active');
+          setResidents(activeResidents);
         })
         .catch(() => setResidents([]))
         .finally(() => setLoadingResidents(false));
@@ -53,7 +52,6 @@ export default function ScheduleVisitPage() {
     }
   }, [user]);
 
-  // Cập nhật displayDate khi visitDate thay đổi
   useEffect(() => {
     if (visitDate) {
       try {
@@ -72,14 +70,13 @@ export default function ScheduleVisitPage() {
     }
   }, [visitDate]);
 
-  // Fetch visits (nếu API hỗ trợ lấy theo user, nên truyền userId)
   const fetchVisits = () => {
     setLoadingVisits(true);
     visitsAPI.getAll()
       .then((data) => {
         const arr = Array.isArray(data) ? data : [];
         setVisitHistory(arr);
-        console.log('DEBUG visitHistory after fetch:', arr); // Log dữ liệu thực tế
+        
       })
       .catch(() => setVisitHistory([]))
       .finally(() => setLoadingVisits(false));
@@ -117,7 +114,7 @@ export default function ScheduleVisitPage() {
       return;
     }
     if (!residents.length) {
-      setError('Không có người thân nào để đặt lịch.');
+      setError('Không có người thân nào đang ở viện để đặt lịch thăm. Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện.');
       setShowErrorModal(true);
       return;
     }
@@ -125,7 +122,6 @@ export default function ScheduleVisitPage() {
     setLoading(true);
     
     try {
-      // Validation thời gian nhanh
       const visitDateTime = new Date(`${visitDate}T${visitTime}:00`);
       const now = new Date();
       const timeDiff = visitDateTime.getTime() - now.getTime();
@@ -146,7 +142,6 @@ export default function ScheduleVisitPage() {
         return;
       }
       
-      // Kiểm tra trùng lịch nhanh hơn - chỉ kiểm tra nếu có visitHistory
       if (visitHistory.length > 0) {
         const duplicatedNames = residents.filter(resident =>
           visitHistory.some((item) =>
@@ -164,7 +159,6 @@ export default function ScheduleVisitPage() {
         }
       }
       
-      // Gọi API createMultiple để backend kiểm tra trùng lịch tập trung
       const residentIds = residents.filter(resident => resident._id).map(r => String(r._id));
       const payload = {
         resident_ids: residentIds,
@@ -177,7 +171,6 @@ export default function ScheduleVisitPage() {
 
       const result = await visitsAPI.createMultiple(payload);
 
-      // Nếu backend trả về trùng lịch
       if (result && result.isDuplicate === true) {
         setError(result.message || 'Đã có lịch thăm trùng thời gian. Vui lòng chọn thời điểm khác.');
         setShowErrorModal(true);
@@ -185,11 +178,10 @@ export default function ScheduleVisitPage() {
         return;
       }
       
-      // Set success state ngay lập tức
-      setScheduledResidents(residents.map(r => r.full_name || r.fullName || r.name || 'Người thân'));
+      const successfulResidents = residents.map(r => r.full_name || r.fullName || r.name || 'Người thân');
+      setScheduledResidents(successfulResidents);
       setShowSuccessModal(true);
       
-      // Fetch visits trong background (không cần đợi)
       setTimeout(() => fetchVisits(), 100);
       
     } catch (err) {
@@ -203,7 +195,7 @@ export default function ScheduleVisitPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center p-8">
       <div className="flex gap-7 bg-white rounded-3xl shadow-xl p-10 max-w-4xl w-full items-start relative">
-        {/* Form đặt lịch */}
+        
         <div className="flex-2 min-w-80">
           <div className="flex items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
@@ -216,7 +208,7 @@ export default function ScheduleVisitPage() {
               </div>
             </div>
 
-            {/* Nút xem lịch sử đặt lịch thăm */}
+            
             <button
               onClick={() => router.push('/family/schedule-visit/history')}
               className="px-4 py-2 rounded-full border-2 border-emerald-500 bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-600 font-bold text-base cursor-pointer shadow-lg transition-all duration-200 flex items-center gap-2 ml-4 hover:from-emerald-100 hover:to-emerald-200"
@@ -229,7 +221,7 @@ export default function ScheduleVisitPage() {
             <>
               {residents.length === 0 && !loadingResidents && (
                 <div className="text-red-500 font-semibold mb-4">
-                  Không có người thân nào để đặt lịch. Vui lòng liên hệ nhân viên để được hỗ trợ thêm.
+                  Không có người thân nào đang ở viện để đặt lịch thăm. Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện. Vui lòng liên hệ nhân viên nếu cần hỗ trợ thêm.
                 </div>
               )}
               <div className="grid gap-6 mb-6">
@@ -378,7 +370,7 @@ export default function ScheduleVisitPage() {
                 </div>
               </div>
               <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 mb-8 text-emerald-600 font-medium text-base">
-                <span className="font-bold text-emerald-500 mr-2">Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
+                <span className="font-bold text-emerald-500 mr-2">Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện. Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
               </div>
               <div className="flex justify-end gap-4">
                 <button
@@ -430,12 +422,12 @@ export default function ScheduleVisitPage() {
         </div>
       </div>
       
-      {/* Visit Modals */}
+      
       <VisitSuccessModal 
         open={showSuccessModal} 
         onClose={() => {
           setShowSuccessModal(false);
-          // Reset form after successful scheduling
+          
           setVisitDate('');
           setVisitTime('');
           setVisitPurpose('');

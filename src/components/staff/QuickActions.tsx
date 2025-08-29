@@ -36,7 +36,6 @@ export default function QuickActions({ residentId, residentName, onActionComplet
         gap: '1rem',
         marginBottom: '1.5rem'
       }}>
-        {/* Add Care Note */}
         <button
           onClick={() => setShowCareNoteModal(true)}
           style={{
@@ -70,7 +69,6 @@ export default function QuickActions({ residentId, residentName, onActionComplet
           </div>
         </button>
 
-        {/* Schedule Single Appointment */}
         <button
           onClick={() => setShowAppointmentModal(true)}
           style={{
@@ -104,7 +102,6 @@ export default function QuickActions({ residentId, residentName, onActionComplet
           </div>
         </button>
 
-        {/* Mark Medication Taken */}
         <button
           onClick={() => setShowMedicationListModal(true)}
           style={{
@@ -139,7 +136,6 @@ export default function QuickActions({ residentId, residentName, onActionComplet
         </button>
       </div>
 
-      {/* Modals */}
       {showCareNoteModal && (
         <CareNoteModal
           residentId={residentId}
@@ -193,7 +189,6 @@ export default function QuickActions({ residentId, residentName, onActionComplet
   );
 }
 
-// Care Note Modal Component
 function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
   residentId: number;
   residentName: string;
@@ -209,15 +204,12 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
 
     setIsSubmitting(true);
     try {
-      // Get current user from  or context
       const currentUser = JSON.parse(clientStorage.getItem('currentUser') || '{}');
       const staffName = currentUser.name || 'Nhân viên';
       
-      // Get existing residents data
       const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
-      // Find and update the resident
       const residentIndex = residents.findIndex((r: any) => r.id === residentId);
       if (residentIndex !== -1) {
         if (!residents[residentIndex].careNotes) {
@@ -347,7 +339,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
   );
 }
 
-// Medication Modal Component
 function MedicationModal({ residentId, residentName, onClose, onComplete }: {
   residentId: number;
   residentName: string;
@@ -367,11 +358,9 @@ function MedicationModal({ residentId, residentName, onClose, onComplete }: {
     setIsSubmitting(true);
     
     try {
-      // Get existing residents data
       const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
-      // Find and update the resident
       const residentIndex = residents.findIndex((r: any) => r.id === residentId);
       if (residentIndex !== -1) {
         if (!residents[residentIndex].medications_detail) {
@@ -390,8 +379,7 @@ function MedicationModal({ residentId, residentName, onClose, onComplete }: {
         };
         
         residents[residentIndex].medications_detail.push(newMedication);
-        
-        // Also update the simple medications array for compatibility
+          
         if (!residents[residentIndex].medications) {
           residents[residentIndex].medications = [];
         }
@@ -597,7 +585,6 @@ function MedicationModal({ residentId, residentName, onClose, onComplete }: {
   );
 }
 
-// Appointment Modal Component
 function AppointmentModal({ residentId, residentName, onClose, onComplete }: {
   residentId: number;
   residentName: string;
@@ -630,11 +617,9 @@ function AppointmentModal({ residentId, residentName, onClose, onComplete }: {
     setIsSubmitting(true);
     
     try {
-      // Get existing residents data
       const savedResidents = clientStorage.getItem('nurseryHomeResidents');
       const residents = savedResidents ? JSON.parse(savedResidents) : [];
       
-      // Find and update the resident
       const residentIndex = residents.findIndex((r: any) => r.id === residentId);
       if (residentIndex !== -1) {
         if (!residents[residentIndex].appointments) {
@@ -878,7 +863,6 @@ function AppointmentModal({ residentId, residentName, onClose, onComplete }: {
   );
 }
 
-// Medication List Modal Component
 function MedicationListModal({ residentId, residentName, onClose, onComplete }: {
   residentId: number;
   residentName: string;
@@ -889,7 +873,6 @@ function MedicationListModal({ residentId, residentName, onClose, onComplete }: 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load medications for this resident
     const savedResidents = clientStorage.getItem('nurseryHomeResidents');
     if (savedResidents) {
       const residents = JSON.parse(savedResidents);
@@ -914,7 +897,6 @@ function MedicationListModal({ residentId, residentName, onClose, onComplete }: 
             residents[residentIndex].medications_detail[medIndex].lastAdministered = new Date().toLocaleString('vi-VN');
             clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
             
-            // Update local state
             setMedications(prev => prev.map(med => 
               med.id === medicationId 
                 ? { ...med, lastAdministered: new Date().toLocaleString('vi-VN') }

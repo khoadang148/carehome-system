@@ -33,14 +33,10 @@ export default function CareNotesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [careNotesMap, setCareNotesMap] = useState<Record<string, any[]>>({});
   
-  // Thêm state cho phân trang
   const [currentPage, setCurrentPage] = useState(1);
-  const [residentsPerPage] = useState(5); // Hiển thị 5 cư dân mỗi trang
+  const [residentsPerPage] = useState(5);
 
-  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
-    // setNotification({ message, type }); // This state was removed
-    // setTimeout(() => setNotification(null), 2000); // This state was removed
-  };
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {};
 
   useEffect(() => {
     if (!user || user.role !== 'staff') {
@@ -56,22 +52,15 @@ export default function CareNotesPage() {
       (resident.room_number || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredResidents(filtered);
-    // Reset về trang đầu tiên khi tìm kiếm
+
     setCurrentPage(1);
   }, [residents, searchTerm]);
 
   const loadResidents = async () => {
     try {
-      // Lấy danh sách assignments của staff đang đăng nhập
       const assignmentsData = await staffAssignmentsAPI.getMyAssignments();
       const assignments = Array.isArray(assignmentsData) ? assignmentsData : [];
-      
-      // Debug: Log assignments data
-      console.log('Raw assignments data for assessments:', assignmentsData);
-      
-      // Chỉ lấy những assignment có trạng thái active
       const activeAssignments = assignments.filter((assignment: any) => assignment.status === 'active');
-      console.log('Active assignments:', activeAssignments);
       
       const residentsWithNotes = await Promise.all(activeAssignments.map(async (assignment: any) => {
         const resident = assignment.resident_id;
@@ -87,19 +76,16 @@ export default function CareNotesPage() {
           }
         }
         
-        // Lấy số phòng từ assignment data
         let room_number = '';
         if (resident.room_number) {
           room_number = resident.room_number;
         } else {
-          // Fallback: lấy từ bed assignments
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
             const bedAssignment = Array.isArray(bedAssignments) ? 
               bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
             
             if (bedAssignment?.bed_id?.room_id) {
-              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
               if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
                 room_number = bedAssignment.bed_id.room_id.room_number;
               } else {
@@ -110,13 +96,11 @@ export default function CareNotesPage() {
                 }
               }
             } else {
-              // Fallback: lấy từ care plan assignments
               const carePlanAssignments = await carePlansAPI.getByResidentId(resident._id);
               const carePlanAssignment = Array.isArray(carePlanAssignments) ? 
                 carePlanAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
               
               if (carePlanAssignment?.bed_id?.room_id) {
-                // New API structure: room_id is nested in bed_id
                 const roomData = carePlanAssignment.bed_id.room_id;
                 if (typeof roomData === 'object' && roomData?.room_number) {
                   room_number = roomData.room_number;
@@ -128,9 +112,7 @@ export default function CareNotesPage() {
                   }
                 }
               } else if (carePlanAssignment?.assigned_room_id) {
-                // Fallback for old API structure
                 const roomId = carePlanAssignment.assigned_room_id;
-                // Đảm bảo roomId là string, không phải object
                 const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
                 if (roomIdString) {
                   const room = await roomsAPI.getById(roomIdString);
@@ -154,7 +136,7 @@ export default function CareNotesPage() {
       
       setResidents(residentsWithNotes);
       
-      // Load care notes cho từng resident song song
+     
       const notesMap: Record<string, any[]> = {};
       await Promise.all(residentsWithNotes.map(async (resident) => {
         try {
@@ -168,7 +150,6 @@ export default function CareNotesPage() {
     } catch (error) {
       setResidents([]);
       setCareNotesMap({});
-      console.error('Error loading residents:', error);
     }
   };
 
@@ -178,9 +159,7 @@ export default function CareNotesPage() {
     router.push(`/staff/assessments/${residentId}/notes?residentName=${encodeURIComponent(residentName)}`);
   };
 
-  const handleCloseModal = () => {
-    // This function is no longer needed as modal state is removed
-  };
+  const handleCloseModal = () => {};
 
   const handleCreateCareNote = (resident: Resident) => {
     router.push(`/staff/assessments/new?residentId=${resident.id}&residentName=${encodeURIComponent(resident.full_name)}`);
@@ -221,7 +200,6 @@ export default function CareNotesPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          {/* Tính toán phân trang */}
           {(() => {
             const totalPages = Math.ceil(filteredResidents.length / residentsPerPage);
             const startIndex = (currentPage - 1) * residentsPerPage;
@@ -230,7 +208,6 @@ export default function CareNotesPage() {
             
             return (
               <>
-                {/* Hiển thị thông tin phân trang */}
                 {filteredResidents.length > 0 && (
                   <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm text-gray-700 mb-6 gap-2">
                     <div className="flex items-center gap-2">
@@ -252,7 +229,6 @@ export default function CareNotesPage() {
                   </div>
                 )}
 
-                {/* Danh sách người cao tuổi */}
                 {currentResidents.length > 0 ? (
                   currentResidents.map((resident) => {
             const notes = careNotesMap[resident.id] || [];
@@ -264,7 +240,7 @@ export default function CareNotesPage() {
                       className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 shadow-md border border-white/20 transition-all duration-200 hover:shadow-lg"
                     >
                       <div className="flex items-center gap-2 mb-4">
-                {/* Avatar */}
+                
                         <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
                   <img
                     src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : ''}
@@ -353,7 +329,6 @@ export default function CareNotesPage() {
           </div>
         )}
 
-                {/* Điều khiển phân trang */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-6">
                     <button
@@ -400,18 +375,9 @@ export default function CareNotesPage() {
           })()}
         </div>
 
-        {/* Modal xem ghi chú */}
-        {/* This section was removed as modal state is removed */}
-
-        {/* Modal sửa ghi chú */}
-        {/* This section was removed as modal state is removed */}
+        
       </div>
 
-      {/* Notification */}
-      {/* This section was removed as notification state is removed */}
-
-      {/* Confirm Delete Modal */}
-      {/* This section was removed as confirmDelete state is removed */}
 
       <style jsx>{`
         @keyframes fadeIn {

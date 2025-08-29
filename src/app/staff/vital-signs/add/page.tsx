@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   HeartIcon as HeartIconSolid,
@@ -81,8 +81,6 @@ const SuccessModal = ({ isOpen, onClose }: {
 // Medical Warning Component
 const MedicalWarning = ({ vitalSigns }: { vitalSigns: VitalSigns }) => {
   const warnings: string[] = [];
-  
-  // Check for medical warnings
   if (vitalSigns.temperature && vitalSigns.temperature > 37.8) {
     warnings.push('⚠️ Nhiệt độ cao (>37.8°C) - cần theo dõi sát');
   }
@@ -255,7 +253,6 @@ export default function AddVitalSignsPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalErrors, setModalErrors] = useState<{ [key: string]: string }>({});
   
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -268,75 +265,104 @@ export default function AddVitalSignsPage() {
     }
   }, [user, router]);
 
-  // Load residents from API when component mounts
-  useEffect(() => {
-    const fetchResidents = async () => {
-      setLoadingData(true);
-      try {
-        let mapped: any[] = [];
-        
-        if (user?.role === 'staff') {
-          const data = await staffAssignmentsAPI.getMyAssignments();
-          const assignmentsData = Array.isArray(data) ? data : [];
-          
-          mapped = assignmentsData
-            .filter((assignment: any) => assignment.status === 'active')
-            .map((assignment: any) => {
-              const resident = assignment.resident_id;
-              
-              return {
-                id: resident._id,
-                name: resident.full_name || '',
-                avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-                assignmentStatus: assignment.status || 'unknown',
-                assignmentId: assignment._id,
-              };
-            });
-        } else if (user?.role === 'admin') {
-          const data = await residentAPI.getAll();
-          const residentsData = Array.isArray(data) ? data : [];
-          
-          mapped = residentsData.map((resident: any) => ({
-            id: resident._id,
-            name: resident.full_name || '',
-            avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-          }));
-        }
-        
-        setResidents(mapped);
-        
-        // Get room numbers for each resident
-        mapped.forEach(async (resident: any) => {
+  const fetchResidents = useCallback(async () => {
+    setLoadingData(true);
+    try {
+      let mapped: any[] = [];
+      if (user?.role === 'staff') {
+        const data = await staffAssignmentsAPI.getMyAssignments();
+        const assignmentsData = Array.isArray(data) ? data : [];
+        mapped = assignmentsData
+          .filter((assignment: any) => assignment.status === 'active')
+          .map((assignment: any) => {
+            const resident = assignment.resident_id;
+            return {
+              id: resident._id,
+              name: resident.full_name || '',
+              avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+              assignmentStatus: assignment.status || 'unknown',
+              assignmentId: assignment._id,
+            };
+          });
+      } else if (user?.role === 'admin') {
+        const data = await residentAPI.getAll();
+        const residentsData = Array.isArray(data) ? data : [];
+        mapped = residentsData.map((resident: any) => ({
+          id: resident._id,
+          name: resident.full_name || '',
+          avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+        }));
+      }
+      setResidents(mapped);
+      const roomEntries = await Promise.all(
+        mapped.map(async (resident: any) => {
           try {
-            const assignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+            const bedAssignment = Array.isArray(bedAssignments)
+              ? bedAssignments.find((a: any) => a.bed_id?.room_id)
+              : null;
+            if (bedAssignment?.bed_id?.room_id) {
+              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                return [resident.id, bedAssignment.bed_id.room_id.room_number] as [string, string];
+              }
+              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
+              }
+            }
+            const assignments = await carePlansAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments)
+              ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id)
+              : null;
             const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
-            } else {
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+              return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
             }
+            return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
           } catch {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+            return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
           }
-        });
-        
-      } catch (err) {
-        console.error('Error loading residents:', err);
-        setResidents([]);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-    
-    if (user) {
-      fetchResidents();
+        })
+      );
+      const nextMap: { [key: string]: string } = {};
+      roomEntries.forEach(([id, number]) => {
+        nextMap[id] = number;
+      });
+      setRoomNumbers(nextMap);
+    } catch (err) {
+      setResidents([]);
+    } finally {
+      setLoadingData(false);
     }
   }, [user]);
 
-  // Single field for blood pressure input
+  useEffect(() => {
+    if (user) {
+      fetchResidents();
+    }
+  }, [user, fetchResidents]);
+
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => fetchResidents();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') fetchResidents();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    const intervalId = window.setInterval(() => {
+      fetchResidents();
+    }, 30000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(intervalId);
+    };
+  }, [user, fetchResidents]);
+
   const [formData, setFormData] = useState<VitalSigns>({
     residentId: '',
     bloodPressure: '',
@@ -348,117 +374,72 @@ export default function AddVitalSignsPage() {
     notes: '',
   });
 
-  // Validation based on medical standards for elderly patients
   const validateForm = (data: VitalSigns) => {
     const errors: { [key: string]: string } = {};
     
-    // Required fields
     if (!data.residentId) {
       errors.residentId = 'Vui lòng chọn người cao tuổi';
     }
     
-    // Temperature validation - Medical standard for elderly (35.0-40.0°C)
     if (data.temperature !== undefined && data.temperature !== null && !isNaN(Number(data.temperature))) {
       const temp = Number(data.temperature);
       if (temp < 35.0 || temp > 40.0) {
         errors.temperature = 'Nhiệt độ phải từ 35.0°C đến 40.0°C (tiêu chuẩn y khoa)';
       }
-      // Warning for fever in elderly (>37.8°C)
-      if (temp > 37.8) {
-        console.warn('Nhiệt độ cao - cần theo dõi sát');
-      }
     }
     
-    // Heart rate validation - Medical standard for elderly (50-120 bpm)
     if (data.heartRate !== undefined && data.heartRate !== null && !isNaN(Number(data.heartRate))) {
       const hr = Number(data.heartRate);
       if (hr < 50 || hr > 120) {
         errors.heartRate = 'Nhịp tim phải từ 50 đến 120 bpm (tiêu chuẩn y khoa cho người cao tuổi)';
       }
-      // Warning for abnormal heart rates
-      if (hr < 60 || hr > 100) {
-        console.warn('Nhịp tim bất thường - cần theo dõi');
-      }
     }
     
-    // Blood pressure validation - Medical standard format and ranges
     if (data.bloodPressure && data.bloodPressure.trim() !== '') {
-      // Format validation: XXX/YYY or XX/YY
       if (!/^[0-9]{2,3}\/[0-9]{2,3}$/.test(data.bloodPressure)) {
         errors.bloodPressure = 'Huyết áp phải đúng định dạng (ví dụ: 120/80)';
       } else {
-        // Range validation for elderly
         const [systolic, diastolic] = data.bloodPressure.split('/').map(Number);
         
-        // Systolic pressure validation (90-200 mmHg for elderly)
         if (systolic < 90 || systolic > 200) {
           errors.bloodPressure = 'Huyết áp tâm thu phải từ 90-200 mmHg';
         }
         
-        // Diastolic pressure validation (50-120 mmHg for elderly)
         if (diastolic < 50 || diastolic > 120) {
           errors.bloodPressure = 'Huyết áp tâm trương phải từ 50-120 mmHg';
         }
         
-        // Systolic should be higher than diastolic
         if (systolic <= diastolic) {
           errors.bloodPressure = 'Huyết áp tâm thu phải cao hơn tâm trương';
-        }
-        
-        // Warning for hypertension in elderly
-        if (systolic >= 140 || diastolic >= 90) {
-          console.warn('Huyết áp cao - cần theo dõi');
-        }
-        
-        // Warning for hypotension in elderly
-        if (systolic < 100 || diastolic < 60) {
-          console.warn('Huyết áp thấp - cần theo dõi');
         }
       }
     }
     
-    // Respiratory rate validation - Medical standard for elderly (12-25 breaths/min)
     if (data.respiratoryRate !== undefined && data.respiratoryRate !== null && !isNaN(Number(data.respiratoryRate))) {
       const rr = Number(data.respiratoryRate);
       if (rr < 12 || rr > 25) {
         errors.respiratoryRate = 'Nhịp thở phải từ 12 đến 25 lần/phút (tiêu chuẩn y khoa cho người cao tuổi)';
       }
-      // Warning for abnormal respiratory rates
-      if (rr < 16 || rr > 20) {
-        console.warn('Nhịp thở bất thường - cần theo dõi');
-      }
     }
     
-    // Oxygen saturation validation - Medical standard (95-100% normal, 90-94% acceptable for elderly)
     if (data.oxygenSaturation !== undefined && data.oxygenSaturation !== null && !isNaN(Number(data.oxygenSaturation))) {
       const o2 = Number(data.oxygenSaturation);
       if (o2 < 90 || o2 > 100) {
         errors.oxygenSaturation = 'Nồng độ oxy phải từ 90% đến 100% (tiêu chuẩn y khoa)';
       }
-      // Check for reasonable decimal precision (max 1 decimal place)
       const decimalPlaces = o2.toString().split('.')[1]?.length || 0;
       if (decimalPlaces > 1) {
         errors.oxygenSaturation = 'Nồng độ oxy chỉ được nhập tối đa 1 chữ số thập phân (ví dụ: 98.5)';
       }
-      // Warning for low oxygen saturation
-      if (o2 < 95) {
-        console.warn('Nồng độ oxy thấp - cần theo dõi sát');
-      }
     }
     
-    // Weight validation - Realistic range for elderly (30-150 kg)
     if (data.weight !== undefined && data.weight !== null && !isNaN(Number(data.weight))) {
       const weight = Number(data.weight);
       if (weight < 30 || weight > 150) {
         errors.weight = 'Cân nặng phải từ 30kg đến 150kg (phù hợp với người cao tuổi)';
       }
-      // Warning for extreme weights
-      if (weight < 40 || weight > 120) {
-        console.warn('Cân nặng bất thường - cần đánh giá dinh dưỡng');
-      }
     }
     
-    // Notes validation - Medical documentation standards
     if (data.notes && data.notes.trim() !== '') {
       if (data.notes.trim().length > 1000) {
         errors.notes = 'Ghi chú không được quá 1000 ký tự (tiêu chuẩn ghi chép y khoa)';
@@ -474,7 +455,6 @@ export default function AddVitalSignsPage() {
   const handleInputChange = (field: keyof VitalSigns, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Clear validation error for this field
     if (validationErrors[field]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
@@ -484,7 +464,6 @@ export default function AddVitalSignsPage() {
     }
   };
 
-  // Update transformToApiFormat to use correct API field names (snake_case)
   const transformToApiFormat = (data: VitalSigns) => {
     const apiData: any = {
       resident_id: data.residentId,
@@ -495,7 +474,6 @@ export default function AddVitalSignsPage() {
       notes: data.notes || '',
     };
 
-    // Only include optional fields if they have values
     if (data.respiratoryRate !== undefined && data.respiratoryRate !== null && !isNaN(Number(data.respiratoryRate))) {
       apiData.respiratory_rate = data.respiratoryRate;
     }
@@ -513,10 +491,7 @@ export default function AddVitalSignsPage() {
 
     if (error.response?.data) {
       const data = error.response.data;
-      
-      // Handle validation errors from backend first
       if (data.error && typeof data.error === 'string') {
-        // Check if it's a field-specific error and translate to Vietnamese
         if (data.error.includes('blood pressure') || data.error.includes('huyết áp')) {
           fieldErrors.bloodPressure = data.error.includes('blood pressure') ? 
             'Huyết áp không hợp lệ. Vui lòng kiểm tra lại định dạng (ví dụ: 120/80)' : data.error;
@@ -539,7 +514,6 @@ export default function AddVitalSignsPage() {
           fieldErrors.residentId = data.error.includes('resident') ? 
             'Vui lòng chọn người cao tuổi' : data.error;
         } else {
-          // Translate common English error messages to Vietnamese
           const translatedError = data.error
             .replace('Please enter a valid value', 'Vui lòng nhập giá trị hợp lệ')
             .replace('The two nearest valid values are', 'Hai giá trị hợp lệ gần nhất là')
@@ -559,8 +533,6 @@ export default function AddVitalSignsPage() {
           errorMessage = translatedError;
         }
       }
-      
-      // Handle array of validation errors
       if (data.errors && Array.isArray(data.errors)) {
         data.errors.forEach((err: any) => {
           if (err.field && err.message) {
@@ -568,15 +540,11 @@ export default function AddVitalSignsPage() {
           }
         });
       }
-      
-      // Handle message field
       if (data.message && !fieldErrors.bloodPressure && !fieldErrors.temperature && 
           !fieldErrors.heartRate && !fieldErrors.oxygenSaturation && !fieldErrors.respiratoryRate && 
           !fieldErrors.weight && !fieldErrors.residentId) {
         errorMessage = data.message;
       }
-      
-      // Only use status code errors if no specific errors found
       if (Object.keys(fieldErrors).length === 0 && !errorMessage.includes('huyết áp') && 
           !errorMessage.includes('nhiệt độ') && !errorMessage.includes('nhịp tim') && 
           !errorMessage.includes('oxy') && !errorMessage.includes('thở') && 
@@ -592,60 +560,38 @@ export default function AddVitalSignsPage() {
         }
       }
     } else if (error.message) {
-      // Handle validation errors from backend
       if ((error as any).isValidationError && (error as any).field) {
         const field = (error as any).field;
         
-        if (field === 'multiple' || field === 'general') {
-          // Handle multiple field errors or general validation error
-          const errorMessage = error.message;
-          if (errorMessage.includes(';')) {
-            // Multiple errors separated by semicolon
-            const errors = errorMessage.split(';').map(e => e.trim());
-            errors.forEach(err => {
-              // Try to map field names from Vietnamese to frontend field names
-              if (err.includes('Người cao tuổi:')) {
-                fieldErrors.residentId = err.replace('Người cao tuổi:', '').trim();
-              } else if (err.includes('Nhiệt độ:')) {
-                fieldErrors.temperature = err.replace('Nhiệt độ:', '').trim();
-              } else if (err.includes('Nhịp tim:')) {
-                fieldErrors.heartRate = err.replace('Nhịp tim:', '').trim();
-              } else if (err.includes('Huyết áp:')) {
-                fieldErrors.bloodPressure = err.replace('Huyết áp:', '').trim();
-              } else if (err.includes('Nồng độ oxy:')) {
-                fieldErrors.oxygenSaturation = err.replace('Nồng độ oxy:', '').trim();
-              } else if (err.includes('Nhịp thở:')) {
-                fieldErrors.respiratoryRate = err.replace('Nhịp thở:', '').trim();
-              } else if (err.includes('Cân nặng:')) {
-                fieldErrors.weight = err.replace('Cân nặng:', '').trim();
-              } else if (err.includes('Ghi chú:')) {
-                fieldErrors.notes = err.replace('Ghi chú:', '').trim();
-              } else {
-                // If can't map to specific field, add to general
-                if (!fieldErrors.general) fieldErrors.general = '';
-                fieldErrors.general += (fieldErrors.general ? '; ' : '') + err;
-              }
-            });
-          } else {
-            // Single general error
-            fieldErrors.general = errorMessage;
-          }
+        const errorMessage = error.message;
+        if (errorMessage.includes(';')) {
+          const errors = errorMessage.split(';').map(e => e.trim());
+          errors.forEach(err => {
+            if (err.includes('Người cao tuổi:')) {
+              fieldErrors.residentId = err.replace('Người cao tuổi:', '').trim();
+            } else if (err.includes('Nhiệt độ:')) {
+              fieldErrors.temperature = err.replace('Nhiệt độ:', '').trim();
+            } else if (err.includes('Nhịp tim:')) {
+              fieldErrors.heartRate = err.replace('Nhịp tim:', '').trim();
+            } else if (err.includes('Huyết áp:')) {
+              fieldErrors.bloodPressure = err.replace('Huyết áp:', '').trim();
+            } else if (err.includes('Nồng độ oxy:')) {
+              fieldErrors.oxygenSaturation = err.replace('Nồng độ oxy:', '').trim();
+            } else if (err.includes('Nhịp thở:')) {
+              fieldErrors.respiratoryRate = err.replace('Nhịp thở:', '').trim();
+            } else if (err.includes('Cân nặng:')) {
+              fieldErrors.weight = err.replace('Cân nặng:', '').trim();
+            } else if (err.includes('Ghi chú:')) {
+              fieldErrors.notes = err.replace('Ghi chú:', '').trim();
+            } else {
+              if (!fieldErrors.general) fieldErrors.general = '';
+              fieldErrors.general += (fieldErrors.general ? '; ' : '') + err;
+            }
+          });
         } else {
-          // Single field error
-          const fieldMap: { [key: string]: string } = {
-            'blood_pressure': 'bloodPressure',
-            'heart_rate': 'heartRate',
-            'temperature': 'temperature',
-            'oxygen_level': 'oxygenSaturation',
-            'respiratory_rate': 'respiratoryRate',
-            'weight': 'weight',
-            'resident_id': 'residentId'
-          };
-          const frontendField = fieldMap[field] || field;
-          fieldErrors[frontendField] = error.message;
+          fieldErrors.general = errorMessage;
         }
       } else {
-        // Handle specific error messages from error.message and translate to Vietnamese
         if (error.message.includes('blood pressure') || error.message.includes('huyết áp')) {
           fieldErrors.bloodPressure = error.message.includes('blood pressure') ? 
             'Huyết áp không hợp lệ. Vui lòng kiểm tra lại định dạng (ví dụ: 120/80)' : error.message;
@@ -668,7 +614,6 @@ export default function AddVitalSignsPage() {
           fieldErrors.residentId = error.message.includes('resident') ? 
             'Vui lòng chọn người cao tuổi' : error.message;
         } else {
-          // Translate common English error messages to Vietnamese
           const translatedError = error.message
             .replace('Please enter a valid value', 'Vui lòng nhập giá trị hợp lệ')
             .replace('The two nearest valid values are', 'Hai giá trị hợp lệ gần nhất là')
@@ -696,21 +641,18 @@ export default function AddVitalSignsPage() {
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     setSubmitSuccess(false);
-    // Redirect back to vital signs page
     router.push('/staff/vital-signs');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     const errors = validateForm(formData);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       return;
     }
 
-    // Check required fields
     const requiredErrors: { [key: string]: string } = {};
     
     if (!formData.residentId) {
@@ -733,7 +675,6 @@ export default function AddVitalSignsPage() {
       requiredErrors.oxygenSaturation = 'Vui lòng nhập nồng độ oxy';
     }
     
-    // Make these fields required with medical standards
     if (formData.respiratoryRate === undefined || formData.respiratoryRate === null || isNaN(Number(formData.respiratoryRate))) {
       requiredErrors.respiratoryRate = 'Vui lòng nhập nhịp thở';
     } else {
@@ -775,7 +716,6 @@ export default function AddVitalSignsPage() {
       setSubmitSuccess(true);
       setShowSuccessModal(true);
       
-      // Reset form
       setFormData({
         residentId: '',
         bloodPressure: '',
@@ -789,13 +729,11 @@ export default function AddVitalSignsPage() {
       setValidationErrors({});
       
     } catch (error: any) {
-      // Parse the error to get detailed information
       const { errorMessage, fieldErrors } = parseApiError(error);
       
       if (Object.keys(fieldErrors).length > 0) {
         setValidationErrors(fieldErrors);
       } else {
-        // Show modal for general errors only
         setModalErrors({ general: errorMessage });
         setShowErrorModal(true);
       }
@@ -805,7 +743,6 @@ export default function AddVitalSignsPage() {
     }
   };
 
-  // Loading state
   if (loadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center">
@@ -830,8 +767,6 @@ export default function AddVitalSignsPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-8">
         <div className="max-w-4xl mx-auto">
           
-
-          {/* Header */}
           <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
             <div className="flex items-center gap-4">
               <button
@@ -857,14 +792,11 @@ export default function AddVitalSignsPage() {
 
 
 
-          {/* Form */}
           <div className="bg-white rounded-2xl p-8 shadow-lg">
-            {/* Medical Warnings */}
             <MedicalWarning vitalSigns={formData} />
             
             <form onSubmit={handleSubmit}>
               <div className="space-y-8">
-                {/* Resident Selection */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
                     <UserIcon className="w-4 h-4 inline mr-2" />
@@ -899,7 +831,6 @@ export default function AddVitalSignsPage() {
                   )}
                 </div>
 
-                {/* Vital Signs Grid */}
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h3 className="text-blue-800 font-semibold mb-2 flex items-center gap-2">
                     <BeakerIcon className="w-4 h-4" />
@@ -916,7 +847,7 @@ export default function AddVitalSignsPage() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Blood Pressure */}
+                 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       <HeartIconSolid className="w-4 h-4 inline mr-2 text-red-600" />
@@ -938,7 +869,7 @@ export default function AddVitalSignsPage() {
                     )}
                   </div>
 
-                  {/* Heart Rate */}
+                 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       <HeartIconSolid className="w-4 h-4 inline mr-2 text-green-600" />
@@ -962,7 +893,7 @@ export default function AddVitalSignsPage() {
                     )}
                   </div>
 
-                  {/* Temperature */}
+                 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       <FireIcon className="w-4 h-4 inline mr-2 text-orange-600" />
@@ -987,7 +918,7 @@ export default function AddVitalSignsPage() {
                     )}
                   </div>
 
-                  {/* Oxygen Saturation */}
+                 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       <CloudIcon className="w-4 h-4 inline mr-2 text-blue-600" />
@@ -1012,7 +943,7 @@ export default function AddVitalSignsPage() {
                     )}
                   </div>
 
-                  {/* Respiratory Rate */}
+                 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       <HandRaisedIcon className="w-4 h-4 inline mr-2 text-green-600" />
@@ -1036,7 +967,7 @@ export default function AddVitalSignsPage() {
                     )}
                   </div>
 
-                  {/* Weight */}
+                 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
                       <ScaleIcon className="w-4 h-4 inline mr-2 text-purple-600" />
@@ -1062,7 +993,7 @@ export default function AddVitalSignsPage() {
                   </div>
                 </div>
 
-                {/* Notes */}
+               
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
                     <BeakerIcon className="w-4 h-4 inline mr-2 text-green-600" />
@@ -1084,7 +1015,6 @@ export default function AddVitalSignsPage() {
                   )}
                 </div>
 
-                {/* Submit Button */}
                 <div className="flex gap-4 justify-end">
                   <button
                     type="button"

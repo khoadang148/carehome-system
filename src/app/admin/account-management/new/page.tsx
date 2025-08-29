@@ -104,7 +104,7 @@ export default function NewAccountPage() {
       errors.role = "Vui lòng chọn vai trò";
     }
     
-    // Nếu là gia đình thì phải chọn cư dân
+    // Nếu là gia đình thì phải chọn người cao tuổi
     if (formData.role === "family" && !selectedResidentId) {
       errors.resident = "Vui lòng chọn người cao tuổi thuộc tài khoản gia đình này";
     }
@@ -356,7 +356,7 @@ export default function NewAccountPage() {
               </div>
             )}
           </div>
-          {/* Nếu là gia đình thì chọn cư dân */}
+          {/* Nếu là gia đình thì chọn người cao tuổi */}
           {formData.role === "family" && (
             <>
               <div>

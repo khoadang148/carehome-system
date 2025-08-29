@@ -1,6 +1,4 @@
-/* Staff Messages Page Styles */
 
-/* Layout */
 .h-screen {
   height: 100vh !important;
 }
@@ -17,7 +15,6 @@
   flex-shrink: 0 !important;
 }
 
-/* Scrollbar */
 .overflow-y-auto::-webkit-scrollbar {
   width: 6px;
 }
@@ -36,7 +33,7 @@
   background: #94a3b8;
 }
 
-/* Message Bubbles */
+
 .message-bubble {
   word-wrap: break-word;
   line-height: 1.4;
@@ -57,7 +54,7 @@
   color: #6b7280;
 }
 
-/* Animations */
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -73,7 +70,7 @@
   animation: fade-in 0.3s ease-out;
 }
 
-/* Responsive Design */
+
 @media (max-width: 768px) {
   .h-screen {
     height: 100vh !important;
@@ -92,7 +89,6 @@
   }
 }
 
-/* Force light theme */
 body {
   background-color: #ffffff !important;
   color: #000000 !important;

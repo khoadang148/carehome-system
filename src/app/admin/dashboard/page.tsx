@@ -49,155 +49,126 @@ export default function AdminDashboardPage() {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Back Button */}
-        <div style={{
-          position: 'absolute',
-          top: '10rem',
-          left: '5rem',
-          zIndex: 10
-        }}>
-          <Link
-            href="/admin"
-            title="Quay lại"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '3.5rem',
-              height: '3.5rem',
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-              textDecoration: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              backdropFilter: 'blur(10px)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
-              e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
-              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-            }}
-          >
-            <ArrowLeftIcon style={{ 
-              width: '1.5rem', 
-              height: '1.5rem', 
-              color: '#64748b',
-              transition: 'all 0.3s ease'
-            }} />
-          </Link>
-        </div>
+        
 
         {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          borderRadius: '1.5rem',
-          padding: '2.5rem',
+          borderRadius: '1rem',
+          padding: '1.5rem 2rem',
           marginBottom: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
-          textAlign: 'center',
           marginTop: '1rem'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: '1rem',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              width: '4rem',
-              height: '4rem',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              borderRadius: '1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.1)'
-            }}>
-              <ChartBarIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
-            </div>
-          </div>
-          
-          <h1 style={{
-            fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
-            fontWeight: 700,
-            margin: '0 0 0.5rem 0',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            lineHeight: 1.2,
-            wordWrap: 'break-word',
-            textAlign: 'center'
-          }}>
-            Bảng điều khiển quản lý
-          </h1>
-          <p style={{
-            fontSize: '1.125rem',
-            color: '#64748b',
-            margin: '0 0 1rem 0',
-            fontWeight: 500
-          }}>
-            Quản lý viện dưỡng lão - Thanh toán & Nhân sự
-          </p>
-          
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2rem',
+            justifyContent: 'space-between',
+            gap: '1.5rem',
             flexWrap: 'wrap'
           }}>
+      
+
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-              borderRadius: '0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: '#475569'
+              gap: '1rem'
             }}>
-              <UsersIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-              <span>Quản lý cư dân</span>
+              <button
+              onClick={() => router.push('/admin')}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại"
+            >
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
+
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                borderRadius: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 8px -2px rgba(59, 130, 246, 0.25)'
+              }}>
+                <ChartBarIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
+              </div>
+              
+              <div>
+                <h1 style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #3b82f6 100%, #3b82f6 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  lineHeight: 1.1
+                }}>
+                  Bảng điều khiển quản lý
+                </h1>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#64748b',
+                  margin: '0.25rem 0 0 0',
+                  fontWeight: 500
+                }}>
+                  Quản lý viện dưỡng lão - Thanh toán & Nhân sự
+                </p>
+              </div>
             </div>
             
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-              borderRadius: '0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: '#475569'
+              gap: '1rem',
+              flexWrap: 'wrap'
             }}>
-              <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-              <span>Quản lý nhân viên</span>
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-              borderRadius: '0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: '#475569'
-            }}>
-              <CurrencyDollarIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-              <span>Quản lý tài chính</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                borderRadius: '0.5rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#475569'
+              }}>
+                <UsersIcon style={{ width: '1rem', height: '1rem' }} />
+                <span>Người cao tuổi</span>
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                borderRadius: '0.5rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#475569'
+              }}>
+                <UserGroupIcon style={{ width: '1rem', height: '1rem' }} />
+                <span>Nhân viên</span>
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                borderRadius: '0.5rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#475569'
+              }}>
+                <CurrencyDollarIcon style={{ width: '1rem', height: '1rem' }} />
+                <span>Tài chính</span>
+              </div>
             </div>
           </div>
         </div>

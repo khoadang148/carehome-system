@@ -17,7 +17,7 @@ import {
   PlusIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-import { parseAIRecommendation, ParsedAIRecommendation, AIRecommendationResponse } from '@/lib/ai-recommendations';
+import { parseAIRecommendation, ParsedAIRecommendation } from '@/lib/ai-recommendations';
 import { activitiesAPI } from '@/lib/api';
 import NotificationModal from '@/components/NotificationModal';
 import { residentAPI, carePlansAPI, roomsAPI, staffAssignmentsAPI, bedAssignmentsAPI } from '@/lib/api';
@@ -67,7 +67,6 @@ export default function AIRecommendationsPage() {
         setResidentsLoading(true);
         const apiData = await residentAPI.getAll();
         
-        // Map lại dữ liệu giống trang residents
         const mapped = await Promise.all(apiData.map(async (r: any) => {
           let roomNumber = '';
           try {
@@ -135,7 +134,7 @@ export default function AIRecommendationsPage() {
           };
         }));
         
-        // Chỉ lấy cư dân chính thức (có phòng và giường)
+        // Chỉ lấy người cao tuổi chính thức (có phòng và giường)
         const officialResidents = await filterOfficialResidents(mapped);
         console.log('Official residents for AI recommendations:', officialResidents);
         
@@ -184,7 +183,7 @@ export default function AIRecommendationsPage() {
       }
       
       // Gọi API mới với residentIds và schedule_time
-      const response: AIRecommendationResponse = await activitiesAPI.getAIRecommendation(
+      const response: any = await activitiesAPI.getAIRecommendation(
         [selectedResident],
         scheduleDateTime
       );
@@ -293,19 +292,14 @@ export default function AIRecommendationsPage() {
   const handleCreateActivity = async (recommendation: ParsedAIRecommendation) => {
     setCreateLoading(true);
     try {
-      // Parse duration from string to number
       const durationMatch = recommendation.duration.match(/(\d+)/);
       const duration = durationMatch ? parseInt(durationMatch[1], 10) : 45;
-      // Create a comprehensive description from trợ lý thông minh recommendation data
       let description = '';
       
-      // Tạo mô tả chuyên nghiệp và dễ đọc
       const descriptionParts: string[] = [];
       
-      // Tạo mô tả cơ bản
       let baseDescription = `Hoạt động ${recommendation.activityName} được thiết kế đặc biệt phù hợp với người cao tuổi.`;
       
-      // Thêm thông tin về độ khó và thời lượng
       if (recommendation.difficulty) {
         baseDescription += ` Độ khó: ${recommendation.difficulty}.`;
       }
@@ -315,18 +309,16 @@ export default function AIRecommendationsPage() {
       
       descriptionParts.push(baseDescription);
       
-      // Thêm mô tả chi tiết nếu có và hợp lệ
       if (recommendation.detailedDescription && 
           recommendation.detailedDescription.length > 20 &&
           !recommendation.detailedDescription.includes('**') &&
           !recommendation.detailedDescription.includes('*')) {
         
-        // Làm sạch mô tả chi tiết
         let cleanDescription = recommendation.detailedDescription
-          .replace(/\*\*/g, '') // Loại bỏ dấu **
-          .replace(/\*/g, '') // Loại bỏ dấu *
-          .replace(/\n/g, ' ') // Thay thế xuống dòng bằng khoảng trắng
-          .replace(/\s+/g, ' ') // Loại bỏ khoảng trắng thừa
+          .replace(/\*\*/g, '') 
+          .replace(/\*/g, '') 
+          .replace(/\n/g, ' ') 
+          .replace(/\s+/g, ' ') 
           .trim();
         
         if (cleanDescription.length > 50) {
@@ -334,7 +326,6 @@ export default function AIRecommendationsPage() {
         }
       }
       
-      // Thêm mục tiêu nếu có
       if (recommendation.objectives && recommendation.objectives.length > 0) {
         const validObjectives = recommendation.objectives
           .filter(obj => obj && obj.length > 5 && !obj.includes('*'))
@@ -345,8 +336,7 @@ export default function AIRecommendationsPage() {
           descriptionParts.push(`Mục tiêu: ${objectivesText}`);
         }
       }
-      
-      // Thêm lợi ích nếu có
+
       if (recommendation.benefits && recommendation.benefits.length > 0) {
         const validBenefits = recommendation.benefits
           .filter(benefit => benefit && benefit.length > 5 && !benefit.includes('*'))
@@ -358,15 +348,12 @@ export default function AIRecommendationsPage() {
         }
       }
       
-      // Ghép các phần lại thành mô tả hoàn chỉnh
       description = descriptionParts.join(' ');
       
-      // Nếu không có mô tả đủ dài, tạo mô tả mặc định
       if (!description || description.length < 50) {
         description = `Hoạt động ${recommendation.activityName} được thiết kế phù hợp với người cao tuổi, giúp cải thiện sức khỏe thể chất và tinh thần. Hoạt động này có độ khó ${recommendation.difficulty || 'trung bình'} và thời lượng ${recommendation.duration || '30-45 phút'}.`;
       }
       
-      // Giới hạn độ dài mô tả để tránh quá dài
       if (description.length > 500) {
         description = description.substring(0, 497) + '...';
       }
@@ -386,6 +373,7 @@ export default function AIRecommendationsPage() {
           return 'Hoạt động chung';
         }
       };
+
       const getLocation = (activityType: string, activityName: string): string => {
         const name = activityName.toLowerCase();
         if (activityType === 'Thể dục' || name.includes('đi bộ')) {
@@ -400,13 +388,12 @@ export default function AIRecommendationsPage() {
           return 'Khu vực chung';
         }
       };
+      
       const activityType = getActivityType(recommendation.activityName);
-      // Validate thời gian - Bắt buộc phải chọn ngày và giờ
       if (!selectedDate || !selectedTime) {
         throw new Error('Vui lòng chọn ngày và giờ cho hoạt động.');
       }
 
-      // Tạo scheduleDateTime với timezone local
       let scheduleDateTime = '';
       if (selectedDate && selectedTime) {
         const year = selectedDate.getFullYear();
@@ -415,13 +402,11 @@ export default function AIRecommendationsPage() {
         scheduleDateTime = `${year}-${month}-${day}T${selectedTime}`;
       }
 
-      // Validate thời gian sử dụng utility function
       const scheduleValidation = validateActivitySchedule(selectedDate, selectedTime, duration);
       if (scheduleValidation) {
         throw new Error(scheduleValidation.message);
       }
 
-      // KIỂM TRA TRÙNG LỊCH TRƯỚC KHI TẠO HOẠT ĐỘNG
       console.log('Checking schedule conflicts for resident:', selectedResident);
       
       try {
@@ -434,20 +419,18 @@ export default function AIRecommendationsPage() {
         if (conflictCheck.hasConflict) {
           console.log('Schedule conflict detected:', conflictCheck.message);
           
-          // Hiển thị thông báo lỗi và dừng việc tạo hoạt động
           setNotification({
             open: true,
             type: 'warning',
             message: conflictCheck.message
           });
           setCreateLoading(false);
-          return; // Dừng ngay tại đây, không tạo hoạt động
+          return; 
         }
         
         console.log('No schedule conflicts found');
       } catch (error) {
         console.error('Error checking schedule conflict:', error);
-        // Nếu có lỗi khi kiểm tra, vẫn cho phép tạo hoạt động
       }
 
       const activityData = {
@@ -459,50 +442,98 @@ export default function AIRecommendationsPage() {
         capacity: 20,
         activity_type: activityType,
       };
-      // Validate required fields
       if (!activityData.activity_name || !activityData.description || !activityData.activity_type) {
         throw new Error('Thiếu thông tin bắt buộc để tạo hoạt động. Vui lòng kiểm tra lại dữ liệu trợ lý thông minh recommendation.');
       }
       const response = await activitiesAPI.create(activityData);
       
-      // Tự động thêm resident đã chọn vào hoạt động vừa tạo
       if (response && response._id && selectedResident) {
         try {
-          // Tìm resident để lấy thông tin đầy đủ
           const selectedResidentData = residents.find(r => r.id === selectedResident);
           if (selectedResidentData) {
-            // Tìm staff được phân công quản lý resident này
-            let assignedStaffId = user?.id || "664f1b2c2f8b2c0012a4e750"; // Mặc định là user hiện tại
+            let assignedStaffId = user?.id || "664f1b2c2f8b2c0012a4e750"; 
+            let hasStaffAssignment = false;
+            let staffName = 'Nhân viên hiện tại';
             
             try {
               const staffAssignments = await staffAssignmentsAPI.getByResident(selectedResidentData.id);
               if (staffAssignments && staffAssignments.length > 0) {
-                // Lấy staff đầu tiên được phân công cho resident này
                 const assignment = staffAssignments[0];
                 assignedStaffId = assignment.staff_id._id || assignment.staff_id;
+                hasStaffAssignment = true;
+                staffName = assignment.staff_name || 'Nhân viên được phân công';
                 console.log('Found assigned staff for resident:', assignedStaffId);
               } else {
                 console.log('No staff assignment found for resident, using current user');
               }
             } catch (assignmentError) {
               console.error('Error fetching staff assignment:', assignmentError);
-              // Nếu không tìm thấy assignment, vẫn sử dụng user hiện tại
             }
             
-            await activityParticipationsAPI.create({
-              staff_id: assignedStaffId,
-              activity_id: response._id,
-              resident_id: selectedResidentData.id, // Sử dụng ID thực tế của resident
-              date: scheduleDateTime ? scheduleDateTime.split('T')[0] + "T00:00:00Z" : new Date().toISOString().split('T')[0] + "T00:00:00Z",
-              performance_notes: 'Tự động thêm từ gợi ý trợ lý thông minh',
-              attendance_status: 'attended'
-            });
-            
-            setNotification({ 
-              open: true, 
-              type: 'success', 
-              message: 'Hoạt động đã được tạo thành công và tự động thêm người cao tuổi vào hoạt động với nhân viên được phân công! Bạn sẽ được chuyển đến trang danh sách hoạt động.' 
-            });
+            // Chỉ tạo participation khi có staff phân công
+            if (hasStaffAssignment) {
+              try {
+                await activityParticipationsAPI.create({
+                  staff_id: assignedStaffId,
+                  activity_id: response._id,
+                  resident_id: selectedResidentData.id, 
+                  date: scheduleDateTime ? scheduleDateTime.split('T')[0] + "T00:00:00Z" : new Date().toISOString().split('T')[0] + "T00:00:00Z",
+                  performance_notes: 'Tự động thêm từ gợi ý trợ lý thông minh',
+                  attendance_status: 'pending'
+                });
+                
+                setNotification({ 
+                  open: true, 
+                  type: 'success', 
+                  message: `Hoạt động đã được tạo thành công và tự động thêm người cao tuổi vào hoạt động với ${staffName}! Bạn sẽ được chuyển đến trang danh sách hoạt động.` 
+                });
+              } catch (participationError: any) {
+                console.error('Error adding resident to activity:', participationError);
+                
+                let errorMessage = 'Có lỗi khi thêm người cao tuổi vào hoạt động.';
+                if (participationError?.response?.data?.message) {
+                  errorMessage = participationError.response.data.message;
+                } else if (participationError?.response?.data?.detail) {
+                  errorMessage = participationError.response.data.detail;
+                } else if (participationError?.message) {
+                  errorMessage = participationError.message;
+                }
+                
+                // Xử lý trường hợp "Người dùng này không phải là nhân viên" - đây không phải lỗi
+                if (errorMessage.includes('không phải là nhân viên') || errorMessage.includes('not a staff member')) {
+                  const residentName = residents.find(r => r.id === selectedResident)?.full_name || 'Người cao tuổi này';
+                  setNotification({ 
+                    open: true, 
+                    type: 'warning', 
+                    message: `Hoạt động đã được tạo thành công! ${residentName} chưa có nhân viên được phân công chăm sóc. Bạn có thể phân công nhân viên trong trang quản lý phân công hoặc thêm người cao tuổi vào hoạt động thủ công sau.` 
+                  });
+                  return;
+                }
+                
+                if (participationError?.response?.status === 400) {
+                  setNotification({ 
+                    open: true, 
+                    type: 'warning', 
+                    message: `Hoạt động đã được tạo thành công! Tuy nhiên: ${errorMessage}` 
+                  });
+                  return;
+                } else {
+                  setNotification({ 
+                    open: true, 
+                    type: 'warning', 
+                    message: 'Hoạt động đã được tạo thành công! Tuy nhiên có lỗi khi thêm người cao tuổi vào hoạt động. Bạn có thể thêm thủ công sau hoặc kiểm tra xem người cao tuổi đã có nhân viên được phân công chưa.' 
+                  });
+                }
+              }
+            } else {
+              // Không tạo participation khi chưa có staff phân công
+              const residentName = selectedResidentData?.full_name || 'Người cao tuổi này';
+              setNotification({ 
+                open: true, 
+                type: 'warning', 
+                message: `Hoạt động đã được tạo thành công! Lưu ý: ${residentName} chưa có nhân viên được phân công chăm sóc nên chưa thể thêm vào hoạt động. Bạn có thể phân công nhân viên trong trang quản lý phân công trước khi thêm người cao tuổi vào hoạt động.` 
+              });
+            }
           } else {
             setNotification({ 
               open: true, 
@@ -513,7 +544,6 @@ export default function AIRecommendationsPage() {
         } catch (participationError: any) {
           console.error('Error adding resident to activity:', participationError);
           
-          // Kiểm tra xem có phải lỗi trùng lịch không
           let errorMessage = 'Có lỗi khi thêm người cao tuổi vào hoạt động.';
           if (participationError?.response?.data?.message) {
             errorMessage = participationError.response.data.message;
@@ -523,20 +553,29 @@ export default function AIRecommendationsPage() {
             errorMessage = participationError.message;
           }
           
-          // Nếu là lỗi trùng lịch (400), hiển thị thông báo lỗi và không chuyển trang
+          // Xử lý trường hợp "Người dùng này không phải là nhân viên" - đây không phải lỗi
+          if (errorMessage.includes('không phải là nhân viên') || errorMessage.includes('not a staff member')) {
+            const residentName = residents.find(r => r.id === selectedResident)?.full_name || 'Người cao tuổi này';
+            setNotification({ 
+              open: true, 
+              type: 'warning', 
+              message: `Hoạt động đã được tạo thành công! ${residentName} chưa có nhân viên được phân công chăm sóc. Bạn có thể phân công nhân viên trong trang quản lý phân công hoặc thêm người cao tuổi vào hoạt động thủ công sau.` 
+            });
+            return;
+          }
+          
           if (participationError?.response?.status === 400) {
             setNotification({ 
               open: true, 
               type: 'warning', 
               message: `Hoạt động đã được tạo thành công! Tuy nhiên: ${errorMessage}` 
             });
-            // Không chuyển trang nếu có lỗi trùng lịch
             return;
           } else {
             setNotification({ 
               open: true, 
-              type: 'success', 
-              message: 'Hoạt động đã được tạo thành công! Tuy nhiên có lỗi khi thêm người cao tuổi vào hoạt động. Bạn có thể thêm thủ công sau.' 
+              type: 'warning', 
+              message: 'Hoạt động đã được tạo thành công! Tuy nhiên có lỗi khi thêm người cao tuổi vào hoạt động. Bạn có thể thêm thủ công sau hoặc kiểm tra xem người cao tuổi đã có nhân viên được phân công chưa.' 
             });
           }
         }
@@ -565,12 +604,10 @@ export default function AIRecommendationsPage() {
         console.error('Backend error details:', error.response.data);
       }
       
-      // Kiểm tra xem có phải lỗi trùng lịch không
-      const isScheduleConflict = errorMessage.includes('Cư dân đã có hoạt động') || 
+      const isScheduleConflict = errorMessage.includes('người cao tuổi đã có hoạt động') || 
                                 errorMessage.includes('trong cùng ngày') ||
                                 error?.response?.status === 400;
       
-      // Chỉ hiển thị thông báo lỗi nếu không phải lỗi trùng lịch (vì đã xử lý ở trên)
       if (!isScheduleConflict) {
         setNotification({ 
           open: true, 
@@ -589,7 +626,7 @@ export default function AIRecommendationsPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background decorations */}
+      
       <div style={{
         position: 'absolute',
         top: 0,
@@ -613,7 +650,7 @@ export default function AIRecommendationsPage() {
       }}>
 
       
-        {/* Header */}
+        
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -668,7 +705,7 @@ export default function AIRecommendationsPage() {
           </div>
         </div>
 
-        {/* Input Section */}
+        
         <div style={{
           background: 'white',
           borderRadius: '1rem',

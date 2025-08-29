@@ -39,18 +39,16 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
   const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
+  const [activeAssignments, setActiveAssignments] = useState<any[]>([]);
   const [bedNumber, setBedNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [bedLoading, setBedLoading] = useState(false);
   
-  // Get residentId from params using React.use()
   const residentId = React.use(params).id;
   
   useEffect(() => {
-    // Fetch resident from API
     const fetchResident = async () => {
       try {
         const data = await residentAPI.getById(residentId);
-        // Map API data về format UI nếu cần
         const mapped = {
           id: data._id,
           name: data.full_name,
@@ -69,31 +67,33 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           ...data
         };
         setResident(mapped);
-        // Fetch care plan assignments (gói dịch vụ đang sử dụng)
         const assignments = await carePlansAPI.getByResidentId(residentId);
-        
-        // Ensure assignments is an array and filter out invalid ones
         const validAssignments = Array.isArray(assignments) 
           ? assignments.filter(assignment => assignment && assignment._id)
           : [];
         
-        setCarePlanAssignments(validAssignments);
+        // Filter out expired assignments
+        const now = new Date();
+        const filteredActiveAssignments = validAssignments.filter((assignment: any) => {
+          const notExpired = !assignment?.end_date || new Date(assignment.end_date) >= now;
+          const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(assignment?.status || '').toLowerCase());
+          const isActive = assignment?.status === 'active' || !assignment?.status;
+          return notExpired && notCancelled && isActive;
+        });
         
-        // Lấy số phòng giống trang family
+        setCarePlanAssignments(validAssignments);
+        setActiveAssignments(filteredActiveAssignments);
         setRoomLoading(true);
         try {
-          // Ưu tiên sử dụng bedAssignmentsAPI
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
             const bedAssignment = Array.isArray(bedAssignments) ? 
               bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
             
             if (bedAssignment?.bed_id?.room_id) {
-              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
               if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
                 setRoomNumber(bedAssignment.bed_id.room_id.room_number);
               } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
                 const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
                 if (roomId) {
                   const room = await roomsAPI.getById(roomId);
@@ -106,11 +106,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               throw new Error('No bed assignment found');
             }
           } catch (bedError) {
-            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
-            // Fallback về carePlansAPI
             const assignment = validAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id);
             const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-            // Đảm bảo roomId là string, không phải object
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
@@ -123,21 +120,17 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
         setRoomLoading(false);
-        // Lấy số giường từ bedAssignmentsAPI
         setBedLoading(true);
         try {
-          // Ưu tiên sử dụng bedAssignmentsAPI
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
             const bedAssignment = Array.isArray(bedAssignments) ? 
               bedAssignments.find((a: any) => a.bed_id) : null;
             
             if (bedAssignment?.bed_id) {
-              // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
               if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
                 setBedNumber(bedAssignment.bed_id.bed_number);
               } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
                 const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
                   bedAssignment.bed_id._id : bedAssignment.bed_id;
                 if (bedId) {
@@ -151,16 +144,13 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               throw new Error('No bed assignment found');
             }
           } catch (bedError) {
-            console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
-            // Fallback về carePlansAPI
             let currentAssignment: any = null;
             if (validAssignments.length > 0) {
               currentAssignment = validAssignments.find(a =>
                 (a.resident_id?._id || a.resident_id) === residentId
-              ) || validAssignments[0]; // fallback assignment đầu tiên nếu không tìm thấy
+              ) || validAssignments[0];
             }
             const assignedBedId = currentAssignment?.assigned_bed_id as any;
-            // Đảm bảo assignedBedId là string, không phải object
             const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
             if (bedIdString) {
               try {
@@ -177,11 +167,9 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           setBedNumber('Chưa hoàn tất đăng kí');
         }
         setBedLoading(false);
-        // Fetch vital signs
         setVitalLoading(true);
         const vitalData = await vitalSignsAPI.getByResidentId(residentId);
         setVitalSigns(Array.isArray(vitalData) && vitalData.length > 0 ? vitalData[0] : null);
-        // Fetch care notes
         try {
           const careNotesData = await careNotesAPI.getAll({ resident_id: residentId });
           setCareNotes(Array.isArray(careNotesData) ? careNotesData : []);
@@ -189,7 +177,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           setCareNotes([]);
         }
       } catch (error) {
-        console.error('Error fetching resident:', error);
         router.push('/staff/residents');
       } finally {
         setLoading(false);
@@ -207,7 +194,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     setRefreshKey(prev => prev + 1);
   };
   
-  // Show loading state while fetching data
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
@@ -221,7 +207,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     );
   }
   
-  // If resident is not found
   if (!resident) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
@@ -245,7 +230,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     );
   }
   
-  // Helper function to render care level with appropriate color
   const renderCareLevel = (level: string) => {
     const colors = {
       'Cơ bản': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
@@ -264,7 +248,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     );
   };
 
-  // Helper function to get status color
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'active':
@@ -280,7 +263,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
   const statusStyle = getStatusColor(resident.status || 'Đang chăm sóc');
 
-  // Tabs configuration
   const tabs = [
     { id: 'overview', label: 'Tổng quan', icon: UserIcon },
     { id: 'medical', label: 'Y tế', icon: HeartIcon },
@@ -291,18 +273,17 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20">
           <div className="flex items-center gap-4 mb-6">
-            <Link
-              href="/staff/residents"
-              className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-xl text-blue-600 no-underline transition-all duration-200 hover:bg-blue-200"
+          <button
+              onClick={() => router.back()}
+              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+              title="Quay lại "
             >
-              <ArrowLeftIcon className="w-5 h-5" />
-            </Link>
+              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+            </button>
             <div className="flex-1">
               <div className="flex items-center gap-6 mb-4">
-                {/* Avatar */}
                 <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-gray-200 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
                   {resident.avatar ? (
                     <img
@@ -333,7 +314,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   )}
                 </div>
                 
-                {/* Thông tin cơ bản */}
                 <div className="flex-1">
                   <div className="mb-2">
                     <span className="text-sm font-medium text-slate-600 block mb-1">
@@ -344,26 +324,22 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     </h1>
                   </div>
                   <div className="flex items-center gap-4 mt-2 flex-wrap">
-                    {/* Tuổi */}
                     <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
                       <UserIcon className="w-4 h-4" />
                       <span>Tuổi:</span>
                       <span>{resident.age} tuổi</span>
                     </span>
-                    {/* Phòng */}
                     <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
                       <CalendarIcon className="w-4 h-4" />
                       <span>Phòng:</span>
                       <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
                     </span>
-                    {/* Giường */}
                     <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
                       <CalendarIcon className="w-4 h-4" />
                       <span>Giường:</span>
                       <span>{bedLoading ? 'Đang tải...' : bedNumber}</span>
                     </span>
                     
-                    {/* Trạng thái sức khỏe */}
                     <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ml-2 ${
                       !vitalSigns || vitalSigns?.notes === 'Ổn định' 
                         ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300' 
@@ -382,7 +358,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
           
-          {/* Tabs Navigation */}
           <div className="flex gap-2 border-t border-slate-200 pt-6">
             {tabs.map((tab) => (
               <button
@@ -401,12 +376,9 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
         
-        {/* Content */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 shadow-lg border border-white/20">
-          {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Personal Information Card */}
               <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
@@ -444,7 +416,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              {/* Care Plans Card */}
               <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
@@ -452,19 +423,18 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                   <h3 className="text-base font-semibold m-0 text-slate-800">
                     Gói dịch vụ đang sử dụng
-                    {carePlanAssignments.length > 0 && (
+                    {activeAssignments.length > 0 && (
                       <span className="ml-2 text-sm font-normal text-gray-500">
-                        ({carePlanAssignments.reduce((total, assignment) => 
+                        ({activeAssignments.reduce((total, assignment) => 
                           total + (assignment.care_plan_ids?.length || 0), 0
                         )} gói)
                       </span>
                     )}
                   </h3>
                 </div>
-                {/* Render danh sách gói dịch vụ từ carePlanAssignments */}
-                {carePlanAssignments.length > 0 ? (
+                {activeAssignments.length > 0 ? (
                   <div className="grid gap-3">
-                    {carePlanAssignments.map((assignment: any, assignmentIdx: number) => (
+                    {activeAssignments.map((assignment: any, assignmentIdx: number) => (
                       assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
                         assignment.care_plan_ids.map((plan: any, planIdx: number) => (
                           <div
@@ -487,7 +457,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                       )
                     ))}
                     
-                    {/* Link xem chi tiết tổng hợp */}
                     <Link
                       href={`/staff/residents/${residentId}/services`}
                       className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4 text-center font-medium no-underline transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:-translate-y-0.5 hover:shadow-md"
@@ -514,10 +483,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             </div>
           )}
 
-          {/* Medical Tab */}
           {activeTab === 'medical' && (
             <div className="grid gap-6">
-              {/* Medical Conditions */}
               <div className="bg-red-50/50 rounded-2xl p-6 border border-red-200/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
@@ -543,7 +510,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              {/* Medications */}
               <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
                 <h3 className="text-base font-semibold mb-4 text-slate-800">
                   Thuốc đang sử dụng
@@ -566,7 +532,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              {/* Allergies */}
               <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200/50">
                 <h3 className="text-base font-semibold mb-4 text-slate-800">
                   Dị ứng
@@ -589,7 +554,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             </div>
           )}
 
-          {/* Contact Tab */}
           {activeTab === 'contact' && (
             <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
               <div className="flex items-center gap-3 mb-6">
@@ -624,10 +588,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             </div>
           )}
 
-          {/* Notes Tab */}
           {activeTab === 'notes' && (
             <div className="grid gap-6">
-              {/* Care Notes */}
               <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200/50">
                 <h3 className="text-base font-semibold mb-4 text-slate-800">
                   Ghi chú chăm sóc
@@ -638,7 +600,6 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                 />
               </div>
           
-              {/* Personal Notes */}
               {resident.personalNotes && (
                 <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200/50">
                   <h3 className="text-base font-semibold mb-4 text-slate-800">

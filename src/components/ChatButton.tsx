@@ -29,8 +29,8 @@ export default function ChatButton({
 }: ChatButtonProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPulsing, setIsPulsing] = useState(false);
 
-  // Fetch unread count for this conversation
   useEffect(() => {
     const fetchUnreadCount = async () => {
       if (!staffId) return;
@@ -38,11 +38,17 @@ export default function ChatButton({
       try {
         setIsLoading(true);
         const response = await messagesAPI.getUnreadCount();
-        // For now, we'll use the total unread count
-        // In a real implementation, you'd filter by conversation
-        setUnreadCount(response.count || 0);
+        const newCount = response.unreadCount || 0;
+        
+        // Trigger pulse animation if count increased
+        if (newCount > unreadCount) {
+          setIsPulsing(true);
+          setTimeout(() => setIsPulsing(false), 1000);
+        }
+        
+        setUnreadCount(newCount);
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        // Silent error handling
       } finally {
         setIsLoading(false);
       }
@@ -50,14 +56,12 @@ export default function ChatButton({
 
     fetchUnreadCount();
     
-    // Set up polling for unread count updates
-    const interval = setInterval(fetchUnreadCount, 30000); // Check every 30 seconds
-    
+    const interval = setInterval(fetchUnreadCount, 15000); // Poll every 15 seconds
+        
     return () => clearInterval(interval);
-  }, [staffId]);
+  }, [staffId, unreadCount]);
 
   const handleClick = () => {
-    // Pass resident and staff names so the chat modal has full header info immediately
     onChatOpen(residentId, staffId, residentName, staffName);
   };
 
@@ -75,10 +79,11 @@ export default function ChatButton({
           : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800'
         }
         ${!staffId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+        ${isPulsing ? 'animate-pulse' : ''}
         ${className}
       `}
       title={staffId 
-        ? `Chat với ${staffName || 'nhân viên'} phụ trách ${residentName}`
+        ? `Chat với ${staffName || 'nhân viên'} phụ trách ${residentName}${hasUnread ? ` (${unreadCount} tin nhắn mới)` : ''}`
         : 'Chưa có nhân viên được phân công'
       }
     >
@@ -88,20 +93,19 @@ export default function ChatButton({
         <ChatBubbleLeftRightIcon className="w-5 h-5" />
       )}
       
-      {/* Unread badge */}
       {hasUnread && (
-        <span className="
+        <span className={`
           absolute -top-1 -right-1 
           bg-red-500 text-white text-xs 
           rounded-full min-w-[18px] h-[18px] 
           flex items-center justify-center
-          font-medium
-        ">
+          font-medium shadow-md
+          ${isPulsing ? 'animate-bounce' : ''}
+        `}>
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
       
-      {/* Loading indicator */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>

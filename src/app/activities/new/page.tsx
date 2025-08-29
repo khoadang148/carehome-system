@@ -24,7 +24,7 @@ export default function NewActivityPage() {
     activity_name: '',
     description: '',
     duration: '',
-    date: '', // vẫn giữ để submit
+    date: '', 
     time: '',
     location: '',
     capacity: '',

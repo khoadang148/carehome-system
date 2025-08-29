@@ -2,19 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = params;
     
-    // Get the authorization header from the incoming request
     const authHeader = request.headers.get('authorization');
     
-    // Call the backend API to get user information
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${id}`, {
       headers: {
         'Content-Type': 'application/json',
-        // Forward the authorization header if it exists
+        
         ...(authHeader && { 'Authorization': authHeader }),
       },
     });

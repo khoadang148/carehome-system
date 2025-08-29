@@ -57,7 +57,6 @@ export default function StaffOverviewPanel() {
 
   const handleActionComplete = () => {
     loadResidents();
-    // Trigger custom event để refresh widgets
     window.dispatchEvent(new CustomEvent('dataUpdated'));
   };
 
@@ -90,7 +89,6 @@ export default function StaffOverviewPanel() {
         Công cụ chăm sóc người cao tuổi
       </h2>
 
-      {/* Search Residents */}
       <div style={{ marginBottom: '2rem' }}>
         <div style={{
           position: 'relative',
@@ -124,14 +122,12 @@ export default function StaffOverviewPanel() {
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
         gap: '1.5rem',
         marginBottom: '2rem'
       }}>
-        {/* Care Notes Button */}
         <ActionCard
           title="Nhật ký theo dõi"
           description="Ghi chú tình trạng và tiến triển sức khỏe"
@@ -145,7 +141,6 @@ export default function StaffOverviewPanel() {
         />
       </div>
 
-      {/* Modals */}
       {showCareNoteModal && selectedResident && (
         <CareNoteModal
           residentId={selectedResident.id}
@@ -165,7 +160,6 @@ export default function StaffOverviewPanel() {
   );
 }
 
-// Action Card Component
 function ActionCard({ 
   title, 
   description, 
@@ -279,7 +273,6 @@ function ActionCard({
   );
 }
 
-// Care Note Modal Component
 function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
   residentId: number;
   residentName: string;
@@ -293,16 +286,13 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
     e.preventDefault();
     if (!note.trim()) return;
 
-    // VALIDATION CHUYÊN NGHIỆP Y KHOA
     const noteContent = note.trim();
     
-    // 1. Kiểm tra độ dài tối thiểu
     if (noteContent.length < 15) {
       toast.warning('⚠️ Nội dung nhật ký quá ngắn.\n\nVui lòng mô tả chi tiết:\n• Tình trạng hiện tại\n• Triệu chứng quan sát\n• Hoạt động thực hiện\n• Phản ứng của người cao tuổi\n\n(Tối thiểu 15 ký tự)');
       return;
     }
 
-    // 2. Phân tích từ khóa y tế NGHIÊM TRỌNG
     const criticalKeywords = [
       'khó thở', 'thở gấp', 'ngạt thở', 'đau ngực', 'đau tim', 
       'ngất xiu', 'bất tỉnh', 'co giật', 'động kinh', 'sốt cao', 
@@ -311,7 +301,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
       'dị ứng nặng', 'phù mặt', 'khó nuốt', 'tím tái'
     ];
     
-    // 3. Phân tích từ khóa CẦN CHÚ Ý
     const attentionKeywords = [
       'đau đầu', 'chóng mặt', 'buồn nôn', 'nôn', 'tiêu chảy', 
       'táo bón', 'đau bụng', 'mệt mỏi', 'yếu', 'ăn kém',
@@ -321,7 +310,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
       'ho', 'đờm', 'khàn tiếng', 'đau họng'
     ];
 
-    // 4. Phân tích từ khóa THUỐC
     const medicationKeywords = [
       'uống thuốc', 'bỏ thuốc', 'quên thuốc', 'từ chối thuốc',
       'tác dụng phụ', 'dị ứng thuốc', 'phản ứng thuốc',
@@ -330,14 +318,10 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
 
     const lowerNote = noteContent.toLowerCase();
     
-    // Tìm từ khóa nghiêm trọng
     const foundCritical = criticalKeywords.filter(keyword => lowerNote.includes(keyword));
-    // Tìm từ khóa cần chú ý
     const foundAttention = attentionKeywords.filter(keyword => lowerNote.includes(keyword));
-    // Tìm từ khóa thuốc
     const foundMedication = medicationKeywords.filter(keyword => lowerNote.includes(keyword));
 
-    // 5. Xác định mức độ ưu tiên TỰ ĐỘNG
     let autoPriority = 'low';
     let alertMessage = '';
     let recommendations: string[] = [];
@@ -369,7 +353,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
       ];
     }
 
-    // 6. Phân loại CHỦNG LOẠI nhật ký
     let category = 'Chăm sóc tổng quát';
     if (foundMedication.length > 0) {
       category = 'Quản lý thuốc';
@@ -385,25 +368,20 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
       category = 'Chăm sóc cá nhân';
     }
 
-    // 7. Tính ĐIỂM CHẤT LƯỢNG nhật ký
-    let qualityScore = 50; // Điểm cơ bản
+    let qualityScore = 50;
     
-    // Cộng điểm cho độ dài phù hợp
     if (noteContent.length >= 50) qualityScore += 20;
     if (noteContent.length >= 100) qualityScore += 10;
     
-    // Cộng điểm cho thông tin cụ thể
-    if (/\d{1,2}:\d{2}/.test(noteContent)) qualityScore += 10; // Có thời gian
-    if (/\d+\/\d+/.test(noteContent)) qualityScore += 10; // Có số đo
-    if (noteContent.includes('°C') || noteContent.includes('mmHg')) qualityScore += 10; // Có đơn vị y tế
+    if (/\d{1,2}:\d{2}/.test(noteContent)) qualityScore += 10;
+    if (/\d+\/\d+/.test(noteContent)) qualityScore += 10;
+    if (noteContent.includes('°C') || noteContent.includes('mmHg')) qualityScore += 10;
     
-    // Trừ điểm cho ngôn ngữ không chuyên nghiệp
     const informalWords = ['ok', 'oke', 'bình thường', 'tạm được'];
     if (informalWords.some(word => lowerNote.includes(word))) qualityScore -= 15;
     
     let qualityLevel = qualityScore >= 80 ? 'excellent' : qualityScore >= 65 ? 'good' : qualityScore >= 50 ? 'fair' : 'poor';
 
-    // 8. Hiển thị cảnh báo nếu có
     if (alertMessage) {
       const confirmed = confirm(`${alertMessage}\n\n${recommendations.length > 0 ? '📋 KHUYẾN NGHỊ:\n' + recommendations.map(r => `• ${r}`).join('\n') : ''}\n\nẤn OK để lưu nhật ký với phân loại tự động.`);
       if (!confirmed) return;
@@ -423,7 +401,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
           residents[residentIndex].careNotes = [];
         }
         
-        // Tạo nhật ký với THÔNG TIN CHUYÊN NGHIỆP
         const newNote = {
           id: Date.now(),
           date: new Date().toISOString().split('T')[0],
@@ -431,7 +408,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
           staff: `${staffName}, Nhân viên chăm sóc`,
           timestamp: new Date().toISOString(),
           type: 'general',
-          // Thông tin validation chuyên nghiệp
           priority: autoPriority,
           category: category,
           qualityScore: qualityLevel,
@@ -450,7 +426,6 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
         clientStorage.setItem('nurseryHomeResidents', JSON.stringify(residents));
       }
       
-      // Thông báo kết quả chi tiết
       let successMessage = `✅ ĐÃ LƯU NHẬT KÝ THÀNH CÔNG!\n\n📊 THÔNG TIN PHÂN TÍCH:\n`;
       successMessage += `• Danh mục: ${category}\n`;
       successMessage += `• Mức độ ưu tiên: ${autoPriority === 'high' ? '🔴 CAO' : autoPriority === 'medium' ? '🟡 TRUNG BÌNH' : '🟢 THẤP'}\n`;
@@ -462,8 +437,7 @@ function CareNoteModal({ residentId, residentName, onClose, onComplete }: {
         successMessage += `\n📋 LƯU Ý: Theo dõi thường xuyên.`;
       }
       
-      toast.success(successMessage);
-      // Trigger custom event để refresh widgets
+      toast.success(successMessage);  
       window.dispatchEvent(new CustomEvent('dataUpdated'));
       onComplete();
     } catch (error) {

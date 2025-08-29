@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useResidents } from '@/lib/contexts/residents-context';
@@ -28,13 +27,10 @@ export default function AdminPage() {
         return;
       }
 
-      // Tối ưu: Chỉ initialize residents khi user thực sự cần xem data
-      // Không tự động load data khi page mount
       setPageReady(true);
     }
   }, [user, loading, router]);
 
-  // Tối ưu: Load success message với delay nhỏ
   useEffect(() => {
     const msg = clientStorage.getItem('login_success');
     if (msg) {
@@ -48,7 +44,6 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Tối ưu: Lazy load residents chỉ khi cần thiết
   const handleLoadResidents = () => {
     if (!initialized) {
       initializeResidents();

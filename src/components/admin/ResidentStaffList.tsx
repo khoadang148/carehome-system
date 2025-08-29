@@ -47,12 +47,10 @@ export default function ResidentStaffList() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'residents' | 'staff'>('residents');
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(6); // Hiển thị 6 items/trang (2 hàng x 3 cột)
+  const [itemsPerPage] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Search state
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredResidents, setFilteredResidents] = useState<Resident[]>([]);
   const [filteredStaff, setFilteredStaff] = useState<Staff[]>([]);
@@ -62,11 +60,9 @@ export default function ResidentStaffList() {
   }, []);
 
   useEffect(() => {
-    // Reset to first page when switching tabs
     setCurrentPage(1);
   }, [activeTab]);
 
-  // Filter data when search term changes
   useEffect(() => {
     const filterData = () => {
       const term = searchTerm.toLowerCase().trim();
@@ -75,7 +71,6 @@ export default function ResidentStaffList() {
         setFilteredResidents(residents);
         setFilteredStaff(staff);
       } else {
-        // Filter residents
         const filteredRes = residents.filter(resident =>
           resident.full_name.toLowerCase().includes(term) ||
           (resident.room_number && resident.room_number.includes(term)) ||
@@ -83,7 +78,6 @@ export default function ResidentStaffList() {
         );
         setFilteredResidents(filteredRes);
 
-        // Filter staff
         const filteredStf = staff.filter(member =>
           member.full_name.toLowerCase().includes(term) ||
           member.email.toLowerCase().includes(term) ||
@@ -101,7 +95,6 @@ export default function ResidentStaffList() {
     try {
       setLoading(true);
       
-      // Fetch residents with active status
       const residentsData = await residentAPI.getAll();
       const activeResidents = residentsData.filter((resident: any) => 
         resident.status === 'active'
@@ -109,7 +102,6 @@ export default function ResidentStaffList() {
       setResidents(activeResidents);
       setFilteredResidents(activeResidents);
 
-      // Fetch active staff
       const staffData = await userAPI.getAll();
       const activeStaff = staffData.filter((user: any) => 
         user.role === 'staff' && user.status === 'active'
@@ -144,7 +136,6 @@ export default function ResidentStaffList() {
     return getAvatarUrlWithFallback(avatar || '');
   };
 
-  // Get current page data
   const getCurrentPageData = () => {
     const data = activeTab === 'residents' ? filteredResidents : filteredStaff;
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -152,17 +143,14 @@ export default function ResidentStaffList() {
     return data.slice(startIndex, endIndex);
   };
 
-  // Calculate total pages
   const calculateTotalPages = () => {
     const data = activeTab === 'residents' ? filteredResidents : filteredStaff;
     return Math.ceil(data.length / itemsPerPage);
   };
 
-  // Update total pages when data changes
   useEffect(() => {
     const total = calculateTotalPages();
     setTotalPages(total);
-    // Reset to first page if current page is out of range
     if (currentPage > total && total > 0) {
       setCurrentPage(1);
     }
@@ -174,7 +162,7 @@ export default function ResidentStaffList() {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
   const clearSearch = () => {
@@ -189,7 +177,6 @@ export default function ResidentStaffList() {
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, currentPage + 2);
 
-    // Previous button
     pages.push(
       <button
         key="prev"
@@ -209,7 +196,6 @@ export default function ResidentStaffList() {
       </button>
     );
 
-    // Page numbers
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
         <button
@@ -231,7 +217,6 @@ export default function ResidentStaffList() {
       );
     }
 
-    // Next button
     pages.push(
       <button
         key="next"
@@ -297,67 +282,133 @@ export default function ResidentStaffList() {
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
       border: '1px solid rgba(255, 255, 255, 0.2)'
     }}>
-      {/* Header */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '2rem'
+        background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+        borderRadius: '1rem',
+        padding: '2rem',
+        marginBottom: '2rem',
+        color: 'white',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <div>
-          <h2 style={{
-            fontSize: '1.5rem',
-            fontWeight: 700,
-            margin: '0 0 0.5rem 0',
-            color: '#1e293b'
-          }}>
-            Quản lý cư dân & nhân viên
-          </h2>
-          <p style={{
-            fontSize: '1rem',
-            color: '#64748b',
-            margin: 0
-          }}>
-            Danh sách người cao tuổi đang nằm viện và nhân viên đang làm việc
-          </p>
-        </div>
+       
+        <div style={{
+          position: 'absolute',
+          bottom: '-30px',
+          left: '-30px',
+          width: '150px',
+          height: '150px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderRadius: '50%'
+        }} />
         
         <div style={{
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '1rem'
+          position: 'relative',
+          zIndex: 1
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            background: '#f1f5f9',
-            borderRadius: '0.75rem'
-          }}>
-            <UsersIcon style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} />
-            <span style={{ fontWeight: 600, color: '#1e293b' }}>
-              {residents.length} cư dân
-            </span>
+          <div>
+            <h2 style={{
+              fontSize: '1.875rem',
+              fontWeight: 800,
+              margin: '0 0 0.75rem 0',
+              color: 'white',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            }}>
+              Quản lý cư dân & nhân viên
+            </h2>
+            <p style={{
+              fontSize: '1.125rem',
+              color: 'rgba(255, 255, 255, 0.9)',
+              margin: 0,
+              fontWeight: 400
+            }}>
+              Tổng quan và quản lý thông tin người cao tuổi, nhân viên tại viện dưỡng lão
+            </p>
           </div>
           
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            background: '#f1f5f9',
-            borderRadius: '0.75rem'
+            gap: '1.5rem'
           }}>
-            <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
-            <span style={{ fontWeight: 600, color: '#1e293b' }}>
-              {staff.length} nhân viên
-            </span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '1rem 1.5rem',
+              background: 'rgba(255, 255, 255, 0.15)',
+              borderRadius: '1rem',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{
+                padding: '0.5rem',
+                background: 'rgba(239, 68, 68, 0.2)',
+                borderRadius: '0.5rem'
+              }}>
+                <UsersIcon style={{ width: '1.5rem', height: '1.5rem', color: '#fecaca' }} />
+              </div>
+              <div>
+                <div style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: 700, 
+                  color: 'white',
+                  lineHeight: 1
+                }}>
+                  {residents.length}
+                </div>
+                <div style={{ 
+                  fontSize: '0.875rem', 
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontWeight: 500
+                }}>
+                  Người cao tuổi
+                </div>
+              </div>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '1rem 1.5rem',
+              background: 'rgba(255, 255, 255, 0.15)',
+              borderRadius: '1rem',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{
+                padding: '0.5rem',
+                background: 'rgba(34, 197, 94, 0.2)',
+                borderRadius: '0.5rem'
+              }}>
+                <UserGroupIcon style={{ width: '1.5rem', height: '1.5rem', color: '#bbf7d0' }} />
+              </div>
+              <div>
+                <div style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: 700, 
+                  color: 'white',
+                  lineHeight: 1
+                }}>
+                  {staff.length}
+                </div>
+                <div style={{ 
+                  fontSize: '0.875rem', 
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontWeight: 500
+                }}>
+                  Nhân viên
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{
         display: 'flex',
         gap: '1rem',
@@ -405,7 +456,6 @@ export default function ResidentStaffList() {
         </button>
       </div>
 
-      {/* Content */}
       <div style={{
         background: 'white',
         borderRadius: '1rem',
@@ -413,7 +463,6 @@ export default function ResidentStaffList() {
         border: '1px solid #e2e8f0',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
       }}>
-        {/* Content Header */}
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #e2e8f0',
@@ -423,31 +472,78 @@ export default function ResidentStaffList() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '1rem'
+            marginBottom: '1.5rem'
           }}>
-            <h3 style={{
-              fontSize: '1.25rem',
-              fontWeight: 600,
-              color: '#1e293b',
-              margin: 0
-            }}>
-              {activeTab === 'residents' ? 'Danh sách người cao tuổi' : 'Danh sách nhân viên'}
-            </h3>
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              color: '#64748b'
+              gap: '0.75rem'
             }}>
-              <span>Hiển thị {currentData.length}/{totalItems}</span>
+              <div style={{
+                width: '4px',
+                height: '24px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                borderRadius: '2px'
+              }} />
+              <h3 style={{
+                fontSize: '1.375rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                margin: 0,
+                letterSpacing: '-0.025em'
+              }}>
+                {activeTab === 'residents' ? 'Danh sách người cao tuổi' : 'Danh sách nhân viên'}
+              </h3>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+              borderRadius: '0.75rem',
+              border: '1px solid rgba(59, 130, 246, 0.1)',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                color: '#374151',
+                fontWeight: 500
+              }}>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  background: '#10b981',
+                  borderRadius: '50%',
+                  boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)'
+                }} />
+                <span>Hiển thị {currentData.length}/{totalItems}</span>
+              </div>
               {totalPages > 1 && (
-                <span>• Trang {currentPage}/{totalPages}</span>
+                <>
+                  <div style={{
+                    width: '1px',
+                    height: '16px',
+                    background: '#d1d5db'
+                  }} />
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#3b82f6',
+                    fontWeight: 600
+                  }}>
+                    <span>Trang {currentPage}/{totalPages}</span>
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {/* Search Bar */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -519,7 +615,6 @@ export default function ResidentStaffList() {
             )}
           </div>
 
-          {/* Search Results Info */}
           {searchTerm && (
             <div style={{
               marginTop: '1rem',
@@ -540,8 +635,7 @@ export default function ResidentStaffList() {
             </div>
           )}
         </div>
-
-        {/* Grid Content */}
+              
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
@@ -594,9 +688,9 @@ export default function ResidentStaffList() {
                       fontSize: '0.875rem',
                       color: '#64748b'
                     }}>
-                      <span>{calculateAge(resident.date_of_birth)} tuổi</span>
+                      <span>Tuổi: {calculateAge(resident.date_of_birth)}</span>
                       <span>•</span>
-                      <span>{resident.gender === 'male' ? 'Nam' : 'Nữ'}</span>
+                      <span>Giới tính: {resident.gender === 'male' ? 'Nam' : 'Nữ'}</span>
                     </div>
                   </div>
                 </div>
@@ -611,10 +705,11 @@ export default function ResidentStaffList() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    color: '#64748b'
+                    color: '#64748b',
+                    gridColumn: '1 / -1'
                   }}>
                     <CalendarDaysIcon style={{ width: '1rem', height: '1rem' }} />
-                    <span>Nhập viện: {formatDate(resident.admission_date)}</span>
+                    <span>Ngày nhập viện: {formatDate(resident.admission_date)}</span>
                   </div>
                   
                   {(resident.room_number || resident.bed_number) && (
@@ -751,10 +846,8 @@ export default function ResidentStaffList() {
           )}
         </div>
 
-        {/* Pagination */}
         {renderPagination()}
 
-        {/* Empty State */}
         {currentData.length === 0 && (
           <div style={{ padding: '3rem 1.5rem' }}>
             <EmptyState
@@ -768,7 +861,7 @@ export default function ResidentStaffList() {
               message={searchTerm
                 ? 'Thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc để xem tất cả.'
                 : activeTab === 'residents'
-                  ? 'Hiện tại chưa có người cao tuổi nào đang nằm viện. Dữ liệu sẽ hiển thị khi có cư dân mới.'
+                  ? 'Hiện tại chưa có người cao tuổi nào đang nằm viện. Dữ liệu sẽ hiển thị khi có người cao tuổi mới.'
                   : 'Hiện tại chưa có nhân viên nào đang làm việc. Dữ liệu sẽ hiển thị khi có nhân viên mới.'
               }
               icon={activeTab === 'residents' ? UsersIcon : UserGroupIcon}

@@ -41,11 +41,13 @@ export default function ServiceAssignmentsPage() {
     setError(null);
     try {
       const resList = await residentAPI.getAll();
-      setResidents(resList);
+      // Lọc chỉ lấy residents có status 'active' (chưa xuất viện)
+      const activeResidents = Array.isArray(resList) ? resList.filter((r: any) => r.status === 'active') : [];
+      setResidents(activeResidents);
       
       // Lấy assignment cho từng resident và gộp các gói dịch vụ
       const allAssignments = await Promise.all(
-        resList.map(async (r: any) => {
+        activeResidents.map(async (r: any) => {
           try {
             const residentId = typeof r._id === 'object' && (r._id as any)?._id 
               ? (r._id as any)._id 
@@ -185,7 +187,8 @@ export default function ServiceAssignmentsPage() {
     }
 
     try {
-      await carePlanAssignmentsAPI.delete(deleteConfirmId);
+      // Sử dụng API removePackage thay vì delete
+      await carePlanAssignmentsAPI.removePackage(deleteConfirmId);
       setDeleteConfirmId(null);
       setShowSuccessModal(true);
       // Refresh data
@@ -208,8 +211,8 @@ export default function ServiceAssignmentsPage() {
     }
 
     try {
-      // Sử dụng API mới để xóa gói riêng lẻ
-      await carePlanAssignmentsAPI.removePackage(selectedAssignment._id, packageId);
+      // Sử dụng API để xóa gói riêng lẻ - gửi packageId trong body
+      await carePlanAssignmentsAPI.update(selectedAssignment._id, { packageId });
 
       setShowPackageSelectModal(false);
       setSelectedAssignment(null);
@@ -322,7 +325,7 @@ export default function ServiceAssignmentsPage() {
             fontWeight: 500,
             marginLeft: '7rem'
           }}>
-            Tổng số đăng ký: {filteredAssignments.length} | Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length}
+            Tổng số đăng ký: {filteredAssignments.length} | Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length} | Chỉ hiển thị người cao tuổi chưa xuất viện
           </p>
         </div>
         

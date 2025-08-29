@@ -60,10 +60,8 @@ export default function StatisticsChart({ type }: StatisticsChartProps) {
     try {
       setLoading(true);
       
-      // Fetch bills data from API
       const bills = await billsAPI.getAll();
       
-      // Process data based on chart type
       switch (type) {
         case 'revenue':
           setChartData(processRevenueData(bills));
@@ -77,7 +75,6 @@ export default function StatisticsChart({ type }: StatisticsChartProps) {
       }
     } catch (error) {
       console.error('Error fetching chart data:', error);
-      // Set empty chart data if API fails
       setChartData({
         labels: [],
         datasets: []
@@ -101,7 +98,6 @@ export default function StatisticsChart({ type }: StatisticsChartProps) {
       }
     });
 
-    // Convert to millions VND for better display
     const revenueInMillions = monthlyRevenue.map(amount => Math.round(amount / 1000000));
 
     return {
@@ -253,8 +249,7 @@ export default function StatisticsChart({ type }: StatisticsChartProps) {
         </div>
       );
     }
-
-    // Check if chart data is empty
+      
     if (!chartData.labels || chartData.labels.length === 0 || 
         !chartData.datasets || chartData.datasets.length === 0 ||
         chartData.datasets.every(dataset => dataset.data.every(value => value === 0))) {

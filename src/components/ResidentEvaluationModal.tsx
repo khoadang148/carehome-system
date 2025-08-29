@@ -40,22 +40,19 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
     activityId: activity.id,
     residents,
     user,
-    activityDate: activity.date // truyền ngày hoạt động
+    activityDate: activity.date
   });
 
-  // Lọc cư dân theo tìm kiếm
   const filteredResidents = residents.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
     (r.room?.toLowerCase() || '').includes(search.toLowerCase())
   );
 
-  // Chọn tất cả Có/Không
   const setAll = (participated: boolean) => {
     handleSelectAll(participated);
     setShowReasonAll(!participated);
   };
 
-  // Khi nhập lý do chung
   const handleReasonAllChange = (val: string) => {
     setReasonAll(val);
     filteredResidents.forEach(resident => {
@@ -79,7 +76,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
       <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
         <div className="fixed inset-0 bg-black opacity-30" />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-5xl mx-auto p-0 sm:p-0 z-15">
-          {/* Header */}
+          
           <div className="flex items-center gap-3 px-6 pt-6 pb-2 border-b">
             <div className="bg-green-100 rounded-lg p-2 flex items-center justify-center">
               <UserGroupIcon className="w-7 h-7 text-green-600" />
@@ -90,14 +87,14 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
             </div>
           </div>
 
-          {/* Tìm kiếm + thao tác nhanh */}
+          
           <div className="flex flex-col sm:flex-row items-center gap-2 px-6 pt-4 pb-2">
             <div className="relative w-full sm:w-1/2">
               <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 className="border rounded pl-8 pr-3 py-2 w-full text-sm focus:ring-green-500 focus:border-green-500"
-                placeholder="Tìm kiếm cư dân theo tên hoặc phòng..."
+                placeholder="Tìm kiếm người cao tuổi theo tên hoặc phòng..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -120,23 +117,23 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
             </div>
           </div>
 
-          {/* Lý do chung nếu tất cả Không */}
+          
           {showReasonAll && (
             <div className="px-6 pb-2">
               <input
                 type="text"
                 className="border rounded px-3 py-2 w-full text-sm mt-1 mb-2 focus:ring-red-500 focus:border-red-500"
-                placeholder="Nhập lý do chung cho tất cả cư dân vắng mặt..."
+                placeholder="Nhập lý do chung cho tất cả người cao tuổi vắng mặt..."
                 value={reasonAll}
                 onChange={e => handleReasonAllChange(e.target.value)}
               />
             </div>
           )}
 
-          {/* Danh sách cư dân */}
+          
           <div className="max-h-[80vh] overflow-y-auto divide-y px-2 sm:px-12 pb-2">
             {filteredResidents.length === 0 && (
-              <div className="text-center text-gray-400 py-8">Không tìm thấy cư dân phù hợp.</div>
+              <div className="text-center text-gray-400 py-8">Không tìm thấy người cao tuổi phù hợp.</div>
             )}
             {filteredResidents.map(resident => {
               const ev = evaluations[resident.id] || { participated: true, reason: '' };
@@ -186,7 +183,7 @@ export default function ResidentEvaluationModal({ open, onClose, activity, resid
             })}
           </div>
 
-          {/* Footer */}
+
           <div className="flex justify-end gap-2 px-12 py-6 border-t bg-gray-50 rounded-b-xl">
             <button
               type="button"

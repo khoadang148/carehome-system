@@ -19,7 +19,6 @@ export default function Header() {
   }, []);
   
   const handleLogout = () => {
-    // Instant logout for maximum speed
     instantLogout();
   };
 
@@ -36,8 +35,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-gradient-to-r from-blue-500 to-purple-600 border-b border-white/10 h-18 flex items-center justify-between px-8 shadow-lg backdrop-blur-sm sticky top-0 z-30 flex-shrink-0">
-      {/* Logo/Brand area */}
+    <header className="bg-gradient-to-r from-blue-500 to-blue-600 border-b border-white/10 h-18 flex items-center justify-between px-8 shadow-lg backdrop-blur-sm sticky top-0 z-30 flex-shrink-0"> 
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-gradient-to-br from-white to-gray-50 rounded-xl flex items-center justify-center shadow-md">
           <HomeIcon className="w-6 h-6 text-blue-500" />
@@ -111,7 +109,7 @@ export default function Header() {
                         active ? 'bg-gray-50' : 'bg-transparent'
                       }`}
                     >
-                      Cài đặt
+                      Đổi mật khẩu
                     </button>
                   )}
                 </Menu.Item>

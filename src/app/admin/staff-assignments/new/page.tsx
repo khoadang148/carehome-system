@@ -84,17 +84,22 @@ export default function NewStaffAssignmentPage() {
           staffAssignmentsAPI.getAllIncludingExpired(),
         ]);
         
-        // Chỉ lấy những user có role staff
+        // Chỉ lấy những user có role staff và đang làm việc
         const staffOnly = Array.isArray(staffData) ? staffData.filter((staff: any) => staff.role === 'staff') : [];
+        // Lọc thêm điều kiện chỉ lấy staff có status 'active' (đang làm việc)
+        const activeStaffOnly = staffOnly.filter((staff: any) => staff.status === 'active');
         console.log('All users:', staffData);
         console.log('Staff only:', staffOnly);
-        setStaffList(staffOnly);
+        console.log('Active staff only:', activeStaffOnly);
+        setStaffList(activeStaffOnly);
         
-        // Chỉ lấy cư dân chính thức (có phòng và giường)
+        // Chỉ lấy người cao tuổi chính thức (có phòng và giường) và còn nằm viện
         const residentsArray = Array.isArray(residentsData) ? residentsData : [];
         const officialResidents = await filterOfficialResidents(residentsArray);
-        console.log('Official residents for staff assignments:', officialResidents);
-        setResidents(officialResidents);
+        // Lọc thêm điều kiện chỉ lấy residents có status 'active' (còn nằm viện)
+        const activeOfficialResidents = officialResidents.filter((resident: any) => resident.status === 'active');
+        console.log('Active official residents for staff assignments:', activeOfficialResidents);
+        setResidents(activeOfficialResidents);
         
         setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
         
@@ -171,7 +176,7 @@ export default function NewStaffAssignmentPage() {
 
     // Validate required fields
     if (!formData.staff_id || formData.resident_ids.length === 0) {
-      toast.error('Vui lòng chọn nhân viên và ít nhất một cư dân');
+      toast.error('Vui lòng chọn nhân viên và ít nhất một người cao tuổi');
       return;
     }
 
@@ -201,7 +206,7 @@ export default function NewStaffAssignmentPage() {
 
     for (const residentId of formData.resident_ids) {
       if (!residentId.match(/^[0-9a-fA-F]{24}$/)) {
-        toast.error('ID cư dân không hợp lệ');
+        toast.error('ID người cao tuổi không hợp lệ');
         return;
       }
     }
@@ -223,7 +228,7 @@ export default function NewStaffAssignmentPage() {
     }
 
     if (existingActiveAssignments.length > 0) {
-      toast.error(`Các cư dân sau đã được phân công cho nhân viên này rồi: ${existingActiveAssignments.join(', ')}. Vui lòng bỏ chọn các cư dân này hoặc chọn nhân viên khác.`);
+      toast.error(`Các người cao tuổi sau đã được phân công cho nhân viên này rồi: ${existingActiveAssignments.join(', ')}. Vui lòng bỏ chọn các người cao tuổi này hoặc chọn nhân viên khác.`);
       return;
     }
 
@@ -290,7 +295,7 @@ export default function NewStaffAssignmentPage() {
       
       // Check for duplicate key error and provide a more helpful message
       if (err.message && err.message.includes('E11000 duplicate key error')) {
-        errorMessage = 'Cư dân này đã được phân công cho nhân viên này rồi. Nếu assignment đã hết hạn, bạn có thể phân công lại. Vui lòng kiểm tra lại danh sách phân công.';
+        errorMessage = 'Người cao tuổi này đã được phân công cho nhân viên này rồi. Nếu assignment đã hết hạn, bạn có thể phân công lại. Vui lòng kiểm tra lại danh sách phân công.';
         
         // Refresh assignments data to show current state
         try {
@@ -631,8 +636,8 @@ export default function NewStaffAssignmentPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Phân công nhân viên phụ trách cư dân 
-                  ({getAvailableResidents().length} cư dân khả dụng, 
+                  Phân công nhân viên phụ trách người cao tuổi 
+                  ({getAvailableResidents().length} người cao tuổi khả dụng, 
                   {getAvailableResidents().filter(r => hasExpiredAssignments(r._id)).length} có thể phân công lại)
                 </p>
               </div>
@@ -772,18 +777,28 @@ export default function NewStaffAssignmentPage() {
                       className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:outline-none transition-all duration-200 text-lg"
                     >
                       <option value="">Chọn nhân viên</option>
-                      {staffList.map((staff) => (
-                        <option key={staff._id} value={staff._id}>
-                          {staff.full_name} - {staff.email}
-                        </option>
-                      ))}
+                      {staffList.length > 0 ? (
+                        staffList.map((staff) => (
+                          <option key={staff._id} value={staff._id}>
+                            {staff.full_name} - {staff.email}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Không có nhân viên đang làm việc</option>
+                      )}
                     </select>
+                    {staffList.length === 0 && (
+                      <p className="text-sm text-orange-600 mt-2 flex items-center">
+                        <ExclamationTriangleIcon className="w-4 h-4 mr-2" />
+                        Không có nhân viên nào đang làm việc để phân công
+                      </p>
+                    )}
                   </div>
 
                   {/* Residents Selection */}
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      Cư dân được phân công <span className="text-red-500">*</span>
+                      Người cao tuổi được phân công <span className="text-red-500">*</span>
                       <span className="text-sm font-normal text-gray-500 ml-2">(Có thể chọn nhiều)</span>
                     </label>
                     
@@ -792,7 +807,7 @@ export default function NewStaffAssignmentPage() {
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder="Tìm kiếm cư dân theo tên hoặc số phòng..."
+                          placeholder="Tìm kiếm người cao tuổi theo tên hoặc số phòng..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 focus:outline-none transition-all duration-200 text-lg"
@@ -814,7 +829,7 @@ export default function NewStaffAssignmentPage() {
                       {searchTerm && (
                         <p className="text-sm text-gray-500 mt-2 flex items-center">
                           <CheckIcon className="w-4 h-4 mr-1" />
-                          Tìm thấy {getFilteredResidents().length} cư dân phù hợp
+                          Tìm thấy {getFilteredResidents().length} người cao tuổi phù hợp
                         </p>
                       )}
                     </div>
@@ -830,7 +845,7 @@ export default function NewStaffAssignmentPage() {
                               onClick={() => {
                                 // Không cho phép chọn resident đã có assignment chưa hết hạn với staff được chọn
                                 if (formData.staff_id && getAssignmentStatus(resident._id) === 'active') {
-                                  toast.error(`Cư dân ${resident.full_name} đã được phân công cho nhân viên này rồi. Vui lòng chọn cư dân khác hoặc nhân viên khác.`);
+                                  toast.error(`Người cao tuổi ${resident.full_name} đã được phân công cho nhân viên này rồi. Vui lòng chọn người cao tuổi khác hoặc nhân viên khác.`);
                                   return;
                                 }
                                 
@@ -911,7 +926,7 @@ export default function NewStaffAssignmentPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                               </div>
-                              <p className="text-lg font-medium mb-2">Không tìm thấy cư dân nào phù hợp</p>
+                              <p className="text-lg font-medium mb-2">Không tìm thấy người cao tuổi nào phù hợp</p>
                               <p className="text-sm">Thử tìm kiếm với từ khóa khác</p>
                             </>
                           ) : (
@@ -919,8 +934,8 @@ export default function NewStaffAssignmentPage() {
                               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <UserPlusIcon className="w-8 h-8 text-gray-400" />
                               </div>
-                              <p className="text-lg font-medium mb-2">Không có cư dân nào khả dụng</p>
-                              <p className="text-sm">Tất cả cư dân đã được phân công hoặc chưa có assignment expired</p>
+                              <p className="text-lg font-medium mb-2">Không có người cao tuổi nào khả dụng</p>
+                              <p className="text-sm">Tất cả người cao tuổi đã được phân công, chưa có assignment expired, hoặc đã xuất viện</p>
                             </>
                           )}
                         </div>
@@ -932,7 +947,7 @@ export default function NewStaffAssignmentPage() {
                       <div className="mt-4 flex items-center justify-between bg-white rounded-xl p-4 border-2 border-green-200">
                         <p className="text-sm text-gray-600 flex items-center">
                           <CheckIcon className="w-4 h-4 mr-2 text-green-500" />
-                          Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">{formData.resident_ids.length}</span> cư dân
+                          Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">{formData.resident_ids.length}</span> người cao tuổi
                         </p>
                         <button
                           onClick={() => setFormData({ ...formData, resident_ids: [] })}
@@ -1102,7 +1117,7 @@ export default function NewStaffAssignmentPage() {
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold text-green-900 flex items-center">
                           <CheckIcon className="w-4 h-4 mr-2" />
-                          Cư dân được chọn ({selectedResidents.length})
+                          Người cao tuổi được chọn ({selectedResidents.length})
                         </h3>
                         <button
                           onClick={() => setFormData({ ...formData, resident_ids: [] })}
@@ -1148,7 +1163,7 @@ export default function NewStaffAssignmentPage() {
                                 resident_ids: formData.resident_ids.filter(id => id !== resident._id)
                               })}
                               className="text-green-600 hover:text-green-800 p-1 rounded-full hover:bg-green-100 transition-colors"
-                              title="Bỏ chọn cư dân này"
+                              title="Bỏ chọn người cao tuổi này"
                             >
                               <XMarkIcon className="w-4 h-4" />
                             </button>
@@ -1247,7 +1262,7 @@ export default function NewStaffAssignmentPage() {
                     <span className="font-semibold text-gray-900">{successData.staff?.full_name}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Cư dân:</span>
+                    <span className="text-gray-600">Người cao tuổi:</span>
                     <span className="font-semibold text-gray-900">{successData.residents.length} người</span>
                   </div>
                 </div>

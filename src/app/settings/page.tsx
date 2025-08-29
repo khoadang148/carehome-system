@@ -13,8 +13,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { userAPI } from '../../lib/api';
 import NotificationModal from '@/components/NotificationModal';
-
-// Validation interfaces
 interface ValidationErrors {
   currentPassword?: string;
   newPassword?: string;
@@ -30,7 +28,6 @@ interface PasswordStrength {
 export default function SettingsPage() {
   const router = useRouter();
   
-  // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -42,10 +39,10 @@ export default function SettingsPage() {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({ score: 0, feedback: '', color: '#d1d5db' });
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'success' | 'error'>('success');
+  const [modalType, setModalType] = useState<'success' | 'error' | 'info' | 'warning'>('success');
   const [modalMessage, setModalMessage] = useState('');
+  const [modalTitle, setModalTitle] = useState('');
 
-  // Validation functions
   const validateCurrentPassword = (password: string): string => {
     if (!password) {
       return 'Vui lòng nhập mật khẩu hiện tại';
@@ -141,7 +138,6 @@ export default function SettingsPage() {
     setErrors(prev => ({ ...prev, newPassword: error }));
     setPasswordStrength(calculatePasswordStrength(value));
     
-    // Re-validate confirm password if it exists
     if (confirmPassword) {
       const confirmError = validateConfirmPassword(confirmPassword);
       setErrors(prev => ({ ...prev, confirmPassword: confirmError }));
@@ -155,7 +151,6 @@ export default function SettingsPage() {
   };
 
   const handleChangePassword = async () => {
-    // Validate all fields
     const currentError = validateCurrentPassword(currentPassword);
     const newError = validateNewPassword(newPassword);
     const confirmError = validateConfirmPassword(confirmPassword);
@@ -168,12 +163,14 @@ export default function SettingsPage() {
 
     setErrors(newErrors);
 
-    // Check if there are any errors
     if (currentError || newError || confirmError) {
       return;
     }
 
     setIsSubmitting(true);
+
+    const originalConsoleError = console.error;
+    console.error = () => {};
 
     try {
       await userAPI.changePassword({
@@ -181,7 +178,9 @@ export default function SettingsPage() {
         newPassword,
         confirmPassword
       });
+      
       setModalType('success');
+      setModalTitle('Thành công');
       setModalMessage('Đổi mật khẩu thành công!');
       setModalOpen(true);
       setCurrentPassword('');
@@ -190,23 +189,44 @@ export default function SettingsPage() {
       setErrors({});
       setPasswordStrength({ score: 0, feedback: '', color: '#d1d5db' });
     } catch (error: any) {
-      setModalType('error');
-      setModalMessage(error?.message || 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.');
-      setModalOpen(true);
-      setErrors({ currentPassword: error?.message || 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.' });
+      const errorMessage = error?.message || 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.';
+      if (errorMessage.includes('Mật khẩu hiện tại không đúng') || 
+          errorMessage.includes('Thông tin không hợp lệ')) {
+        setModalType('info');
+        setModalTitle('Thông báo');
+        setModalMessage(errorMessage);
+        setModalOpen(true);
+        setErrors({ currentPassword: 'Mật khẩu hiện tại không đúng' });
+      } else if (errorMessage.includes('Phiên đăng nhập đã hết hạn')) {
+        setModalType('warning');
+        setModalTitle('Phiên đăng nhập');
+        setModalMessage(errorMessage);
+        setModalOpen(true);
+        setErrors({ currentPassword: errorMessage });
+      } else if (errorMessage.includes('Hệ thống đang gặp sự cố')) {
+        setModalType('error');
+        setModalTitle('Lỗi hệ thống');
+        setModalMessage(errorMessage);
+        setModalOpen(true);
+        setErrors({ currentPassword: errorMessage });
+      } else {
+        setModalType('error');
+        setModalTitle('Lỗi');
+        setModalMessage(errorMessage);
+        setModalOpen(true);
+        setErrors({ currentPassword: errorMessage });
+      }
     } finally {
+      console.error = originalConsoleError;
       setIsSubmitting(false);
     }
   };
 
   return (
     <>
-      
-
-      {/* Main Content */}
       <div className="min-h-screen bg-gray-50 px-4 pb-6">
         <div className="max-w-2xl mx-auto">
-          {/* Header Section */}
+          
           <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
             <div className="flex items-center gap-4 mb-3">
             <button
@@ -230,14 +250,14 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Password Change Section */}
+          
           <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 mb-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Đổi mật khẩu
             </h3>
             
             <div className="space-y-4">
-              {/* Current Password */}
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mật khẩu hiện tại
@@ -272,7 +292,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* New Password */}
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mật khẩu mới
@@ -300,7 +320,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 
-                {/* Password Strength Indicator */}
+                
                 {newPassword && (
                   <div className="mt-2">
                     <div className="flex justify-between items-center mb-1">
@@ -332,7 +352,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* Confirm Password */}
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Xác nhận mật khẩu mới
@@ -367,7 +387,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* Submit Button */}
+              
               <div className="border-t border-gray-100 pt-4 flex justify-end gap-4 items-center">
                 {passwordSuccess && (
                   <div className="text-green-700 text-sm flex items-center gap-2">
@@ -402,11 +422,10 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-
-      {/* Notification Modal */}
+      
       <NotificationModal
         open={modalOpen}
-        title={modalType === 'success' ? 'Thành công' : 'Lỗi'}
+        title={modalTitle}
         type={modalType}
         message={modalMessage}
         onClose={() => setModalOpen(false)}

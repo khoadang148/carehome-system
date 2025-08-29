@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -20,25 +20,7 @@ import { userAPI } from "@/lib/api";
 import { residentAPI } from "@/lib/api";
 
 export default function FinancePage() {
-  // Add CSS for animations
-  React.useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes spin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
+  
 
   const [selectedResident, setSelectedResident] = useState(0);
   const [familyFinancialData, setFamilyFinancialData] = useState<any[]>([]);
@@ -46,28 +28,26 @@ export default function FinancePage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Fetch residents for family
+  
   useEffect(() => {
     const fetchResidentsAndBills = async (familyMemberId: string) => {
       try {
         const residents = await residentAPI.getByFamilyMemberId(familyMemberId);
-        console.log('Residents for finance page:', residents);
+        
         if (!Array.isArray(residents)) {
-          console.log('Residents is not an array, setting empty data');
+          
           setFamilyFinancialData([]);
           return;
         }
-        // Fetch bills for each resident
         const billsData = await Promise.all(residents.map(async (resident: any) => {
           let bills = [];
           try {
             bills = await billsAPI.getByResidentId(resident._id);
-            console.log(`Bills for resident ${resident._id}:`, bills);
+            
           } catch (e) {
-            console.log(`Error fetching bills for resident ${resident._id}:`, e);
+            
             bills = [];
           }
-          // Map bills to UI payment structure
           const payments = Array.isArray(bills) ? bills.map((bill: any, idx: number) => ({
             id: bill._id || idx,
             description: bill.care_plan_snapshot?.planName || bill.notes || 'Hóa đơn dịch vụ',
@@ -103,10 +83,7 @@ export default function FinancePage() {
       }
     }
   }, [user]);
-
-
-
-  // Check access permissions
+  
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -148,126 +125,35 @@ export default function FinancePage() {
     return 'pending';
   };
   
-  // If user is family, show family finance view
+  
   if (user?.role === 'family') {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        position: 'relative'
-      }}>
-        {/* Background decorations */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `
-            radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.05) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.03) 0%, transparent 50%)
-          `,
-          pointerEvents: 'none'
-        }} />
-        <div style={{
-          maxWidth: '1300px',
-          margin: '0 auto',
-          padding: '1.5rem 1rem',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {/* Header Section for Family */}
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.875rem'}}>
-                <div style={{
-                  width: '2.75rem',
-                  height: '2.75rem',
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                  borderRadius: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)'
-                }}>
-                  <BanknotesIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
+      <div className="min-h-screen relative bg-gradient-to-br from-slate-50 to-slate-200">
+        <div className="max-w-[1300px] mx-auto px-4 py-6 relative z-[1]">
+          
+          <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 mb-6 shadow-md border border-white/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 bg-gradient-to-br from-green-600 to-green-700 rounded-lg flex items-center justify-center shadow-[0_2px_8px_rgba(22,163,74,0.25)]">
+                  <BanknotesIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 style={{
-                    fontSize: '1.5rem', 
-                    fontWeight: 700, 
-                    margin: 0,
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    letterSpacing: '-0.025em',
-                    lineHeight: 1.2
-                  }}>
-                    Thông tin tài chính
-                  </h1>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b',
-                    margin: '0.125rem 0 0 0',
-                    fontWeight: 500
-                  }}>
-                    Theo dõi chi phí chăm sóc người thân
-                  </p>
+                  <h1 className="text-2xl font-bold m-0 bg-gradient-to-br from-green-600 to-green-700 bg-clip-text text-transparent tracking-tight leading-tight">Thông tin tài chính</h1>
+                  <p className="text-sm text-slate-500 mt-0.5 font-medium">Theo dõi chi phí chăm sóc người thân</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Family Member Selector */}
+          
           {familyFinancialData.length > 1 && (
-            <div style={{
-              marginBottom: '2.5rem',
-              maxWidth: 5000,
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1.5rem',
-              padding: '2rem',
-              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                  borderRadius: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
-                }}>
-                  <UsersIcon style={{width: '1.5rem', height: '1.5rem', color: 'white'}} />
+            <div className="mb-10 max-w-full bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 shadow-xl border border-white/20 backdrop-blur">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(139,92,246,0.3)]">
+                  <UsersIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    margin: 0,
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    letterSpacing: '-0.025em'
-                  }}>
-                    Chọn người thân để xem thông tin tài chính
-                  </h3>
+                  <h3 className="text-base font-bold m-0 bg-gradient-to-br from-violet-500 to-violet-600 bg-clip-text text-transparent tracking-tight">Chọn người thân để xem thông tin tài chính</h3>
                 </div>
               </div>
               
@@ -371,103 +257,19 @@ export default function FinancePage() {
             </div>
           )}
 
-          {/* Payment History for Family */}
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '1.25rem',
-            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <h3 style={{fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '1.25rem'}}>
-              Lịch sử thanh toán - {familyFinancialData[selectedResident]?.residentName}
-            </h3>
-
-            <div style={{overflowX: 'auto'}}>
-              <table style={{width: '100%', borderCollapse: 'collapse'}}>
+          
+          <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-5 shadow-md border border-white/30">
+            <h3 className="text-base font-semibold text-slate-900 mb-5">Lịch sử thanh toán - {familyFinancialData[selectedResident]?.residentName}</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{
-                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                    borderBottom: '2px solid #0f172a',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                  }}>
-                    <th style={{
-                      textAlign: 'left', 
-                      padding: '1.125rem 0.75rem', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#ffffff', 
-                      width: '25%',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                      Mô tả dịch vụ
-                    </th>
-                    <th style={{
-                      textAlign: 'center', 
-                      padding: '1.125rem 0.75rem', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#ffffff', 
-                      width: '12%',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                      Số tiền
-                    </th>
-                    <th style={{
-                      textAlign: 'center', 
-                      padding: '1.125rem 0.75rem', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#ffffff', 
-                      width: '12%',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                      Hạn thanh toán
-                    </th>
-                    <th style={{
-                      textAlign: 'center', 
-                      padding: '1.125rem 0.75rem', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#ffffff', 
-                      width: '12%',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                      Phương thức
-                    </th>
-                    <th style={{
-                      textAlign: 'center', 
-                      padding: '1.125rem 0.75rem', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#ffffff', 
-                      width: '15%',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      borderRight: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                      Trạng thái
-                    </th>
-                    <th style={{
-                      textAlign: 'center', 
-                      padding: '1.125rem 0.75rem', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 700, 
-                      color: '#ffffff', 
-                      width: '24%',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Thao tác
-                    </th>
+                  <tr className="bg-gradient-to-br from-slate-800 to-slate-700 border-b-2 border-slate-900 shadow">
+                    <th className="text-left py-4 px-3 text-sm font-bold text-white w-[25%] uppercase tracking-wider border-r border-white/10">Mô tả dịch vụ</th>
+                    <th className="text-center py-4 px-3 text-sm font-bold text-white w-[12%] uppercase tracking-wider border-r border-white/10">Số tiền</th>
+                    <th className="text-center py-4 px-3 text-sm font-bold text-white w-[12%] uppercase tracking-wider border-r border-white/10">Hạn thanh toán</th>
+                    <th className="text-center py-4 px-3 text-sm font-bold text-white w-[12%] uppercase tracking-wider border-r border-white/10">Phương thức</th>
+                    <th className="text-center py-4 px-3 text-sm font-bold text-white w-[15%] uppercase tracking-wider border-r border-white/10">Trạng thái</th>
+                    <th className="text-center py-4 px-3 text-sm font-bold text-white w-[24%] uppercase tracking-wider">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -495,56 +297,28 @@ export default function FinancePage() {
                           }
                         })
                         .map((payment: any) => (
-                          <tr key={payment.id} style={{borderBottom: '1px solid #f3f4f6'}}>
-                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', color: '#111827'}}>
-                              {payment.description}
-                            </td>
-                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827', textAlign: 'center'}}>
-                              {formatCurrency(payment.amount)}
-                            </td>
-                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center'}}>
-                                <span style={{color: '#111827', fontWeight: 500}}>
+                          <tr key={payment.id} className="border-b border-gray-100">
+                            <td className="py-4 px-3 text-sm text-slate-900">{payment.description}</td>
+                            <td className="py-4 px-3 text-sm font-semibold text-slate-900 text-center">{formatCurrency(payment.amount)}</td>
+                            <td className="py-4 px-3 text-sm text-center">
+                              <div className="flex flex-col gap-1 items-center">
+                                <span className="text-slate-900 font-medium">
                                   {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
                                 </span>
                                 {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
-                                  <div style={{
-                                    fontSize: '0.65rem',
-                                    color: '#dc2626',
-                                    fontWeight: 600,
-                                    background: '#fef2f2',
-                                    padding: '0.25rem 0.5rem',
-                                    borderRadius: '0.375rem',
-                                    border: '1px solid #fecaca',
-                                    width: 'fit-content',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    textTransform: 'none',
-                                    letterSpacing: 'normal'
-                                  }}>
+                                  <div className="text-[0.65rem] text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-md border border-red-200 w-fit inline-flex items-center gap-1">
                                     Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
                                   </div>
                                 )}
                               </div>
                             </td>
-                            <td style={{padding: '1rem 0.75rem', fontSize: '0.875rem', textAlign: 'center'}}>
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.375rem',
-                                padding: '0.25rem 0.75rem',
-                                background: '#f3f4f6',
-                                borderRadius: '1rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 500,
-                                color: '#374151'
-                              }}>
-                                <BuildingLibraryIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                            <td className="py-4 px-3 text-sm text-center">
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-700">
+                                <BuildingLibraryIcon className="w-3.5 h-3.5" />
                                 Chuyển khoản
                               </div>
                             </td>
-                            <td style={{padding: '1rem 0.75rem'}}>
+                            <td className="py-4 px-3">
                               {(() => {
                                 const status = getPaymentStatus(payment);
                                 const statusConfig = {
@@ -593,25 +367,8 @@ export default function FinancePage() {
                                 };
                                 
                                 return (
-                                  <div style={{display: 'flex', justifyContent: 'center'}}>
-                                    <span style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 4,
-                                      padding: '0.18rem 0.7rem',
-                                      borderRadius: '0.8rem',
-                                      fontSize: '0.92rem',
-                                      fontWeight: 500,
-                                      background: statusConfig[status].bg,
-                                      color: statusConfig[status].color,
-                                      border: `1px solid ${statusConfig[status].border}`,
-                                      whiteSpace: 'nowrap',
-                                      boxShadow: '0 1px 2px 0 rgba(51,65,85,0.01)',
-                                      letterSpacing: '0.01em',
-                                      lineHeight: 1.32,
-                                      fontFamily: 'inherit',
-                                      transition: 'background 0.18s, color 0.18s'
-                                    }}>
+                                  <div className="flex justify-center">
+                                    <span className="inline-flex items-center gap-1 px-[0.7rem] py-[0.18rem] rounded-[0.8rem] text-[0.92rem] font-medium whitespace-nowrap shadow-sm tracking-[0.01em] leading-[1.32]" style={{ background: statusConfig[status].bg, color: statusConfig[status].color, border: `1px solid ${statusConfig[status].border}` }}>
                                       {statusConfig[status].icon}
                                       {statusConfig[status].label}
                                     </span>
@@ -625,48 +382,13 @@ export default function FinancePage() {
                                 
                                 if (status === 'paid') {
                                   return (
-                                    <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
-                                      <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.375rem',
-                                        padding: '0.25rem 0.75rem',
-                                        background: 'rgba(34, 197, 94, 0.1)',
-                                        color: '#16a34a',
-                                        borderRadius: '0.5rem',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 600,
-                                        border: '1px solid rgba(34, 197, 94, 0.3)'
-                                      }}>
-                                        <CheckCircleIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                    <div className="flex flex-col gap-1.5 items-center">
+                                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/10 text-green-600 rounded-md text-xs font-semibold border border-green-500/30">
+                                        <CheckCircleIcon className="w-3.5 h-3.5" />
                                         Hoàn thành
                                       </div>
-                                      <button
-                                        onClick={() => handleViewInvoice(payment)}
-                                        style={{
-                                          marginTop: '0.25rem',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.375rem',
-                                          padding: '0.375rem 0.75rem',
-                                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                          color: 'white',
-                                          border: 'none',
-                                          borderRadius: '0.5rem',
-                                          fontSize: '0.75rem',
-                                          fontWeight: 600,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.2s ease',
-                                          minWidth: '90px'
-                                        }}
-                                        onMouseOver={e => {
-                                          e.currentTarget.style.transform = 'translateY(-1px)';
-                                        }}
-                                        onMouseOut={e => {
-                                          e.currentTarget.style.transform = 'translateY(0)';
-                                        }}
-                                      >
-                                        <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                      <button onClick={() => handleViewInvoice(payment)} className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br from-blue-500 to-blue-700 text-white border-none rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5">
+                                        <EyeIcon className="w-3.5 h-3.5" />
                                         Xem chi tiết
                                       </button>
                                     </div>
@@ -675,25 +397,8 @@ export default function FinancePage() {
                                 
                                 if (status === 'processing') {
                                   return (
-                                    <span style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.375rem',
-                                      padding: '0.5rem 1rem',
-                                      background: 'rgba(59, 130, 246, 0.1)',
-                                      color: '#3b82f6',
-                                      borderRadius: '0.5rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 600
-                                    }}>
-                                      <div style={{
-                                        width: '0.875rem',
-                                        height: '0.875rem',
-                                        border: '2px solid rgba(59, 130, 246, 0.3)',
-                                        borderTop: '2px solid #3b82f6',
-                                        borderRadius: '50%',
-                                        animation: 'spin 1s linear infinite'
-                                      }} />
+                                    <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-md text-xs font-semibold">
+                                      <div className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-500 rounded-full animate-spin" />
                                       Đang xử lý
                                     </span>
                                   );
@@ -704,65 +409,13 @@ export default function FinancePage() {
                                   const isWarning = status === 'grace_period';
                                   
                                   return (
-                                    <div style={{display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'center'}}>
-                                      <button
-                                        onClick={() => handlePayOnline(payment)}
-                                        style={{
-                                          marginTop: '0.25rem',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.375rem',
-                                          padding: '0.375rem 0.75rem',
-                                          background: isUrgent 
-                                            ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
-                                            : isWarning
-                                            ? 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)'
-                                            : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                          color: 'white',
-                                          border: 'none',
-                                          borderRadius: '0.5rem',
-                                          fontSize: '0.75rem',
-                                          fontWeight: 600,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.2s ease',
-                                          minWidth: '90px'
-                                        }}
-                                        onMouseOver={e => {
-                                          e.currentTarget.style.transform = 'translateY(-1px)';
-                                        }}
-                                        onMouseOut={e => {
-                                          e.currentTarget.style.transform = 'translateY(0)';
-                                        }}
-                                      >
-                                        <BanknotesIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                    <div className="flex flex-col gap-1.5 items-center">
+                                      <button onClick={() => handlePayOnline(payment)} className={`${isUrgent ? 'from-red-600 to-red-700' : isWarning ? 'from-orange-600 to-orange-700' : 'from-green-600 to-green-700'} mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br text-white rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5`}>
+                                        <BanknotesIcon className="w-3.5 h-3.5" />
                                         {isUrgent ? 'Thanh toán' : 'Thanh toán'}
                                       </button>
-                                      <button
-                                        onClick={() => handleViewInvoice(payment)}
-                                        style={{
-                                          marginTop: '0.25rem',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.375rem',
-                                          padding: '0.375rem 0.75rem',
-                                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                          color: 'white',
-                                          border: 'none',
-                                          borderRadius: '0.5rem',
-                                          fontSize: '0.75rem',
-                                          fontWeight: 600,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.2s ease',
-                                          minWidth: '90px'
-                                        }}
-                                        onMouseOver={e => {
-                                          e.currentTarget.style.transform = 'translateY(-1px)';
-                                        }}
-                                        onMouseOut={e => {
-                                          e.currentTarget.style.transform = 'translateY(0)';
-                                        }}
-                                      >
-                                        <EyeIcon style={{width: '0.875rem', height: '0.875rem'}} />
+                                      <button onClick={() => handleViewInvoice(payment)} className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5">
+                                        <EyeIcon className="w-3.5 h-3.5" />
                                         Xem chi tiết
                                       </button>
                                     </div>
@@ -776,26 +429,14 @@ export default function FinancePage() {
                         ))
                     : (
                       <tr>
-                        <td colSpan={6} style={{padding: '3rem 1rem', textAlign: 'center'}}>
-                          <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem'}}>
-                            <div style={{
-                              width: '4rem',
-                              height: '4rem',
-                              background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              <DocumentPlusIcon style={{width: '2rem', height: '2rem', color: '#9ca3af'}} />
+                        <td colSpan={6} className="py-12 px-4 text-center">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
+                              <DocumentPlusIcon className="w-8 h-8 text-gray-400" />
                             </div>
                             <div>
-                              <h3 style={{fontSize: '1.125rem', fontWeight: 600, color: '#374151', margin: '0 0 0.5rem 0'}}>
-                                Chưa có hóa đơn nào
-                              </h3>
-                              <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
-                                Hiện tại chưa có hóa đơn nào được tạo cho người thân này
-                              </p>
+                              <h3 className="text-lg font-semibold text-gray-700 mb-2">Chưa có hóa đơn nào</h3>
+                              <p className="text-sm text-gray-500 m-0">Hiện tại chưa có hóa đơn nào được tạo cho người thân này</p>
                             </div>
                           </div>
                         </td>
@@ -831,17 +472,17 @@ interface ResidentOption {
 }
 
 const formatOptionLabel = (option: ResidentOption) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+  <div className="flex items-center gap-[14px]">
     <img
       src={option.avatar && option.avatar.trim() !== '' ? option.avatar : '/default-avatar.svg'}
       alt={option.label}
-      style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', background: '#f3f4f6' }}
+      className="w-12 h-12 rounded-full object-cover bg-gray-100"
       onError={(e) => {
         e.currentTarget.src = '/default-avatar.svg';
       }}
     />
     <div>
-      <div style={{ fontWeight: 700, fontSize: 20 }}>{option.label}</div>
+      <div className="font-bold text-[20px]">{option.label}</div>
     </div>
   </div>
 );

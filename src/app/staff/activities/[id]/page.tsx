@@ -39,7 +39,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const [participations, setParticipations] = useState<any[]>([]);
   const [evaluationMode, setEvaluationMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [evaluations, setEvaluations] = useState<{[key: string]: {participated: boolean, reason?: string}}>({});
+  const [evaluations, setEvaluations] = useState<{[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}}>({});
   const [saving, setSaving] = useState(false);
   const [addResidentModalOpen, setAddResidentModalOpen] = useState(false);
   const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
@@ -60,9 +60,16 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Function to show notification modal
+  // Check if activity date has passed
+  const isActivityDatePassed = () => {
+    if (!activity?.date) return false;
+    const activityDate = new Date(activity.date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return activityDate < today;
+  };
+
   const showNotification = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    console.log('Showing notification:', { title, message, type });
     setNotificationModal({
       isOpen: true,
       title,
@@ -70,13 +77,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       type
     });
   };
-
-  // Function to close notification modal
   const closeNotification = () => {
     setNotificationModal(prev => ({ ...prev, isOpen: false }));
   };
   
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -112,19 +116,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     fetchActivity();
   }, [params]);
 
-  // Lấy staff assignments và danh sách cư dân được phân công
   useEffect(() => {
     const fetchStaffAssignments = async () => {
       if (!user?.id) return;
       
       try {
-        console.log('Fetching staff assignments for user:', user.id);
         const assignments = await staffAssignmentsAPI.getMyAssignments();
-        console.log('Staff assignments:', assignments);
         
         setStaffAssignments(Array.isArray(assignments) ? assignments : []);
         
-        // Lấy danh sách resident IDs được phân công (chỉ active assignments)
         const residentIds = Array.isArray(assignments) 
           ? assignments
               .filter((assignment: any) => assignment.status === 'active' && assignment.resident_id)
@@ -135,10 +135,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               )
           : [];
         
-        console.log('Assigned resident IDs (active only):', residentIds);
         setAssignedResidentIds(residentIds);
       } catch (error) {
-        console.error('Error fetching staff assignments:', error);
         setStaffAssignments([]);
         setAssignedResidentIds([]);
       }
@@ -147,7 +145,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     fetchStaffAssignments();
   }, [user?.id]);
 
-  // Function to cleanup duplicate participations
   const cleanupDuplicateParticipations = async (participationsData: any[]) => {
     const seen = new Set();
     const duplicates: any[] = [];
@@ -168,11 +165,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       }
     });
     
-    // Xóa duplicate participations
     for (const duplicate of duplicates) {
       try {
         await activityParticipationsAPI.delete(duplicate._id);
-        console.log('Deleted duplicate participation:', duplicate._id);
       } catch (error) {
         console.error('Error deleting duplicate participation:', error);
       }
@@ -185,73 +180,70 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     return uniqueParticipations;
   };
 
-  // Fetch participations for this activity
   useEffect(() => {
     const fetchParticipations = async () => {
       if (!activity?.id) return;
       
       try {
-        // Sử dụng endpoint mới để lấy participations theo activity_id và date
         const participationsData = await activityParticipationsAPI.getByActivityId(
           activity.id, 
           activity.date
         );
-        console.log('Fetched participations for activity:', activity.id, 'date:', activity.date, participationsData);
-        console.log('Available residents:', residents);
-        console.log('Using new endpoint: getByActivityId');
-        console.log('Participation data structure:', participationsData.map((p: any) => ({
-          residentId: p.resident_id?._id || p.resident_id,
-          residentName: p.resident_id?.full_name,
-          attendanceStatus: p.attendance_status,
-          performanceNotes: p.performance_notes
-        })));
         
-        // Dọn dẹp duplicate participations (nếu có)
         const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
         setParticipations(cleanedParticipations);
         
-        // Initialize evaluations from existing participations
-        // Sử dụng trực tiếp resident_id từ participation data
-        const initialEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+        const initialEvaluations: {[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}} = {};
         
-        // Process participations sequentially to handle async updates
         for (const participation of participationsData) {
-          // Extract resident_id from the nested object structure
           const residentId = participation.resident_id?._id || participation.resident_id;
-          const participated = participation.attendance_status === 'attended';
+          
+          console.log('Processing participation:', {
+            residentId,
+            attendance_status: participation.attendance_status,
+            performance_notes: participation.performance_notes
+          });
+          
+          // Chỉ set status nếu attendance_status rõ ràng, còn lại mặc định là pending
+          let status: 'pending' | 'attended' | 'absent' = 'pending';
+          if (participation.attendance_status === 'attended') {
+            status = 'attended';
+          } else if (participation.attendance_status === 'absent') {
+            status = 'absent';
+          }
+          // Nếu attendance_status là 'pending' hoặc undefined/null, giữ nguyên pending
+          
           let reason = participation.performance_notes || '';
           
-          // Fix old data: if resident didn't participate but has "Tham gia tích cực" text, replace with "Lý do sức khỏe"
-          if (!participated && reason.includes('Tham gia tích cực')) {
+          if (status === 'absent' && reason.includes('Tham gia tích cực')) {
             reason = 'Lý do sức khỏe';
-            console.log('Fixed old data for resident:', residentId, 'reason changed to:', reason);
             
-            // Update the database to fix the old data
             try {
               await activityParticipationsAPI.update(participation._id, {
                 performance_notes: 'Lý do sức khỏe'
               });
-              console.log('Updated database for resident:', residentId);
             } catch (error) {
               console.error('Error updating database for resident:', residentId, error);
             }
           }
           
           if (residentId) {
-            console.log('Processing participation for residentId:', residentId, 'name:', participation.resident_id?.full_name);
-            // Sử dụng trực tiếp resident_id từ participation, không cần match với residents array
+            console.log('Setting evaluation for residentId:', residentId, 'status:', status, 'reason:', reason);
             initialEvaluations[residentId] = {
-              participated,
+              status,
               reason
             };
           }
         }
-        console.log('Initialized evaluations:', initialEvaluations);
-        console.log('Evaluations keys:', Object.keys(initialEvaluations));
+        console.log('Final initialEvaluations:', initialEvaluations);
+        console.log('Status counts:', {
+          attended: Object.values(initialEvaluations).filter(e => e.status === 'attended').length,
+          absent: Object.values(initialEvaluations).filter(e => e.status === 'absent').length,
+          pending: Object.values(initialEvaluations).filter(e => e.status === 'pending').length
+        });
         setEvaluations(initialEvaluations);
         setIsRefreshing(false);
       } catch (error) {
-        console.error('Error fetching participations:', error);
         setIsRefreshing(false);
       }
     };
@@ -259,76 +251,60 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     fetchParticipations();
   }, [activity?.id, refreshTrigger]);
 
-  // Auto-refresh data every 30 seconds
   useEffect(() => {
     if (!activity?.id) return;
     
     const interval = setInterval(() => {
-      console.log('Auto-refreshing data...');
       setIsRefreshing(true);
       setRefreshTrigger(prev => prev + 1);
-    }, 30000); // 30 seconds
+    }, 30000);
     
     return () => clearInterval(interval);
   }, [activity?.id]);
 
-  // Auto-refresh when evaluation mode changes
   useEffect(() => {
     if (!evaluationMode && activity?.id) {
-      // Refresh data when exiting evaluation mode
-      console.log('Exiting evaluation mode, refreshing data...');
       setRefreshTrigger(prev => prev + 1);
     }
   }, [evaluationMode, activity?.id]);
 
-  // Auto-refresh when add resident modal closes
   useEffect(() => {
     if (!addResidentModalOpen && activity?.id) {
-      // Refresh data when add resident modal closes
-      console.log('Add resident modal closed, refreshing data...');
       setRefreshTrigger(prev => prev + 1);
     }
   }, [addResidentModalOpen, activity?.id]);
 
-  // Debug: Log when evaluations change
   useEffect(() => {
     console.log('Evaluations state changed:', evaluations);
   }, [evaluations]);
 
-  // Map API data to match component expectations
   const mapActivityFromAPI = (apiActivity: any) => {
     try {
-      // Validate schedule_time
       if (!apiActivity.schedule_time || typeof apiActivity.schedule_time !== 'string') {
         console.warn('Invalid schedule_time for activity:', apiActivity._id);
         return null;
       }
 
-      // Parse schedule_time as UTC and keep it as is, don't add timezone offset
       const scheduleTimeStr = apiActivity.schedule_time.endsWith('Z') 
         ? apiActivity.schedule_time 
         : `${apiActivity.schedule_time}Z`;
       const scheduleTime = new Date(scheduleTimeStr);
 
-      // Check if date is valid
       if (isNaN(scheduleTime.getTime())) {
         console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
         return null;
       }
 
-      // Calculate end time safely
       const durationInMinutes = typeof apiActivity.duration === 'number' ? apiActivity.duration : 0;
       const endTime = new Date(scheduleTime.getTime() + durationInMinutes * 60000);
 
-      // Check if end time is valid
       if (isNaN(endTime.getTime())) {
         console.error('Invalid end time calculated for activity:', apiActivity._id);
         return null;
       }
 
-      // Chuyển đổi thời gian từ UTC về múi giờ Việt Nam (+7)
       const convertToVietnamTime = (utcTime: Date) => {
-        const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000)); // +7 giờ
+        const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
         return vietnamTime.toLocaleTimeString('vi-VN', { 
           hour: '2-digit', 
           minute: '2-digit',
@@ -341,14 +317,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         name: apiActivity.activity_name,
         description: apiActivity.description,
         category: getCategoryLabel(apiActivity.activity_type),
-        scheduledTime: convertToVietnamTime(scheduleTime), // Convert to Vietnam time
-        startTime: convertToVietnamTime(scheduleTime), // Convert to Vietnam time
-        endTime: convertToVietnamTime(endTime), // Convert to Vietnam time
+        scheduledTime: convertToVietnamTime(scheduleTime),
+        startTime: convertToVietnamTime(scheduleTime),
+        endTime: convertToVietnamTime(endTime),
         duration: apiActivity.duration,
-        date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
+        date: scheduleTime.toLocaleDateString('en-CA'),
         location: apiActivity.location,
         capacity: apiActivity.capacity,
-        participants: 0, // API không có field này, sẽ cần fetch riêng
+        participants: 0,
         facilitator: 'Chưa phân công',
         status: 'Đã lên lịch',
         level: 'Trung bình',
@@ -369,7 +345,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  // Helper functions for data mapping
   const getCategoryLabel = (activityType: string) => {
     const categoryMap: { [key: string]: string } = {
       'Nhận thức': 'Nhận thức',
@@ -411,17 +386,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     router.push(`/staff/activities/${activity.id}/edit`);
   };
 
-  // Evaluation functions
-  const handleEvaluationChange = (residentId: string, participated: boolean) => {
+  const handleEvaluationChange = (residentId: string, status: 'pending' | 'attended' | 'absent') => {
     setEvaluations(prev => {
       const currentEvaluation = prev[residentId] || {};
       let newReason = currentEvaluation.reason || '';
       
-      if (participated) {
-        // Nếu chọn "Có", xóa lý do vắng mặt
+      if (status === 'attended') {
         newReason = '';
-      } else {
-        // Nếu chọn "Không", kiểm tra và sửa lý do không phù hợp
+      } else if (status === 'absent') {
         if (!newReason || newReason.includes('Tham gia tích cực')) {
           newReason = 'Lý do sức khỏe';
         }
@@ -431,7 +403,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       ...prev,
       [residentId]: {
           ...currentEvaluation,
-        participated,
+        status,
           reason: newReason
       }
       };
@@ -448,25 +420,23 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }));
   };
 
-  const handleSelectAll = (participated: boolean) => {
+  const handleSelectAll = (status: 'pending' | 'attended' | 'absent') => {
     setEvaluations(prev => {
-      const newEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
-      filteredResidents.forEach(resident => {
-        const currentEvaluation = prev[resident.id] || {};
+      const newEvaluations: {[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}} = {};
+      Object.keys(prev).forEach(residentId => {
+        const currentEvaluation = prev[residentId] || {};
         let newReason = currentEvaluation.reason || '';
         
-        if (participated) {
-          // Nếu chọn "Có", xóa lý do vắng mặt
+        if (status === 'attended') {
           newReason = '';
-        } else {
-          // Nếu chọn "Không", kiểm tra và sửa lý do không phù hợp
+        } else if (status === 'absent') {
           if (!newReason || newReason.includes('Tham gia tích cực')) {
             newReason = 'Lý do sức khỏe';
           }
         }
         
-        newEvaluations[resident.id] = {
-          participated,
+        newEvaluations[residentId] = {
+          status,
           reason: newReason
         };
       });
@@ -477,9 +447,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const handleSaveEvaluations = async () => {
     if (!activity?.id) return;
     
-    // Validate evaluations before saving
     const invalidEvaluations = Object.entries(evaluations).filter(([_, evaluation]) => {
-      return !evaluation.participated && (!evaluation.reason || evaluation.reason.trim() === '');
+      return evaluation.status === 'absent' && (!evaluation.reason || evaluation.reason.trim() === '');
     });
     
     if (invalidEvaluations.length > 0) {
@@ -493,9 +462,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     
     setSaving(true);
     try {
-      // Update or create participations for each resident
       for (const [residentId, evaluation] of Object.entries(evaluations)) {
-        // Find existing participation by matching resident_id and date
         const existingParticipation = participations.find(p => {
           const pResidentId = p.resident_id?._id || p.resident_id;
           const pDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
@@ -506,15 +473,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         });
         
         if (existingParticipation) {
-          // Update existing participation - only update necessary fields
           const updateData: any = {
-            performance_notes: evaluation.participated ? 
+            performance_notes: evaluation.status === 'attended' ? 
               'Tham gia tích cực, tinh thần tốt' : 
               (evaluation.reason || 'Lý do sức khỏe'),
-            attendance_status: evaluation.participated ? 'attended' : 'absent'
+            attendance_status: evaluation.status
           };
           
-          // Only update staff_id if it's different or missing
           const currentStaffId = existingParticipation.staff_id?._id || existingParticipation.staff_id;
           const newStaffId = user?.id || "664f1b2c2f8b2c0012a4e750";
           if (currentStaffId !== newStaffId) {
@@ -523,11 +488,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           
           await activityParticipationsAPI.update(existingParticipation._id, updateData);
         } else {
-          // Create new participation
-          // Find the resident to get their API ID
           const resident = residents.find(r => r.id === residentId);
           if (resident) {
-            // Sử dụng staff_id hiện tại của hoạt động hoặc user hiện tại
             const currentStaffId = participations.length > 0 ? 
               (participations[0].staff_id?._id || participations[0].staff_id) : 
               user?.id || "664f1b2c2f8b2c0012a4e750";
@@ -535,72 +497,67 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             await activityParticipationsAPI.create({
               staff_id: currentStaffId,
               activity_id: activity.id,
-              resident_id: resident.id, // Use actual resident ID
-              date: activity.date + "T00:00:00Z", // Send as ISO string
-              performance_notes: evaluation.participated ? 
+              resident_id: resident.id,
+              date: activity.date + "T00:00:00Z",
+              performance_notes: evaluation.status === 'attended' ? 
                 'Tham gia tích cực, tinh thần tốt' : 
                  (evaluation.reason || 'Lý do sức khỏe'),
-              attendance_status: evaluation.participated ? 'attended' : 'absent'
+              attendance_status: evaluation.status
             });
           }
         }
       }
       
-      // Refresh participations
       const participationsData = await activityParticipationsAPI.getByActivityId(
         activity.id, 
         activity.date
       );
       
-      // Dọn dẹp duplicate participations (nếu có)
       const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
       setParticipations(cleanedParticipations);
       
-      // Cập nhật evaluations state với dữ liệu mới
-      const updatedEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
+      const updatedEvaluations: {[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}} = {};
       
-      // Process participations sequentially to handle async updates
       for (const participation of cleanedParticipations) {
         const residentId = participation.resident_id?._id || participation.resident_id;
-        const participated = participation.attendance_status === 'attended';
+        
+        // Chỉ set status nếu attendance_status rõ ràng, còn lại mặc định là pending
+        let status: 'pending' | 'attended' | 'absent' = 'pending';
+        if (participation.attendance_status === 'attended') {
+          status = 'attended';
+        } else if (participation.attendance_status === 'absent') {
+          status = 'absent';
+        }
+        // Nếu attendance_status là 'pending' hoặc undefined/null, giữ nguyên pending
+        
         let reason = participation.performance_notes || '';
         
-        // Fix old data: if resident didn't participate but has "Tham gia tích cực" text, replace with "Lý do sức khỏe"
-        if (!participated && reason.includes('Tham gia tích cực')) {
+        if (status === 'absent' && reason.includes('Tham gia tích cực')) {
           reason = 'Lý do sức khỏe';
-          console.log('Fixed old data for resident:', residentId, 'reason changed to:', reason);
           
-          // Update the database to fix the old data
           try {
             await activityParticipationsAPI.update(participation._id, {
               performance_notes: 'Lý do sức khỏe'
             });
-            console.log('Updated database for resident:', residentId);
           } catch (error) {
             console.error('Error updating old data for resident:', residentId, error);
           }
         }
         
         if (residentId) {
-          console.log('Processing participation for residentId:', residentId, 'name:', participation.resident_id?.full_name);
           updatedEvaluations[residentId] = {
-            participated,
+            status,
             reason
           };
         }
       }
-      console.log('Updated evaluations after save:', updatedEvaluations);
-      console.log('Evaluations keys:', Object.keys(updatedEvaluations));
       setEvaluations(updatedEvaluations);
       
-      // Force re-render để cập nhật UI
       setRefreshTrigger(prev => prev + 1);
       
       setEvaluationMode(false);
        
-       // Auto-refresh data after saving
        setTimeout(() => {
-         console.log('Auto-refreshing data after save...');
          setRefreshTrigger(prev => prev + 1);
        }, 1000);
        
@@ -610,7 +567,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         'success'
       );
     } catch (error: any) {
-      console.error('Error saving evaluations:', error);
       let errorMessage = 'Có lỗi xảy ra khi lưu đánh giá. Vui lòng thử lại.';
       
       if (error.response?.data?.message) {
@@ -625,14 +581,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  // Debug: Log residents data
-  console.log('Residents data:', residents);
-  console.log('Residents loading:', residentsLoading);
-  console.log('Residents error:', residentsError);
-  console.log('Participations data:', participations);
-  console.log('Activity ID:', activity?.id);
-  console.log('Activity date:', activity?.date);
-  
   type ActivityResident = {
     id: string;
     name: string;
@@ -643,22 +591,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     reason: string;
     evaluationDate: string;
   };
-  // Map participations to ActivityResident[]
   const allResidentsForDay: ActivityResident[] = participations
     .filter((p: any) => {
-      // Lọc đúng hoạt động và đúng ngày
       const participationActivityId = p.activity_id?._id || p.activity_id;
       const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
-      const isMatch = participationActivityId === activity?.id && participationDate === activity.date;
-      console.log('AllResidentsForDay filter:', {
-        participationActivityId,
-        activityId: activity?.id,
-        participationDate,
-        activityDate: activity.date,
-        isMatch,
-        participation: p
-      });
-      return isMatch;
+      return participationActivityId === activity?.id && participationDate === activity.date;
     })
     .map((p: any) => {
       const residentId = p.resident_id?._id || p.resident_id;
@@ -674,22 +611,17 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         evaluationDate: p.date
       };
     });
-// Chỉ giữ lại 1 bản ghi cho mỗi cư dân/ngày, ưu tiên bản ghi 'Không tham gia'
-const activityResidents: ActivityResident[] = Object.values(
-  allResidentsForDay.reduce((acc, curr) => {
-    // Key theo residentId
-    const key = curr.id;
-    // Nếu chưa có hoặc bản ghi hiện tại là 'Không tham gia', thì ghi đè
-    if (!acc[key] || (!curr.participated)) {
-      acc[key] = curr;
-    }
-    return acc;
-  }, {} as { [residentId: string]: ActivityResident })
-);
-  // Tạo danh sách cư dân từ evaluations state, chỉ lấy những cư dân tham gia hoạt động này VÀ được phân công
+  const activityResidents: ActivityResident[] = Object.values(
+    allResidentsForDay.reduce((acc, curr) => {
+      const key = curr.id;
+      if (!acc[key] || (!curr.participated)) {
+        acc[key] = curr;
+      }
+      return acc;
+    }, {} as { [residentId: string]: ActivityResident })
+  );
   const residentsFromEvaluations: ActivityResident[] = Object.entries(evaluations)
     .filter(([residentId, evaluation]) => {
-      // Chỉ lấy những cư dân có participation record cho hoạt động này VÀ được phân công cho staff hiện tại
       const participation = participations.find((p: any) => {
         const pResidentId = p.resident_id?._id || p.resident_id;
         const participationActivityId = p.activity_id?._id || p.activity_id;
@@ -701,7 +633,6 @@ const activityResidents: ActivityResident[] = Object.values(
                participationDate === activityDate;
       });
       
-      // Kiểm tra xem cư dân có được phân công cho staff hiện tại không
       const isAssigned = assignedResidentIds.includes(residentId);
       
       return participation !== undefined && isAssigned;
@@ -712,7 +643,6 @@ const activityResidents: ActivityResident[] = Object.values(
         return pResidentId === residentId;
       });
       
-      // Sử dụng thông tin từ participation data, fallback về residents array nếu cần
       const residentInfo = residents.find((r: any) => r.id === residentId);
       
       return {
@@ -721,33 +651,20 @@ const activityResidents: ActivityResident[] = Object.values(
         room: residentInfo?.room || '',
         age: residentInfo?.age || '',
         participationId: participation?._id || '',
-        participated: evaluation.participated,
+        participated: evaluation.status === 'attended',
         reason: evaluation.reason || '',
         evaluationDate: participation?.date || activity?.date || ''
       };
     });
 
-  // Filter residents from evaluations based on search term
-  const filteredResidents: ActivityResident[] = residentsFromEvaluations.filter((resident: ActivityResident) =>
-    resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (resident.room?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  // Remove filteredResidents since we're now filtering directly in the render
   
-  // Lấy danh sách cư dân đã tham gia hoạt động này vào đúng ngày
   const joinedResidentIds = Array.from(new Set(
     participations
       .filter((p: any) => {
         const participationActivityId = p.activity_id?._id || p.activity_id;
         const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
         const isMatch = participationActivityId === activity?.id && participationDate === activity.date;
-        console.log('Participation filter:', {
-          participationActivityId,
-          activityId: activity?.id,
-          participationDate,
-          activityDate: activity.date,
-          isMatch,
-          participation: p
-        });
         return isMatch;
       })
       .map((p: any) => p.resident_id?._id || p.resident_id)
@@ -765,11 +682,9 @@ const activityResidents: ActivityResident[] = Object.values(
     reason: r.reason
   })));
   
-  // Đếm số lượng tham gia một cách rõ ràng
   const participationCount = activityResidents.length;
   console.log('Participation count:', participationCount);
   
-  // Lấy danh sách cư dân được phân công cho staff hiện tại (chưa tham gia hoạt động này)
   const residentsNotJoined = staffAssignments
     .filter((assignment: any) => assignment.status === 'active')
     .map((assignment: any) => {
@@ -791,19 +706,11 @@ const activityResidents: ActivityResident[] = Object.values(
         assignedDate: assignment.assigned_date,
       };
     })
-    .filter((resident: any) => !joinedResidentIds.includes(resident.id)); // Chỉ lấy cư dân chưa tham gia
+    .filter((resident: any) => !joinedResidentIds.includes(resident.id));
 
-  // Debug logs
-  console.log('Staff assignments:', staffAssignments);
-  console.log('Assigned resident IDs (active only):', assignedResidentIds);
-  console.log('Residents not joined (from assignments):', residentsNotJoined.map(r => ({ id: r.id, name: r.name })));
-  console.log('Total residents available for assignment:', residentsNotJoined.length);
-
-  // Thêm cư dân vào hoạt động
   const handleAddResident = async () => {
     if (!selectedResidentId || !activity?.id || !activity.date) return;
     
-    // Kiểm tra sức chứa trước khi thêm
     const currentParticipantCount = participations.filter((p: any) => {
       const participationActivityId = p.activity_id?._id || p.activity_id;
       const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
@@ -811,11 +718,10 @@ const activityResidents: ActivityResident[] = Object.values(
     }).length;
     
     if (currentParticipantCount >= activity.capacity) {
-      toast.error(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm cư dân.`);
+      toast.error(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm người cao tuổi.`);
       return;
     }
     
-    // Kiểm tra xem cư dân đã được thêm vào hoạt động này chưa
     const isAlreadyParticipating = participations.some((p: any) => {
       const participationActivityId = p.activity_id?._id || p.activity_id;
       const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
@@ -836,8 +742,6 @@ const activityResidents: ActivityResident[] = Object.values(
     
     setAddingResident(true);
     try {
-      // Sử dụng staff_id hiện tại của hoạt động hoặc user hiện tại nếu chưa có
-      // Lấy staff_id từ participation đầu tiên nếu có
       const currentStaffId = participations.length > 0 ? 
         (participations[0].staff_id?._id || participations[0].staff_id) : 
         user?.id || '';
@@ -847,7 +751,7 @@ const activityResidents: ActivityResident[] = Object.values(
         activity_id: activity.id,
         resident_id: selectedResidentId,
         date: activity.date + 'T00:00:00Z',
-        attendance_status: 'attended',
+        attendance_status: 'pending',
         performance_notes: ''
       });
       setAddResidentModalOpen(false);
@@ -859,14 +763,11 @@ const activityResidents: ActivityResident[] = Object.values(
         'success'
       );
       
-             // Force refresh data
-       setRefreshTrigger(prev => prev + 1);
-       
-       // Auto-refresh data after adding resident
-       setTimeout(() => {
-         console.log('Auto-refreshing data after adding resident...');
-         setRefreshTrigger(prev => prev + 1);
-       }, 1000);
+      setRefreshTrigger(prev => prev + 1);
+      
+      setTimeout(() => {
+        setRefreshTrigger(prev => prev + 1);
+      }, 1000);
     } catch (err: any) {
       console.error('Error adding resident:', err);
       let errorMessage = 'Không thể thêm người cao tuổi vào hoạt động. Vui lòng thử lại.';
@@ -991,7 +892,6 @@ const activityResidents: ActivityResident[] = Object.values(
     );
   }
 
-  // Helper function to render category with appropriate color
   const renderCategory = (category: string) => {
     const bgColor = 
       category === 'Thể chất' ? 'rgba(16, 185, 129, 0.1)' : 
@@ -1025,7 +925,6 @@ const activityResidents: ActivityResident[] = Object.values(
     );
   };
 
-  // Helper function to render status with appropriate color
   const renderStatus = (status: string) => {
     const bgColor = 
       status === 'Đã lên lịch' ? 'rgba(99, 102, 241, 0.1)' : 
@@ -1061,7 +960,6 @@ const activityResidents: ActivityResident[] = Object.values(
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background decorations */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -1083,7 +981,6 @@ const activityResidents: ActivityResident[] = Object.values(
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -1167,7 +1064,6 @@ const activityResidents: ActivityResident[] = Object.values(
           </div>
       </div>
       
-        {/* Main Activity Card */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -1176,7 +1072,6 @@ const activityResidents: ActivityResident[] = Object.values(
           backdropFilter: 'blur(10px)',
           overflow: 'hidden'
         }}>
-          {/* Activity Header */}
           <div style={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
@@ -1248,7 +1143,6 @@ const activityResidents: ActivityResident[] = Object.values(
               </div>
             </div>
             
-            {/* Quick Info */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -1325,7 +1219,6 @@ const activityResidents: ActivityResident[] = Object.values(
           </div>
         </div>
         
-          {/* Content Section */}
           <div style={{ padding: '2rem' }}>
             <div style={{
               display: 'grid', 
@@ -1333,8 +1226,7 @@ const activityResidents: ActivityResident[] = Object.values(
               gap: '1.5rem'
             }}>
             
-            {/* Schedule Information */}
-              <div style={{
+            <div style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 borderRadius: '1rem', 
                 border: '1px solid #e5e7eb', 
@@ -1439,8 +1331,7 @@ const activityResidents: ActivityResident[] = Object.values(
               </div>
             </div>
             
-            {/* Participation Information */}
-              <div style={{
+            <div style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 borderRadius: '1rem', 
                 border: '1px solid #e5e7eb', 
@@ -1483,32 +1374,50 @@ const activityResidents: ActivityResident[] = Object.values(
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                    <button
-                      onClick={() => {
-                        if (participationCount >= activity.capacity) {
-                          showNotification(
-                            'Đã đạt sức chứa tối đa',
-                            `Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm người cao tuổi.`,
-                            'warning'
-                          );
-                          return;
-                        }
-                        setAddResidentModalOpen(true);
-                      }}
-                      disabled={participationCount >= activity.capacity}
-                      style={{
-                        background: participationCount >= activity.capacity ? '#9ca3af' : '#10b981', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: 6, 
-                        padding: '0.5rem 1rem', 
-                        fontWeight: 600, 
-                        cursor: participationCount >= activity.capacity ? 'not-allowed' : 'pointer',
-                        opacity: participationCount >= activity.capacity ? 0.6 : 1
-                      }}
-                    >
-                      {participationCount >= activity.capacity ? 'Đã đạt sức chứa tối đa' : '+ Thêm người tham gia'}
-                    </button>
+                    {!isActivityDatePassed() ? (
+                      <button
+                        onClick={() => {
+                          if (participationCount >= activity.capacity) {
+                            showNotification(
+                              'Đã đạt sức chứa tối đa',
+                              `Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm người cao tuổi.`,
+                              'warning'
+                            );
+                            return;
+                          }
+                          setAddResidentModalOpen(true);
+                        }}
+                        disabled={participationCount >= activity.capacity}
+                        style={{
+                          background: participationCount >= activity.capacity ? '#9ca3af' : '#10b981', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: 6, 
+                          padding: '0.5rem 1rem', 
+                          fontWeight: 600, 
+                          cursor: participationCount >= activity.capacity ? 'not-allowed' : 'pointer',
+                          opacity: participationCount >= activity.capacity ? 0.6 : 1
+                        }}
+                      >
+                        {participationCount >= activity.capacity ? 'Đã đạt sức chứa tối đa' : '+ Thêm người tham gia'}
+                      </button>
+                    ) : (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 1rem',
+                        background: '#f3f4f6',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600
+                      }}>
+                        <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                        Hoạt động đã qua ngày - Không thể thêm người tham gia
+                      </div>
+                    )}
                   </div>
 
                 </div>
@@ -1521,7 +1430,6 @@ const activityResidents: ActivityResident[] = Object.values(
           
 
 
-          {/* Bảng đánh giá tham gia */}
           <div style={{
             marginTop: '1.5rem',
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -1580,7 +1488,7 @@ const activityResidents: ActivityResident[] = Object.values(
                     </span>
                   )}
                 </h3>
-                {residentsFromEvaluations.length > 0 && (
+                {Object.keys(evaluations).length > 0 && (
                   <div style={{
                     display: 'flex',
                     gap: '1rem',
@@ -1588,13 +1496,14 @@ const activityResidents: ActivityResident[] = Object.values(
                     fontSize: '0.875rem',
                     color: '#6b7280'
                   }}>
-                    <span>Tham gia: <strong style={{ color: '#10b981' }}>{residentsFromEvaluations.filter(r => r.participated).length}</strong></span>
-                    <span>Vắng: <strong style={{ color: '#dc2626' }}>{residentsFromEvaluations.filter(r => !r.participated).length}</strong></span>
-                    <span>Tổng: <strong>{residentsFromEvaluations.length}</strong></span>
+                    <span>Đã tham gia: <strong style={{ color: '#10b981' }}>{Object.values(evaluations).filter(e => e.status === 'attended').length}</strong></span>
+                    <span>Không tham gia: <strong style={{ color: '#dc2626' }}>{Object.values(evaluations).filter(e => e.status === 'absent').length}</strong></span>
+                    <span>Chưa tham gia: <strong style={{ color: '#6b7280' }}>{Object.values(evaluations).filter(e => e.status === 'pending').length}</strong></span>
+                    <span>Tổng: <strong>{Object.keys(evaluations).length}</strong></span>
                   </div>
                 )}
               </div>
-              {!evaluationMode && (
+              {!evaluationMode && !isActivityDatePassed() && (
                 <button
                   onClick={() => setEvaluationMode(true)}
                   style={{
@@ -1616,11 +1525,27 @@ const activityResidents: ActivityResident[] = Object.values(
                   Đánh giá tham gia
                 </button>
               )}
+              {!evaluationMode && isActivityDatePassed() && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600
+                }}>
+                  <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                  Hoạt động đã qua ngày - Không thể chỉnh sửa
+                </div>
+              )}
             </div>
 
             {evaluationMode ? (
               <div>
-                {/* Search and bulk actions */}
                 <div style={{
                   display: 'flex',
                   gap: '1rem',
@@ -1654,121 +1579,223 @@ const activityResidents: ActivityResident[] = Object.values(
                       }}
                     />
                   </div>
-                  <button
-                    onClick={() => handleSelectAll(true)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem 1rem',
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <CheckIcon style={{ width: '1rem', height: '1rem' }} />
-                    Chọn tất cả Có
-                  </button>
-                  <button
-                    onClick={() => handleSelectAll(false)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem 1rem',
-                      background: '#dc2626',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
-                    Chọn tất cả Không
-                  </button>
-                </div>
-
-                {/* Participants list */}
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }} key={`participants-${refreshTrigger}`}>
-                  {filteredResidents.map((resident) => {
-                    const evaluation = evaluations[resident.id] || { participated: false, reason: '' };
-                    return (
-                      <div
-                        key={`${resident.id}-${refreshTrigger}`}
+                  {!isActivityDatePassed() && (
+                    <>
+                      <button
+                        onClick={() => handleSelectAll('attended')}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          padding: '1rem',
-                          borderBottom: '1px solid #e5e7eb',
-                          background: evaluation.participated ? '#f0fdf4' : '#fef2f2'
+                          gap: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
                         }}
                       >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
-                            {resident.name}
-                          </div>
-                          
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                            <input
-                              type="radio"
-                              name={`participation-${resident.id}`}
-                              checked={evaluation.participated}
-                              onChange={() => handleEvaluationChange(resident.id, true)}
-                              style={{ cursor: 'pointer' }}
-                              key={`yes-${resident.id}-${refreshTrigger}`}
-                            />
-                            <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Có</span>
-                          </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                            <input
-                              type="radio"
-                              name={`participation-${resident.id}`}
-                              checked={!evaluation.participated}
-                              onChange={() => handleEvaluationChange(resident.id, false)}
-                              style={{ cursor: 'pointer' }}
-                              key={`no-${resident.id}-${refreshTrigger}`}
-                            />
-                            <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Không</span>
-                          </label>
-                        </div>
-                        {!evaluation.participated && (
-                          <div style={{ marginTop: '0.5rem' }}>
-                            <input
-                              type="text"
-                              placeholder="Lý do vắng mặt..."
-                              value={evaluation.reason || ''}
-                              onChange={(e) => handleReasonChange(resident.id, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem',
-                                borderRadius: '0.375rem',
-                                border: '1px solid #d1d5db',
-                                fontSize: '0.875rem',
-                                background: '#fef2f2'
-                              }}
-                              key={`reason-${resident.id}-${refreshTrigger}`}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {filteredResidents.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                      {residentsFromEvaluations.length === 0 ? 'Chưa có đánh giá tham gia nào cho hoạt động này.' : 'Không tìm thấy người cao tuổi nào phù hợp với từ khóa tìm kiếm.'}
-                    </div>
+                        <CheckIcon style={{ width: '1rem', height: '1rem' }} />
+                        Chọn tất cả Đã tham gia
+                      </button>
+                      <button
+                        onClick={() => handleSelectAll('absent')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          background: '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                        Chọn tất cả Không tham gia
+                      </button>
+                      <button
+                        onClick={() => handleSelectAll('pending')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          background: '#6b7280',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                        Chọn tất cả Chưa tham gia
+                      </button>
+                    </>
                   )}
                 </div>
 
-                {/* Action buttons */}
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }} key={`participants-${refreshTrigger}`}>
+                  {Object.entries(evaluations)
+                    .filter(([residentId, evaluation]) => {
+                      // Lấy thông tin resident từ participations
+                      const participation = participations.find((p: any) => {
+                        const pResidentId = p.resident_id?._id || p.resident_id;
+                        return pResidentId === residentId;
+                      });
+                      
+                      const residentInfo = residents.find((r: any) => r.id === residentId);
+                      const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
+                      const residentRoom = residentInfo?.room || '';
+                      
+                      // Filter by search term
+                      if (searchTerm && !residentName.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                          !residentRoom.toLowerCase().includes(searchTerm.toLowerCase())) {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map(([residentId, evaluation]) => {
+                      // Lấy thông tin resident từ participations
+                      const participation = participations.find((p: any) => {
+                        const pResidentId = p.resident_id?._id || p.resident_id;
+                        return pResidentId === residentId;
+                      });
+                      
+                      const residentInfo = residents.find((r: any) => r.id === residentId);
+                      const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
+                      const residentRoom = residentInfo?.room || '';
+                    return (
+                                              <div
+                          key={`${residentId}-${refreshTrigger}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            borderBottom: '1px solid #e5e7eb',
+                            background: evaluation.status === 'attended' ? '#f0fdf4' : evaluation.status === 'absent' ? '#fef2f2' : '#f9fafb'
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                              {residentName}
+                            </div>
+                            
+                          </div>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            {!isActivityDatePassed() ? (
+                              <>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="radio"
+                                    name={`participation-${residentId}`}
+                                    checked={evaluation.status === 'attended'}
+                                    onChange={() => handleEvaluationChange(residentId, 'attended')}
+                                    style={{ cursor: 'pointer' }}
+                                    key={`attended-${residentId}-${refreshTrigger}`}
+                                  />
+                                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#10b981' }}>Đã tham gia</span>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="radio"
+                                    name={`participation-${residentId}`}
+                                    checked={evaluation.status === 'absent'}
+                                    onChange={() => handleEvaluationChange(residentId, 'absent')}
+                                    style={{ cursor: 'pointer' }}
+                                    key={`absent-${residentId}-${refreshTrigger}`}
+                                  />
+                                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#dc2626' }}>Không tham gia</span>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="radio"
+                                    name={`participation-${residentId}`}
+                                    checked={evaluation.status === 'pending'}
+                                    onChange={() => handleEvaluationChange(residentId, 'pending')}
+                                    style={{ cursor: 'pointer' }}
+                                    key={`pending-${residentId}-${refreshTrigger}`}
+                                  />
+                                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#6b7280' }}>Chưa tham gia</span>
+                                </label>
+                              </>
+                            ) : (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.5rem 1rem',
+                                background: '#f3f4f6',
+                                color: '#6b7280',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '0.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: 600
+                              }}>
+                                <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                                {evaluation.status === 'attended' ? 'Đã tham gia' : 
+                                 evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
+                              </div>
+                            )}
+                          </div>
+                          {evaluation.status === 'absent' && !isActivityDatePassed() && (
+                            <div style={{ marginTop: '0.5rem' }}>
+                              <input
+                                type="text"
+                                placeholder="Lý do vắng mặt..."
+                                value={evaluation.reason || ''}
+                                onChange={(e) => handleReasonChange(residentId, e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem',
+                                  borderRadius: '0.375rem',
+                                  border: '1px solid #d1d5db',
+                                  fontSize: '0.875rem',
+                                  background: '#fef2f2'
+                                }}
+                                key={`reason-${residentId}-${refreshTrigger}`}
+                              />
+                            </div>
+                          )}
+                      </div>
+                    );
+                  })}
+                  {Object.keys(evaluations).length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      Chưa có đánh giá tham gia nào cho hoạt động này.
+                    </div>
+                  )}
+                  {Object.keys(evaluations).length > 0 && searchTerm && (() => {
+                    const filteredCount = Object.entries(evaluations).filter(([residentId, evaluation]) => {
+                      const participation = participations.find((p: any) => {
+                        const pResidentId = p.resident_id?._id || p.resident_id;
+                        return pResidentId === residentId;
+                      });
+                      const residentInfo = residents.find((r: any) => r.id === residentId);
+                      const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
+                      const residentRoom = residentInfo?.room || '';
+                      return residentName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             residentRoom.toLowerCase().includes(searchTerm.toLowerCase());
+                    }).length;
+                    
+                    if (filteredCount === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                          Không tìm thấy người cao tuổi nào phù hợp với từ khóa tìm kiếm.
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+
                 <div style={{
                   display: 'flex',
                   justifyContent: 'flex-end',
@@ -1792,35 +1819,37 @@ const activityResidents: ActivityResident[] = Object.values(
                   >
                     Hủy
                   </button>
-                  <button
-                    onClick={handleSaveEvaluations}
-                    disabled={saving}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: saving ? '#9ca3af' : '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    {saving && (
-                      <div style={{
-                        width: '1rem',
-                        height: '1rem',
-                        border: '2px solid transparent',
-                        borderTopColor: 'white',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                      }} />
-                    )}
-                    {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
-                  </button>
+                  {!isActivityDatePassed() && (
+                    <button
+                      onClick={handleSaveEvaluations}
+                      disabled={saving}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: saving ? '#9ca3af' : '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      {saving && (
+                        <div style={{
+                          width: '1rem',
+                          height: '1rem',
+                          border: '2px solid transparent',
+                          borderTopColor: 'white',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                      )}
+                      {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1835,36 +1864,70 @@ const activityResidents: ActivityResident[] = Object.values(
                     </tr>
                   </thead>
                   <tbody>
-                    {activityResidents.map((resident) => {
-                      const participated = resident.participated;
+                    {Object.entries(evaluations).map(([residentId, evaluation]) => {
+                      // Lấy thông tin resident từ participations
+                      const participation = participations.find((p: any) => {
+                        const pResidentId = p.resident_id?._id || p.resident_id;
+                        return pResidentId === residentId;
+                      });
+                      
+                      const residentInfo = residents.find((r: any) => r.id === residentId);
+                      const status = evaluation.status;
                       
                       // Validate performance notes for absent residents
-                      const performanceNotes = resident.reason;
-                      const isValidAbsenceReason = !participated && performanceNotes && 
+                      const performanceNotes = evaluation.reason || '';
+                      const isValidAbsenceReason = status === 'absent' && performanceNotes && 
                         !performanceNotes.includes('Tham gia tích cực') && 
                         !performanceNotes.includes('tinh thần tốt');
                       
+                      const getStatusColor = (status: string) => {
+                        switch (status) {
+                          case 'attended': return '#10b981';
+                          case 'absent': return '#dc2626';
+                          case 'pending': return '#6b7280';
+                          default: return '#6b7280';
+                        }
+                      };
+                      
+                      const getStatusText = (status: string) => {
+                        switch (status) {
+                          case 'attended': return 'Đã tham gia';
+                          case 'absent': return 'Không tham gia';
+                          case 'pending': return 'Chưa tham gia';
+                          default: return 'Chưa tham gia';
+                        }
+                      };
+                      
+                      const getBackgroundColor = (status: string) => {
+                        switch (status) {
+                          case 'attended': return '#f0fdf4';
+                          case 'absent': return '#fef2f2';
+                          case 'pending': return '#f9fafb';
+                          default: return '#f9fafb';
+                        }
+                      };
+                      
                       return (
-                        <tr key={resident.participationId} style={{ background: participated ? '#f0fdf4' : '#fef2f2' }}>
+                        <tr key={residentId} style={{ background: getBackgroundColor(status) }}>
                           <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', fontWeight: 500 }}>
-                            {resident.name}
+                            {participation?.resident_id?.full_name || residentInfo?.name || 'N/A'}
                           </td>
-                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: participated ? '#10b981' : '#dc2626', fontWeight: 600 }}>
-                            {participated ? 'Có' : 'Không'}
+                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: getStatusColor(status), fontWeight: 600 }}>
+                            {getStatusText(status)}
                           </td>
                           <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
-                            {participated ? '-' : (
+                            {status === 'attended' ? '-' : status === 'absent' ? (
                               isValidAbsenceReason ? performanceNotes : 
                               <span style={{ color: '#f59e0b' }}>Chưa nhập lý do hoặc lý do không hợp lệ</span>
-                            )}
+                            ) : status === 'pending' ? '-' : '-'}
                           </td>
                           <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.875rem' }}>
-                            {resident.evaluationDate ? new Date(resident.evaluationDate).toLocaleDateString('vi-VN') : 'N/A'}
+                            {participation?.date ? new Date(participation.date).toLocaleDateString('vi-VN') : 'N/A'}
                           </td>
                         </tr>
                       );
                     })}
-                    {activityResidents.length === 0 && (
+                    {Object.keys(evaluations).length === 0 && (
                       <tr>
                         <td colSpan={4} style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>
                           Chưa có đánh giá tham gia nào cho ngày này.
@@ -1880,7 +1943,6 @@ const activityResidents: ActivityResident[] = Object.values(
         </div>
       </div>
 
-      {/* Modal chọn cư dân */}
       <Dialog open={addResidentModalOpen} onClose={() => setAddResidentModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
           <div className="fixed inset-0 bg-black opacity-30" />
@@ -1916,13 +1978,11 @@ const activityResidents: ActivityResident[] = Object.values(
           </div>
       </Dialog>
 
-      {/* Notification Modal */}
       <Dialog open={notificationModal.isOpen} onClose={closeNotification} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
           <div className="fixed inset-0 bg-black opacity-30" />
           <Dialog.Panel className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
             <div className="flex items-start gap-4">
-              {/* Icon */}
               <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
                 notificationModal.type === 'success' ? 'bg-green-100' :
                 notificationModal.type === 'error' ? 'bg-red-100' :
@@ -1943,7 +2003,6 @@ const activityResidents: ActivityResident[] = Object.values(
                 )}
               </div>
               
-              {/* Content */}
               <div className="flex-1">
                 <Dialog.Title className={`text-lg font-semibold mb-2 ${
                   notificationModal.type === 'success' ? 'text-green-800' :
@@ -1958,7 +2017,6 @@ const activityResidents: ActivityResident[] = Object.values(
                 </p>
               </div>
               
-              {/* Close button */}
               <button
                 onClick={closeNotification}
                 className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
@@ -1967,7 +2025,6 @@ const activityResidents: ActivityResident[] = Object.values(
               </button>
             </div>
             
-            {/* Action button */}
             <div className="mt-6 flex justify-end">
               <button
                 onClick={closeNotification}

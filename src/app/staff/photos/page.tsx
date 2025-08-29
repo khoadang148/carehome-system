@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeftIcon,
@@ -8,7 +8,7 @@ import {
   XMarkIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI, activitiesAPI } from '@/lib/api';
+import { residentAPI, photosAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI, activitiesAPI, activityParticipationsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
 
@@ -16,7 +16,6 @@ export default function PhotoUploadPage() {
   const { user } = useAuth();
   const router = useRouter();
   
-  // Photo upload states with professional validation
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [photoDescription, setPhotoDescription] = useState('');
   const [selectedResident, setSelectedResident] = useState('');
@@ -25,7 +24,7 @@ export default function PhotoUploadPage() {
   const [photoTags, setPhotoTags] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [currentUploading, setCurrentUploading] = useState(0); // Ảnh đang upload thứ mấy
+  const [currentUploading, setCurrentUploading] = useState(0); 
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [shareWithFamily, setShareWithFamily] = useState(true);
   const [residents, setResidents] = useState<any[]>([]);
@@ -36,27 +35,21 @@ export default function PhotoUploadPage() {
   const [autoCloseTimeout, setAutoCloseTimeout] = useState<NodeJS.Timeout | null>(null);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
-  // Load residents from API
   useEffect(() => {
     const fetchResidents = async () => {
       try {
-        // Nếu là staff, chỉ lấy cư dân được phân công (active assignments)
+
         if (user?.role === 'staff') {
           const data = await staffAssignmentsAPI.getMyAssignments();
           const assignmentsData = Array.isArray(data) ? data : [];
           
-          // Debug: Log assignments data
-          console.log('Raw assignments data for photos:', assignmentsData);
-          
-          // Chỉ lấy những assignment có trạng thái active
           const activeAssignments = assignmentsData.filter((assignment: any) => assignment.status === 'active');
-          console.log('Active assignments for photos:', activeAssignments);
           
           const residentsWithRoom = await Promise.all(activeAssignments.map(async (assignment: any) => {
             const resident = assignment.resident_id;
             let room_number = '';
             try {
-              // Ưu tiên sử dụng bedAssignmentsAPI
+              
               try {
                 const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
                 const bedAssignment = Array.isArray(bedAssignments) ? 
@@ -76,8 +69,7 @@ export default function PhotoUploadPage() {
                   throw new Error('No bed assignment found');
                 }
               } catch (bedError) {
-                console.warn(`Failed to get bed assignment for resident ${resident._id}:`, bedError);
-                // Fallback về carePlansAPI
+                
                 const assignments = await carePlansAPI.getByResidentId(resident._id);
                 const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
                 const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
@@ -91,9 +83,8 @@ export default function PhotoUploadPage() {
             return { ...resident, room_number };
           }));
           setResidents(residentsWithRoom);
-          console.log('Staff residents with room_number:', residentsWithRoom);
         } else {
-          // Nếu là admin, lấy tất cả cư dân và lọc chỉ lấy cư dân chính thức
+          
           const data = await residentAPI.getAll();
           const allResidents = Array.isArray(data) ? data : [];
           const officialResidents = await filterOfficialResidents(allResidents);
@@ -101,7 +92,7 @@ export default function PhotoUploadPage() {
           const residentsWithRoom = await Promise.all(officialResidents.map(async (resident: any) => {
             let room_number = '';
             try {
-              // Ưu tiên sử dụng bedAssignmentsAPI
+              
               try {
                 const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
                 const bedAssignment = Array.isArray(bedAssignments) ? 
@@ -121,8 +112,7 @@ export default function PhotoUploadPage() {
                   throw new Error('No bed assignment found');
                 }
               } catch (bedError) {
-                console.warn(`Failed to get bed assignment for resident ${resident._id}:`, bedError);
-                // Fallback về carePlansAPI
+                
                 const assignments = await carePlansAPI.getByResidentId(resident._id);
                 const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
                 const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
@@ -136,10 +126,8 @@ export default function PhotoUploadPage() {
             return { ...resident, room_number };
           }));
           setResidents(residentsWithRoom);
-          console.log('Official residents with room_number for photos:', residentsWithRoom);
         }
       } catch (err) {
-        console.error('Error fetching residents:', err);
         setResidents([]);
       }
     };
@@ -149,43 +137,42 @@ export default function PhotoUploadPage() {
     }
   }, [user]);
 
-  // Load activities from API
+  
+  // Load activities assigned to current staff via participations
   useEffect(() => {
-    const fetchActivities = async () => {
+    const fetchStaffActivities = async () => {
       try {
-        const data = await activitiesAPI.getAll();
-        const activitiesArray = Array.isArray(data) ? data : [];
-        setActivities(activitiesArray);
-        console.log('Activities loaded for photos:', activitiesArray);
-        
-        // Debug: Check if activities have valid MongoDB IDs
-        activitiesArray.forEach((activity, index) => {
-          console.log(`Activity ${index}:`, {
-            _id: activity._id,
-            activity_name: activity.activity_name,
-            idType: typeof activity._id,
-            isValidMongoId: activity._id && /^[0-9a-fA-F]{24}$/.test(activity._id)
-          });
+        if (!user || !('id' in user) || !(user as any).id) {
+          setActivities([]);
+          return;
+        }
+        const participations = await activityParticipationsAPI.getByStaffId((user as any).id);
+        const activityIds = [...new Set((Array.isArray(participations) ? participations : []).map((p: any) => p.activity_id?._id || p.activity_id))].filter(Boolean);
+        const activityPromises = activityIds.map(async (activityId: any) => {
+          try {
+            const activityData = await activitiesAPI.getById(activityId);
+            return mapActivityFromAPI(activityData);
+          } catch {
+            return null;
+          }
         });
-      } catch (err) {
-        console.error('Error fetching activities:', err);
+        const mapped = (await Promise.all(activityPromises)).filter(Boolean);
+        setActivities(mapped as any[]);
+      } catch {
         setActivities([]);
       }
     };
-    
-    if (user) {
-      fetchActivities();
-    }
+    if (user) fetchStaffActivities();
   }, [user]);
   
-  // Cleanup preview URLs when component unmounts
+  
   useEffect(() => {
     return () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
   }, [previewUrls]);
   
-  // Check access permissions
+  
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -198,8 +185,8 @@ export default function PhotoUploadPage() {
     }
   }, [user, router]);
   
-  // Professional constants for nursing home operations
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
   const MAX_FILES_COUNT = 10;
   const ALLOWED_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   const ACTIVITY_TYPES = [
@@ -219,30 +206,29 @@ export default function PhotoUploadPage() {
     'Thân thiện', 'Năng động', 'Tập trung', 'Hạnh phúc', 'An toàn'
   ];
   
-  // Professional validation functions
+  
   const validateFiles = (files: File[]): {isValid: boolean, errors: string[]} => {
     const errors: string[] = [];
     
-    // Check file count
+    
     if (files.length === 0) {
       errors.push('Vui lòng chọn ít nhất 1 ảnh');
     } else if (files.length > MAX_FILES_COUNT) {
       errors.push(`Tối đa ${MAX_FILES_COUNT} ảnh mỗi lần tải lên`);
     }
     
-    // Check individual files
     files.forEach((file, index) => {
-      // File size validation
+      
       if (file.size > MAX_FILE_SIZE) {
         errors.push(`Ảnh "${file.name}" quá lớn (tối đa 10MB)`);
       }
       
-      // File format validation
+      
       if (!ALLOWED_FORMATS.includes(file.type)) {
         errors.push(`Ảnh "${file.name}" không đúng định dạng (chỉ chấp nhận JPG, PNG, WebP)`);
       }
       
-      // File name validation (nursing home security)
+      
       if (file.name.length > 100) {
         errors.push(`Tên file "${file.name}" quá dài (tối đa 100 ký tự)`);
       }
@@ -254,19 +240,23 @@ export default function PhotoUploadPage() {
   const validateForm = (): boolean => {
     const errors: {[key: string]: string} = {};
     
-    // Resident selection
+    
     if (!selectedResident) {
       errors.selectedResident = 'Vui lòng chọn người cao tuổi';
     }
     
-    // Activity type
+    
     if (!activityType) {
       errors.activityType = 'Vui lòng chọn loại hoạt động';
     } else if (activityType === 'Khác' && !customActivityType.trim()) {
       errors.customActivityType = 'Vui lòng nhập loại hoạt động tùy chỉnh';
     }
     
-    // Description validation
+    if (!selectedActivity || !/^[0-9a-fA-F]{24}$/.test(selectedActivity)) {
+      errors.selectedActivity = 'Vui lòng chọn Hoạt động sinh hoạt hợp lệ';
+    }
+    
+    
     if (!photoDescription.trim()) {
       errors.photoDescription = 'Vui lòng nhập mô tả hoạt động';
     } else if (photoDescription.trim().length < 10) {
@@ -275,7 +265,7 @@ export default function PhotoUploadPage() {
       errors.photoDescription = 'Mô tả không được vượt quá 500 ký tự';
     }
     
-    // Files validation
+    
     const fileValidation = validateFiles(selectedFiles);
     if (!fileValidation.isValid) {
       errors.files = fileValidation.errors.join('; ');
@@ -285,24 +275,24 @@ export default function PhotoUploadPage() {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle photo upload with professional validation
+  
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    // Nối files mới vào danh sách cũ
+    
     const newFiles = [...selectedFiles, ...files];
-    // Giới hạn tối đa 10 ảnh
+    
     if (newFiles.length > MAX_FILES_COUNT) {
       setValidationErrors(prev => ({...prev, files: `Tối đa ${MAX_FILES_COUNT} ảnh mỗi lần tải lên`}));
       event.target.value = '';
       return;
     }
-    // Validate files mới
+    
     const validation = validateFiles(newFiles);
     if (validation.isValid) {
       setSelectedFiles(newFiles);
       setValidationErrors(prev => ({...prev, files: ''}));
       
-      // Tạo preview URLs cho files mới
+      
       const newPreviewUrls = files.map(file => URL.createObjectURL(file));
       setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
     } else {
@@ -324,31 +314,21 @@ export default function PhotoUploadPage() {
     const errors: string[] = [];
 
     try {
-      // Validate selectedFiles before starting upload
-      console.log('selectedFiles before upload:', selectedFiles);
-      console.log('selectedFiles length:', selectedFiles.length);
+      
       
       if (!selectedFiles || selectedFiles.length === 0) {
         throw new Error('No files selected for upload');
       }
       
-      // Validate each file
+      
       selectedFiles.forEach((file, index) => {
-        console.log(`File ${index}:`, {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified
-        });
         
         if (!file || file.size === 0) {
           throw new Error(`File ${file.name} is empty or invalid`);
         }
       });
       
-      // Lấy resident object từ danh sách residents (so sánh kiểu string)
       const residentObj = residents.find(r => String(r._id) === String(selectedResident));
-      console.log('residentObj:', residentObj);
       
       if (!residentObj) {
         setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người cao tuổi'}));
@@ -356,21 +336,16 @@ export default function PhotoUploadPage() {
         return;
       }
       
-      // Kiểm tra familyId - có thể không cần thiết cho staff upload ảnh
       const familyId = (residentObj as any).family_member_id || (residentObj as any).familyId || (residentObj as any).family_id;
-      console.log('familyId:', familyId);
-      console.log('residentObj:', residentObj);
       
-      // Nếu là staff và không có familyId, vẫn cho phép upload (có thể là cư dân mới chưa có family)
       if (user?.role === 'staff' && !familyId) {
-        console.log('Staff upload without familyId - allowed');
+        
       } else if (!familyId && user?.role !== 'staff') {
         setValidationErrors(prev => ({...prev, selectedResident: 'Không tìm thấy thông tin người thân (familyId)'}));
         setIsUploading(false);
         return;
       }
       
-      // Upload từng ảnh một thay vì song song để tránh quá tải database
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         setCurrentUploading(i + 1);
@@ -378,11 +353,6 @@ export default function PhotoUploadPage() {
         try {
         const formData = new FormData();
           
-          // Validate file before appending
-          console.log('File to upload:', file);
-          console.log('File name:', file.name);
-          console.log('File size:', file.size);
-          console.log('File type:', file.type);
           
           if (!file || file.size === 0) {
             throw new Error(`File ${file.name} is empty or invalid`);
@@ -391,7 +361,6 @@ export default function PhotoUploadPage() {
           formData.append('file', file);
           formData.append('resident_id', residentObj._id);
           
-          // Chỉ thêm các field cần thiết
           if (photoDescription.trim()) {
         formData.append('caption', photoDescription.trim());
           }
@@ -402,26 +371,23 @@ export default function PhotoUploadPage() {
             formData.append('activity_type', customActivityType.trim());
           }
           
-          // Thêm related_activity_id nếu có chọn activity và có giá trị hợp lệ
           if (selectedActivity && 
               selectedActivity.trim() !== '' && 
               selectedActivity !== 'null' && 
               selectedActivity !== 'undefined' &&
               /^[0-9a-fA-F]{24}$/.test(selectedActivity)) {
             formData.append('related_activity_id', selectedActivity);
-            console.log('Adding related_activity_id:', selectedActivity);
+            
           } else if (selectedActivity) {
-            console.warn('Invalid related_activity_id format:', selectedActivity);
+            
           }
           
-          // Chỉ append tags nếu có
           if (photoTags.length > 0) {
         photoTags.forEach(tag => formData.append('tags', tag));
           }
           
         formData.append('taken_date', new Date().toISOString());
         
-        // Truyền thêm tên người gửi
         let senderName = 'Nhân viên';
         if (user) {
           if ('full_name' in user && (user as any).full_name) senderName = (user as any).full_name;
@@ -430,54 +396,6 @@ export default function PhotoUploadPage() {
         }
         formData.append('staff_notes', String(senderName));
         
-          // Thêm familyId nếu có và không rỗng - chỉ cho admin, không cho staff
-          // Note: Backend gets family_id from resident data, not from form
-          // if (familyId && familyId.toString().trim() !== '' && user?.role !== 'staff') {
-          //   formData.append('family_id', familyId.toString());
-          // }
-          
-          // Thêm user_id để backend biết ai upload (nếu cần)
-          // Note: Backend expects uploaded_by from JWT token, not user_id
-          // if (user && 'id' in user && user.id) {
-          //   formData.append('user_id', user.id);
-          // }
-          
-          // Debug: Log FormData content
-          console.log('FormData content for', file.name, ':');
-          const formDataEntries: [string, any][] = [];
-          for (let [key, value] of formData.entries()) {
-            console.log(key, ':', value);
-            formDataEntries.push([key, value]);
-          }
-          
-          // Validate that file is in FormData
-          const fileInFormData = formData.get('file');
-          console.log('File in FormData after appending:', fileInFormData);
-          console.log('File in FormData type:', typeof fileInFormData);
-          console.log('File in FormData instanceof File:', fileInFormData instanceof File);
-          
-          if (!fileInFormData || !(fileInFormData instanceof File)) {
-            throw new Error(`File not properly added to FormData for ${file.name}`);
-          }
-          
-          // Debug: Log selectedActivity specifically
-          console.log('selectedActivity value:', selectedActivity);
-          console.log('selectedActivity type:', typeof selectedActivity);
-          
-          // Check if related_activity_id is being sent
-          const hasRelatedActivityId = formDataEntries.some(([key, value]) => key === 'related_activity_id');
-          console.log('FormData contains related_activity_id:', hasRelatedActivityId);
-          
-          // Validate that we're only sending expected fields
-          const expectedFields = ['file', 'resident_id', 'caption', 'activity_type', 'tags', 'taken_date', 'staff_notes', 'related_activity_id'];
-          const unexpectedFields = formDataEntries.filter(([key, value]) => !expectedFields.includes(key));
-          if (unexpectedFields.length > 0) {
-            console.warn('Unexpected fields in FormData:', unexpectedFields);
-          }
-          
-          console.log(`Uploading file ${i + 1}/${selectedFiles.length}:`, file.name);
-          
-          // Thử upload với retry logic
           let retryCount = 0;
           const maxRetries = 2;
           let uploadSuccess = false;
@@ -487,15 +405,14 @@ export default function PhotoUploadPage() {
               await photosAPI.upload(formData);
             successCount++;
               uploadSuccess = true;
-              console.log(`✅ Successfully uploaded: ${file.name}`);
+              
             } catch (uploadError: any) {
               retryCount++;
-              console.error(`❌ Upload attempt ${retryCount} failed for ${file.name}:`, uploadError);
+              
               
               if (uploadError.message?.includes('cơ sở dữ liệu') || uploadError.message?.includes('Database')) {
                 if (retryCount <= maxRetries) {
-                  console.log(`🔄 Retrying upload for ${file.name} (attempt ${retryCount + 1}/${maxRetries + 1})`);
-                  // Wait 2 seconds before retry
+                  
                   await new Promise(resolve => setTimeout(resolve, 2000));
                   continue;
                 } else {
@@ -503,7 +420,7 @@ export default function PhotoUploadPage() {
                 }
               } else {
                 errors.push(`${file.name}: ${uploadError.message || 'Lỗi không xác định'}`);
-                break; // Don't retry for non-database errors
+                break;
               }
             }
           }
@@ -514,15 +431,14 @@ export default function PhotoUploadPage() {
           
         } catch (fileError: any) {
           errorCount++;
-          console.error(`❌ Failed to upload ${file.name}:`, fileError);
           errors.push(`${file.name}: ${fileError.message || 'Lỗi không xác định'}`);
         }
         
-        // Update progress
+        
         setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
       }
       
-      // Hiển thị kết quả
+      
       if (successCount > 0) {
         const errorMessage = errorCount > 0 ? `\n\n❌ ${errorCount} ảnh lỗi:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n... và ${errors.length - 3} lỗi khác` : ''}` : '';
         setResultMessage(`✅ Đã tải lên ${successCount}/${selectedFiles.length} ảnh thành công!${errorMessage}`);
@@ -532,7 +448,7 @@ export default function PhotoUploadPage() {
       
       setShowResultModal(true);
       
-      // Chuyển hướng nhanh hơn sau 2 giây nếu có ít nhất 1 ảnh thành công
+      
       if (successCount > 0) {
       if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
       const timeout = setTimeout(() => {
@@ -548,7 +464,6 @@ export default function PhotoUploadPage() {
         setAutoCloseTimeout(timeout);
       }
     } catch (error: any) {
-      console.error('General upload error:', error);
       setResultMessage(`❌ Có lỗi xảy ra khi tải ảnh: ${error.message || 'Lỗi không xác định'}`);
       setShowResultModal(true);
       if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
@@ -563,7 +478,7 @@ export default function PhotoUploadPage() {
     }
   };
 
-  // Helper functions
+  
   const handleTagToggle = (tag: string) => {
     setPhotoTags(prev => 
       prev.includes(tag) 
@@ -573,7 +488,6 @@ export default function PhotoUploadPage() {
   };
 
   const resetForm = () => {
-    // Cleanup preview URLs
     previewUrls.forEach(url => URL.revokeObjectURL(url));
     setPreviewUrls([]);
     
@@ -592,37 +506,154 @@ export default function PhotoUploadPage() {
     router.push('/staff/photos');
   };
 
+  const mapActivityFromAPI = (apiActivity: any) => {
+    try {
+      if (!apiActivity || !apiActivity._id) return null;
+      const scheduleTime = apiActivity.schedule_time ? new Date(apiActivity.schedule_time) : null;
+      const durationInMinutes = typeof apiActivity.duration === 'number' ? apiActivity.duration : 0;
+      const endTime = scheduleTime ? new Date(scheduleTime.getTime() + durationInMinutes * 60000) : null;
+      return {
+        _id: apiActivity._id,
+        activity_name: apiActivity.activity_name,
+        activity_type: apiActivity.activity_type,
+        description: apiActivity.description,
+        schedule_time: apiActivity.schedule_time,
+        duration: apiActivity.duration,
+        startTime: scheduleTime ? scheduleTime.toTimeString().slice(0, 5) : '',
+        endTime: endTime ? endTime.toTimeString().slice(0, 5) : '',
+        date: scheduleTime ? scheduleTime.toLocaleDateString('en-CA') : undefined,
+        location: apiActivity.location,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const getDateFromActivity = (a: any): Date | null => {
+    const parseDateFlexible = (val: any): Date | null => {
+      if (!val) return null;
+      if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+      if (typeof val === 'number') {
+        const dt = new Date(val);
+        return isNaN(dt.getTime()) ? null : dt;
+      }
+      if (typeof val === 'string') {
+        const s = val.trim();
+        const ymd = /^(\d{4})-(\d{2})-(\d{2})$/;
+        const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+        const numeric = /^\d+$/;
+        if (ymd.test(s)) {
+          const dt = new Date(s + 'T00:00:00');
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+        if (dmy.test(s)) {
+          const [, dd, mm, yy] = s.match(dmy)!;
+          const dt = new Date(Number(yy), Number(mm) - 1, Number(dd));
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+        if (numeric.test(s)) {
+          const num = Number(s);
+          const ms = s.length === 10 ? num * 1000 : num;
+          const dt = new Date(ms);
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+        const dt = new Date(s);
+        return isNaN(dt.getTime()) ? null : dt;
+      }
+      return null;
+    };
+
+    const candidates = [
+      a.activity_date,
+      a.activityDate,
+      a.date,
+      a.scheduled_date,
+      a.scheduledDate,
+      a.scheduled_at,
+      a.start_time,
+      a.startTime,
+      a.start_at,
+      a.startAt,
+      a.created_at,
+      a.updated_at
+    ];
+    for (const d of candidates) {
+      const dt = parseDateFlexible(d);
+      if (dt) return dt;
+    }
+    return null;
+  };
+
+  const isTodayLocal = (dt: Date) => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return dt.getTime() >= start.getTime() && dt.getTime() <= end.getTime();
+  };
+
+  const todaysActivities = useMemo(() => {
+    return Array.isArray(activities)
+      ? activities.filter((a: any) => {
+          const dt = getDateFromActivity(a);
+          return dt ? isTodayLocal(dt) : false;
+        })
+      : [];
+  }, [activities]);
+
+  const [activityParticipants, setActivityParticipants] = useState<{ [activityId: string]: string[] }>({});
+
+  useEffect(() => {
+    const loadParticipants = async () => {
+      try {
+        const entries = await Promise.all(
+          todaysActivities.map(async (a: any) => {
+            const activityId = a._id || a.id;
+            if (!activityId) return [null, []] as [string | null, string[]];
+            const list = await activityParticipationsAPI.getAll({ activity_id: activityId });
+            const filtered = (Array.isArray(list) ? list : []).filter((p: any) => {
+              const pDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
+              const aDate = a.date || (getDateFromActivity(a)?.toLocaleDateString('en-CA'));
+              return pDate && aDate && pDate === aDate;
+            });
+            const residentIds = filtered.map((p: any) => p.resident_id?._id || p.resident_id).filter(Boolean);
+            return [activityId, Array.from(new Set(residentIds))] as [string, string[]];
+          })
+        );
+        const map: { [k: string]: string[] } = {};
+        entries.forEach(([id, ids]) => { if (id) map[id] = ids; });
+        setActivityParticipants(map);
+      } catch {
+        setActivityParticipants({});
+      }
+    };
+    
+    // Chỉ gọi loadParticipants nếu có activities và chưa load
+    if (todaysActivities.length > 0) {
+      loadParticipants();
+    } else {
+      // Chỉ set empty object nếu hiện tại không empty để tránh infinite loop
+      setActivityParticipants(prev => {
+        if (Object.keys(prev).length === 0) return prev;
+        return {};
+      });
+    }
+  }, [todaysActivities]);
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg,rgb(251, 251, 248) 0%,rgb(249, 247, 243) 100%)',
-      padding: '2rem 1rem'
-    }}>
-      <div style={{
-        maxWidth: '800px',
-        margin: '0 auto',
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-        borderRadius: '1.5rem',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '2rem',
-          color: 'white'
-        }}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem'}}>
+    <div className="min-h-screen bg-[linear-gradient(135deg,rgb(251,251,248)_0%,rgb(249,247,243)_100%)] py-8 px-4">
+      <div className="max-w-[800px] mx-auto bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+        
+        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-8 text-white">
+          <div className="flex items-center gap-4 mb-4">
             
             <div>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                <PhotoIcon style={{width: '2.5rem', height: '2.5rem', color: 'white'}} />
+              <div className="flex items-center gap-3">
+                <PhotoIcon className="w-10 h-10 text-white" />
                 <div>
-                  <h1 style={{fontSize: '1.8rem', fontWeight: 700, margin: 0}}>
+                  <h1 className="text-[1.8rem] font-bold m-0">
                 Đăng ảnh của người cao tuổi
               </h1>
-                  <p style={{fontSize: '0.9rem', margin: '0.5rem 0 0 0', opacity: 0.9}}>
+                  <p className="text-sm mt-2 opacity-90 m-0">
                 Ghi lại những khoảnh khắc đáng nhớ và chia sẻ với gia đình
               </p>
                 </div>
@@ -631,18 +662,12 @@ export default function PhotoUploadPage() {
           </div>
         </div>
 
-        {/* Form Content */}
-        <div style={{padding: '2rem'}}>
-          {/* Resident Selection */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.5rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
-              Chọn người cao tuổi <span style={{color: '#ef4444'}}>*</span>
+        
+        <div className="p-8">
+          
+          <div className="mb-6">
+            <label className="block font-semibold mb-2 text-slate-700 text-[0.95rem]">
+              Chọn người cao tuổi <span className="text-red-500">*</span>
             </label>
             <select
               value={selectedResident}
@@ -650,16 +675,7 @@ export default function PhotoUploadPage() {
                 setSelectedResident(e.target.value);
                 setValidationErrors(prev => ({...prev, selectedResident: ''}));
               }}
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                borderRadius: '0.75rem',
-                border: `2px solid ${validationErrors.selectedResident ? '#ef4444' : '#e5e7eb'}`,
-                fontSize: '0.95rem',
-                background: validationErrors.selectedResident ? '#fef2f2' : 'white',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
+              className={`w-full p-3 rounded-xl border-2 text-[0.95rem] outline-none ${validationErrors.selectedResident ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
             >
               <option value="">-- Chọn người cao tuổi --</option>
               {residents.map((resident: any) => (
@@ -669,61 +685,55 @@ export default function PhotoUploadPage() {
               ))}
             </select>
             {validationErrors.selectedResident && (
-              <p style={{color: '#ef4444', fontSize: '0.875rem', margin: '0.5rem 0 0 0', fontWeight: 500}}>
+              <p className="text-red-500 text-sm mt-2 font-medium">
                 {validationErrors.selectedResident}
               </p>
             )}
           </div>
 
-          {/* Activity Selection */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.5rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
-              Liên kết với hoạt động (tùy chọn)
+          
+          <div className="mb-6">
+            <label className="block font-semibold mb-2 text-slate-700 text-[0.95rem]">
+              Hoạt động sinh hoạt
             </label>
             <select
               value={selectedActivity}
               onChange={(e) => {
                 setSelectedActivity(e.target.value);
               }}
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                borderRadius: '0.75rem',
-                border: '2px solid #e5e7eb',
-                fontSize: '0.95rem',
-                background: 'white',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
+              className={`w-full p-3 rounded-xl border-2 text-[0.95rem] outline-none ${validationErrors.selectedActivity ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
             >
-              <option value="">-- Chọn hoạt động (không bắt buộc) --</option>
-              {activities.map((activity: any) => (
+              <option value="">-- Chọn hoạt động --</option>
+              {!selectedResident ? (
+                <option value="" disabled>Chọn người cao tuổi trước</option>
+              ) : todaysActivities.length === 0 ? (
+                <option value="" disabled>Người cao tuổi không có hoạt động hôm nay</option>
+              ) : (() => {
+                const residentActivities = todaysActivities.filter((activity: any) => {
+                  const activityId = activity._id || activity.id;
+                  const list = activityParticipants[activityId] || [];
+                  return list.includes(selectedResident);
+                });
+                if (residentActivities.length === 0) {
+                  return <option value="" disabled>Người cao tuổi không có hoạt động hôm nay</option>;
+                }
+                return residentActivities.map((activity: any) => (
                 <option key={activity._id} value={activity._id}>
                   {activity.activity_name} - {activity.activity_type || 'Không phân loại'}
                 </option>
-              ))}
+                ));
+              })()}
             </select>
-            <p style={{color: '#6b7280', fontSize: '0.8rem', margin: '0.5rem 0 0 0'}}>
-              Chọn hoạt động nếu ảnh này liên quan đến một hoạt động cụ thể
+           {validationErrors.selectedActivity && (
+             <p className="text-red-500 text-sm mt-2 font-medium">
+               {validationErrors.selectedActivity}
             </p>
+           )}
           </div>
 
-          {/* Activity Type */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.5rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
-              Loại hoạt động <span style={{color: '#ef4444'}}>*</span>
+          <div className="mb-6">
+            <label className="block font-semibold mb-2 text-slate-700 text-[0.95rem]">
+              Loại hoạt động <span className="text-red-500">*</span>
             </label>
             <select
               value={activityType}
@@ -732,16 +742,7 @@ export default function PhotoUploadPage() {
                 setCustomActivityType('');
                 setValidationErrors(prev => ({...prev, activityType: '', customActivityType: ''}));
               }}
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                borderRadius: '0.75rem',
-                border: `2px solid ${validationErrors.activityType ? '#ef4444' : '#e5e7eb'}`,
-                fontSize: '0.95rem',
-                background: validationErrors.activityType ? '#fef2f2' : 'white',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
+              className={`w-full p-3 rounded-xl border-2 text-[0.95rem] outline-none ${validationErrors.activityType ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
             >
               <option value="">-- Chọn loại hoạt động --</option>
               {ACTIVITY_TYPES.map(type => (
@@ -749,22 +750,16 @@ export default function PhotoUploadPage() {
               ))}
             </select>
             {validationErrors.activityType && (
-              <p style={{color: '#ef4444', fontSize: '0.875rem', margin: '0.5rem 0 0 0', fontWeight: 500}}>
+              <p className="text-red-500 text-sm mt-2 font-medium">
                 {validationErrors.activityType}
               </p>
             )}
             
-            {/* Custom Activity Type Input */}
+            
             {activityType === 'Khác' && (
-              <div style={{marginTop: '1rem'}}>
-                <label style={{
-                  display: 'block', 
-                  fontWeight: 600, 
-                  marginBottom: '0.5rem', 
-                  color: '#374151',
-                  fontSize: '0.95rem'
-                }}>
-                  Nhập loại hoạt động tùy chỉnh <span style={{color: '#ef4444'}}>*</span>
+              <div className="mt-4">
+                <label className="block font-semibold mb-2 text-slate-700 text-[0.95rem]">
+                  Nhập loại hoạt động tùy chỉnh <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -774,19 +769,10 @@ export default function PhotoUploadPage() {
                     setValidationErrors(prev => ({...prev, customActivityType: ''}));
                   }}
                   placeholder="VD: Hoạt động dã ngoại, Lễ kỷ niệm, Hoạt động tình nguyện..."
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    borderRadius: '0.75rem',
-                    border: `2px solid ${validationErrors.customActivityType ? '#ef4444' : '#e5e7eb'}`,
-                    fontSize: '0.95rem',
-                    background: validationErrors.customActivityType ? '#fef2f2' : 'white',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
+                  className={`w-full p-3 rounded-xl border-2 text-[0.95rem] outline-none ${validationErrors.customActivityType ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
                 />
                 {validationErrors.customActivityType && (
-                  <p style={{color: '#ef4444', fontSize: '0.875rem', margin: '0.5rem 0 0 0', fontWeight: 500}}>
+                  <p className="text-red-500 text-sm mt-2 font-medium">
                     {validationErrors.customActivityType}
                   </p>
                 )}
@@ -794,19 +780,11 @@ export default function PhotoUploadPage() {
             )}
           </div>
 
-          {/* Description */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.5rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
-              Mô tả hoạt động <span style={{color: '#ef4444'}}>*</span>
-              <span style={{fontSize: '0.8rem', color: '#6b7280', fontWeight: 400}}>
-                ({photoDescription.length}/500 ký tự)
-              </span>
+          
+          <div className="mb-6">
+            <label className="block font-semibold mb-2 text-slate-700 text-[0.95rem]">
+              Mô tả hoạt động <span className="text-red-500">*</span>
+              <span className="text-xs text-slate-500 font-normal ml-2">({photoDescription.length}/500 ký tự)</span>
             </label>
             <textarea
               value={photoDescription}
@@ -816,56 +794,26 @@ export default function PhotoUploadPage() {
               }}
               placeholder="VD: Cô Lan tham gia hoạt động thể dục buổi sáng với các bạn, rất vui vẻ và tích cực..."
               rows={4}
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                borderRadius: '0.75rem',
-                border: `2px solid ${validationErrors.photoDescription ? '#ef4444' : '#e5e7eb'}`,
-                fontSize: '0.95rem',
-                background: validationErrors.photoDescription ? '#fef2f2' : 'white',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                resize: 'vertical'
-              }}
+              className={`w-full p-3 rounded-xl border-2 text-[0.95rem] outline-none resize-y ${validationErrors.photoDescription ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
             />
             {validationErrors.photoDescription && (
-              <p style={{color: '#ef4444', fontSize: '0.875rem', margin: '0.5rem 0 0 0', fontWeight: 500}}>
+              <p className="text-red-500 text-sm mt-2 font-medium">
                 {validationErrors.photoDescription}
               </p>
             )}
           </div>
 
-          {/* Photo Tags */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.75rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
+          
+          <div className="mb-6">
+            <label className="block font-semibold mb-3 text-slate-700 text-[0.95rem]">
               Tags cảm xúc (tùy chọn)
             </label>
-            <div style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
+            <div className="flex flex-wrap gap-3">
               {PHOTO_TAGS.map(tag => (
                 <button
                   key={tag}
                   onClick={() => handleTagToggle(tag)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '2rem',
-                    border: photoTags.includes(tag) ? '2px solid #22c55e' : '2px solid #e5e7eb',
-                    background: photoTags.includes(tag) ? '#22c55e' : 'white',
-                    color: photoTags.includes(tag) ? 'white' : '#6b7280',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    transition: 'all 0.2s'
-                  }}
+                  className={`px-4 py-2 rounded-full text-[0.85rem] font-medium transition border ${photoTags.includes(tag) ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 bg-white text-slate-600 hover:border-green-400 hover:bg-green-50'}`}
                 >
                   {tag}
                 </button>
@@ -873,38 +821,15 @@ export default function PhotoUploadPage() {
             </div>
           </div>
 
-          {/* File Upload */}
-          <div style={{marginBottom: '1.5rem'}}>
-            <label style={{
-              display: 'block', 
-              fontWeight: 600, 
-              marginBottom: '0.5rem', 
-              color: '#374151',
-              fontSize: '0.95rem'
-            }}>
-              Chọn ảnh <span style={{color: '#ef4444'}}>*</span>
-              <span style={{fontSize: '0.8rem', color: '#6b7280', fontWeight: 400}}>
-                (Tối đa {MAX_FILES_COUNT} ảnh, mỗi ảnh ≤ 10MB, JPG/PNG/WebP)
-              </span>
+          
+          <div className="mb-6">
+            <label className="block font-semibold mb-2 text-slate-700 text-[0.95rem]">
+              Chọn ảnh <span className="text-red-500">*</span>
+              <span className="text-xs text-slate-500 font-normal ml-2">(Tối đa {MAX_FILES_COUNT} ảnh, mỗi ảnh ≤ 10MB, JPG/PNG/WebP)</span>
             </label>
-            <div style={{
-              border: `2px dashed ${validationErrors.files ? '#ef4444' : '#d1d5db'}`,
-              borderRadius: '0.75rem',
-              padding: '2rem',
-              textAlign: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              background: validationErrors.files ? '#fef2f2' : 'white'
-            }}
+            <div
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${validationErrors.files ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white hover:border-green-500 hover:bg-green-50/50'}`}
               onClick={() => document.getElementById('fileInput')?.click()}
-            onMouseOver={(e) => {
-                                e.currentTarget.style.borderColor = validationErrors.files ? '#ef4444' : '#22c55e';
-                              e.currentTarget.style.background = validationErrors.files ? '#fef2f2' : 'rgba(34, 197, 94, 0.05)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = validationErrors.files ? '#ef4444' : '#d1d5db';
-              e.currentTarget.style.background = validationErrors.files ? '#fef2f2' : 'white';
-            }}
             >
               <input
                 id="fileInput"
@@ -912,171 +837,63 @@ export default function PhotoUploadPage() {
                 multiple
                 accept=".jpg,.jpeg,.png,.webp"
                 onChange={handleFileSelect}
-                style={{display: 'none'}}
+                className="hidden"
               />
               
-              <PhotoIcon style={{
-                width: '3rem', 
-                height: '3rem', 
-                margin: '0 auto 1rem', 
-                color: validationErrors.files ? '#ef4444' : '#9ca3af'
-              }} />
+              <PhotoIcon className={`${validationErrors.files ? 'text-red-500' : 'text-gray-400'} w-12 h-12 mx-auto mb-4`} />
               <div>
-                <p style={{
-                  color: validationErrors.files ? '#ef4444' : '#6b7280', 
-                  margin: 0, 
-                  fontSize: '1rem',
-                  fontWeight: 600
-                }}>
+                <p className={`${validationErrors.files ? 'text-red-500' : 'text-slate-600'} m-0 text-base font-semibold`}>
                   {selectedFiles.length > 0 
-                    ? `✅ Đã chọn ${selectedFiles.length} ảnh` 
+                    ? `Đã chọn ${selectedFiles.length} ảnh` 
                     : 'Click để chọn ảnh'
                   }
                 </p>
-                <p style={{
-                  color: '#9ca3af', 
-                  margin: '0.5rem 0 0 0', 
-                  fontSize: '0.85rem'
-                }}>
+                <p className="text-gray-400 mt-2 text-sm m-0">
                   Kéo thả ảnh vào đây hoặc click để chọn
                 </p>
               </div>
             </div>
             {validationErrors.files && (
-              <p style={{color: '#ef4444', fontSize: '0.875rem', margin: '0.5rem 0 0 0', fontWeight: 500}}>
+              <p className="text-red-500 text-sm mt-2 font-medium">
                 {validationErrors.files}
               </p>
             )}
           </div>
 
-          {/* Selected Files Preview */}
           {selectedFiles.length > 0 && (
-            <div style={{marginBottom: '1.5rem'}}>
-              <p style={{fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: '0.75rem'}}>
-                📎 Ảnh đã chọn ({selectedFiles.length}):
-              </p>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                gap: '1rem',
-                padding: '1rem',
-                background: '#f8fafc',
-                borderRadius: '0.75rem',
-                border: '1px solid #e5e7eb'
-              }}>
+            <div className="mb-6">
+              <p className="text-[0.95rem] font-semibold text-slate-700 mb-3">📎 Ảnh đã chọn ({selectedFiles.length}):</p>
+              <div className="grid [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
                 {selectedFiles.map((file, index) => (
-                  <div key={index} style={{
-                    background: 'white',
-                    padding: '0.75rem',
-                    borderRadius: '0.75rem',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}>
-                    {/* Image Preview */}
-                    <div style={{
-                      width: '100%',
-                      height: '120px',
-                      borderRadius: '0.5rem',
-                      margin: '0 auto 0.75rem',
-                      overflow: 'hidden',
-                      background: '#f3f4f6',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative'
-                    }}>
+                  <div key={index} className="bg-white p-3 rounded-xl shadow-sm text-center relative overflow-hidden border border-slate-100">
+                    <div className="w-full h-[120px] rounded-lg mb-3 overflow-hidden bg-slate-100 flex items-center justify-center relative">
                       <img
                         src={previewUrls[index]}
                         alt={`Preview ${file.name}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          borderRadius: '0.5rem'
-                        }}
+                        className="w-full h-full object-cover rounded-lg"
                         onError={(e) => {
-                          // Fallback nếu ảnh không load được
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
-                          const fallback = target.parentElement?.querySelector('.fallback') as HTMLElement;
+                          const fallback = (target.parentElement?.querySelector('.fallback') as HTMLElement);
                           if (fallback) fallback.style.display = 'flex';
                         }}
                       />
-                      {/* Fallback icon nếu ảnh không load được */}
-                      <div 
-                        className="fallback"
-                        style={{
-                          display: 'none',
-                          width: '100%',
-                          height: '100%',
-                          background: 'linear-gradient(135deg, #22c55e 0%, #f59e0b 100%)',
-                          borderRadius: '0.5rem',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: '2rem'
-                        }}
-                      >
+                      <div className="fallback hidden w-full h-full bg-gradient-to-br from-green-500 to-amber-500 rounded-lg items-center justify-center text-white text-2xl">
                         📷
                       </div>
                     </div>
-                    
-                    {/* File Info */}
-                    <p style={{
-                      fontSize: '0.8rem',
-                      color: '#374151',
-                      margin: '0 0 0.25rem 0',
-                      wordBreak: 'break-word',
-                      fontWeight: 500
-                    }}>
+                    <p className="text-[0.8rem] text-slate-800 m-0 mb-1 break-words font-medium">
                       {file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name}
                     </p>
-                    <p style={{
-                      fontSize: '0.7rem',
-                      color: '#6b7280',
-                      margin: 0
-                    }}>
-                      {(file.size / 1024 / 1024).toFixed(1)} MB
-                    </p>
-                    
-                    {/* Nút xóa ảnh */}
+                    <p className="text-[0.7rem] text-slate-500 m-0">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
                     <button
                       type="button"
                       onClick={() => {
-                        // Cleanup preview URL
                         URL.revokeObjectURL(previewUrls[index]);
                         setPreviewUrls(prev => prev.filter((_, i) => i !== index));
                         setSelectedFiles(prev => prev.filter((_, i) => i !== index));
                       }}
-                      style={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        background: 'rgba(239, 68, 68, 0.9)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '2rem',
-                        height: '2rem',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: '1.2rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 8px rgba(239,68,68,0.3)',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#ef4444';
-                        e.currentTarget.style.transform = 'scale(1.1)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.9)';
-                        e.currentTarget.style.transform = 'scale(1)';
-                      }}
+                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold shadow hover:bg-red-500"
                       title="Xóa ảnh này"
                     >
                       ×
@@ -1089,123 +906,44 @@ export default function PhotoUploadPage() {
 
           
 
-          {/* Upload Progress */}
+          
           {isUploading && (
-            <div style={{
-              marginBottom: '1.5rem',
-              padding: '1rem',
-              background: 'rgba(34, 197, 94, 0.05)',
-              borderRadius: '0.75rem',
-              border: '1px solid rgba(34, 197, 94, 0.2)'
-            }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem'}}>
-                <div style={{
-                  width: '1.5rem',
-                  height: '1.5rem',
-                  border: '2px solid rgba(34, 197, 94, 0.3)',
-                  borderTopColor: '#22c55e',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                <span style={{fontSize: '0.95rem', fontWeight: 600, color: '#22c55e'}}>
+            <div className="mb-6 p-4 bg-green-50 rounded-xl border border-green-200">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 border-2 border-green-300 border-t-green-500 rounded-full animate-spin" />
+                <span className="text-[0.95rem] font-semibold text-green-600">
                   Đang tải ảnh {currentUploading}/{selectedFiles.length}... {uploadProgress}%
                 </span>
               </div>
-              <div style={{
-                width: '100%',
-                height: '0.5rem',
-                background: '#e5e7eb',
-                borderRadius: '0.25rem',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  width: `${uploadProgress}%`,
-                  height: '100%',
-                  background: 'linear-gradient(135deg, #22c55e 0%, #f59e0b 100%)',
-                  transition: 'width 0.3s ease',
-                  borderRadius: '0.25rem'
-                }} />
+              <div className="w-full h-2 bg-slate-200 rounded overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-green-500 to-amber-500 transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div style={{
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            gap: '1rem',
-            paddingTop: '1rem',
-            borderTop: '1px solid #e5e7eb'
-          }}>
+          
+          <div className="flex justify-between gap-4 pt-4 border-t border-slate-200">
             <button
               onClick={() => router.push('/staff/photos/gallery')}
-              style={{
-                padding: '0.875rem 2rem',
-                borderRadius: '0.75rem',
-                border: '1px solid #d97706',
-                background: 'white',
-                color: '#d97706',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#f59e0b';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'white';
-                e.currentTarget.style.color = '#d97706';
-              }}
+              className="px-6 py-3 rounded-xl border border-amber-600 bg-white text-amber-600 font-semibold text-[0.95rem] flex items-center gap-2 hover:bg-amber-500 hover:text-white"
             >
-              <PhotoIcon style={{width: '1.25rem', height: '1.25rem'}} />
+              <PhotoIcon className="w-5 h-5" />
               Xem thư viện ảnh
             </button>
             
             <button
               onClick={handleUploadPhotos}
               disabled={isUploading || Object.values(validationErrors).some(error => error !== '')}
-              style={{
-                padding: '0.875rem 2rem',
-                borderRadius: '0.75rem',
-                border: 'none',
-                background: (isUploading || Object.values(validationErrors).some(error => error !== ''))
-                  ? '#d1d5db' 
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                cursor: (isUploading || Object.values(validationErrors).some(error => error !== ''))
-                  ? 'not-allowed' 
-                  : 'pointer',
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.2s',
-                boxShadow: (isUploading || Object.values(validationErrors).some(error => error !== ''))
-                  ? 'none'
-                  : '0 4px 12px rgba(102, 126, 234, 0.3)'
-              }}
+              className={`${isUploading || Object.values(validationErrors).some(error => error !== '') ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[0_4px_12px_rgba(102,126,234,0.3)] hover:opacity-95'} px-6 py-3 rounded-xl text-white font-semibold text-[0.95rem] flex items-center gap-2`}
             >
               {isUploading ? (
                 <>
-                  <div style={{
-                    width: '1rem',
-                    height: '1rem',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderTopColor: 'white',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Đang xử lý...
                 </>
               ) : (
                 <>
-                  <CloudArrowUpIcon style={{width: '1.25rem', height: '1.25rem'}} />
+                  <CloudArrowUpIcon className="w-5 h-5" />
                   Đăng ảnh ({selectedFiles.length})
                 </>
               )}
@@ -1214,221 +952,42 @@ export default function PhotoUploadPage() {
         </div>
       </div>
 
-      {/* Add animations */}
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes slideIn {
-          from { 
-            opacity: 0;
-            transform: translateY(-20px) scale(0.95);
-          }
-          to { 
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-        
-        @keyframes bounceIn {
-          0% { 
-            opacity: 0;
-            transform: scale(0.3);
-          }
-          50% { 
-            opacity: 1;
-            transform: scale(1.05);
-          }
-          70% { 
-            transform: scale(0.9);
-          }
-          100% { 
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-         
-         @keyframes zoomIn {
-           from {
-             opacity: 0;
-             transform: scale(0.95);
-           }
-           to {
-             opacity: 1;
-             transform: scale(1);
-           }
-         }
-         
-         @keyframes checkmark {
-           0% {
-             stroke-dashoffset: 40;
-           }
-           100% {
-             stroke-dashoffset: 0;
-           }
-         }
-      `}</style>
-             {/* Modal kết quả upload đồng bộ với login success modal */}
+      
       {showResultModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-           background: 'rgba(30, 41, 59, 0.25)',
-           backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-           zIndex: 9999,
-           animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-             background: resultMessage.startsWith('✅') 
-               ? 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)'
-               : 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
-             borderRadius: '24px',
-             padding: '2.5rem 2.5rem 2rem 2.5rem',
-             minWidth: 340,
-             boxShadow: resultMessage.startsWith('✅')
-               ? '0 8px 40px 0 rgba(16, 185, 129, 0.18), 0 2px 8px 0 rgba(0, 0, 0, 0.08)'
-               : '0 8px 40px 0 rgba(239, 68, 68, 0.18), 0 2px 8px 0 rgba(0, 0, 0, 0.08)',
-            textAlign: 'center',
-            position: 'relative',
-             animation: 'zoomIn 0.2s ease-out'
-          }}>
-             {/* Animated checkmark SVG for success */}
-             {resultMessage.startsWith('✅') && (
-            <div style={{
-                 marginBottom: '18px',
-              display: 'flex',
-              justifyContent: 'center',
-                 alignItems: 'center'
-               }}>
-                 <svg width="64" height="64" viewBox="0 0 64 64" style={{ display: 'block', margin: '0 auto' }}>
-                   <circle cx="32" cy="32" r="32" fill="#22c55e" opacity="0.15" />
-                   <circle cx="32" cy="32" r="24" fill="#22c55e" />
-                   <polyline
-                     points="22,34 30,42 44,26"
-                     fill="none"
-                     stroke="#fff"
-                     strokeWidth="4"
-                     strokeLinecap="round"
-                     strokeLinejoin="round"
-                     style={{
-                       strokeDasharray: 40,
-                       strokeDashoffset: 40,
-                       animation: 'checkmark 0.3s cubic-bezier(0.77, 0, 0.18, 1) forwards',
-                       animationDelay: '0.1s'
-                     }}
-                   />
-                 </svg>
+        <div className="fixed inset-0 bg-slate-800/25 backdrop-blur-sm flex items-center justify-center z-[9999] animate-fade-in">
+          <div className={`${resultMessage.startsWith('✅') ? 'bg-gradient-to-br from-green-50 to-green-200' : 'bg-gradient-to-br from-red-50 to-red-200'} rounded-3xl px-10 pt-10 pb-8 min-w-[340px] shadow-xl text-center relative`}>
+            {resultMessage.startsWith('✅') ? (
+              <div className="mb-4 flex justify-center items-center">
+                <div className="w-16 h-16 rounded-full bg-green-500/15 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-xl">✓</div>
                </div>
-             )}
-             
-             {/* Error icon for failure */}
-             {!resultMessage.startsWith('✅') && (
-               <div style={{
-                 marginBottom: '18px',
-                 display: 'flex',
-                 justifyContent: 'center',
-                 alignItems: 'center'
-               }}>
-                 <svg width="64" height="64" viewBox="0 0 64 64" style={{ display: 'block', margin: '0 auto' }}>
-                   <circle cx="32" cy="32" r="32" fill="#ef4444" opacity="0.15" />
-                   <circle cx="32" cy="32" r="24" fill="#ef4444" />
-                   <path
-                     d="M24 24L40 40M40 24L24 40"
-                     fill="none"
-                     stroke="#fff"
-                     strokeWidth="4"
-                     strokeLinecap="round"
-                     strokeLinejoin="round"
-                     style={{
-                       strokeDasharray: 40,
-                       strokeDashoffset: 40,
-                       animation: 'checkmark 0.3s cubic-bezier(0.77, 0, 0.18, 1) forwards',
-                       animationDelay: '0.1s'
-                     }}
-                   />
-                 </svg>
+              </div>
+            ) : (
+              <div className="mb-4 flex justify-center items-center">
+                <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white text-xl">✕</div>
+                </div>
             </div>
              )}
-            
-            {/* Title */}
-             <h2 style={{
-               fontSize: '26px',
-               fontWeight: 800,
-               marginBottom: '10px',
-               color: resultMessage.startsWith('✅') ? '#166534' : '#dc2626',
-               letterSpacing: '-0.01em'
-             }}>
+            <h2 className={`text-[26px] font-extrabold mb-2 ${resultMessage.startsWith('✅') ? 'text-green-800' : 'text-red-600'}`}>
                {resultMessage.startsWith('✅') ? 'Tải lên thành công! 🎉' : 'Có lỗi xảy ra! ❌'}
              </h2>
-            
-            {/* Message */}
-             <div style={{
-               fontSize: '18px',
-               color: resultMessage.startsWith('✅') ? '#166534' : '#dc2626',
-               marginBottom: '28px',
-               fontWeight: 500,
-               lineHeight: 1.4
-            }}>
+            <div className={`text-lg mb-7 font-medium ${resultMessage.startsWith('✅') ? 'text-green-800' : 'text-red-600'}`}>
               {resultMessage.replace(/^✅|^❌/, '')}
              </div>
-            
-            {/* Action Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-               justifyContent: 'center',
-               flexWrap: 'wrap'
-            }}>
+            <div className="flex gap-4 justify-center flex-wrap">
               {resultMessage.startsWith('✅') && (
                 <button
                   onClick={() => {
                     setShowResultModal(false);
                     router.push('/staff/photos/gallery');
                   }}
-                  style={{
-                     background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
-                    color: 'white',
-                    border: 'none',
-                     borderRadius: '999px',
-                     padding: '0.6rem 2.2rem',
-                     fontWeight: 700,
-                     fontSize: '17px',
-                    cursor: 'pointer',
-                     boxShadow: '0 2px 8px rgba(34, 197, 94, 0.12)',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseOver={(e) => {
-                     e.currentTarget.style.background = 'linear-gradient(90deg, #16a34a 0%, #15803d 100%)';
-                     e.currentTarget.style.transform = 'translateY(-1px)';
-                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.2)';
-                  }}
-                  onMouseOut={(e) => {
-                     e.currentTarget.style.background = 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(34, 197, 94, 0.12)';
-                  }}
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full px-8 py-2.5 font-bold shadow hover:from-green-600 hover:to-green-700 flex items-center gap-2"
                 >
-                  <PhotoIcon style={{width: '1.25rem', height: '1.25rem'}} />
+                  <PhotoIcon className="w-5 h-5" />
                   Xem thư viện ảnh
                 </button>
               )}
-              
               <button
                 onClick={() => {
                   setShowResultModal(false);
@@ -1436,40 +995,7 @@ export default function PhotoUploadPage() {
                     resetForm();
                   }
                 }}
-                style={{
-                   background: resultMessage.startsWith('✅') 
-                     ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
-                     : 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
-                   color: 'white',
-                   border: 'none',
-                   borderRadius: '999px',
-                   padding: '0.6rem 2.2rem',
-                   fontWeight: 700,
-                   fontSize: '17px',
-                  cursor: 'pointer',
-                   boxShadow: resultMessage.startsWith('✅')
-                     ? '0 2px 8px rgba(34, 197, 94, 0.12)'
-                     : '0 2px 8px rgba(239, 68, 68, 0.12)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                   e.currentTarget.style.background = resultMessage.startsWith('✅')
-                     ? 'linear-gradient(90deg, #16a34a 0%, #15803d 100%)'
-                     : 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)';
-                   e.currentTarget.style.transform = 'translateY(-1px)';
-                   e.currentTarget.style.boxShadow = resultMessage.startsWith('✅')
-                     ? '0 4px 12px rgba(34, 197, 94, 0.2)'
-                     : '0 4px 12px rgba(239, 68, 68, 0.2)';
-                }}
-                onMouseOut={(e) => {
-                   e.currentTarget.style.background = resultMessage.startsWith('✅')
-                     ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
-                     : 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)';
-                   e.currentTarget.style.transform = 'translateY(0)';
-                   e.currentTarget.style.boxShadow = resultMessage.startsWith('✅')
-                     ? '0 2px 8px rgba(34, 197, 94, 0.12)'
-                     : '0 2px 8px rgba(239, 68, 68, 0.12)';
-                }}
+                className={`${resultMessage.startsWith('✅') ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'} text-white rounded-full px-8 py-2.5 font-bold shadow hover:opacity-95`}
               >
                 {resultMessage.startsWith('✅') ? 'Tiếp tục tải lên' : 'Đóng'}
               </button>

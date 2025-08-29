@@ -43,11 +43,9 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [submitSuccess, setSubmitSuccess] = useState(false);
   
-  // Debug residents
   console.log('🏠 Available residents:', residents);
   console.log('🏠 Residents loading:', residentsLoading);
 
-  // Single field for blood pressure input
   const [formData, setFormData] = useState<VitalSigns>({
     residentId: '',
     bloodPressure: '',
@@ -59,44 +57,37 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
     notes: '',
   });
 
-  // Update validateFormStrict for single bloodPressure field
   const validateFormStrict = (data: VitalSigns) => {
     const errors: { [key: string]: string } = {};
     
-    // Required fields
     if (!data.residentId) {
       errors.residentId = 'Vui lòng chọn người cao tuổi';
     }
     
-    // Temperature (required)
     if (data.temperature === undefined || data.temperature === null || isNaN(Number(data.temperature))) {
       errors.temperature = 'Vui lòng nhập nhiệt độ';
     } else if (data.temperature < 30 || data.temperature > 45) {
       errors.temperature = 'Nhiệt độ phải từ 30°C đến 45°C';
     }
     
-    // Heart Rate (required)
     if (data.heartRate === undefined || data.heartRate === null || isNaN(Number(data.heartRate))) {
       errors.heartRate = 'Vui lòng nhập nhịp tim';
     } else if (data.heartRate < 30 || data.heartRate > 200) {
       errors.heartRate = 'Nhịp tim phải từ 30 đến 200 bpm';
     }
     
-    // Blood Pressure (required) - validate format only
     if (!data.bloodPressure || data.bloodPressure.trim() === '') {
       errors.bloodPressure = 'Vui lòng nhập huyết áp';
     } else if (!/^\d{2,3}\/\d{2,3}$/.test(data.bloodPressure)) {
       errors.bloodPressure = 'Huyết áp phải đúng định dạng (ví dụ: 120/80)';
     }
     
-    // Oxygen Saturation (required)
     if (data.oxygenSaturation === undefined || data.oxygenSaturation === null || isNaN(Number(data.oxygenSaturation))) {
       errors.oxygenSaturation = 'Vui lòng nhập nồng độ oxy';
     } else if (data.oxygenSaturation < 70 || data.oxygenSaturation > 100) {
       errors.oxygenSaturation = 'Nồng độ oxy phải từ 70% đến 100%';
     }
     
-    // Optional fields - only validate if provided
     if (data.respiratoryRate !== undefined && data.respiratoryRate !== null && !isNaN(Number(data.respiratoryRate))) {
       if (data.respiratoryRate < 5 || data.respiratoryRate > 60) {
         errors.respiratoryRate = 'Nhịp thở phải từ 5 đến 60 lần/phút';
@@ -112,10 +103,8 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
     return errors;
   };
 
-  // Replace old validateForm with strict version
   const validateForm = validateFormStrict;
 
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       const now = new Date();
@@ -137,7 +126,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
   const handleInputChange = (field: keyof VitalSigns, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Clear validation error for this field
     if (validationErrors[field]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
@@ -147,11 +135,10 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
     }
   };
 
-  // Update transformToApiFormat to use bloodPressure directly and handle optional fields
   const transformToApiFormat = (data: VitalSigns) => {
     const apiData: any = {
       resident_id: data.residentId,
-      recorded_by: user?.id || '', // Add current user ID as recorded_by
+      recorded_by: user?.id || '',
       temperature: Number(data.temperature),
       heart_rate: Number(data.heartRate),
       blood_pressure: data.bloodPressure,
@@ -159,7 +146,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
       notes: data.notes?.trim() || ''
     };
 
-    // Only include optional fields if they have valid values
     if (data.respiratoryRate !== undefined && data.respiratoryRate !== null && !isNaN(Number(data.respiratoryRate))) {
       apiData.respiratory_rate = Number(data.respiratoryRate);
     }
@@ -172,11 +158,9 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
     return apiData;
   };
 
-  // Enhanced error handling function
   const parseApiError = (error: any) => {
     console.error('🔍 Parsing API error:', error);
     
-    // Default error message
     let errorMessage = 'Có lỗi không xác định xảy ra. Vui lòng thử lại.';
     let fieldErrors: { [key: string]: string } = {};
 
@@ -184,21 +168,16 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
       const { status, data } = error.response;
       console.error(`❌ API Error - Status: ${status}`, data);
 
-      // Handle specific HTTP status codes
       switch (status) {
         case 400:
-          // Bad Request - usually validation errors
           if (data && typeof data === 'object') {
-            // Check for FastAPI validation errors
             if (data.detail && Array.isArray(data.detail)) {
-              // FastAPI validation error format
               data.detail.forEach((item: any) => {
                 if (item.loc && item.msg) {
-                  const field = item.loc[item.loc.length - 1]; // Get last location part
+                  const field = item.loc[item.loc.length - 1];
                   let fieldName = field;
                   let errorMsg = item.msg;
 
-                  // Map API field names to UI field names
                   switch (field) {
                     case 'resident_id':
                       fieldName = 'residentId';
@@ -242,19 +221,15 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
               }
             }
-            // Check for single detail message
             else if (data.detail && typeof data.detail === 'string') {
               errorMessage = `Lỗi dữ liệu: ${data.detail}`;
             }
-            // Check for message field
             else if (data.message) {
               errorMessage = `Lỗi: ${data.message}`;
             }
-            // Check for error field
             else if (data.error) {
               errorMessage = `Lỗi: ${data.error}`;
             }
-            // Generic validation error
             else {
               errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin đã nhập.';
             }
@@ -288,7 +263,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
           break;
 
         case 422:
-          // Unprocessable Entity - validation errors
           errorMessage = 'Dữ liệu không được chấp nhận. Vui lòng kiểm tra định dạng và giá trị các trường.';
           break;
 
@@ -318,11 +292,9 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
           }
       }
     } else if (error.request) {
-      // Network error
       console.error('🌐 Network error:', error.request);
       errorMessage = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.';
     } else {
-      // Other error
       console.error('⚠️ Other error:', error.message);
       errorMessage = `Lỗi: ${error.message || 'Có lỗi không xác định xảy ra'}`;
     }
@@ -333,14 +305,12 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     const errors = validateForm(formData);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       return;
     }
 
-    // Check required fields
     if (!formData.residentId) {
       setValidationErrors({ residentId: 'Vui lòng chọn người cao tuổi' });
       return;
@@ -355,12 +325,10 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
     try {
       await onSubmit(formData);
       setSubmitSuccess(true);
-      // Scroll lên đầu modal để thấy banner thành công
       setTimeout(() => {
         const modal = document.querySelector('.vital-signs-modal');
         if (modal) modal.scrollTop = 0;
       }, 100);
-      // Tự động đóng modal sau 1.5s
       setTimeout(() => {
         setFormData({
           residentId: '',
@@ -377,7 +345,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
         onClose();
       }, 1500);
     } catch (error: any) {
-      // Parse the error to get detailed information
       const { errorMessage, fieldErrors } = parseApiError(error);
       if (Object.keys(fieldErrors).length > 0) {
         setValidationErrors({ ...fieldErrors, general: errorMessage });
@@ -466,7 +433,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid rgba(255, 255, 255, 0.1)'
         }}>
-          {/* Header with gradient */}
           <div style={{
             background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
             borderRadius: '1.5rem 1.5rem 0 0',
@@ -474,7 +440,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
             position: 'relative',
             overflow: 'hidden'
           }}>
-            {/* Background pattern */}
             <div style={{
               position: 'absolute',
               top: 0,
@@ -554,9 +519,7 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
             </div>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
-            {/* Success Message */}
             {submitSuccess && (
               <div className="success-banner" style={{
                 display: 'flex',
@@ -578,7 +541,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
               </div>
             )}
             
-            {/* Error Message */}
             {validationErrors.general && !submitSuccess && (
               <div style={{
                 display: 'flex',
@@ -603,7 +565,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
               </div>
             )}
 
-            {/* Resident Selection - Full Width */}
             <div style={{ marginBottom: '2rem' }}>
               <label style={{
                 display: 'flex',
@@ -647,14 +608,12 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
               )}
             </div>
 
-            {/* Vital Signs Grid */}
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
               gap: '1.5rem', 
               marginBottom: '2rem' 
             }}>
-              {/* Blood Pressure */}
               <div className="card-hover" style={{
                 background: 'white',
                 padding: '1.5rem',
@@ -698,7 +657,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 )}
               </div>
 
-              {/* Heart Rate */}
               <div className="card-hover" style={{
                 background: 'white',
                 padding: '1.5rem',
@@ -742,7 +700,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 )}
               </div>
 
-              {/* Temperature */}
               <div className="card-hover" style={{
                 background: 'white',
                 padding: '1.5rem',
@@ -787,7 +744,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 )}
               </div>
 
-              {/* Oxygen Level */}
               <div className="card-hover" style={{
                 background: 'white',
                 padding: '1.5rem',
@@ -831,7 +787,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 )}
               </div>
 
-              {/* Respiratory Rate */}
               <div className="card-hover" style={{
                 background: 'white',
                 padding: '1.5rem',
@@ -875,7 +830,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
                 )}
               </div>
 
-              {/* Weight */}
               <div className="card-hover" style={{
                 background: 'white',
                 padding: '1.5rem',
@@ -921,7 +875,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
               </div>
             </div>
 
-            {/* Notes */}
             <div style={{ marginBottom: '2rem' }}>
               <label style={{
                 display: 'flex',
@@ -956,7 +909,6 @@ export default function VitalSignsForm({ isOpen, onClose, onSubmit }: VitalSigns
               />
             </div>
 
-            {/* Action Buttons */}
             <div style={{
               display: 'flex',
               justifyContent: 'flex-end',

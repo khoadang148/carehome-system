@@ -65,7 +65,6 @@ export default function SessionTimeoutModal({
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         textAlign: 'center'
       }}>
-        {/* Warning Icon */}
         <div style={{
           width: '4rem',
           height: '4rem',
@@ -86,7 +85,6 @@ export default function SessionTimeoutModal({
           </svg>
         </div>
 
-        {/* Title */}
         <h2 style={{
           fontSize: '1.5rem',
           fontWeight: 700,
@@ -96,7 +94,6 @@ export default function SessionTimeoutModal({
           Phiên làm việc sắp hết hạn
         </h2>
 
-        {/* Message */}
         <p style={{
           fontSize: '1rem',
           color: '#6b7280',
@@ -110,7 +107,6 @@ export default function SessionTimeoutModal({
           . Bạn có muốn tiếp tục phiên làm việc không?
         </p>
 
-        {/* Timer */}
         <div style={{
           background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
           border: '2px solid #f59e0b',
@@ -127,8 +123,7 @@ export default function SessionTimeoutModal({
             {formatTime(timeLeft)}
           </div>
         </div>
-
-        {/* Buttons */}
+            
         <div style={{
           display: 'flex',
           gap: '1rem',

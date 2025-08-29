@@ -20,8 +20,6 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { residentAPI, userAPI, carePlanAssignmentsAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import ConfirmModal from '@/components/shared/ConfirmModal';
-
-// Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return undefined;
   if (avatarPath.startsWith('http')) return avatarPath;
@@ -33,7 +31,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user } = useAuth();
   
-  // State management
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -56,10 +53,10 @@ export default function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // File validation
+
   const validateFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024; 
 
     if (!allowedTypes.includes(file.type)) {
       return 'Chỉ hỗ trợ file ảnh định dạng JPG, PNG, WEBP';
@@ -72,7 +69,6 @@ export default function ProfilePage() {
     return null;
   };
 
-  // Handle file selection
   const handleFileSelect = (file: File) => {
     const error = validateFile(file);
     if (error) {
@@ -91,7 +87,6 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   };
 
-  // Handle drag and drop
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -119,7 +114,6 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // Handle file input change
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -127,12 +121,11 @@ export default function ProfilePage() {
     }
   };
 
-  // Upload avatar function
   const uploadAvatar = async () => {
     setIsUploading(true);
     setUploadProgress(0);
 
-    // Simulate progress
+    
     for (let i = 0; i <= 90; i += 10) {
       await new Promise(resolve => setTimeout(resolve, 100));
       setUploadProgress(i);
@@ -183,7 +176,6 @@ export default function ProfilePage() {
     resetUploadState();
   };
 
-  // Reset upload state
   const resetUploadState = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
@@ -194,19 +186,16 @@ export default function ProfilePage() {
     }
   };
 
-  // Open upload modal
   const openUploadModal = () => {
     setShowUploadModal(true);
     resetUploadState();
   };
 
-  // Close upload modal
   const closeUploadModal = () => {
     setShowUploadModal(false);
     resetUploadState();
   };
 
-  // Calculate age from date of birth
   const calculateAge = (dateOfBirth: string) => {
     const dob = new Date(dateOfBirth);
     if (isNaN(dob.getTime())) return '-- tuổi';
@@ -220,7 +209,6 @@ export default function ProfilePage() {
     return age + ' tuổi';
   };
 
-  // Fetch user profile data
   useEffect(() => {
     if (user) {
       setProfileLoading(true);
@@ -235,7 +223,6 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  // Fetch residents for family members
   useEffect(() => {
     if (user?.role === 'family' && user?.id) {
       setLoading(true);
@@ -255,10 +242,8 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  // Get selected resident
   const selectedResident = residents.find(r => r._id === selectedResidentId);
 
-  // Fetch room information for selected resident
   useEffect(() => {
     if (!selectedResidentId) {
       setRoomNumber('Chưa hoàn tất đăng kí');
@@ -274,11 +259,9 @@ export default function ProfilePage() {
       .then((assignments: any[]) => {
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
         if (assignment?.bed_id?.room_id) {
-          // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
           if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
             setRoomNumber(assignment.bed_id.room_id.room_number);
           } else {
-            // Nếu chỉ có _id, fetch thêm thông tin
             const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
             if (roomId) {
               return roomsAPI.getById(roomId)
@@ -293,7 +276,6 @@ export default function ProfilePage() {
             }
           }
         } else {
-          // Fallback: lấy từ care plan assignments
           return carePlanAssignmentsAPI.getByResidentId(residentId)
             .then((careAssignments: any[]) => {
               const careAssignment = Array.isArray(careAssignments) ? careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
@@ -328,7 +310,7 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto">
         
 
-        {/* Header */}
+        
         <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
           <div className="flex items-center gap-4 mb-3">
           <button
@@ -352,9 +334,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Profile Card */}
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
-          {/* Avatar & Basic Info */}
           <div className="flex items-center gap-6 mb-8 flex-wrap">
             <div className="relative flex-shrink-0">
               <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold border-2 overflow-hidden relative ${
@@ -376,7 +356,6 @@ export default function ProfilePage() {
                 )}
               </div>
               
-              {/* Upload button */}
               <button
                 onClick={openUploadModal}
                 disabled={isUploading}
@@ -396,7 +375,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Admin Profile */}
           {userData?.role === 'admin' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl mx-auto">
               <div>
@@ -438,7 +416,6 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Contact Info */}
               <div>
                 <h3 className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
                   <EnvelopeIcon className="w-4 h-4 text-indigo-500" />
@@ -483,7 +460,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Role-specific Info */}
               <div>
                 <h3 className="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
                   {user?.role === 'family' ? (
@@ -582,154 +558,205 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Upload Modal */}
         {showUploadModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-auto shadow-2xl">
-              {/* Modal Header */}
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Thay đổi ảnh đại diện
-                </h3>
-                <button
-                  onClick={closeUploadModal}
-                  className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-                >
-                  <XMarkIcon className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Upload Area */}
-              {!previewUrl && (
-                <div
-                  onDragEnter={handleDragIn}
-                  onDragLeave={handleDragOut}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer mb-4 ${
-                    dragActive 
-                      ? 'border-indigo-500 bg-indigo-50' 
-                      : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-                  }`}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ArrowUpTrayIcon className={`w-12 h-12 mx-auto mb-4 ${
-                    dragActive ? 'text-indigo-500' : 'text-gray-400'
-                  }`} />
-                  <p className="text-base font-medium text-gray-700 mb-2">
-                    {dragActive ? 'Thả file ảnh vào đây' : 'Kéo thả ảnh hoặc click để chọn'}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Hỗ trợ JPG, PNG, WEBP (tối đa 5MB)
-                  </p>
-                  
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    onChange={handleFileInputChange}
-                    className="hidden"
-                  />
-                </div>
-              )}
-
-              {/* Preview Area */}
-              {previewUrl && (
-                <div className="mb-6">
-                  <h4 className="text-base font-medium text-gray-700 mb-4">
-                    Xem trước
-                  </h4>
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <div 
-                      className="w-16 h-16 rounded-full border-2 border-gray-200 bg-cover bg-center bg-no-repeat"
-                      style={{ backgroundImage: `url(${previewUrl})` }}
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 mb-1">
-                        {selectedFile?.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {selectedFile && (selectedFile.size / 1024 / 1024).toFixed(2)} MB
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 pt-20">
+            <div className="bg-white rounded-3xl p-0 max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-gray-100">
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      <CameraIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">
+                        Thay đổi ảnh đại diện
+                      </h3>
+                      <p className="text-indigo-100 text-sm mt-1">
+                        Cập nhật ảnh đại diện mới cho tài khoản
                       </p>
                     </div>
-                    <button
-                      onClick={resetUploadState}
-                      className="p-2 rounded-md text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <XMarkIcon className="w-4 h-4" />
-                    </button>
                   </div>
+                  <button
+                    onClick={closeUploadModal}
+                    className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
                 </div>
-              )}
-
-              {/* Error Message */}
-              {uploadError && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
-                  <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
-                  <span className="text-sm text-red-700">
-                    {uploadError}
-                  </span>
-                </div>
-              )}
-
-              {/* Upload Progress */}
-              {isUploading && (
-                <div className="mb-6">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-gray-700">
-                      Đang tải lên...
-                    </span>
-                    <span className="text-sm text-gray-700">
-                      {uploadProgress}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
+              </div>
+        
+              <div className="p-8">
+                {!previewUrl && (
+                  <div
+                    onDragEnter={handleDragIn}
+                    onDragLeave={handleDragOut}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    className={`border-3 border-dashed rounded-2xl p-16 text-center transition-all duration-300 cursor-pointer mb-6 group ${
+                      dragActive 
+                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-lg scale-105' 
+                        : 'border-gray-200 bg-gradient-to-br from-gray-50 to-slate-50 hover:border-indigo-300 hover:shadow-lg hover:scale-[1.02]'
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className={`w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                      dragActive 
+                        ? 'bg-indigo-100 shadow-lg' 
+                        : 'bg-white shadow-md group-hover:shadow-lg'
+                    }`}>
+                      <ArrowUpTrayIcon className={`w-10 h-10 transition-all duration-300 ${
+                        dragActive ? 'text-indigo-600 scale-110' : 'text-gray-400 group-hover:text-indigo-500 group-hover:scale-110'
+                      }`} />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-800 mb-3">
+                      {dragActive ? 'Thả ảnh vào đây' : 'Tải lên ảnh đại diện'}
+                    </h4>
+                    <p className="text-gray-600 mb-4 leading-relaxed">
+                      {dragActive ? 'Thả file ảnh để tải lên ngay lập tức' : 'Kéo thả ảnh vào đây hoặc click để chọn file từ máy tính'}
+                    </p>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Hỗ trợ JPG, PNG, WEBP (tối đa 5MB)
+                    </div>
+                    
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={handleFileInputChange}
+                      className="hidden"
                     />
                   </div>
+                )}
+                {previewUrl && (
+                  <div className="mb-8">
+                    <h4 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                      <CheckIcon className="w-5 h-5 text-green-500" />
+                      Xem trước ảnh đại diện
+                    </h4>
+                    <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-2xl p-6 border border-gray-200">
+                      <div className="flex items-center gap-6">
+                        <div className="relative">
+                          <div 
+                            className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg bg-cover bg-center bg-no-repeat overflow-hidden"
+                            style={{ backgroundImage: `url(${previewUrl})` }}
+                          />
+                          <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                            <CheckIcon className="w-4 h-4 text-white" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-3">
+                            <h5 className="text-base font-bold text-gray-800">
+                              {selectedFile?.name}
+                            </h5>
+                            <button
+                              onClick={resetUploadState}
+                              className="p-2 rounded-xl text-red-500 hover:bg-red-50 transition-all duration-200"
+                              title="Chọn ảnh khác"
+                            >
+                              <XMarkIcon className="w-5 h-5" />
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2" />
+                              </svg>
+                              Kích thước: {selectedFile && (selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Định dạng hợp lệ
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {uploadError && (
+                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-2xl mb-6">
+                    <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="text-sm font-bold text-red-800 mb-1">Lỗi tải lên</h5>
+                      <p className="text-sm text-red-700">
+                        {uploadError}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {isUploading && (
+                  <div className="mb-8">
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                        <div>
+                          <h5 className="text-base font-bold text-blue-800">Đang tải lên ảnh</h5>
+                          <p className="text-sm text-blue-600">Vui lòng chờ trong giây lát...</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-blue-700 font-medium">Tiến độ</span>
+                          <span className="text-blue-700 font-bold">{uploadProgress}%</span>
+                        </div>
+                        <div className="w-full h-3 bg-blue-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500 ease-out rounded-full"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-4 justify-end pt-6 border-t border-gray-100">
+                  <button
+                    onClick={closeUploadModal}
+                    disabled={isUploading}
+                    className={`px-8 py-3 rounded-xl border-2 text-sm font-bold transition-all duration-200 ${
+                      isUploading 
+                        ? 'border-gray-200 text-gray-400 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                    }`}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    onClick={uploadAvatar}
+                    disabled={!selectedFile || isUploading}
+                    className={`px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all duration-200 shadow-lg ${
+                      !selectedFile || isUploading 
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
+                        : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 hover:shadow-xl hover:scale-105'
+                    }`}
+                  >
+                    {isUploading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Đang tải...
+                      </>
+                    ) : (
+                      <>
+                        <CheckIcon className="w-4 h-4" />
+                        Cập nhật ảnh đại diện
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={closeUploadModal}
-                  disabled={isUploading}
-                  className={`px-6 py-3 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium transition-colors ${
-                    isUploading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={uploadAvatar}
-                  disabled={!selectedFile || isUploading}
-                  className={`px-6 py-3 rounded-lg border-none text-white text-sm font-medium flex items-center gap-2 transition-colors ${
-                    !selectedFile || isUploading 
-                      ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-indigo-500 hover:bg-indigo-600'
-                  }`}
-                >
-                  {isUploading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Đang tải...
-                    </>
-                  ) : (
-                    <>
-                      <CheckIcon className="w-4 h-4" />
-                      Xác nhận
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           </div>
         )}
-
-        {/* Success Modal */}
         <ConfirmModal
           isOpen={showSuccessModal}
           title="Thành công"

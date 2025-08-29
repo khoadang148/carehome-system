@@ -44,7 +44,6 @@ export default function StaffResidentsPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState('');
 
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -57,7 +56,6 @@ export default function StaffResidentsPage() {
     }
   }, [user, router]);
 
-  // Load residents from API when component mounts
   useEffect(() => {
     const fetchResidents = async () => {
       setLoadingData(true);
@@ -65,12 +63,8 @@ export default function StaffResidentsPage() {
         const data = await staffAssignmentsAPI.getMyAssignments();
         const assignmentsData = Array.isArray(data) ? data : [];
         
-        // Debug: Log assignments data
-        console.log('Raw assignments data:', assignmentsData);
-        
-        // Map API data về đúng format UI và chỉ lấy những assignment active
         const mapped = assignmentsData
-          .filter((assignment: any) => assignment.status === 'active') // Chỉ lấy active assignments
+          .filter((assignment: any) => assignment.status === 'active')
           .map((assignment: any) => {
             const resident = assignment.resident_id;
             const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
@@ -93,28 +87,48 @@ export default function StaffResidentsPage() {
         
         setResidentsData(mapped);
         
-        // Lấy số phòng cho từng resident
-        mapped.forEach(async (resident: any) => {
-          try {
-            const assignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-            // Đảm bảo roomId là string, không phải object
-            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-            if (roomIdString) {
-              const room = await roomsAPI.getById(roomIdString);
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
-            } else {
-              setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+        const roomEntries = await Promise.all(
+          mapped.map(async (resident: any) => {
+            try {
+              const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+              const bedAssignment = Array.isArray(bedAssignments)
+                ? bedAssignments.find((a: any) => a.bed_id?.room_id)
+                : null;
+              if (bedAssignment?.bed_id?.room_id) {
+                if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                  return [resident.id, bedAssignment.bed_id.room_id.room_number] as [string, string];
+                }
+                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
+                }
+              }
+
+              const assignments = await carePlansAPI.getByResidentId(resident.id);
+              const assignment = Array.isArray(assignments)
+                ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id)
+                : null;
+              const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+              if (roomIdString) {
+                const room = await roomsAPI.getById(roomIdString);
+                return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
+              }
+              return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
+            } catch {
+              return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
             }
-          } catch {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
-          }
+          })
+        );
+        const nextMap: { [key: string]: string } = {};
+        roomEntries.forEach(([id, number]) => {
+          nextMap[id] = number;
         });
+        setRoomNumbers(nextMap);
         
         setError('');
       } catch (err) {
-        console.error('Error loading assignments:', err);
         setError('Không thể tải danh sách người cao tuổi được phân công.');
         setResidentsData([]);
       } finally {
@@ -127,7 +141,6 @@ export default function StaffResidentsPage() {
     }
   }, [user]);
 
-  // Filter residents chỉ theo search term
   const filteredResidents = residentsData.filter((resident) => {
     const searchValue = (searchTerm || '').toString();
     const residentName = (resident.name || '').toString();
@@ -136,7 +149,6 @@ export default function StaffResidentsPage() {
            residentRoom.toLowerCase().includes(searchValue.toLowerCase());
   });
   
-  // Handle view resident details
   const handleViewResident = (residentId: number) => {
     router.push(`/staff/residents/${residentId}`);
   };
@@ -154,11 +166,9 @@ export default function StaffResidentsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
-      {/* Background decorations */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(102,126,234,0.05)_0%,transparent_50%),radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.05)_0%,transparent_50%),radial-gradient(circle_at_40%_40%,rgba(245,158,11,0.03)_0%,transparent_50%)] pointer-events-none" />
       
       <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
-        {/* Header Section */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
           <div className="flex justify-between items-center flex-wrap gap-4">
             <div className="flex items-center gap-4">
@@ -177,10 +187,8 @@ export default function StaffResidentsPage() {
           </div>
         </div>
 
-        {/* Search and Filter Section */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-8 shadow-md border border-white/20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-            {/* Search Input */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Tìm kiếm
@@ -197,7 +205,6 @@ export default function StaffResidentsPage() {
               </div>
             </div>
 
-            {/* Results Count */}
             <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
               <p className="text-sm text-indigo-600 m-0 font-semibold">
                 Hiển thị: {filteredResidents.length} người cao tuổi
@@ -206,14 +213,12 @@ export default function StaffResidentsPage() {
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-8">
             {error}
           </div>
         )}
 
-        {/* Loading */}
         {loadingData && (
           <div className="flex justify-center items-center py-16 px-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -221,7 +226,6 @@ export default function StaffResidentsPage() {
           </div>
         )}
 
-        {/* Residents Table */}
         {!loadingData && (
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl overflow-hidden shadow-md border border-white/20">
             <div className="overflow-x-auto">
@@ -273,7 +277,6 @@ export default function StaffResidentsPage() {
                             <p className="text-sm font-semibold text-gray-900 m-0">
                               {resident.name}
                             </p>
-                           
                           </div>
                         </div>
                       </td>

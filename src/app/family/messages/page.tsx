@@ -71,7 +71,6 @@ export default function MessagesPage() {
   const [showResidentChangeMessage, setShowResidentChangeMessage] = useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
-  // Filter conversations by selected resident's staff
   const filteredConversations = React.useMemo(() => {
     if (!selectedResidentId || !staffAssignments[selectedResidentId]) {
       return conversations;
@@ -88,9 +87,8 @@ export default function MessagesPage() {
     );
   }, [conversations, selectedResidentId, staffAssignments, searchTerm]);
 
-  // Fetch staff details
   const fetchStaffDetails = async (staffId: string) => {
-    if (staffDetails[staffId]) return; // Already fetched
+    if (staffDetails[staffId]) return;
     
     try {
       const staffData = await userAPI.getById(staffId);
@@ -103,7 +101,6 @@ export default function MessagesPage() {
     }
   };
 
-  // Fetch residents for family member
   const fetchResidents = async () => {
     if (!user) return;
     
@@ -111,7 +108,6 @@ export default function MessagesPage() {
       const residentsData = await residentAPI.getByFamilyMemberId(user.id);
       setResidents(residentsData);
       
-      // Auto-select first resident if available
       if (residentsData.length > 0 && !selectedResidentId) {
         setSelectedResidentId(residentsData[0]._id);
       }
@@ -120,9 +116,8 @@ export default function MessagesPage() {
     }
   };
 
-  // Fetch staff assignments for a resident
   const fetchStaffAssignments = async (residentId: string) => {
-    if (staffAssignments[residentId]) return; // Already fetched
+    if (staffAssignments[residentId]) return;
     
     try {
       const assignments = await staffAssignmentsAPI.getByResident(residentId);
@@ -140,32 +135,26 @@ export default function MessagesPage() {
     }
   };
 
-  // Fetch residents first
   useEffect(() => {
     if (user) {
       fetchResidents();
     }
   }, [user]);
 
-  // Clear conversation when resident changes
   useEffect(() => {
-    // Only clear if there's an active conversation and resident actually changed
     if (selectedConversation && previousResidentId && previousResidentId !== selectedResidentId) {
       setSelectedConversation(null);
       setMessages([]);
       setShowResidentChangeMessage(true);
       
-      // Hide message after 3 seconds
       setTimeout(() => {
         setShowResidentChangeMessage(false);
       }, 3000);
     }
     
-    // Update previous resident ID
     setPreviousResidentId(selectedResidentId);
   }, [selectedResidentId, selectedConversation, previousResidentId]);
 
-  // Fetch conversations and staff assignments when resident is selected
   useEffect(() => {
     const fetchConversations = async () => {
       if (!selectedResidentId) return;
@@ -175,7 +164,6 @@ export default function MessagesPage() {
         const response = await messagesAPI.getConversations();
         setConversations(response.conversations || response || []);
         
-        // Fetch staff assignments for selected resident
         fetchStaffAssignments(selectedResidentId);
       } catch (error) {
         console.error('Error fetching conversations:', error);
@@ -189,7 +177,6 @@ export default function MessagesPage() {
     }
   }, [selectedResidentId]);
 
-  // Fetch staff details for conversations
   useEffect(() => {
     if (conversations.length > 0) {
       conversations.forEach(conversation => {
@@ -198,7 +185,6 @@ export default function MessagesPage() {
     }
   }, [conversations]);
 
-  // Fetch messages for selected conversation
   useEffect(() => {
     const fetchMessages = async () => {
       if (!selectedConversation) return;
@@ -223,7 +209,6 @@ export default function MessagesPage() {
     fetchMessages();
   }, [selectedConversation]);
 
-  // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -305,7 +290,6 @@ export default function MessagesPage() {
     return userAPI.getAvatarUrl(cleanPath);
   };
 
-  // Bảo vệ route chỉ cho family
   useEffect(() => {
     if (user && user.role !== 'family') {
       router.replace('/login');
@@ -315,15 +299,15 @@ export default function MessagesPage() {
   if (!user || user.role !== 'family') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
-        <LoadingSpinner size="large" text="Đang tải..." />
+        <LoadingSpinner size="lg" text="Đang tải..." />
       </div>
     );
   }
 
     return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-0 font-sans">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-0 font-sans overflow-hidden">
+      
+      <div className="bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-6">
@@ -373,13 +357,11 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-8xl mx-auto px-10 pb-12">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="flex h-[calc(100vh-200px)]">
-                          {/* Conversations List */}
+      <div className="max-w-8xl mx-auto px-10 h-[calc(100vh-280px)]">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden h-full">
+          <div className="flex h-full">
               <div className="w-1/3 border-r border-gray-200 flex flex-col min-h-0">
-                {/* Search - Fixed */}
+                
                 <div className="p-4 border-b border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100 flex-shrink-0">
                   <div key="search-container" className="relative">
                     <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-300 text-lg pointer-events-none z-10">
@@ -399,12 +381,12 @@ export default function MessagesPage() {
                   </div>
                 </div>
 
-                {/* Conversations - Scrollable */}
-                <div className="flex-1 overflow-y-auto min-h-0">
+                
+                <div className="flex-1 overflow-y-auto scroll-smooth min-h-0 max-h-full">
                 {isLoading ? (
                   <div key="loading" className="flex flex-col items-center justify-center h-full text-slate-500">
                     <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mb-3">
-                      <LoadingSpinner key="loading-spinner" size="medium" />
+                      <LoadingSpinner key="loading-spinner" size="md" />
                     </div>
                     <p key="loading-text" className="text-base font-medium">Đang tải cuộc trò chuyện...</p>
                   </div>
@@ -466,7 +448,7 @@ export default function MessagesPage() {
                               </span>
                             </div>
                             <div key="conversation-details" className="flex flex-col gap-0.5">
-                              {/* Staff role and position */}
+                              
                               {staffDetails[conversation.partner._id] && (
                                 <div key={`staff-info-${conversation._id || index}`} className="flex items-center gap-1">
                                   {staffDetails[conversation.partner._id].position && (
@@ -477,7 +459,7 @@ export default function MessagesPage() {
                                   
                                 </div>
                               )}
-                              {/* Resident info */}
+                              
                               {selectedResidentId && residents.find(r => r._id === selectedResidentId) && (
                                 <p key={`resident-${conversation._id || index}`} className="text-xs text-purple-600 font-medium">
                                   Phụ trách: {residents.find(r => r._id === selectedResidentId)?.full_name}
@@ -495,9 +477,9 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            {/* Messages */}
+            
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Resident change notification */}
+              
               {showResidentChangeMessage && (
                 <div className="absolute top-4 right-4 z-20 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2 rounded-lg shadow-lg animate-fade-in">
                   <p className="text-sm font-medium">Đã chuyển sang người cao tuổi khác</p>
@@ -515,7 +497,7 @@ export default function MessagesPage() {
               ) : selectedConversation ? (
                 <div key={`conversation-${selectedConversation._id}`} className="flex flex-col h-full">
                 <>
-                  {/* Chat Header - Fixed */}
+                  
                   <div className="p-4 border-b border-gray-200 bg-gradient-to-br from-purple-50 to-purple-100 flex-shrink-0">
                     <div key="chat-header-content" className="flex items-center space-x-3">
                       <img
@@ -532,7 +514,7 @@ export default function MessagesPage() {
                           {selectedConversation.partner.full_name}
                         </h2>
                         <div key="chat-header-details" className="flex flex-col gap-0.5">
-                          {/* Staff role and position */}
+                            
                           {staffDetails[selectedConversation.partner._id] && (
                             <div key={`header-staff-info-${selectedConversation._id}`} className="flex items-center gap-1">
                               {staffDetails[selectedConversation.partner._id].position && (
@@ -549,12 +531,12 @@ export default function MessagesPage() {
                     </div>
                   </div>
 
-                  {/* Messages - Scrollable */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-1 min-h-0">
+                  
+                  <div className="flex-1 overflow-y-auto scroll-smooth p-6 space-y-1 min-h-0">
                     {isLoadingMessages ? (
                       <div key="loading-messages" className="flex flex-col items-center justify-center h-full text-slate-500">
                         <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mb-3">
-                          <LoadingSpinner key="loading-messages-spinner" size="medium" />
+                          <LoadingSpinner key="loading-messages-spinner" size="md" />
                         </div>
                         <p key="loading-messages-text" className="text-base font-medium">Đang tải tin nhắn...</p>
                       </div>
@@ -576,7 +558,7 @@ export default function MessagesPage() {
 
                         return (
                           <div key={message._id || `message-${index}`}>
-                            {/* Date separator */}
+                            
                             {showDate && (
                               <div key={`date-${formatDate(message.timestamp)}`} className="date-separator">
                                 <span key={`date-text-${formatDate(message.timestamp)}`}>
@@ -585,7 +567,7 @@ export default function MessagesPage() {
                               </div>
                             )}
                             
-                            {/* Message */}
+                            
                             <div key={`message-${message._id || index}`} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}>
                               <div className={`
                                 max-w-xs lg:max-w-md px-4 py-3 rounded-2xl text-sm shadow-md message-bubble
@@ -617,7 +599,7 @@ export default function MessagesPage() {
                     <div key="messages-end" ref={messagesEndRef} />
                   </div>
 
-                  {/* Message Input - Fixed */}
+                  
                   <div className="p-4 border-t border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100 flex-shrink-0">
                     <div key="message-input-container" className="flex space-x-3">
                       <input
@@ -637,7 +619,7 @@ export default function MessagesPage() {
                         className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg"
                       >
                         {isSending ? (
-                          <LoadingSpinner key="sending-spinner" size="small" />
+                          <LoadingSpinner key="sending-spinner" size="sm" />
                         ) : (
                           <PaperAirplaneIcon key="send-icon" className="w-4 h-4" />
                         )}

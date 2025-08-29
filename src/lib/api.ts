@@ -4,14 +4,14 @@ import { isTokenValid } from './utils/tokenUtils';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-// Tạo client riêng cho login với timeout hợp lý
+// Tạo client riêng cho login với timeout tối ưu
 const loginClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 10000, // Tăng timeout lên 10 giây cho login
+  timeout: 5000, // Giảm timeout xuống 5 giây cho login nhanh hơn
 });
 
 const apiClient = axios.create({
@@ -56,7 +56,8 @@ export const isAuthenticated = () => {
 const handleApiError = (error: any, context: string) => {
   if (error.response) {
     const { status, data } = error.response;
-    console.error(`${context} - Status: ${status}`, data);
+    // Không log error để tránh hiển thị trong console
+    // console.error(`${context} - Status: ${status}`, data);
     
     if (data && data.detail) {
       return data.detail;
@@ -69,10 +70,10 @@ const handleApiError = (error: any, context: string) => {
               status === 500 ? 'Lỗi máy chủ' : 'Có lỗi xảy ra'}`;
     }
   } else if (error.request) {
-    console.error(`${context} - Network error:`, error.request);
+    // console.error(`${context} - Network error:`, error.request);
     return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
   } else {
-    console.error(`${context} - Error:`, error.message);
+    // console.error(`${context} - Error:`, error.message);
     return 'Có lỗi xảy ra. Vui lòng thử lại sau.';
   }
 };
@@ -84,14 +85,15 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers = config.headers || {};
       config.headers['Authorization'] = `Bearer ${token}`;
-      console.log('Request with token:', config.url, token.substring(0, 20) + '...');
+      // Tối ưu: Bỏ console.log để tăng tốc
+      // console.log('Request with token:', config.url, token.substring(0, 20) + '...');
     } else {
-      console.warn('No token found for request:', config.url);
+      // console.warn('No token found for request:', config.url);
     }
     
     // Don't override Content-Type for FormData uploads
     if (config.data instanceof FormData) {
-      console.log('FormData detected, removing Content-Type header to let browser set it');
+      // console.log('FormData detected, removing Content-Type header to let browser set it');
       delete config.headers['Content-Type'];
     }
     
@@ -107,7 +109,7 @@ apiClient.interceptors.response.use(
   async (error) => {
     // Nếu gặp 401 thì chỉ logout, không thử refresh
     if (error.response?.status === 401) {
-      console.error('401 Unauthorized - Redirecting to login');
+      // console.error('401 Unauthorized - Redirecting to login');
       clientStorage.removeItem('access_token');
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -117,12 +119,12 @@ apiClient.interceptors.response.use(
     
     // Xử lý lỗi 403 Forbidden
     if (error.response?.status === 403) {
-      console.error('403 Forbidden - Access denied:', {
-        url: error.config?.url,
-        method: error.config?.method,
-              hasToken: !!clientStorage.getItem('access_token'),
-      tokenPreview: clientStorage.getItem('access_token')?.substring(0, 20) + '...'
-      });
+      // console.error('403 Forbidden - Access denied:', {
+      //   url: error.config?.url,
+      //   method: error.config?.method,
+      //         hasToken: !!clientStorage.getItem('access_token'),
+      // tokenPreview: clientStorage.getItem('access_token')?.substring(0, 20) + '...'
+      // });
     }
 
     return Promise.reject(error);
@@ -186,7 +188,8 @@ const endpoints = {
 export const authAPI = {
   login: async (email: string, password: string) => {
     try {
-      console.log('🔄 Login attempt starting...');
+      // Tối ưu: Bỏ console.log để tăng tốc
+      // console.log('🔄 Login attempt starting...');
       
       const response = await loginClient.post('/auth/login', {
         email,
@@ -194,7 +197,7 @@ export const authAPI = {
       });
       
       const { access_token } = response.data;
-      console.log('✅ Login successful, setting token');
+      // console.log('✅ Login successful, setting token');
       
       // Lưu token vào localStorage ngay lập tức
       if (typeof window !== 'undefined') {
@@ -202,11 +205,66 @@ export const authAPI = {
       }
       return response.data;
     } catch (error: any) {
-      console.error('❌ Login failed:', error);
+      // console.error('❌ Login failed:', error);
       
       // Xử lý lỗi cụ thể để trả về thông báo chính xác
       if (error.response?.status === 401) {
         throw new Error('Email hoặc mật khẩu không chính xác');
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
+      } else {
+        throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
+      }
+    }
+  },
+
+  sendOtp: async (phone: string) => {
+    try {
+      const response = await loginClient.post('/auth/send-otp', {
+        phone,
+      });
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Có lỗi xảy ra khi gửi OTP');
+      }
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
+      } else {
+        throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
+      }
+    }
+  },
+
+  verifyOtp: async (phone: string, otp: string) => {
+    try {
+      const response = await loginClient.post('/auth/verify-otp', {
+        phone,
+        otp,
+      });
+      
+      if (response.data.success) {
+        const { access_token } = response.data;
+        
+        // Lưu token vào localStorage ngay lập tức
+        if (typeof window !== 'undefined') {
+          clientStorage.setItem('access_token', access_token);
+        }
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Có lỗi xảy ra khi xác thực OTP');
+      }
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
       } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
         throw new Error('Kết nối chậm. Vui lòng thử lại.');
       } else if (error.response?.status === 500) {
@@ -241,7 +299,6 @@ export const authAPI = {
     try {
       // Kiểm tra token validity trước khi gọi API
       if (!isTokenValid()) {
-        console.log('Token invalid or expired, skipping logout API call');
         return { message: 'No valid session to logout', success: true };
       }
 
@@ -257,9 +314,7 @@ export const authAPI = {
       return response.data;
     } catch (error: any) {
       // Don't throw error to avoid blocking logout process
-      if (error.response?.status === 401) {
-        console.log('Token expired or invalid, continuing with local logout');
-      } else {
+      if (error.response?.status !== 401) {
         console.warn('Logout API call failed:', error);
       }
       return { message: 'Logged out locally', success: true };
@@ -323,9 +378,72 @@ export const userAPI = {
     try {
       const response = await apiClient.patch('/auth/change-password', passwordData);
       return response.data;
-    } catch (error) {
-      console.error('Error changing password:', error);
-      throw error;
+    } catch (error: any) {
+      // Không log error gốc để tránh hiển thị trong console
+      // console.error('Error changing password:', error);
+      
+      // Xử lý tất cả các trường hợp có thể
+      let errorMessage = '';
+      
+      // Lấy message từ nhiều nguồn khác nhau
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Log để debug (chỉ trong development)
+      // Error details logged for debugging in development
+      
+      // Xử lý status code 400 (Bad Request) - thường là mật khẩu sai
+      if (error.response?.status === 400) {
+        const lowerMessage = errorMessage.toLowerCase();
+        
+        // Kiểm tra nhiều pattern khác nhau
+        if (
+          lowerMessage.includes('current password') ||
+          lowerMessage.includes('mật khẩu hiện tại') ||
+          lowerMessage.includes('old password') ||
+          lowerMessage.includes('incorrect password') ||
+          lowerMessage.includes('wrong password') ||
+          lowerMessage.includes('invalid password') ||
+          lowerMessage.includes('password mismatch') ||
+          lowerMessage.includes('mật khẩu không đúng') ||
+          lowerMessage.includes('mật khẩu sai') ||
+          lowerMessage.includes('400') ||
+          lowerMessage.includes('bad request')
+        ) {
+          throw new Error('Mật khẩu hiện tại không đúng. Vui lòng kiểm tra lại.');
+        }
+        
+        // Nếu không match pattern nào, vẫn throw thông báo thân thiện
+        throw new Error('Thông tin không hợp lệ. Vui lòng kiểm tra lại mật khẩu hiện tại.');
+      }
+      
+      // Fallback: Nếu có error.message và chứa "400", cũng xử lý như lỗi mật khẩu
+      if (error.message && error.message.includes('400')) {
+        throw new Error('Mật khẩu hiện tại không đúng. Vui lòng kiểm tra lại.');
+      }
+      
+      // Xử lý các lỗi khác
+      if (error.response?.status === 401) {
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('Bạn không có quyền thực hiện thao tác này.');
+      }
+      
+      if (error.response?.status >= 500) {
+        throw new Error('Hệ thống đang gặp sự cố. Vui lòng thử lại sau.');
+      }
+      
+      // Nếu không xác định được loại lỗi, throw thông báo chung
+      throw new Error('Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.');
     }
   },
 
@@ -341,9 +459,7 @@ export const userAPI = {
 
   update: async (id: string, data: any) => {
     try {
-      console.log('userAPI.update - Input:', { id, data });
       const response = await apiClient.patch(`/users/${id}`, data);
-      console.log('userAPI.update - Success:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -353,11 +469,7 @@ export const userAPI = {
 
   updateAvatar: async (id: string, avatarData: FormData) => {
     try {
-      // Debug: Log FormData content
-      console.log('API - FormData entries:');
-      for (let [key, value] of avatarData.entries()) {
-        console.log(key, value);
-      }
+      // Debug: Log FormData content in development only
       
       // Ưu tiên endpoint /users/{id}/avatar
       const response = await apiClient.patch(`/users/${id}/avatar`, avatarData, {
@@ -376,7 +488,6 @@ export const userAPI = {
     if (avatarPath.startsWith('http')) return avatarPath;
     const cleanPath = avatarPath.replace(/^\\+|^\/+/g, '').replace(/\\/g, '/');
     const fullUrl = `${API_BASE_URL}/${cleanPath}`;
-    console.log('Avatar URL:', { original: avatarPath, cleaned: cleanPath, full: fullUrl });
     return fullUrl;
   },
   getAvatarUrlById: (id: string) => {
@@ -537,7 +648,6 @@ export const staffAPI = {
     try {
       // Kiểm tra authentication
       if (!isAuthenticated()) {
-        console.warn('User not authenticated, redirecting to login');
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
@@ -548,24 +658,20 @@ export const staffAPI = {
       const user = JSON.parse(clientStorage.getItem('user') || '{}');
       if (user.role === 'family') {
         // Family sử dụng endpoint /users và filter ở frontend
-        console.log('Family user - fetching all users');
         const response = await apiClient.get('/users', { params });
         // Filter chỉ lấy staff ở frontend
         const allUsers = response.data;
         const staffUsers = allUsers.filter((user: any) => user.role === 'staff');
-        console.log('Filtered staff users:', staffUsers);
         return staffUsers;
       }
       
       // Admin và Staff sử dụng endpoint /users/by-role
-      console.log('Admin/Staff user - fetching staff with params:', { role: 'staff', ...params });
       const response = await apiClient.get('/users/by-role', { 
         params: { 
           role: 'staff',
           ...params 
         } 
       });
-      console.log('Staff API response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching staff:', error);
@@ -1655,7 +1761,7 @@ export const vitalSignsAPI = {
 
   update: async (id: string, vitalSigns: any) => {
     try {
-      const response = await apiClient.put(`${endpoints.vitalSigns}/${id}`, vitalSigns);
+      const response = await apiClient.patch(`${endpoints.vitalSigns}/${id}`, vitalSigns);
       return response.data;
     } catch (error) {
       console.error(`Error updating vital signs with ID ${id}:`, error);
@@ -1875,7 +1981,7 @@ export const visitsAPI = {
     }
   },
 
-  // Tạo nhiều lịch cho nhiều cư dân trong một lần gọi
+  // Tạo nhiều lịch cho nhiều người cao tuổi trong một lần gọi
   createMultiple: async (data: {
     resident_ids: string[];
     visit_date: string; // ISO string

@@ -68,7 +68,6 @@ export default function ResidentNotesPage() {
       const notes = await careNotesAPI.getAll({ resident_id: residentId });
       const notesArray = Array.isArray(notes) ? notes : [];
       
-      // Sắp xếp theo ngày mới nhất
       const sortedNotes = notesArray.sort((a, b) => {
         const dateA = new Date(a.date || 0);
         const dateB = new Date(b.date || 0);
@@ -77,21 +76,18 @@ export default function ResidentNotesPage() {
       
       setCareNotes(sortedNotes);
       
-      // Lấy tên cư dân từ URL params hoặc từ note đầu tiên
       const urlParams = new URLSearchParams(window.location.search);
       const nameFromUrl = urlParams.get('residentName');
       if (nameFromUrl) {
         setResidentName(decodeURIComponent(nameFromUrl));
       }
     } catch (error) {
-      console.error('Error loading notes:', error);
       showNotification('Không thể tải danh sách ghi chú', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Lọc và phân trang ghi chú
   const filteredNotes = careNotes.filter(note => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
@@ -120,7 +116,6 @@ export default function ResidentNotesPage() {
     }
     
     try {
-      // Chuẩn bị dữ liệu theo đúng format API yêu cầu
       const updateData = {
         assessment_type: note.assessment_type || 'Đánh giá tổng quát',
         notes: editContent,
@@ -128,9 +123,6 @@ export default function ResidentNotesPage() {
         resident_id: typeof note.resident_id === 'object' ? note.resident_id._id : String(note.resident_id),
         conducted_by: typeof note.conducted_by === 'object' ? (note.conducted_by._id || note.conducted_by.full_name) : note.conducted_by,
       };
-      
-      console.log('Updating note with data:', updateData);
-      
       await careNotesAPI.update(note._id, updateData);
       
       await loadResidentNotes();
@@ -141,12 +133,10 @@ export default function ResidentNotesPage() {
       setOriginalRecommendations('');
       showNotification('Cập nhật ghi chú thành công!', 'success');
     } catch (err) {
-      console.error('Error updating note:', err);
       showNotification('Cập nhật ghi chú thất bại!', 'error');
     }
   };
 
-  // Kiểm tra xem có thay đổi nào không
   const hasChanges = () => {
     return editContent !== originalContent || editRecommendations !== originalRecommendations;
   };
@@ -173,7 +163,6 @@ export default function ResidentNotesPage() {
     if (typeof staffId === 'string') {
       if (staffNames[staffId]) return staffNames[staffId];
       
-      // Load staff name if not cached
       userAPI.getById(staffId)
         .then(data => {
           setStaffNames(prev => ({ 
@@ -198,7 +187,6 @@ export default function ResidentNotesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 p-4 sm:p-6 lg:p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-6 sm:p-8 mb-6 sm:mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
           <div className="flex items-center gap-4 mb-6">
             <button
@@ -222,7 +210,6 @@ export default function ResidentNotesPage() {
             </div>
           </div>
 
-          {/* Search and Actions */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
@@ -249,7 +236,6 @@ export default function ResidentNotesPage() {
           </div>
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="text-center py-16">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
@@ -258,7 +244,6 @@ export default function ResidentNotesPage() {
           </div>
         ) : (
           <>
-            {/* Pagination Info */}
             {filteredNotes.length > 0 && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm text-gray-600 mb-6 bg-white rounded-xl p-4 shadow-sm">
                 <span className="mb-2 sm:mb-0">
@@ -272,7 +257,6 @@ export default function ResidentNotesPage() {
               </div>
             )}
 
-            {/* Notes List */}
             {currentNotes.length > 0 ? (
               <div className="space-y-4">
                 {currentNotes.map((note, index) => (
@@ -362,7 +346,6 @@ export default function ResidentNotesPage() {
               </div>
             )}
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-8">
                 <button
@@ -403,7 +386,6 @@ export default function ResidentNotesPage() {
           </>
         )}
 
-        {/* Edit Modal */}
         {editNote && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
             <div className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl relative animate-slideUp">
@@ -481,7 +463,6 @@ export default function ResidentNotesPage() {
           </div>
         )}
 
-        {/* Confirm Delete Modal */}
         {confirmDelete && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
             <div className="bg-white rounded-2xl min-w-80 max-w-96 p-8 shadow-2xl text-center animate-slideUp">
@@ -516,7 +497,6 @@ export default function ResidentNotesPage() {
           </div>
         )}
 
-        {/* Notification */}
         {notification && (
           <div className="fixed inset-0 bg-black/15 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-fadeIn">
             <div className={`${

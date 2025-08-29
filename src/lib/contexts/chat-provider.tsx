@@ -10,16 +10,13 @@ interface ChatState {
   currentStaffId: string | null;
   currentResidentName: string;
   currentStaffName: string;
-  // Total unread messages across all conversations
   totalUnread: number;
   unreadCounts: Record<string, number>;
 }
 
 interface ChatContextType {
-  // State
   chatState: ChatState;
   
-  // Actions
   openChat: (
     residentId: string,
     staffId?: string,
@@ -29,7 +26,6 @@ interface ChatContextType {
   closeChat: () => void;
   updateUnreadCount: (residentId: string, count: number) => void;
   
-  // Data
   getStaffForResident: (residentId: string) => Promise<{ staffId: string; staffName: string } | null>;
 }
 
@@ -47,7 +43,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     unreadCounts: {}
   });
 
-  // Fetch staff assignments for residents
   const getStaffForResident = async (residentId: string) => {
     try {
       const assignments = await staffAssignmentsAPI.getByResident(residentId);
@@ -65,12 +60,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       return null;
     } catch (error) {
-      console.error('Error fetching staff for resident:', error);
       return null;
     }
   };
 
-  // Open chat with resident
   const openChat = async (
     residentId: string,
     staffId?: string,
@@ -80,7 +73,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     let finalStaffId = staffId;
     let finalStaffName = staffName;
 
-    // If no staffId provided, try to get it from assignments
     if (!finalStaffId) {
       const staffInfo = await getStaffForResident(residentId);
       if (staffInfo) {
@@ -99,7 +91,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  // Close chat
   const closeChat = () => {
     setChatState(prev => ({
       ...prev,
@@ -111,7 +102,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  // Update unread count for a resident
   const updateUnreadCount = (residentId: string, count: number) => {
     setChatState(prev => ({
       ...prev,
@@ -122,20 +112,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  // Poll for unread counts
   useEffect(() => {
     if (!user || (user.role !== 'family' && user.role !== 'staff')) return;
 
     const pollUnreadCounts = async () => {
       try {
         const response = await messagesAPI.getUnreadCount();
-        // Support multiple possible response shapes
         const total = Number(
-          (response && (response.totalUnread ?? response.total ?? response.count)) || 0
+          (response && (response.totalUnread ?? response.total ?? response.unreadCount)) || 0
         );
 
         let computedTotal = Number.isFinite(total) ? total : 0;
-        // If response has per-conversation unread counts, compute total to be safe
         if (!computedTotal && response && typeof response === 'object') {
           const possibleMaps = [response.unreadCounts, response.perConversations, response.byResident];
           for (const m of possibleMaps) {
@@ -151,17 +138,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           totalUnread: computedTotal,
         }));
       } catch (error) {
-        console.error('Error polling unread counts:', error);
+        // Silent error handling for polling
       }
     };
 
-    // Poll immediately
     pollUnreadCounts();
 
-    // Set up polling interval
-    const interval = setInterval(pollUnreadCounts, 10000); // Every 10 seconds for snappier updates
+    const interval = setInterval(pollUnreadCounts, 10000); 
 
-    // Also refresh when window regains focus
+    
     const onFocus = () => pollUnreadCounts();
     if (typeof window !== 'undefined') {
       window.addEventListener('focus', onFocus);

@@ -21,13 +21,8 @@ export const pushToLogin = (router: AppRouterInstance) => {
  * Redirect user based on their role
  */
 export const redirectByRole = (router: AppRouterInstance, role: string) => {
-  // Preload trang đích trước khi redirect
+  // Tối ưu: Redirect ngay lập tức, không cần prefetch vì đã preload trước đó
   const targetPath = getTargetPath(role);
-  
-  // Prefetch để tăng tốc độ chuyển trang
-  router.prefetch(targetPath);
-  
-  // Redirect ngay lập tức
   router.push(targetPath);
 };
 
@@ -91,7 +86,11 @@ export const preloadRolePages = (router: AppRouterInstance, role: string) => {
   };
   
   const pages = rolePages[role as keyof typeof rolePages] || [];
-  pages.forEach(page => {
-    router.prefetch(page);
+  
+  // Tối ưu: Sử dụng Promise.all để preload song song
+  Promise.all(
+    pages.map(page => router.prefetch(page))
+  ).catch(() => {
+    // Ignore prefetch errors
   });
 };

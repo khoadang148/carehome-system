@@ -32,29 +32,22 @@ import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
 import 'react-datepicker/dist/react-datepicker.css';
 
-// Map API data to match component expectations
 const mapActivityFromAPI = (apiActivity: any) => {
   try {
-    // Validate schedule_time
     if (!apiActivity.schedule_time || typeof apiActivity.schedule_time !== 'string') {
       console.warn('Invalid schedule_time for activity:', apiActivity._id);
       return null;
     }
-
-    // Parse schedule_time as local time, do NOT add Z or treat as UTC
     const scheduleTime = new Date(apiActivity.schedule_time);
 
-    // Check if date is valid
     if (isNaN(scheduleTime.getTime())) {
       console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
       return null;
     }
 
-    // Calculate end time safely
     const durationInMinutes = typeof apiActivity.duration === 'number' ? apiActivity.duration : 0;
     const endTime = new Date(scheduleTime.getTime() + durationInMinutes * 60000);
 
-    // Check if end time is valid
     if (isNaN(endTime.getTime())) {
       console.error('Invalid end time calculated for activity:', apiActivity._id);
       return null;
@@ -320,7 +313,7 @@ export default function ActivitiesPage() {
       setEvaluationResidents(filteredResidents);
       setEvaluationModalOpen(true);
     } catch (err) {
-      toast.error('Không thể tải danh sách cư dân tham gia hoạt động này.');
+      toast.error('Không thể tải danh sách người cao tuổi tham gia hoạt động này.');
     }
   };
 
@@ -1263,7 +1256,7 @@ export default function ActivitiesPage() {
                         <UserGroupIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng cư dân tham gia:</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng người cao tuổi tham gia:</div>
                         <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
                           {(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
                         </div>

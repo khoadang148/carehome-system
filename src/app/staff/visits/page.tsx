@@ -47,7 +47,7 @@ interface Visit {
   updated_at?: string;
 }
 
-const ITEMS_PER_PAGE = 10; // Số lịch thăm hiển thị trên mỗi trang
+const ITEMS_PER_PAGE = 10;
 
 export default function StaffVisitsPage() {
   const router = useRouter();
@@ -58,8 +58,8 @@ export default function StaffVisitsPage() {
   const [timeStatusFilter, setTimeStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedNames, setExpandedNames] = useState<Record<string, boolean>>({});
 
-  // Load visits data
   useEffect(() => {
     loadVisits();
   }, []);
@@ -68,17 +68,14 @@ export default function StaffVisitsPage() {
     setLoading(true);
     try {
       const data = await visitsAPI.getAll();
-      console.log('Visits data:', data);
       setVisits(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading visits:', error);
       setVisits([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Get time-based status for a visit
   const getTimeBasedStatus = (visit: Visit) => {
     const visitDate = new Date(visit.visit_date);
     const today = startOfDay(new Date());
@@ -91,11 +88,9 @@ export default function StaffVisitsPage() {
     } else if (isAfter(visitDay, today)) {
       return 'upcoming';
     }
-    
-    return 'today'; // fallback
+    return 'today';
   };
 
-  // Get status configuration based on time
   const getStatusConfig = (visit: Visit) => {
     const timeStatus = getTimeBasedStatus(visit);
     
@@ -105,27 +100,29 @@ export default function StaffVisitsPage() {
         color: 'text-gray-500',
         bg: 'bg-gray-100',
         border: 'border-gray-300',
-        icon: CheckCircleIcon
+        icon: CheckCircleIcon,
+        accentBg: 'bg-gray-400'
       },
       today: {
         label: 'Trạng thái: Hôm nay',
         color: 'text-amber-600',
         bg: 'bg-amber-50',
         border: 'border-amber-200',
-        icon: CalendarDaysIcon
+        icon: CalendarDaysIcon,
+        accentBg: 'bg-amber-500'
       },
       upcoming: {
         label: 'Trạng thái: Sắp tới',
         color: 'text-blue-600',
         bg: 'bg-blue-50',
         border: 'border-blue-200',
-        icon: ClockIcon
+        icon: ClockIcon,
+        accentBg: 'bg-blue-500'
       }
     };
     return configs[timeStatus] || configs.upcoming;
   };
 
-  // Tính giờ kết thúc từ ngày + giờ bắt đầu + duration
   const getEndTimeString = (visit: Visit): string => {
     try {
       const [hoursStr, minutesStr] = (visit.visit_time || '00:00').split(':');
@@ -142,12 +139,10 @@ export default function StaffVisitsPage() {
     }
   };
 
-  // Lấy URL avatar cho family member (ưu tiên path, fallback theo id)
   const getFamilyAvatarUrl = (family: Visit['family_member_id']): string => {
     try {
       const anyFm: any = family as any;
       const a: any = anyFm?.avatar;
-      // Hỗ trợ nhiều kiểu avatar: string | object | array
       let rawPath = '' as string;
       if (typeof a === 'string' && a.trim()) {
         rawPath = a;
@@ -162,10 +157,8 @@ export default function StaffVisitsPage() {
       if (rawPath) return userAPI.getAvatarUrl(rawPath);
 
       if (family?._id) {
-        // Ưu tiên endpoint avatar của family member
         return `${API_BASE_URL}/family-members/${family._id}/avatar`;
       }
-      // Thử endpoint users (fallback cũ)
       if (family?._id) {
         return userAPI.getAvatarUrlById(family._id);
       }
@@ -175,7 +168,6 @@ export default function StaffVisitsPage() {
     }
   };
 
-  // Component nhỏ render avatar với fallback icon xám
   const FamilyAvatar = ({ family }: { family: Visit['family_member_id'] }) => {
     const [imgError, setImgError] = useState(false);
     const src = getFamilyAvatarUrl(family);
@@ -196,7 +188,6 @@ export default function StaffVisitsPage() {
     );
   };
 
-  // Filter and sort visits (newest first) - using useMemo for performance
   const filteredVisits = useMemo(() => {
     return visits
       .filter(visit => {
@@ -213,31 +204,26 @@ export default function StaffVisitsPage() {
         return matchesSearch && matchesTimeStatus && matchesDate;
       })
       .sort((a, b) => {
-        // Sort by visit_date first (newest first), then by created_at
         const dateA = new Date(a.visit_date);
         const dateB = new Date(b.visit_date);
         if (dateA.getTime() !== dateB.getTime()) {
           return dateB.getTime() - dateA.getTime();
         }
-        // If same date, sort by created_at
         const createdA = new Date(a.created_at || a.visit_date);
         const createdB = new Date(b.created_at || b.visit_date);
         return createdB.getTime() - createdA.getTime();
       });
   }, [visits, searchTerm, timeStatusFilter, dateFilter]);
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredVisits.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentVisits = filteredVisits.slice(startIndex, endIndex);
 
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, timeStatusFilter, dateFilter]);
 
-  // Generate page numbers for pagination
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     const maxVisiblePages = 5;
@@ -285,7 +271,6 @@ export default function StaffVisitsPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 p-8">
       <div className="max-w-7xl mx-auto">
 
-        {/* Header */}
         <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
           <div className="flex justify-between items-center">
             <div>
@@ -329,10 +314,8 @@ export default function StaffVisitsPage() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg">
           <div className="grid grid-cols-4 gap-4 items-end">
-            {/* Search */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tìm kiếm
@@ -349,7 +332,6 @@ export default function StaffVisitsPage() {
               </div>
             </div>
 
-            {/* Time Status Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Trạng thái thời gian
@@ -366,7 +348,6 @@ export default function StaffVisitsPage() {
               </select>
             </div>
 
-            {/* Date Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Lọc theo ngày
@@ -385,7 +366,6 @@ export default function StaffVisitsPage() {
             </div>
           </div>
 
-          {/* Clear Filters */}
           <div className="flex justify-end mt-4">
             <button
               onClick={() => {
@@ -401,7 +381,6 @@ export default function StaffVisitsPage() {
           </div>
         </div>
 
-        {/* Visits List */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-lg">
           <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
             <h2 className="text-2xl font-bold text-indigo-600 m-0 flex items-center gap-2">
@@ -427,69 +406,91 @@ export default function StaffVisitsPage() {
           ) : (
             <>
               <div className="p-4">
-                <div className="grid gap-4">
-                  {currentVisits.map((visit) => {
+                <div className="grid gap-3">
+                  {currentVisits.map((visit, idx) => {
                     const statusConfig = getStatusConfig(visit);
                     const StatusIcon = statusConfig.icon;
                     
                     return (
                       <div
                         key={visit._id}
-                        className="bg-gray-50 border border-gray-200 rounded-xl p-6 transition-all duration-200 cursor-pointer hover:shadow-lg hover:-translate-y-1"
+                        className={`relative bg_white odd:bg-white even:bg-slate-50 border border-gray-200 rounded-xl p-4 transition-all duration-200 cursor-pointer hover:shadow-md`}
                       >
-                        <div className="flex justify-between items-start mb-4">
+                        <div className={`absolute left-0 top-0 h-full w-1 ${statusConfig.accentBg} rounded-l-xl`} />
+                        <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-2 mb-1.5">
                               <FamilyAvatar family={visit.family_member_id} />
                               <div>
-                                <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
+                                <div className="text-[11px] text-gray-500 font-medium uppercase tracking-wide mb-0.5">
                                   Người đặt lịch
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                                <h3 className="text-sm font-semibold text-gray-800 m-0">
                                   {visit.family_member_id?.full_name}
                                 </h3>
-                                <p className="text-sm text-gray-500 m-0 flex items-center gap-1">
-                                  <UsersIcon className="w-3.5 h-3.5" />
-                                  Thăm người thân: {visit.residents_name.join(', ')}
+                                <p className="text-xs text-gray-500 m-0 flex items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1">
+                                    <UsersIcon className="w-3 h-3" />
+                                    {(() => {
+                                      const names = visit.residents_name.join(', ');
+                                      const tooLong = names.length > 80;
+                                      const isExpanded = !!expandedNames[visit._id];
+                                      const display = isExpanded || !tooLong ? names : names.slice(0, 80) + '...';
+                                      return (
+                                        <>
+                                          <span>Thăm người thân: {display}</span>
+                                          {tooLong && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setExpandedNames(prev => ({ ...prev, [visit._id]: !isExpanded }))}
+                                              className="ml-1 text-[11px] text-amber-600 hover:text-amber-700 underline underline-offset-2"
+                                            >
+                                              {isExpanded ? 'Thu gọn' : 'Xem thêm'}
+                                            </button>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </span>
                                 </p>
                               </div>
                             </div>
                           </div>
                           
                           <div className="flex items-center gap-4">
-                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color} border ${statusConfig.border}`}>
-                              <StatusIcon className="w-3.5 h-3.5" />
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${statusConfig.bg} ${statusConfig.color} border ${statusConfig.border}`}>
+                              <StatusIcon className="w-3 h-3" />
                               {statusConfig.label}
                             </span>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
-                            <CalendarDaysIcon className="w-4 h-4 text-amber-500" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border border-gray-200">
+                            <CalendarDaysIcon className="w-3.5 h-3.5 text-amber-500" />
                             <div>
-                              <div className="text-xs text-gray-500 font-medium">Ngày & Giờ</div>
-                              <div className="text-sm font-semibold text-gray-800">
-                                {format(new Date(visit.visit_date), 'dd/MM/yyyy', { locale: vi })} - {visit.visit_time} - {getEndTimeString(visit)}
+                              <div className="text-[11px] text-gray-500 font-medium">Ngày & Giờ</div>
+                              <div className="text-xs font-semibold text-gray-800">
+                                {format(new Date(visit.visit_date), 'dd/MM/yyyy', { locale: vi })} & {visit.visit_time} - {getEndTimeString(visit)}
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
-                            <ClockIcon className="w-4 h-4 text-blue-500" />
+                          <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-gray-200">
+                            <ClockIcon className="w-3.5 h-3.5 text-blue-500" />
                             <div>
-                              <div className="text-xs text-gray-500 font-medium">Thời gian</div>
-                              <div className="text-sm font-semibold text-gray-800">
+                              <div className="text-[11px] text-gray-500 font-medium">Thời gian</div>
+                              <div className="text-xs font-semibold text-gray-800">
                                 {visit.duration} phút
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
-                            <DocumentTextIcon className="w-4 h-4 text-indigo-500" />
+                          <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border border-gray-200">
+                            <DocumentTextIcon className="w-3.5 h-3.5 text-indigo-500" />
                             <div>
-                              <div className="text-xs text-gray-500 font-medium">Mục đích</div>
-                              <div className="text-sm font-semibold text-gray-800 truncate">
+                              <div className="text-[11px] text-gray-500 font-medium">Mục đích</div>
+                              <div className="text-xs font-semibold text-gray-800 truncate">
                                 {visit.purpose}
                               </div>
                             </div>
@@ -501,7 +502,6 @@ export default function StaffVisitsPage() {
                 </div>
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
                   <div className="flex items-center justify-between">
@@ -510,7 +510,6 @@ export default function StaffVisitsPage() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      {/* Previous Button */}
                       <button
                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                         disabled={currentPage === 1}
@@ -519,7 +518,6 @@ export default function StaffVisitsPage() {
                         <ChevronLeftIcon className="w-4 h-4" />
                       </button>
 
-                      {/* Page Numbers */}
                       <div className="flex items-center gap-1">
                         {getPageNumbers().map((page, index) => (
                           <button
@@ -539,7 +537,6 @@ export default function StaffVisitsPage() {
                         ))}
                       </div>
 
-                      {/* Next Button */}
                       <button
                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                         disabled={currentPage === totalPages}

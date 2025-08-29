@@ -163,7 +163,6 @@ export default function RoomManagementPage() {
     return null;
   };
 
-  // Chức năng chuyển đổi phòng/giường
   const openTransferPage = (bed: any, room: any) => {
     router.push(`/admin/room-management/transfer?bedId=${bed._id}&roomId=${room._id}`);
   };
@@ -219,7 +218,7 @@ export default function RoomManagementPage() {
         <div className="bg-gradient-to-r from-white to-blue-50 rounded-3xl p-8 mb-8 shadow-xl border border-blue-100">
           <div className="flex items-center gap-6">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/admin')}
               className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
               title="Quay lại"
             >
@@ -241,54 +240,54 @@ export default function RoomManagementPage() {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-500/30">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 text-blue-800 shadow-lg border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Tổng phòng</p>
-                <p className="text-3xl font-bold">{totalRooms}</p>
-                <p className="text-blue-100 text-xs font-bold">phòng</p>
+                <p className="text-blue-600 text-sm font-medium">Tổng phòng</p>
+                <p className="text-3xl font-bold text-blue-900">{totalRooms}</p>
+                <p className="text-blue-600 text-xs font-bold">phòng</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <HomeIcon className="w-6 h-6" />
+              <div className="w-12 h-12 bg-blue-200/50 rounded-xl flex items-center justify-center">
+                <HomeIcon className="w-6 h-6 text-blue-700" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg shadow-green-500/30">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 text-green-800 shadow-lg border border-green-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium">Phòng trống</p>
-                <p className="text-3xl font-bold">{availableRooms}</p>
-                <p className="text-green-100 text-xs font-bold">phòng</p>
+                <p className="text-green-600 text-sm font-medium">Phòng trống</p>
+                <p className="text-3xl font-bold text-green-900">{availableRooms}</p>
+                <p className="text-green-600 text-xs font-bold">phòng</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <UsersIcon className="w-6 h-6" />
+              <div className="w-12 h-12 bg-green-200/50 rounded-xl flex items-center justify-center">
+                <UsersIcon className="w-6 h-6 text-green-700" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg shadow-orange-500/30">
+          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-6 text-orange-800 shadow-lg border border-orange-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium">Phòng đã sử dụng</p>
-                <p className="text-3xl font-bold">{occupiedRooms}</p>
-                <p className="text-orange-100 text-xs font-bold">phòng</p>
+                <p className="text-orange-600 text-sm font-medium">Phòng đã sử dụng</p>
+                <p className="text-3xl font-bold text-orange-900">{occupiedRooms}</p>
+                <p className="text-orange-600 text-xs font-bold">phòng</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <MapPinIcon className="w-6 h-6" />
+              <div className="w-12 h-12 bg-orange-200/50 rounded-xl flex items-center justify-center">
+                <MapPinIcon className="w-6 h-6 text-orange-700" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg shadow-purple-500/30">
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 text-purple-800 shadow-lg border border-purple-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm font-medium">Tổng giường</p>
-                <p className="text-3xl font-bold">{totalBeds}</p>
-                <p className="text-purple-100 text-xs font-bold">giường</p>
+                <p className="text-purple-600 text-sm font-medium">Tổng giường</p>
+                <p className="text-3xl font-bold text-purple-900">{totalBeds}</p>
+                <p className="text-purple-600 text-xs font-bold">giường</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <ClockIcon className="w-6 h-6" />
+              <div className="w-12 h-12 bg-purple-200/50 rounded-xl flex items-center justify-center">
+                <ClockIcon className="w-6 h-6 text-purple-700" />
               </div>
             </div>
           </div>

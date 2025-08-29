@@ -89,7 +89,6 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
     );
   }
 
-  // Sort appointments by date
   const sortedAppointments = [...appointments].sort((a, b) => {
     const dateA = new Date(`${a.date}T${a.time}`);
     const dateB = new Date(`${b.date}T${b.time}`);
@@ -118,7 +117,6 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
               alignItems: 'flex-start',
               gap: '1rem'
             }}>
-              {/* Appointment Type Icon */}
               <div style={{
                 fontSize: '2rem',
                 marginTop: '0.25rem'
@@ -126,7 +124,6 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
                 {getAppointmentTypeIcon(appointment.type)}
               </div>
 
-              {/* Main Content */}
               <div style={{ flex: 1 }}>
                 <div style={{
                   display: 'flex',
@@ -156,7 +153,6 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
                     </div>
                   </div>
 
-                  {/* Status Badge */}
                   <span style={{
                     padding: '0.25rem 0.75rem',
                     backgroundColor: colors.text,
@@ -169,7 +165,6 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
                   </span>
                 </div>
 
-                {/* Date and Time */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -183,7 +178,6 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
                   <span>{formatDateTime(appointment.date, appointment.time)}</span>
                 </div>
 
-                {/* Notes */}
                 {appointment.notes && (
                   <div style={{
                     fontSize: '0.75rem',
@@ -199,8 +193,7 @@ export default function AppointmentsDisplay({ appointments, isStaff = false }: A
                 )}
               </div>
             </div>
-
-            {/* Upcoming appointment highlight */}
+                  
             {status === 'upcoming' && (
               <div style={{
                 position: 'absolute',

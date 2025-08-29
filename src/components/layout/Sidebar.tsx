@@ -38,7 +38,6 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-// Phân loại menu theo nhóm chức năng
 const menuGroups: MenuGroup[] = [
  
   {
@@ -95,7 +94,6 @@ export default function Sidebar() {
   const { user } = useAuth();
   const userRole = user?.role || null;
   
-  // Hide sidebar completely if no user is logged in
   if (!user) {
     return null;
   }
@@ -114,7 +112,6 @@ export default function Sidebar() {
       zIndex: 20,
       flexShrink: 0
     }}>
-      {/* Header section */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -181,7 +178,6 @@ export default function Sidebar() {
         </button>
       </div>
       
-      {/* Navigation */}
       <nav style={{flexGrow: 1, overflowY: 'auto', padding: '1.25rem'}}>
         {menuGroups.map((group, groupIndex) => {
           const filteredItems = group.items.filter(item => userRole && item.roles.includes(userRole));
@@ -190,7 +186,6 @@ export default function Sidebar() {
           
           return (
             <div key={groupIndex} style={{marginBottom: '2rem'}}>
-              {/* Group title */}
               {!collapsed && (
                 <div style={{
                   fontSize: '0.6875rem',
@@ -319,7 +314,6 @@ export default function Sidebar() {
         })}
       </nav>
       
-      {/* Footer section */}
       {!collapsed && user && (
         <div style={{
           padding: '1.25rem', 
@@ -327,15 +321,14 @@ export default function Sidebar() {
           background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)'
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', 
+            background: 'linear-gradient(135deg,rgb(17, 132, 240) 0%,rgb(58, 139, 237) 100%)', 
             color: 'white', 
             borderRadius: '0.75rem', 
             padding: '1.25rem 1.5rem',
             position: 'relative',
             overflow: 'hidden',
             boxShadow: '0 4px 12px -1px rgba(139, 92, 246, 0.18)'
-          }}>
-            {/* Background decoration */}
+          }}>   
             <div style={{
               position: 'absolute',
               top: '-40%',

@@ -402,7 +402,7 @@ export default function StaffAssignmentDetailPage() {
                     <option value="">Chọn người cao tuổi</option>
                     {residents
                       .filter(resident => {
-                        // Ẩn những resident đã được phân công cho staff khác (trừ cư dân hiện tại đang chỉnh sửa)
+                        // Ẩn những resident đã được phân công cho staff khác (trừ người cao tuổi hiện tại đang chỉnh sửa)
                         const isAssignedToOtherStaff = assignments.some(
                           assignment => 
                             assignment.resident_id._id === resident._id && 

@@ -19,7 +19,6 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedsAPI } from '@/lib/api';
 
-// Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return '/default-avatar.svg';
   
@@ -45,11 +44,9 @@ export default function ResidentServiceDetailPage() {
   const [bedLoading, setBedLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
 
-  // Get IDs from URL params
   const residentId = params.id as string;
   const serviceId = params.serviceId as string;
 
-  // Check access permissions - staff only
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -62,7 +59,6 @@ export default function ResidentServiceDetailPage() {
     }
   }, [user, router]);
 
-  // Load resident data
   useEffect(() => {
     const loadResident = async () => {
       try {
@@ -87,7 +83,6 @@ export default function ResidentServiceDetailPage() {
         };
         setResident(mapped);
       } catch (error) {
-        console.error('Error loading resident:', error);
         router.push('/staff/residents');
       } finally {
         setLoading(false);
@@ -99,7 +94,6 @@ export default function ResidentServiceDetailPage() {
     }
   }, [residentId, router]);
 
-  // Load care plan assignment
   useEffect(() => {
     const loadCarePlanAssignment = async () => {
       if (!residentId) return;
@@ -111,7 +105,6 @@ export default function ResidentServiceDetailPage() {
         if (assignment) {
           setCarePlanAssignment(assignment);
           
-          // Load care plan details
           if (assignment.care_plan_ids && assignment.care_plan_ids.length > 0) {
             const carePlanPromises = assignment.care_plan_ids.map(async (plan: any) => {
               const planId = plan._id || plan;
@@ -119,7 +112,6 @@ export default function ResidentServiceDetailPage() {
                 const planData = await carePlansAPI.getById(planId);
                 return planData;
               } catch (err) {
-                console.error('Error fetching care plan with ID', planId, ':', err);
                 return plan;
               }
             });
@@ -129,14 +121,12 @@ export default function ResidentServiceDetailPage() {
           }
         }
       } catch (error) {
-        console.error('Error loading care plan assignment:', error);
       }
     };
 
     loadCarePlanAssignment();
   }, [residentId, serviceId]);
 
-  // Load room and bed information
   useEffect(() => {
     const loadRoomAndBedInfo = async () => {
       if (!carePlanAssignment) return;
@@ -145,7 +135,6 @@ export default function ResidentServiceDetailPage() {
       setBedLoading(true);
 
       try {
-        // Load room information
         const assignedRoomId = carePlanAssignment.bed_id?.room_id || carePlanAssignment.assigned_room_id;
         const roomIdString = typeof assignedRoomId === 'object' && assignedRoomId?._id ? assignedRoomId._id : assignedRoomId;
         if (roomIdString) {
@@ -155,7 +144,6 @@ export default function ResidentServiceDetailPage() {
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
 
-        // Load bed information
         const assignedBedId = carePlanAssignment.assigned_bed_id;
         const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
         if (bedIdString) {
@@ -165,7 +153,6 @@ export default function ResidentServiceDetailPage() {
           setBedNumber('Chưa hoàn tất đăng kí');
         }
       } catch (error) {
-        console.error('Error loading room/bed info:', error);
         setRoomNumber('Chưa hoàn tất đăng kí');
         setBedNumber('Chưa hoàn tất đăng kí');
       } finally {
@@ -238,7 +225,6 @@ export default function ResidentServiceDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-lg border border-white/20">
           <div className="flex items-center gap-4 mb-6">
             <Link
@@ -250,7 +236,6 @@ export default function ResidentServiceDetailPage() {
             
             <div className="flex-1">
               <div className="flex items-center gap-6">
-                {/* Avatar */}
                 <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-gray-200 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
                   {resident.avatar ? (
                     <img
@@ -281,7 +266,6 @@ export default function ResidentServiceDetailPage() {
                   )}
                 </div>
                 
-                {/* Thông tin cơ bản */}
                 <div className="flex-1">
                   <div className="mb-2">
                     <span className="text-sm font-medium text-slate-600 block mb-1">
@@ -292,19 +276,16 @@ export default function ResidentServiceDetailPage() {
                     </h1>
                   </div>
                   <div className="flex items-center gap-4 mt-2 flex-wrap">
-                    {/* Tuổi */}
                     <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
                       <UserIcon className="w-4 h-4" />
                       <span>Tuổi:</span>
                       <span>{resident.age} tuổi</span>
                     </span>
-                    {/* Phòng */}
                     <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
                       <HomeIcon className="w-4 h-4" />
                       <span>Phòng:</span>
                       <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
                     </span>
-                    {/* Giường */}
                     <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-gray-100 rounded-lg px-3 py-1 font-medium">
                       <CalendarIcon className="w-4 h-4" />
                       <span>Giường:</span>
@@ -316,7 +297,6 @@ export default function ResidentServiceDetailPage() {
             </div>
           </div>
           
-          {/* Page Title */}
           <div className="flex items-center gap-4 pt-6 border-t border-slate-200">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
               <DocumentTextIcon className="w-6 h-6 text-white" />
@@ -332,11 +312,9 @@ export default function ResidentServiceDetailPage() {
           </div>
         </div>
         
-        {/* Content */}
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 shadow-lg border border-white/20">
           <div className="grid gap-8">
             
-            {/* Service Cost Overview */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 border border-blue-300">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -383,7 +361,6 @@ export default function ResidentServiceDetailPage() {
               </div>
             </div>
 
-            {/* Service Packages */}
             <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-2xl p-8 border border-cyan-300">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center">
@@ -407,7 +384,6 @@ export default function ResidentServiceDetailPage() {
               <div className="grid gap-6">
                 {carePlanDetails.map((carePlan: any, index: number) => (
                   <div key={index} className="bg-white/90 rounded-2xl p-6 border border-cyan-200 shadow-md transition-all duration-200 hover:shadow-lg">
-                    {/* Header with name and price */}
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1">
                         <h4 className="text-xl font-bold text-slate-800 mb-2">
@@ -432,7 +408,6 @@ export default function ResidentServiceDetailPage() {
                       </div>
                     </div>
                     
-                    {/* Time Information */}
                     <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 mb-6 border border-green-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="text-center">
@@ -462,7 +437,6 @@ export default function ResidentServiceDetailPage() {
                       </div>
                     </div>
                     
-                    {/* Services Included */}
                     <div className="border-t border-slate-200 pt-6">
                       <p className="text-sm font-semibold text-gray-700 mb-4">
                         Dịch vụ bao gồm:
@@ -514,7 +488,6 @@ export default function ResidentServiceDetailPage() {
               </div>
             </div>
 
-            {/* Room & Bed Information */}
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-8 border border-green-300">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">

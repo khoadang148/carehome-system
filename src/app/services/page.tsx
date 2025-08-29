@@ -602,13 +602,13 @@ export default function ServicesPage() {
       ? (selectedStaffResidentId as any)._id 
       : selectedStaffResidentId;
     
-    // 1. Lấy danh sách gói đã đăng ký của cư dân
+    // 1. Lấy danh sách gói đã đăng ký của người cao tuổi
     try {
       const carePlans = await carePlansAPI.getByResidentId(residentId);
       // 2. Kiểm tra trùng gói
       const selectedPlan = carePlans.find((plan: any) => plan.planId === selectedPackage && ['active', 'pending_approval'].includes(plan.status));
       if (selectedPlan) {
-        toast.error('Cư dân đã có gói này đang hoạt động hoặc chờ duyệt!');
+        toast.error('người cao tuổi đã có gói này đang hoạt động hoặc chờ duyệt!');
         return;
       }
       // 3. Nếu hợp lệ, chuyển sang trang đăng ký
@@ -3195,18 +3195,18 @@ export default function ServicesPage() {
             boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
             position: 'relative'
           }}>
-            <h3 style={{ fontWeight: 700, fontSize: '1.25rem', marginBottom: 16 }}>Chọn cư dân để đăng ký gói dịch vụ</h3>
+            <h3 style={{ fontWeight: 700, fontSize: '1.25rem', marginBottom: 16 }}>Chọn người cao tuổi để đăng ký gói dịch vụ</h3>
             {loadingStaffResidents ? (
-              <div>Đang tải danh sách cư dân...</div>
+              <div>Đang tải danh sách người cao tuổi...</div>
             ) : staffResidents.length === 0 ? (
-              <div>Không có cư dân nào.</div>
+              <div>Không có người cao tuổi nào.</div>
             ) : (
               <select
                 value={selectedStaffResidentId || ''}
                 onChange={e => setSelectedStaffResidentId(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem', borderRadius: 8, border: '1px solid #d1d5db', marginBottom: 20 }}
               >
-                <option value=''>-- Chọn cư dân --</option>
+                <option value=''>-- Chọn người cao tuổi --</option>
                 {staffResidents.map(r => (
                   <option key={r._id} value={r._id}>{r.fullName || r.name} - Phòng: {r.room || ''}</option>
                 ))}

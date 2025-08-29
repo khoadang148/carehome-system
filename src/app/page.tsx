@@ -12,12 +12,10 @@ export default function Home() {
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        // Nếu chưa đăng nhập và không phải đang ở trang login, redirect đến trang đăng nhập
         if (pathname !== '/login') {
           router.push('/login');
         }
       } else {
-        // Nếu đã đăng nhập, redirect dựa trên role
         if (user.role === 'family') {
           router.push('/family');
         } else if (user.role === 'admin') {
@@ -25,14 +23,13 @@ export default function Home() {
         } else if (user.role === 'staff') {
           router.push('/staff');
         } else {
-          // Fallback cho các role khác
           router.push('/login');
         }
       }
     }
   }, [user, router, pathname]);
   
- 
+  
   
   return null;
 }

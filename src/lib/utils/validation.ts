@@ -703,7 +703,7 @@ export interface ScheduleConflictData {
 }
 
 /**
- * Kiểm tra trùng lịch hoạt động cho cư dân
+ * Kiểm tra trùng lịch hoạt động cho người cao tuổi
  * @param data - Dữ liệu để kiểm tra trùng lịch
  * @returns ValidationError | null - Lỗi nếu có trùng lịch, null nếu không
  */
@@ -745,7 +745,7 @@ export const checkScheduleConflict = (data: ScheduleConflictData): ValidationErr
       
       return {
         field: 'schedule_time',
-        message: `Cư dân đã có hoạt động "${activityName}" vào lúc ${activityTime} trong cùng ngày. Vui lòng chọn thời gian khác.`,
+        message: `người cao tuổi đã có hoạt động "${activityName}" vào lúc ${activityTime} trong cùng ngày. Vui lòng chọn thời gian khác.`,
         code: 'SCHEDULE_CONFLICT'
       };
     }

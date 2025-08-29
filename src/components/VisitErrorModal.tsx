@@ -21,7 +21,6 @@ export default function VisitErrorModal({
 }: VisitErrorModalProps) {
   useEffect(() => {
     if (open) {
-      // Auto close after 4 seconds for faster UX
       const timer = setTimeout(onClose, 4000);
       return () => clearTimeout(timer);
     }
@@ -100,7 +99,6 @@ export default function VisitErrorModal({
         className="visit-error-modal-content"
         style={{ background: getBgGradient() }}
       >
-        {/* Animated error icon */}
         <div className="visit-error-icon-container">
           <div 
             className="visit-error-icon-circle"

@@ -99,7 +99,6 @@ export default function ErrorModal({
         className="error-modal-content"
         style={{ background: getBgGradient() }}
       >
-        {/* Animated error icon */}
         <div className="error-icon-container">
           <div 
             className="error-icon-circle"

@@ -28,13 +28,10 @@ export default function StaffPage() {
         return;
       }
 
-      // Tối ưu: Không tự động initialize residents khi page mount
-      // Chỉ load data khi user thực sự cần
       setPageReady(true);
     }
   }, [user, loading, router]);
 
-  // Tối ưu: Load success message với delay nhỏ
   useEffect(() => {
     const msg = clientStorage.getItem('login_success');
     if (msg) {
@@ -48,7 +45,6 @@ export default function StaffPage() {
     }
   }, []);
 
-  // Tối ưu: Lazy load residents chỉ khi cần thiết
   const handleLoadResidents = () => {
     if (!initialized) {
       initializeResidents();

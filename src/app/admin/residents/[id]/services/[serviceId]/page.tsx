@@ -45,6 +45,7 @@ export default function ResidentServiceDetailPage() {
   const [roomLoading, setRoomLoading] = useState(false);
   const [bedLoading, setBedLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
+  const [roomCost, setRoomCost] = useState<number>(0);
 
   // Get IDs from URL params
   const residentId = params.id as string;
@@ -107,7 +108,10 @@ export default function ResidentServiceDetailPage() {
 
       try {
         const assignments = await carePlansAPI.getByResidentId(residentId);
+        console.log('🔍 All care plan assignments for resident:', assignments);
+        
         const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a._id === serviceId) : null;
+        console.log('🔍 Found assignment:', assignment);
         
         if (assignment) {
           setCarePlanAssignment(assignment);
@@ -118,19 +122,35 @@ export default function ResidentServiceDetailPage() {
               const planId = plan._id || plan;
               try {
                 const planData = await carePlansAPI.getById(planId);
+                console.log('✅ Loaded care plan:', planData);
                 return planData;
               } catch (err) {
-                console.error('Error fetching care plan with ID', planId, ':', err);
-                return plan;
+                console.error('❌ Error fetching care plan with ID', planId, ':', err);
+                // Return a fallback object with basic info
+                return {
+                  plan_name: plan.plan_name || 'Gói dịch vụ không xác định',
+                  description: plan.description || 'Không có mô tả',
+                  monthly_price: plan.monthly_price || 0,
+                  services_included: plan.services_included || ['Không có thông tin dịch vụ'],
+                  start_date: plan.start_date || assignment.start_date,
+                  end_date: plan.end_date || assignment.end_date
+                };
               }
             });
             
             const carePlanData = await Promise.all(carePlanPromises);
+            console.log('📋 Final care plan details:', carePlanData);
             setCarePlanDetails(carePlanData);
+          } else {
+            console.log('⚠️ No care plan IDs found in assignment');
+            setCarePlanDetails([]);
           }
+        } else {
+          console.log('❌ No assignment found for serviceId:', serviceId);
         }
       } catch (error) {
-        console.error('Error loading care plan assignment:', error);
+        console.error('❌ Error loading care plan assignment:', error);
+        setCarePlanDetails([]);
       }
     };
 
@@ -146,22 +166,41 @@ export default function ResidentServiceDetailPage() {
       setBedLoading(true);
 
       try {
+        console.log('🏠 Loading room and bed info for resident:', residentId);
+        
         // Ưu tiên sử dụng bedAssignmentsAPI để lấy thông tin phòng và giường
         try {
           const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+          console.log('🛏️ Bed assignments found:', bedAssignments);
+          
           const bedAssignment = Array.isArray(bedAssignments) ? 
             bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+          
+          console.log('🛏️ Active bed assignment:', bedAssignment);
           
           if (bedAssignment?.bed_id?.room_id) {
             // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
             if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+              console.log('🏠 Room number from bed assignment:', bedAssignment.bed_id.room_id.room_number);
               setRoomNumber(bedAssignment.bed_id.room_id.room_number);
+              // Set room cost if available
+              if (bedAssignment.bed_id.room_id.monthly_price) {
+                setRoomCost(bedAssignment.bed_id.room_id.monthly_price);
+                console.log('💰 Room cost from bed assignment:', bedAssignment.bed_id.room_id.monthly_price);
+              }
             } else {
               // Nếu chỉ có _id, fetch thêm thông tin
               const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              console.log('🏠 Fetching room info for ID:', roomId);
               if (roomId) {
                 const room = await roomsAPI.getById(roomId);
+                console.log('🏠 Room data:', room);
                 setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+                // Set room cost from fetched room data
+                if (room?.monthly_price) {
+                  setRoomCost(room.monthly_price);
+                  console.log('💰 Room cost from fetched room:', room.monthly_price);
+                }
               } else {
                 throw new Error('No room ID found');
               }
@@ -173,12 +212,15 @@ export default function ResidentServiceDetailPage() {
           if (bedAssignment?.bed_id) {
             // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
             if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
+              console.log('🛏️ Bed number from bed assignment:', bedAssignment.bed_id.bed_number);
               setBedNumber(bedAssignment.bed_id.bed_number);
             } else {
               // Nếu chỉ có _id, fetch thêm thông tin
               const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
+              console.log('🛏️ Fetching bed info for ID:', bedId);
               if (bedId) {
                 const bed = await bedsAPI.getById(bedId);
+                console.log('🛏️ Bed data:', bed);
                 setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
               } else {
                 throw new Error('No bed ID found');
@@ -188,36 +230,52 @@ export default function ResidentServiceDetailPage() {
             throw new Error('No bed assignment found');
           }
         } catch (bedError) {
-          console.warn(`Failed to get bed assignment for resident ${residentId}:`, bedError);
+          console.warn(`⚠️ Failed to get bed assignment for resident ${residentId}:`, bedError);
           
           // Fallback về carePlansAPI nếu bedAssignmentsAPI không có kết quả
           if (carePlanAssignment) {
+            console.log('🔄 Falling back to care plan assignment for room/bed info');
+            
             // Load room information from care plan assignment
             const assignedRoomId = carePlanAssignment.bed_id?.room_id || carePlanAssignment.assigned_room_id;
+            console.log('🏠 Room ID from care plan:', assignedRoomId);
+            
             const roomIdString = typeof assignedRoomId === 'object' && assignedRoomId?._id ? assignedRoomId._id : assignedRoomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
+              console.log('🏠 Room data from care plan:', room);
               setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
+              // Set room cost from care plan fallback
+              if (room?.monthly_price) {
+                setRoomCost(room.monthly_price);
+                console.log('💰 Room cost from care plan fallback:', room.monthly_price);
+              }
             } else {
+              console.log('❌ No room ID found in care plan assignment');
               setRoomNumber('Chưa hoàn tất đăng kí');
             }
 
             // Load bed information from care plan assignment
             const assignedBedId = carePlanAssignment.assigned_bed_id;
+            console.log('🛏️ Bed ID from care plan:', assignedBedId);
+            
             const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
             if (bedIdString) {
               const bed = await bedsAPI.getById(bedIdString);
+              console.log('🛏️ Bed data from care plan:', bed);
               setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
             } else {
+              console.log('❌ No bed ID found in care plan assignment');
               setBedNumber('Chưa hoàn tất đăng kí');
             }
           } else {
+            console.log('❌ No care plan assignment available for fallback');
             setRoomNumber('Chưa hoàn tất đăng kí');
             setBedNumber('Chưa hoàn tất đăng kí');
           }
         }
       } catch (error) {
-        console.error('Error loading room/bed info:', error);
+        console.error('❌ Error loading room/bed info:', error);
         setRoomNumber('Chưa hoàn tất đăng kí');
         setBedNumber('Chưa hoàn tất đăng kí');
       } finally {
@@ -570,115 +628,7 @@ export default function ResidentServiceDetailPage() {
         }}>
           <div style={{ display: 'grid', gap: '2rem' }}>
             
-            {/* Service Cost Overview */}
-            <div style={{
-              background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-              borderRadius: '1rem',
-              padding: '2rem',
-              border: '1px solid #93c5fd'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  borderRadius: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <CurrencyDollarIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-                </div>
-                <div>
-                  <h3 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 700,
-                    color: '#1e293b',
-                    margin: 0
-                  }}>
-                    Tổng chi phí dịch vụ
-                  </h3>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b',
-                    margin: '0.25rem 0 0 0'
-                  }}>
-                    Chi phí hàng tháng bao gồm phòng và dịch vụ
-                  </p>
-                </div>
-              </div>
-              
-              <div style={{ textAlign: 'center' }}>
-                <p style={{
-                  fontSize: '2.5rem',
-                  fontWeight: 800,
-                  color: '#1d4ed8',
-                  margin: '0 0 0.5rem 0'
-                }}>
-                  {formatCurrency(carePlanAssignment.total_monthly_cost || 0)}
-                </p>
-                <p style={{
-                  fontSize: '1rem',
-                  color: '#64748b',
-                  margin: '0 0 1.5rem 0'
-                }}>
-                  Mỗi tháng
-                </p>
-                
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '0.75rem',
-                  padding: '1.5rem',
-                  border: '1px solid #dbeafe'
-                }}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '1.5rem'
-                  }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#64748b',
-                        margin: '0 0 0.5rem 0'
-                      }}>
-                        Tiền phòng
-                      </p>
-                      <p style={{
-                        fontSize: '1.5rem',
-                        fontWeight: 700,
-                        color: '#1e293b',
-                        margin: 0
-                      }}>
-                        {formatCurrency(carePlanAssignment.room_monthly_cost || 0)}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#64748b',
-                        margin: '0 0 0.5rem 0'
-                      }}>
-                        Tiền dịch vụ
-                      </p>
-                      <p style={{
-                        fontSize: '1.5rem',
-                        fontWeight: 700,
-                        color: '#1e293b',
-                        margin: 0
-                      }}>
-                        {formatCurrency(carePlanAssignment.care_plans_monthly_cost || 0)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+           
 
             {/* Service Packages */}
             <div style={{

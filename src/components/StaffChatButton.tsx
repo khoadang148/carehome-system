@@ -2,15 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
-import { useChat } from '@/lib/contexts/chat-provider';
+import { ChatBubbleLeftRightIcon as ChatBubbleSolid } from '@heroicons/react/24/solid';
 import { messagesAPI } from '@/lib/api';
+import { useChat } from '@/lib/contexts/chat-provider';
 
 interface StaffChatButtonProps {
   familyMemberId: string;
   familyMemberName: string;
-  residentId?: string;
+  onChatOpen: (familyMemberId: string, familyMemberName: string, 
+    residentId?: string, residentName?: string) => void;
+  residentId?: string, 
   residentName?: string;
-  onChatOpen: (familyMemberId: string, familyMemberName: string, residentId?: string, residentName?: string) => void;
   className?: string;
 }
 
@@ -23,42 +25,65 @@ export default function StaffChatButton({
   className = ""
 }: StaffChatButtonProps) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isPulsing, setIsPulsing] = useState(false);
   const { chatState } = useChat();
 
-  // Fetch unread count for this family member
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
         const response = await messagesAPI.getUnreadCount();
-        // This would need to be adjusted based on how the backend returns per-conversation counts
-        // For now, we'll use the total unread count
-        if (typeof response.count === 'number') {
-          setUnreadCount(response.count);
+        const newCount = response.unreadCount || 0;
+        
+        // Trigger pulse animation if count increased
+        if (newCount > unreadCount) {
+          setIsPulsing(true);
+          setTimeout(() => setIsPulsing(false), 1000);
+        }
+        
+        if (typeof newCount === 'number') {
+          setUnreadCount(newCount);
         }
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        // Silent error handling
       }
     };
 
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 10000); // Poll every 10 seconds
+    const interval = setInterval(fetchUnreadCount, 10000);
 
     return () => clearInterval(interval);
-  }, [familyMemberId]);
+  }, [familyMemberId, unreadCount]);
 
   const handleClick = () => {
     onChatOpen(familyMemberId, familyMemberName, residentId, residentName);
   };
 
+  const hasUnread = unreadCount > 0;
+
   return (
     <button
       onClick={handleClick}
-      className={`relative p-2 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl ${className}`}
-      title={`Chat với ${familyMemberName}${residentName ? ` về ${residentName}` : ''}`}
+      className={`
+        relative p-2 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 
+        text-white hover:from-blue-600 hover:to-blue-700 
+        transition-all duration-200 shadow-lg hover:shadow-xl
+        ${isPulsing ? 'animate-pulse' : ''}
+        ${className}
+      `}
+      title={`Chat với ${familyMemberName}${residentName ? ` về ${residentName}` : ''}${hasUnread ? ` (${unreadCount} tin nhắn mới)` : ''}`}
     >
-      <ChatBubbleLeftRightIcon className="w-4 h-4" />
+      {hasUnread ? (
+        <ChatBubbleSolid className="w-4 h-4" />
+      ) : (
+        <ChatBubbleLeftRightIcon className="w-4 h-4" />
+      )}
       {unreadCount > 0 && (
-        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center font-bold">
+        <span className={`
+          absolute -top-1 -right-1 bg-red-500 text-white text-xs 
+          rounded-full min-w-[16px] h-4 flex items-center justify-center 
+          font-bold shadow-md
+          ${isPulsing ? 'animate-bounce' : ''}
+        `}>
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}

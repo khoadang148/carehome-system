@@ -23,23 +23,25 @@ import { Tab } from '@headlessui/react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { vi } from 'date-fns/locale';
-import { residentAPI } from '@/lib/api';
 import Select from 'react-select';
-import { vitalSignsAPI } from '@/lib/api';
-import { careNotesAPI } from '@/lib/api';
-import { staffAPI } from '@/lib/api';
-import { carePlansAPI, roomsAPI } from '@/lib/api';
-import { userAPI } from '@/lib/api';
-import { activityParticipationsAPI } from '@/lib/api';
+import { 
+  residentAPI, 
+  vitalSignsAPI, 
+  careNotesAPI, 
+  staffAPI, 
+  carePlansAPI, 
+  roomsAPI, 
+  userAPI, 
+  activityParticipationsAPI, 
+  activitiesAPI, 
+  staffAssignmentsAPI, 
+  bedAssignmentsAPI 
+} from '@/lib/api';
 import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
-import { activitiesAPI } from '@/lib/api';
-import { staffAssignmentsAPI } from '@/lib/api';
-import { bedAssignmentsAPI } from '@/lib/api';
 import SuccessModal from '@/components/SuccessModal';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { completePageTransition } from '@/lib/utils/pageTransition';
 
-// Helper functions
 const getAge = (dob: string) => {
   if (!dob) return '';
   const birth = new Date(dob);
@@ -63,17 +65,14 @@ const formatDob = (dob: string) => {
 };
 
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
-  // Nếu không có avatar hoặc avatar rỗng, trả về avatar mặc định
   if (!avatarPath || avatarPath.trim() === '' || avatarPath === 'null' || avatarPath === 'undefined') {
     return '/default-avatar.svg';
   }
   
-  // Nếu là URL hoặc data URL, trả về nguyên bản
   if (avatarPath.startsWith('http') || avatarPath.startsWith('data:')) {
     return avatarPath;
   }
   
-  // Nếu là đường dẫn local, làm sạch và trả về
   const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
   return userAPI.getAvatarUrl(cleanPath);
 };
@@ -83,14 +82,6 @@ function FamilyPortalPageContent() {
   const { user, loading } = useAuth();
   const { chatState, openChat, closeChat } = useChat();
 
-  // Main state
-  const [residents, setResidents] = useState<any[]>([]);
-  const [selectedResidentId, setSelectedResidentId] = useState<string>("");
-  const [dataLoading, setDataLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [pageReady, setPageReady] = useState(false);
-  
-  // Notifications
   interface Notification {
     id: number;
     type: 'success' | 'error' | 'info';
@@ -98,9 +89,12 @@ function FamilyPortalPageContent() {
     message: string;
     timestamp: string;
   }
+  const [residents, setResidents] = useState<any[]>([]);
+  const [selectedResidentId, setSelectedResidentId] = useState<string>("");
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pageReady, setPageReady] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  // Success modal
   const [successModalData, setSuccessModalData] = useState<{
     title: string;
     message: string;
@@ -110,21 +104,15 @@ function FamilyPortalPageContent() {
   } | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  // Vital signs
   const [vitalSigns, setVitalSigns] = useState<any>(null);
   const [vitalLoading, setVitalLoading] = useState(false);
   const [vitalError, setVitalError] = useState('');
   const [vitalSignsHistory, setVitalSignsHistory] = useState<any[]>([]);
   const [vitalHistoryLoading, setVitalHistoryLoading] = useState(false);
   const [vitalHistoryError, setVitalHistoryError] = useState('');
-
-  // Care notes
   const [careNotes, setCareNotes] = useState<any[]>([]);
   const [careNotesLoading, setCareNotesLoading] = useState(false);
   const [careNotesError, setCareNotesError] = useState('');
-
-  // Staff and room
   const [staffList, setStaffList] = useState<any[]>([]);
   const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
@@ -132,8 +120,6 @@ function FamilyPortalPageContent() {
   const [assignedStaff, setAssignedStaff] = useState<any[]>([]);
   const [assignedStaffLoading, setAssignedStaffLoading] = useState(false);
   const [assignedStaffError, setAssignedStaffError] = useState('');
-
-  // Activities
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
@@ -142,13 +128,10 @@ function FamilyPortalPageContent() {
   const [activityHistoryDates, setActivityHistoryDates] = useState<string[]>([]);
   const [serverToday, setServerToday] = useState<string>('');
   const [activityTimes, setActivityTimes] = useState<{[activityId: string]: {start: string, end: string}}>({});
-
-  // Tab loading states for lazy loading
   const [activeTab, setActiveTab] = useState(0);
   const [tabsLoaded, setTabsLoaded] = useState<{[key: number]: boolean}>({0: false});
   const [tabLoading, setTabLoading] = useState<{[key: number]: boolean}>({});
 
-  // Tối ưu: Load success message ngay lập tức
   useEffect(() => {
     const msg = clientStorage.getItem('login_success');
     if (msg) {
@@ -158,11 +141,9 @@ function FamilyPortalPageContent() {
     }
   }, []);
 
-  // Tối ưu: Preload server date và staff list song song
   useEffect(() => {
     const preloadData = async () => {
       try {
-        // Load server date và staff list song song
         const [serverDateResponse, staffData] = await Promise.allSettled([
           fetch('/api/current-date', {
             method: 'GET',
@@ -171,7 +152,6 @@ function FamilyPortalPageContent() {
           staffAPI.getAll()
         ]);
 
-        // Handle server date
         if (serverDateResponse.status === 'fulfilled' && serverDateResponse.value.ok) {
           const data = await serverDateResponse.value.json();
           setServerToday(data.date);
@@ -179,7 +159,6 @@ function FamilyPortalPageContent() {
           setServerToday(new Date().toISOString().slice(0, 10));
         }
 
-        // Handle staff data
         if (staffData.status === 'fulfilled') {
           setStaffList(Array.isArray(staffData.value) ? staffData.value : []);
         } else {
@@ -195,17 +174,15 @@ function FamilyPortalPageContent() {
     preloadData();
   }, []);
 
-  // Tối ưu: Fetch resident data với timeout
   useEffect(() => {
     if (user?.id) {
       setDataLoading(true);
       setError('');
       
-      // Add timeout for resident data fetch
       const timeoutId = setTimeout(() => {
         setError('Không thể tải dữ liệu trong thời gian chờ. Vui lòng thử lại.');
         setDataLoading(false);
-      }, 10000); // 10 second timeout
+      }, 10000);
 
       residentAPI.getByFamilyMemberId(user.id)
         .then((data) => {
@@ -222,17 +199,14 @@ function FamilyPortalPageContent() {
         })
         .finally(() => {
           setDataLoading(false);
-          // Mark page as ready after initial data load
           setTimeout(() => setPageReady(true), 100);
         });
     }
   }, [user]);
 
-  // Tối ưu: Load only activities data initially (tab 0)
   useEffect(() => {
     if (!selectedResidentId || !pageReady) return;
 
-    // Only load activities data initially
     const loadActivitiesData = async () => {
       try {
         setTabLoading(prev => ({ ...prev, 0: true }));
@@ -295,7 +269,6 @@ function FamilyPortalPageContent() {
     loadActivitiesData();
   }, [selectedResidentId, pageReady, serverToday, showActivityHistory]);
 
-  // Lazy load care notes data (tab 1)
   const loadCareNotesData = async () => {
     if (tabsLoaded[1] || tabLoading[1]) return;
     
@@ -314,7 +287,6 @@ function FamilyPortalPageContent() {
     }
   };
 
-  // Lazy load vital signs data (tab 2)
   const loadVitalSignsData = async () => {
     if (tabsLoaded[2] || tabLoading[2]) return;
     
@@ -340,11 +312,9 @@ function FamilyPortalPageContent() {
     }
   };
 
-  // Handle tab change with lazy loading
   const handleTabChange = (index: number) => {
     setActiveTab(index);
     
-    // Load data for the selected tab if not already loaded
     if (index === 1 && !tabsLoaded[1]) {
       loadCareNotesData();
     } else if (index === 2 && !tabsLoaded[2]) {
@@ -352,7 +322,6 @@ function FamilyPortalPageContent() {
     }
   };
 
-  // Fetch activity times for all activities when activities change
   useEffect(() => {
     const missingIds = activities
       .map((activity: any) => activity.activity_id?._id || activity.activity_id)
@@ -365,10 +334,9 @@ function FamilyPortalPageContent() {
       }
       activitiesAPI.getById(id)
         .then(data => {
-          // Sử dụng thời gian trực tiếp từ API (đã là Vietnam time)
           const convertToVietnamTime = (utcTime: string) => {
             if (!utcTime) return '';
-            return utcTime; // Không chuyển đổi timezone nữa
+            return utcTime;
           };
           
           setActivityTimes(prev => ({
@@ -387,11 +355,9 @@ function FamilyPortalPageContent() {
     });
   }, [activities, activityTimes]);
 
-  // Lấy ngày hiện tại từ server
   useEffect(() => {
     const getServerDate = async () => {
       try {
-        // Gọi API để lấy ngày hiện tại từ server
         const response = await fetch('/api/current-date', {
           method: 'GET',
           headers: {
@@ -400,28 +366,19 @@ function FamilyPortalPageContent() {
         });
         if (response.ok) {
           const data = await response.json();
-          console.log('Server date:', data.date); // Debug log
-          console.log('Server timezone:', data.timezone); // Debug log
-          console.log('Original time:', data.originalTime); // Debug log
-          console.log('Vietnam time:', data.vietnamTime); // Debug log
           setServerToday(data.date);
         } else {
-          // Fallback: sử dụng ngày client nếu API không có sẵn
           const clientDate = new Date().toISOString().slice(0, 10);
-          console.log('Using client date:', clientDate); // Debug log
           setServerToday(clientDate);
         }
       } catch (error) {
-        // Fallback: sử dụng ngày client nếu có lỗi
         const clientDate = new Date().toISOString().slice(0, 10);
-        console.log('Error getting server date, using client date:', clientDate); // Debug log
         setServerToday(clientDate);
       }
     };
     getServerDate();
   }, []);
 
-  // Pagination
   const [careNotesPage, setCareNotesPage] = useState(1);
   const [vitalPage, setVitalPage] = useState(1);
   const notesPerPage = 5;
@@ -438,14 +395,11 @@ function FamilyPortalPageContent() {
   useEffect(() => { setCareNotesPage(1); }, [careNotes.length]);
   useEffect(() => { setVitalPage(1); }, [vitalSignsHistory.length]);
 
-  // Tối ưu: Load all resident data song song khi có selectedResidentId
   useEffect(() => {
     if (!selectedResidentId || !pageReady) return;
 
-    // Load all data in parallel with individual loading states
     const loadResidentData = async () => {
       try {
-        // Start all API calls in parallel
         const [
           vitalSignsPromise,
           vitalHistoryPromise,
@@ -455,16 +409,14 @@ function FamilyPortalPageContent() {
           activitiesPromise
         ] = await Promise.allSettled([
           vitalSignsAPI.getByResidentId(selectedResidentId),
-          vitalSignsAPI.getByResidentId(selectedResidentId), // Same API for history
+          vitalSignsAPI.getByResidentId(selectedResidentId),
           careNotesAPI.getAll({ resident_id: selectedResidentId }),
           bedAssignmentsAPI.getByResidentId(selectedResidentId).then(assignments => {
             const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
             if (assignment?.bed_id?.room_id) {
-              // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
               if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
                 return { room_number: assignment.bed_id.room_id.room_number };
               }
-              // Nếu chỉ có _id, fetch thêm thông tin
               const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
               if (roomId) {
                 return roomsAPI.getById(roomId);
@@ -476,7 +428,6 @@ function FamilyPortalPageContent() {
           activityParticipationsAPI.getByResidentId(selectedResidentId)
         ]);
 
-        // Handle vital signs
         if (vitalSignsPromise.status === 'fulfilled') {
           const data = vitalSignsPromise.value;
           if (Array.isArray(data) && data.length > 0) {
@@ -489,26 +440,22 @@ function FamilyPortalPageContent() {
           }
         }
 
-        // Handle care notes
         if (careNotesPromise.status === 'fulfilled') {
           setCareNotes(Array.isArray(careNotesPromise.value) ? careNotesPromise.value : []);
         }
 
-        // Handle room number
         if (roomPromise.status === 'fulfilled' && roomPromise.value) {
           setRoomNumber(roomPromise.value?.room_number || 'Chưa hoàn tất đăng kí');
         } else {
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
 
-        // Handle assigned staff
         if (assignedStaffPromise.status === 'fulfilled') {
           const assignments = Array.isArray(assignedStaffPromise.value) ? assignedStaffPromise.value : [];
         const activeAssignments = assignments.filter((assignment: any) => 
           assignment.status === 'active' || !assignment.status
         );
         
-          // Load staff details in parallel
           const staffWithDetails = await Promise.allSettled(
           activeAssignments.map(async (assignment: any) => {
             try {
@@ -535,7 +482,6 @@ function FamilyPortalPageContent() {
           ).filter(Boolean));
         }
 
-        // Handle activities
         if (activitiesPromise.status === 'fulfilled') {
           const arr = Array.isArray(activitiesPromise.value) ? activitiesPromise.value : [];
         const grouped: Record<string, any[]> = {};
@@ -582,7 +528,6 @@ function FamilyPortalPageContent() {
           }
         }
 
-        // Complete page transition monitoring
         const transitionId = sessionStorage.getItem('current_transition_id');
         if (transitionId) {
           completePageTransition(transitionId);
@@ -597,7 +542,6 @@ function FamilyPortalPageContent() {
     loadResidentData();
   }, [selectedResidentId, pageReady, serverToday, showActivityHistory]);
 
-// When selectedActivityDate changes in history mode, update activities
 useEffect(() => {
   if (!showActivityHistory || !selectedActivityDate || !selectedResidentId) return;
   setActivitiesLoading(true);
@@ -612,7 +556,6 @@ useEffect(() => {
         if (!grouped[date]) grouped[date] = [];
         grouped[date].push(item);
       });
-      // Loại bỏ trùng lặp cho history mode
       const dateActivities = grouped[selectedActivityDate] || [];
       const uniqueActivities = dateActivities.reduce((acc: any[], current: any) => {
         const activityId = current.activity_id?._id || current.activity_id;
@@ -638,13 +581,10 @@ useEffect(() => {
     })
     .catch(() => setActivities([]))
     .finally(() => setActivitiesLoading(false));
-// eslint-disable-next-line
 }, [selectedActivityDate]);
 
-  // Lấy resident đang chọn
   const selectedResident = residents.find(r => r._id === selectedResidentId);
 
-  // Lấy danh sách nhân viên phụ trách (không trùng lặp)
   const staffInCharge: string[] = selectedResident && selectedResident.careNotes ? Array.from(new Set(
     selectedResident.careNotes.map((note: any) => {
       let staffName = note.staff;
@@ -658,7 +598,6 @@ useEffect(() => {
     })
   )) : [];
 
-  // Tạo danh sách staff cho modal - sử dụng dữ liệu thực từ assignedStaff
   const staffMembers = assignedStaff.map((assignment: any, index: number) => {
     const staff = assignment.staff_id;
     const staffName = staff?.full_name || staff?.fullName || staff?.name || staff?.username || staff?.email || 'Chưa rõ';
@@ -669,11 +608,10 @@ useEffect(() => {
       name: staffName,
       role: staffPosition,
       assignment: assignment,
-      staff_id: staff // Thêm staff_id để truy cập thông tin chi tiết
+      staff_id: staff
     };
   });
 
-  // Navigation handlers
   const handleContactStaff = () => {
     router.push('/family/contact-staff');
   };
@@ -686,20 +624,18 @@ useEffect(() => {
     router.push('/family/photos');
   };
 
-  // Ensure header is shown when component mounts
   useEffect(() => {
     document.body.classList.remove('hide-header');
     document.body.style.overflow = 'unset';
   }, []);
 
-  // Remove notification after 5 seconds
   useEffect(() => {
     const timers: NodeJS.Timeout[] = [];
     
     notifications.forEach((notification) => {
       const timer = setTimeout(() => {
         setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
-      }, 5000); // Remove after 5 seconds
+      }, 5000);
       
       timers.push(timer);
     });
@@ -709,7 +645,6 @@ useEffect(() => {
     };
   }, [notifications]);
 
-  // Bảo vệ route chỉ cho family
   useEffect(() => {
     if (!loading && user && user.role !== 'family') {
       if (user.role === 'staff') router.replace('/staff');
@@ -718,12 +653,11 @@ useEffect(() => {
     }
   }, [user, loading, router]);
 
-  // Show loading spinner while initial data is loading
   if (loading || (user && user.role !== 'family')) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
         <div className="text-center">
-          <LoadingSpinner size="large" text="Đang tải thông tin người thân..." />
+          <LoadingSpinner size="lg" text="Đang tải thông tin người thân..." />
         </div>
       </div>
     );
@@ -733,7 +667,7 @@ useEffect(() => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
         <div className="text-center">
-          <LoadingSpinner size="large" text="Đang tải thông tin người thân..." />
+          <LoadingSpinner size="lg" text="Đang tải thông tin người thân..." />
         </div>
       </div>
     );
@@ -762,7 +696,7 @@ useEffect(() => {
     <>
       <SuccessModal open={showSuccessModal} onClose={() => setShowSuccessModal(false)} name={successMessage} />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
-        {/* Notification Banner */}
+          
         {notifications.length > 0 && (
           <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 shadow-lg border-b border-white/20 animate-slideDown">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -791,14 +725,14 @@ useEffect(() => {
 
 
 
-        {/* Background decorations */}
+        
         <div className="absolute inset-0 bg-gradient-radial from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-radial from-purple-500/5 via-transparent to-transparent pointer-events-none" style={{ backgroundPosition: '80% 20%' }} />
         <div className="absolute inset-0 bg-gradient-radial from-blue-500/3 via-transparent to-transparent pointer-events-none" style={{ backgroundPosition: '40% 40%' }} />
         
         <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
           <div className="w-full max-w-6xl mx-auto">
-          {/* Header Section */}
+          
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-xl w-full">
             <div className="flex justify-between items-center flex-wrap gap-4">
               <div className="flex items-center gap-4">
@@ -818,7 +752,7 @@ useEffect(() => {
             </div>
           </div>
           
-          {/* Family Member Selector */}
+          
           {residents.length > 1 && (
             <div className="mb-10 w-full bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 shadow-xl border border-white/20 backdrop-blur-xl">
               <div className="flex items-center gap-4 mb-6">
@@ -832,7 +766,7 @@ useEffect(() => {
                 </div>
               </div>
               
-              {/* React-select dropdown */}
+
               <Select
                 options={residents.map((r: any) => ({
                   value: r._id,
@@ -928,9 +862,9 @@ useEffect(() => {
               />
             </div>
           )}
-          {/* Resident Overview */}
+          
           <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-xl p-10 w-full my-8">
-            {/* Avatar and basic info */}
+            
             <div className="flex flex-col items-center mb-8">
               <img 
                 src={getAvatarUrl(selectedResident?.avatar)} 
@@ -958,9 +892,9 @@ useEffect(() => {
                 Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa hoàn tất đăng kí'}
               </div>
             </div>
-            {/* Information Cards */}
+            
             <div className="flex flex-col gap-6 w-full">
-              {/* Personal Information Card */}
+            
               <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl p-7 shadow-lg">
                 <div className="font-bold text-slate-800 text-xl mb-5 flex items-center gap-3.5 pb-3.5 border-b-3 border-indigo-500">
                   <div className="bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full p-2.5 flex items-center justify-center shadow-lg">
@@ -1001,7 +935,6 @@ useEffect(() => {
                 </div>
               </div>
               
-              {/* Emergency Contact Card */}
               <div className="bg-gradient-to-br from-red-50 to-white border border-red-200 rounded-2xl p-6 shadow-lg">
                 <div className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-3 pb-3 border-b-2 border-red-500">
                   <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-full p-2 flex items-center justify-center">
@@ -1031,7 +964,6 @@ useEffect(() => {
                 )}
               </div>
               
-              {/* Vital Signs Card */}
               <div className="bg-white border-2 border-slate-200 rounded-2xl p-6 shadow-lg">
                 <div className="flex items-center justify-center gap-2.5 mb-4">
                   <span className="font-bold text-lg text-slate-800 text-center">
@@ -1073,7 +1005,6 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Assigned Staff Card */}
                 {assignedStaffLoading ? (
                 <div className="text-center p-5 text-slate-500">
                   <div className="text-base font-semibold">Đang tải thông tin nhân viên...</div>
@@ -1084,7 +1015,6 @@ useEffect(() => {
                   </div>
                                   ) : assignedStaff.length > 0 ? (
                 <div className="bg-white rounded-xl p-5 border border-blue-200 shadow-lg">
-                  {/* Header with icon and title */}
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
                       <UsersIcon className="w-5 h-5 text-white" />
@@ -1094,18 +1024,15 @@ useEffect(() => {
                     </h3>
                   </div>
                   
-                  {/* Separator line */}
                   <div className="h-0.5 bg-blue-500 mb-4" />
                   
-                  {/* Table header */}
                   <div className="grid grid-cols-4 gap-4 mb-3 px-3">
                     <div className="text-xs text-blue-600 font-semibold text-center">Tên nhân viên</div>
                     <div className="text-xs text-blue-600 font-semibold text-center">Chức vụ</div>
                     <div className="text-xs text-blue-600 font-semibold text-center">Số điện thoại</div>
                     <div className="text-xs text-blue-600 font-semibold text-center">Liên hệ</div>
                   </div>
-                  
-                  {/* Staff list */}
+
                   <div className="space-y-2">
                     {assignedStaff.map((assignment: any, index: number) => {
                       const staff = assignment.staff_id;
@@ -1154,8 +1081,6 @@ useEffect(() => {
               
             </div>
           </div>
-
-          {/* Tabbed Information */}
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-xl border border-white/20 overflow-hidden w-full">
             <Tab.Group selectedIndex={activeTab} onChange={handleTabChange}>
               <Tab.List className="flex bg-gradient-to-r from-slate-50 to-slate-200 border-b border-white/20">
@@ -1247,7 +1172,7 @@ useEffect(() => {
                   <div className="flex flex-col gap-4">
                     {tabLoading[0] ? (
                       <div className="flex flex-col items-center justify-center p-12">
-                        <LoadingSpinner size="large" text="Đang tải hoạt động..." />
+                        <LoadingSpinner size="lg" text="Đang tải hoạt động..." />
                       </div>
                     ) : activitiesError ? (
                       <div className="text-red-500">{activitiesError}</div>
@@ -1269,6 +1194,21 @@ useEffect(() => {
                         
                         const time = activityTimes[activityId]?.start ? formatTimeForDisplay(activityTimes[activityId].start) : '';
                         const endTimeStr = activityTimes[activityId]?.end ? formatTimeForDisplay(activityTimes[activityId].end) : '';
+                        
+                        const resolveStaffName = (): string => {
+                          const staffFromActivity = activity?.staff_id as any;
+                          if (staffFromActivity && typeof staffFromActivity === 'object') {
+                            return staffFromActivity.full_name || staffFromActivity.fullName || staffFromActivity.name || staffFromActivity.username || '';
+                          }
+                          const staffId = (typeof activity?.staff_id === 'string') ? activity.staff_id : (staffFromActivity?._id || staffFromActivity?.id);
+                          if (!staffId) return '';
+                          const match = assignedStaff.find((assignment: any) => {
+                            const id = assignment?.staff_id?._id || assignment?.staff_id?.id;
+                            return String(id) === String(staffId);
+                          });
+                          return match?.staff_id?.full_name || match?.staff_id?.fullName || match?.staff_id?.name || '';
+                        };
+                        const staffName = resolveStaffName() || 'Chưa rõ';
                         
                         return (
                           <div key={activity._id} className={`flex items-center p-4 rounded-xl border ${
@@ -1293,6 +1233,10 @@ useEffect(() => {
                               </div>
                               <div className="text-xs text-gray-500 mb-1">
                                 <span className="font-semibold">Thời gian: </span>{time}{endTimeStr?` - ${endTimeStr}`:''}
+                              </div>
+                              <div className="text-xs text-blue-600 mb-1">
+                                <span className="font-semibold">Nhân viên phụ trách: </span>
+                                {staffName || 'Chưa phân công'}
                               </div>
                               <span className={`text-xs font-medium ${
                                 attended ? 'text-emerald-700' : absent ? 'text-red-600' : 'text-gray-500'
@@ -1326,7 +1270,7 @@ useEffect(() => {
                   </h3>
                   {tabLoading[1] ? (
                     <div className="flex flex-col items-center justify-center p-12">
-                      <LoadingSpinner size="large" text="Đang tải ghi chú chăm sóc..." />
+                      <LoadingSpinner size="lg" text="Đang tải ghi chú chăm sóc..." />
                     </div>
                   ) : careNotesError ? (
                     <div className="text-red-500 text-center p-8">{careNotesError}</div>
@@ -1457,7 +1401,7 @@ useEffect(() => {
                   </h3>
                   {tabLoading[2] ? (
                     <div className="flex flex-col items-center justify-center p-12">
-                      <LoadingSpinner size="large" text="Đang tải chỉ số sức khỏe..." />
+                      <LoadingSpinner size="lg" text="Đang tải chỉ số sức khỏe..." />
                     </div>
                   ) : vitalError ? (
                     <div className="text-red-500 text-center p-8">{vitalError}</div>
@@ -1566,8 +1510,6 @@ useEffect(() => {
         </div>
         </div>
       </div>
-      
-      {/* Chat Widget */}
       <ChatWidget
         isOpen={chatState.isOpen}
         onClose={closeChat}

@@ -53,13 +53,12 @@ export function useVitalSigns(): UseVitalSignsReturn {
   const [staffMap, setStaffMap] = useState<{ [id: string]: string }>({});
   const [loading, setLoading] = useState(true);
 
-  // Load residents data
+  
   const loadResidents = useCallback(async () => {
     try {
       let resList = await residentAPI.getAll();
       console.log('All residents from API:', resList);
       
-      // If user is staff, filter residents by staff assignment
       if (user?.role === 'staff' && user?.id) {
         console.log('User is staff, filtering residents by assignments...');
         try {
@@ -72,7 +71,6 @@ export function useVitalSigns(): UseVitalSignsReturn {
             return residentId;
           });
           
-          // Filter residents to only show assigned ones
           resList = resList.filter((resident: any) => {
             const residentId = resident._id || resident.id;
             const isAssigned = assignedResidentIds.includes(residentId);
@@ -85,16 +83,13 @@ export function useVitalSigns(): UseVitalSignsReturn {
           console.log('Filtered residents for staff:', resList.length);
         } catch (assignmentError) {
           console.error('Error fetching staff assignments:', assignmentError);
-          // If error fetching assignments, show no residents for staff
           resList = [];
         }
       } else {
         console.log('User is not staff or no user ID, showing all residents');
       }
       
-      // Get room information for each resident
       const mappedResidents: Resident[] = await Promise.all(resList.map(async (r: any) => {
-        // Calculate age from date_of_birth
         let age = 0;
         if (r.date_of_birth) {
           const birthDate = new Date(r.date_of_birth);
@@ -106,13 +101,11 @@ export function useVitalSigns(): UseVitalSignsReturn {
           }
         }
 
-        // Get room number from care plans
         let roomNumber = 'Chưa phân phòng';
         try {
           const assignments = await carePlansAPI.getByResidentId(r._id);
           const assignment = Array.isArray(assignments) ? assignments.find(a => a.assigned_room_id) : null;
           const roomId = assignment?.assigned_room_id;
-          // Đảm bảo roomId là string, không phải object
           const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
           if (roomIdString) {
             const room = await roomsAPI.getById(roomIdString);
@@ -141,7 +134,6 @@ export function useVitalSigns(): UseVitalSignsReturn {
     }
   }, [user]);
 
-  // Load staff data
   const loadStaff = useCallback(async () => {
     try {
       const staffList = await staffAPI.getAll();
@@ -150,7 +142,6 @@ export function useVitalSigns(): UseVitalSignsReturn {
         const staffId = staff._id || staff.id;
         const staffName = staff.full_name || staff.fullName || staff.username || staff.email || 'Staff';
         
-        // Ensure we only store string values
         if (staffId && typeof staffName === 'string') {
           map[staffId] = staffName;
         }
@@ -162,7 +153,6 @@ export function useVitalSigns(): UseVitalSignsReturn {
     }
   }, []);
 
-  // Load vital signs data
   const loadVitalSigns = useCallback(async () => {
     setLoading(true);
     try {
@@ -177,7 +167,6 @@ export function useVitalSigns(): UseVitalSignsReturn {
         const transformed = transformApiVitalSignsData(vs, residentsList);
         return transformed;
       });
-      // Lọc unique theo id
       const uniqueVitalSigns = Array.from(
         new Map(mappedVitalSigns.map(vs => [vs.id, vs])).values()
       );
@@ -191,9 +180,7 @@ export function useVitalSigns(): UseVitalSignsReturn {
     }
   }, [loadResidents]);
 
-  // Add new vital signs
   const addVitalSigns = useCallback(async (data: Partial<VitalSigns>) => {
-    // Validate required fields BEFORE API call only
     if (!data.residentId) {
       throw new Error('Vui lòng chọn người cao tuổi');
     }
@@ -209,7 +196,6 @@ export function useVitalSigns(): UseVitalSignsReturn {
       await loadVitalSigns();
       return response;
     } catch (error: any) {
-      // More specific error messages
       if (error.response?.status === 400) {
         throw new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các thông tin đã nhập.');
       } else if (error.response?.status === 401) {
@@ -219,19 +205,17 @@ export function useVitalSigns(): UseVitalSignsReturn {
       } else if (error.response?.status === 500) {
         throw new Error('Lỗi hệ thống. Vui lòng thử lại sau.');
       } else if (error.message) {
-        throw error; // Re-throw validation errors
+        throw error; 
       } else {
         throw new Error('Lỗi khi thêm chỉ số sức khỏe. Vui lòng thử lại.');
       }
     }
   }, [loadVitalSigns]);
 
-  // Validate form data
   const validateForm = useCallback((data: Partial<VitalSigns>): ValidationError[] => {
     return validateVitalSignsForm(data);
   }, []);
 
-  // Get filtered vital signs
   const getFilteredVitalSigns = useCallback((residentId?: string, date?: string): VitalSigns[] => {
     console.log('🔍 Filtering vital signs with:', { residentId, date });
     console.log('📊 Total vital signs:', vitalSigns.length);
@@ -239,30 +223,26 @@ export function useVitalSigns(): UseVitalSignsReturn {
     const filtered = vitalSigns.filter(vs => {
       const matchResident = residentId ? vs.residentId === residentId : true;
       
-      // Improved date matching - handle different date formats
       let matchDate = true;
       if (date && date.trim()) {
-        const filterDate = date.trim(); // YYYY-MM-DD format
+        const filterDate = date.trim(); 
         
-        // Extract date part from vs.date (handle both YYYY-MM-DD and ISO datetime)
         let vsDatePart = '';
         if (vs.date) {
           if (vs.date.includes('T')) {
-            // ISO datetime format: 2025-07-18T01:53:00.000Z -> 2025-07-18
             vsDatePart = vs.date.split('T')[0];
           } else {
-            // Already date format: 2025-07-18
             vsDatePart = vs.date;
           }
         }
         
-        // Normalize both dates to ensure consistent comparison
+
         const normalizedFilterDate = filterDate.replace(/-/g, '');
         const normalizedVsDate = vsDatePart.replace(/-/g, '');
         
         matchDate = normalizedVsDate === normalizedFilterDate;
         
-        // Debug log
+        
         console.log('📅 Date comparison:', {
           vsId: vs.id,
           vsDate: vs.date,
@@ -273,7 +253,7 @@ export function useVitalSigns(): UseVitalSignsReturn {
           matchDate
         });
       } else {
-        // If no date filter, show all records
+        
         matchDate = true;
       }
       
@@ -284,7 +264,7 @@ export function useVitalSigns(): UseVitalSignsReturn {
     return filtered;
   }, [vitalSigns]);
 
-  // Initialize data on mount
+
   useEffect(() => {
     if (user) {
       loadVitalSigns();

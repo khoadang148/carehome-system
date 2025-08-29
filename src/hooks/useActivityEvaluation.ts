@@ -23,7 +23,6 @@ export function useActivityEvaluation({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Fetch participations for this activity and date
   useEffect(() => {
     const fetchParticipations = async () => {
       if (!activityId || !activityDate) return;
@@ -35,14 +34,12 @@ export function useActivityEvaluation({
           date: activityDate
         });
         setParticipations(participationsData);
-        // Only residents who have participation on this date
         const filteredResidents = residents.filter(r =>
           participationsData.some((p: any) => {
             const residentId = p.resident_id?._id || p.resident_id;
             return r.id === residentId;
           })
         );
-        // Initialize evaluations from existing participations
         const initialEvaluations: { [key: string]: Evaluation } = {};
         participationsData.forEach((participation: any) => {
           const residentId = participation.resident_id?._id || participation.resident_id;
@@ -63,7 +60,6 @@ export function useActivityEvaluation({
       }
     };
     fetchParticipations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityId, activityDate, residents]);
 
   const handleEvaluationChange = (residentId: string, participated: boolean) => {
@@ -100,12 +96,11 @@ export function useActivityEvaluation({
 
   const handleSaveEvaluations = async (activity: any) => {
     if (!activity?.id) return;
-    // Validate evaluations before saving
     const invalidEvaluations = Object.entries(evaluations).filter(([_, evaluation]) => {
       return !evaluation.participated && (!evaluation.reason || evaluation.reason.trim() === '');
     });
     if (invalidEvaluations.length > 0) {
-      throw new Error(`Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} cư dân đã chọn "Không tham gia".`);
+      throw new Error(`Vui lòng nhập lý do vắng mặt cho ${invalidEvaluations.length} người cao tuổi đã chọn "Không tham gia".`);
     }
     setSaving(true);
     try {
@@ -123,7 +118,6 @@ export function useActivityEvaluation({
         } else {
           const resident = residents.find(r => r.id === residentId);
           if (resident) {
-            // Sử dụng staff_id hiện tại của hoạt động hoặc user hiện tại
             const currentStaffId = participations.length > 0 ? 
               (participations[0].staff_id?._id || participations[0].staff_id) : 
               user?.id || "664f1b2c2f8b2c0012a4e750";
@@ -141,17 +135,14 @@ export function useActivityEvaluation({
           }
         }
       }
-      // Refresh participations
       const participationsData = await activityParticipationsAPI.getByActivityId(
         activity.id, 
         activity.date
       );
       setParticipations(participationsData);
       
-            // Cập nhật evaluations state với dữ liệu mới
       const updatedEvaluations: {[key: string]: {participated: boolean, reason?: string}} = {};
       participationsData.forEach((participation: any) => {
-        // Xử lý resident_id có thể là object hoặc string
         const residentId = participation.resident_id?._id || participation.resident_id;
         const participated = participation.attendance_status === 'attended';
         const reason = participation.performance_notes || '';

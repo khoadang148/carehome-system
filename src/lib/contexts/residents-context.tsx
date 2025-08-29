@@ -6,9 +6,9 @@ import { residentAPI, roomsAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { useAuth } from './auth-context';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
 
-// Define types for resident data
+
 export interface Resident {
-  id: string; // Changed to string to match API ObjectIds
+  id: string; 
   name: string;
   room: string;
   photo: string;
@@ -44,7 +44,7 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   const fetchResidents = async () => {
-    if (loading) return; // Prevent multiple simultaneous requests
+    if (loading) return; 
     
     setLoading(true);
     setError(null);
@@ -52,7 +52,7 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
     try {
       const residentsData = await residentAPI.getAll();
       
-      // Map residents data with additional information
+      
       const mappedResidentsPromises = residentsData.map(async (resident: any) => {
         const mappedResident = {
           id: resident._id || resident.id,
@@ -69,32 +69,32 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
           careLevel: resident.care_level || '',
           avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
           status: resident.status || 'active',
-          roomNumber: 'Loading...', // Default value
+          roomNumber: 'Loading...', 
           carePlan: null,
           ...resident
         };
 
-        // Fetch care plan assignments (gói dịch vụ đang sử dụng)
+        
         try {
           const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id || resident.id);
           console.log(`Care plan assignments for resident ${resident._id}:`, assignments);
           
           if (Array.isArray(assignments) && assignments.length > 0) {
-            // Find the most recent active assignment
+            
             const activeAssignment = assignments.find((a: any) => 
               a.status === 'active' || a.status === 'room_assigned' || a.status === 'payment_completed'
-            ) || assignments[0]; // Fallback to first assignment if no active one
+            ) || assignments[0]; 
             
             console.log(`Selected assignment for resident ${resident._id}:`, activeAssignment);
             
-            // Check if assignment has room information
+            
             if (activeAssignment?.bed_id?.room_id) {
               try {
-                // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
+                
                 if (typeof activeAssignment.bed_id.room_id === 'object' && activeAssignment.bed_id.room_id.room_number) {
                   mappedResident.roomNumber = activeAssignment.bed_id.room_id.room_number;
                 } else {
-                  // Nếu chỉ có _id, fetch thêm thông tin
+                  
                   const roomId = activeAssignment.bed_id.room_id._id || activeAssignment.bed_id.room_id;
                   if (roomId) {
                     const room = await roomsAPI.getById(roomId);
@@ -111,7 +111,7 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
               mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
             }
             
-            // Set care plan information
+            
             mappedResident.carePlan = activeAssignment;
           } else {
             mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
@@ -129,36 +129,38 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
       setInitialized(true);
     } catch (err) {
       console.error('Error fetching residents:', err);
-      setError('Không thể tải danh sách cư dân');
+      setError('Không thể tải danh sách người cao tuổi');
       setResidents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Lazy loading: chỉ fetch data khi cần thiết
+  
   const initializeResidents = useCallback(() => {
     if (!initialized && !loading) {
       fetchResidents();
     }
   }, [initialized, loading]);
 
-  const refreshResidents = useCallback(() => {
-    fetchResidents();
+  const refreshResidents = useCallback(async () => {
+    await fetchResidents();
   }, []);
 
-  // Tối ưu: Không tự động fetch data khi user login
-  // Chỉ fetch khi component thực sự cần data
+  
+  
   useEffect(() => {
-    // Chỉ clear data khi user logout, không tự động fetch
+    
     if (!user) {
       setResidents([]);
       setLoading(false);
       setInitialized(false);
       return;
     }
-    // Không tự động initializeResidents() ở đây
+
   }, [user]);
+
+  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
 
   const getResidentById = (id: string) => {
     return residents.find(resident => resident.id === id);
@@ -173,6 +175,10 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
       residents, 
       loading, 
       error, 
+      selectedResident,
+      setSelectedResident,
+      getResidentById,
+      getResidentByName,
       initialized,
       initializeResidents,
       refreshResidents 

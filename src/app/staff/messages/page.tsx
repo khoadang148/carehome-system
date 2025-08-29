@@ -164,7 +164,6 @@ export default function StaffMessagesPage() {
 
 			setConversations(filteredEntries);
 		} catch (error) {
-			console.error('Error fetching conversations:', error);
 			setConversations([]);
 		}
 	};
@@ -187,7 +186,6 @@ export default function StaffMessagesPage() {
 					: normalized
 			);
 		} catch (error) {
-			console.error('Error fetching messages:', error);
 			setMessages([]);
 		}
 	};
@@ -211,7 +209,6 @@ export default function StaffMessagesPage() {
 			await fetchMessages(selectedConversation.partner._id, selectedConversation.residentId || undefined);
 			await fetchConversations();
 		} catch (error) {
-			console.error('Error sending message:', error);
 		} finally {
 			setSending(false);
 		}
@@ -275,14 +272,13 @@ export default function StaffMessagesPage() {
 	if (loading) {
 		return (
 			<div className="h-screen bg-white flex items-center justify-center">
-				<LoadingSpinner size="large" text="Đang tải..." />
+				        <LoadingSpinner size="lg" text="Đang tải..." />
 			</div>
 		);
 	}
 
 	return (
 		<div className="h-screen bg-white flex flex-col">
-			{/* Header */}
 			<div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-4 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-6">
 				<div className="flex items-center justify-between gap-10 flex-wrap">
 					<div className="flex items-center gap-6">
@@ -318,12 +314,9 @@ export default function StaffMessagesPage() {
 				</div>
 			</div>
 
-			{/* Main Content */}
 			<div className="flex-1 w-full max-w-7xl mx-auto px-6">
 				<div className="bg-white border border-slate-200 rounded-3xl shadow-lg overflow-hidden flex min-h-0 h-[calc(100vh-220px)]">
-					{/* Conversations List */}
 					<div className="shrink-0 w-[380px] md:w-[400px] lg:w-[440px] overflow-y-auto min-h-0 border-r border-gray-200 bg-slate-50/60">
-						{/* List header (refined) */}
 						<div className="sticky top-0 z-10 px-5 py-3 bg-white/90 backdrop-blur border-b border-slate-200">
 							<div className="flex items-center justify-between">
 								<div className="flex items-center gap-2.5">
@@ -379,7 +372,6 @@ export default function StaffMessagesPage() {
 														</span>
 													)}
 												</div>
-												{/* Resident context */}
 												{conversation.residentName && (
 													<p className="text-[11px] text-blue-600 font-medium truncate mt-0.5">
 														Gia đình của {conversation.residentName}
@@ -398,11 +390,9 @@ export default function StaffMessagesPage() {
 						)}
 					</div>
 
-					{/* Chat Area */}
 					<div className="flex-1 flex flex-col min-h-0">
 						{selectedConversation ? (
 							<>
-								{/* Chat Header */}
 								<div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-gray-200 p-4">
 									<div className="flex items-center gap-3">
 										<img
@@ -424,7 +414,6 @@ export default function StaffMessagesPage() {
 									</div>
 								</div>
 
-							{/* Messages */}
 							<div
 								id="messages-container"
 								className="flex-1 overflow-y-auto min-h-0 p-6 space-y-3"
@@ -474,7 +463,6 @@ export default function StaffMessagesPage() {
 								)}
 							</div>
 
-							{/* Message Input */}
 							<div className="flex-shrink-0 p-4 border-t border-gray-200">
 								<div className="flex gap-3 pr-3">
 									<input
@@ -491,7 +479,7 @@ export default function StaffMessagesPage() {
 										disabled={!newMessage.trim() || sending}
 										className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
 									>
-										{sending ? <LoadingSpinner size="small" /> : <PaperAirplaneIcon className="w-4 h-4" />}
+										        {sending ? <LoadingSpinner size="sm" /> : <PaperAirplaneIcon className="w-4 h-4" />}
 									</button>
 								</div>
 							</div>

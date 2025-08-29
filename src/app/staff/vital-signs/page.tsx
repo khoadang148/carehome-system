@@ -8,7 +8,9 @@ import {
   ArrowLeftIcon,
   BellIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  PencilIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { 
   HeartIcon as HeartIconSolid
@@ -19,7 +21,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import { formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone, getDateYYYYMMDDWithTimezone, formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
 
-// Helper function to ensure string values
 const ensureString = (value: any): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'object' && value !== null) {
@@ -37,13 +38,12 @@ const ensureString = (value: any): string => {
   return String(value || 'N/A');
 };
 
-const ITEMS_PER_PAGE = 10; // Số chỉ số sức khỏe hiển thị trên mỗi trang
+const ITEMS_PER_PAGE = 10;
 
 export default function StaffVitalSignsPage() {
   const { user } = useAuth();
   const router = useRouter();
   
-  // State management
   const [vitalSigns, setVitalSigns] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
@@ -56,8 +56,10 @@ export default function StaffVitalSignsPage() {
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
 
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -70,45 +72,30 @@ export default function StaffVitalSignsPage() {
     }
   }, [user, router]);
 
-  // Load residents assigned to current staff
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Load staff assignments for current user
         const myAssignmentsData = await staffAssignmentsAPI.getMyAssignments();
         const myAssignments = Array.isArray(myAssignmentsData) ? myAssignmentsData : [];
         
-        // Get active assignments only
         const activeAssignments = myAssignments.filter((assignment: any) => assignment.status === 'active');
         
-        console.log('Active assignments structure:', activeAssignments.map(a => ({
-          assignmentId: a._id,
-          residentId: a.resident_id,
-          residentIdType: typeof a.resident_id,
-          residentIdStructure: a.resident_id
-        })));
-        
-        // Get resident details for assigned residents
         const assignedResidents = await Promise.all(
           activeAssignments.map(async (assignment: any) => {
-            // Kiểm tra xem resident_id có tồn tại không trước khi gọi API
             let residentIdToFetch = assignment.resident_id;
             
-            // Xử lý trường hợp resident_id là object (có _id bên trong)
             if (assignment.resident_id && typeof assignment.resident_id === 'object' && assignment.resident_id._id) {
               residentIdToFetch = assignment.resident_id._id;
             }
             
             if (!residentIdToFetch) {
-              console.warn('Skipping resident fetch due to missing resident_id in assignment:', assignment);
               return null;
             }
 
             try {
               const resident = await residentAPI.getById(residentIdToFetch);
               
-              // Get room assignment for this resident
               let roomNumber = 'Chưa hoàn tất đăng kí';
               try {
                 const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
@@ -121,7 +108,6 @@ export default function StaffVitalSignsPage() {
                   roomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
                 }
               } catch (roomError) {
-                console.warn('Error fetching room for resident:', roomError);
               }
               
               return {
@@ -135,11 +121,7 @@ export default function StaffVitalSignsPage() {
                 hasRoom: roomNumber !== 'Chưa hoàn tất đăng kí'
               };
             } catch (residentError) {
-              console.warn('Error fetching resident details for ID:', residentIdToFetch, residentError);
-              
-              // Fallback: sử dụng dữ liệu resident có sẵn trong assignment
               if (assignment.resident_id && typeof assignment.resident_id === 'object') {
-                console.log('Using fallback resident data from assignment');
                 return {
                   id: assignment.resident_id._id || assignment.resident_id,
                   name: assignment.resident_id.full_name || '',
@@ -157,17 +139,10 @@ export default function StaffVitalSignsPage() {
           })
         );
         
-        // Filter out null values and only include residents with completed registration
         const validResidents = assignedResidents.filter((resident: any) => resident && resident.hasRoom);
         
-        console.log('Loaded residents data:', {
-          totalResidents: validResidents.length,
-          sampleResident: validResidents[0],
-          allResidentIds: validResidents.map(r => r?.id).filter(Boolean)
-        });
         setResidents(validResidents);
         
-        // Set room numbers
         const roomNumbersMap: {[residentId: string]: string} = {};
         validResidents.forEach((resident: any) => {
           roomNumbersMap[resident.id] = resident.roomNumber;
@@ -175,7 +150,6 @@ export default function StaffVitalSignsPage() {
         setRoomNumbers(roomNumbersMap);
         
       } catch (err) {
-        console.error('Error loading assigned residents:', err);
         setResidents([]);
       } finally {
         setLoading(false);
@@ -187,11 +161,9 @@ export default function StaffVitalSignsPage() {
     }
   }, [user]);
 
-  // Load vital signs data for assigned residents
   useEffect(() => {
     const fetchVitalSigns = async () => {
       try {
-        // Get assigned resident IDs
         const assignedResidentIds = residents.map(resident => resident.id);
         
         if (assignedResidentIds.length === 0) {
@@ -199,29 +171,20 @@ export default function StaffVitalSignsPage() {
           return;
         }
         
-        // Fetch vital signs for assigned residents only
         const allVitalSigns = await Promise.all(
           assignedResidentIds.map(async (residentId) => {
             try {
               const data = await vitalSignsAPI.getByResidentId(residentId);
               return Array.isArray(data) ? data : [];
             } catch (err) {
-              console.warn(`Error loading vital signs for resident ${residentId}:`, err);
               return [];
             }
           })
         );
         
-        // Flatten the array of arrays
         const vitalSignsData = allVitalSigns.flat();
-        console.log('Loaded vital signs data:', {
-          totalVitalSigns: vitalSignsData.length,
-          sampleVitalSign: vitalSignsData[0],
-          allResidentIds: vitalSignsData.map(vs => vs.resident_id)
-        });
         setVitalSigns(vitalSignsData);
       } catch (err) {
-        console.error('Error loading vital signs:', err);
         setVitalSigns([]);
       }
     };
@@ -233,21 +196,10 @@ export default function StaffVitalSignsPage() {
     }
   }, [user, residents]);
 
-  // Transform vital signs data for display
   const transformVitalSignsForDisplay = (vitalSignsData: any[]) => {
     return vitalSignsData.map(vs => {
-      // Debug: Log the mapping process
-      console.log('Mapping vital sign:', {
-        vsResidentId: vs.resident_id,
-        vsResidentIdType: typeof vs.resident_id,
-        availableResidentIds: residents.map(r => ({ id: r.id, name: r.name })),
-      });
-      
       const resident = residents.find(r => {
         const match = String(r.id) === String(vs.resident_id);
-        if (!match) {
-          console.log('No match found for resident_id:', vs.resident_id, 'vs resident.id:', r.id);
-        }
         return match;
       });
       
@@ -273,7 +225,6 @@ export default function StaffVitalSignsPage() {
     });
   };
 
-  // Get filtered vital signs
   const getFilteredVitalSigns = (residentId?: string, dateFilter?: string) => {
     let filtered = vitalSigns;
     
@@ -286,95 +237,60 @@ export default function StaffVitalSignsPage() {
         const dateTime = vs.date_time || vs.date;
         if (!dateTime) return false;
         
-        // Sử dụng cùng logic timezone như khi hiển thị
         const formattedDate = getDateYYYYMMDDWithTimezone(dateTime);
-        
-        console.log('Date filtering:', {
-          originalDateTime: dateTime,
-          formattedDate: formattedDate,
-          dateFilter: dateFilter,
-          matches: formattedDate === dateFilter,
-          vsId: vs.id || vs._id
-        });
         
         return formattedDate === dateFilter;
       });
     }
     
-    // Sort by date (newest first)
     filtered.sort((a, b) => {
       const dateA = new Date(a.date_time || a.date);
       const dateB = new Date(b.date_time || b.date);
-      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      return dateB.getTime() - dateA.getTime();
     });
     
     return transformVitalSignsForDisplay(filtered);
   };
 
-  // Get filtered data
   const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, selectedDate || undefined);
   
 
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredVitalSigns.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentVitalSigns = filteredVitalSigns.slice(startIndex, endIndex);
 
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedResident, selectedDate]);
 
-  // Helper function to convert dd/mm/yyyy to yyyy-mm-dd with timezone consideration
   const convertDateToISO = (dateString: string): string => {
     if (!dateString) return '';
     const parts = dateString.split('/');
     if (parts.length !== 3) return '';
     const [day, month, year] = parts;
     
-    // Tạo date object với timezone local
     const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     
-    // Áp dụng cùng logic timezone như getDateYYYYMMDDWithTimezone
-    // Thêm 7 giờ để bù trừ cho việc trừ 7 giờ trong getDateYYYYMMDDWithTimezone
     const adjustedDate = new Date(localDate.getTime() + 7 * 60 * 60 * 1000);
     
-    // Chuyển đổi sang ISO string và lấy phần date
     const isoDate = adjustedDate.toISOString().split('T')[0];
-    
-    console.log('Date conversion with timezone adjustment:', {
-      input: dateString,
-      localDate: localDate,
-      adjustedDate: adjustedDate,
-      isoDate: isoDate
-    });
     
     return isoDate;
   };
 
-  // Helper function to convert yyyy-mm-dd to dd/mm/yyyy with timezone consideration
   const convertDateToDisplay = (dateString: string): string => {
     if (!dateString) return '';
     
-    // Tạo date object từ ISO string
     const date = new Date(dateString + 'T00:00:00');
     if (isNaN(date.getTime())) return '';
     
-    // Sử dụng formatDateDDMMYYYY để đảm bảo đồng bộ với timezone
     const formattedDate = formatDateDDMMYYYY(date);
-    
-    console.log('Date display conversion:', {
-      input: dateString,
-      date: date,
-      formattedDate: formattedDate
-    });
     
     return formattedDate;
   };
 
-  // Calendar helper functions
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -403,21 +319,10 @@ export default function StaffVitalSignsPage() {
   const handleDateSelect = (day: number) => {
     const selectedDateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     
-    // Đảm bảo ngày được xử lý với timezone local
     const localDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), selectedDateObj.getDate());
     
-    // Áp dụng cùng logic timezone như getDateYYYYMMDDWithTimezone
-    // Thêm 7 giờ để bù trừ cho việc trừ 7 giờ trong getDateYYYYMMDDWithTimezone
     const adjustedDate = new Date(localDate.getTime() + 7 * 60 * 60 * 1000);
     const isoDate = adjustedDate.toISOString().split('T')[0];
-    
-    console.log('Calendar date selection with timezone adjustment:', {
-      selectedDateObj: selectedDateObj,
-      localDate: localDate,
-      adjustedDate: adjustedDate,
-      isoDate: isoDate,
-      displayDate: formatDateDDMMYYYY(localDate)
-    });
     
     setSelectedDate(isoDate);
     setSelectedDateDisplay(formatDateDDMMYYYY(localDate));
@@ -432,7 +337,6 @@ export default function StaffVitalSignsPage() {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
 
-  // Handle click outside date picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -450,7 +354,7 @@ export default function StaffVitalSignsPage() {
     };
   }, [showDatePicker]);
 
-  // Generate page numbers for pagination
+
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     const maxVisiblePages = 5;
@@ -486,7 +390,7 @@ export default function StaffVitalSignsPage() {
     return pages;
   };
 
-  // Loading state
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center">
@@ -501,9 +405,6 @@ export default function StaffVitalSignsPage() {
       
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-8">
         <div className="max-w-7xl mx-auto">
-         
-
-          {/* Header */}
           <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
             <div className="flex justify-between items-center">
               <div>
@@ -566,7 +467,7 @@ export default function StaffVitalSignsPage() {
             </div>
           </div>
 
-          {/* Filters */}
+         
           <div className="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-sm">
             <div className="flex justify-between items-center mb-6">
               
@@ -584,7 +485,7 @@ export default function StaffVitalSignsPage() {
               )}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-end">
-              {/* Resident Filter */}
+             
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
                    Lọc theo người cao tuổi
@@ -614,7 +515,7 @@ export default function StaffVitalSignsPage() {
                 )}
               </div>
 
-              {/* Date Filter */}
+             
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3 bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent">
                   Lọc theo ngày
@@ -627,7 +528,7 @@ export default function StaffVitalSignsPage() {
                       const value = e.target.value;
                       setSelectedDateDisplay(value);
                       
-                      // Validate dd/mm/yyyy format
+                     
                       const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
                       if (dateRegex.test(value)) {
                         const isoDate = convertDateToISO(value);
@@ -648,10 +549,10 @@ export default function StaffVitalSignsPage() {
                     </svg>
                   </button>
                   
-                  {/* Calendar Popup */}
+                 
                   {showDatePicker && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-lg z-50 p-4 min-w-[280px]">
-                      {/* Calendar Header */}
+                     
                       <div className="flex items-center justify-between mb-4">
                         <button
                           onClick={prevMonth}
@@ -674,21 +575,19 @@ export default function StaffVitalSignsPage() {
                         </button>
                       </div>
 
-                      {/* Calendar Grid */}
+                     
                       <div className="grid grid-cols-7 gap-1">
-                        {/* Day headers */}
+                      
                         {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
                           <div key={day} className="w-8 h-8 flex items-center justify-center text-xs font-medium text-gray-500">
                             {day}
                           </div>
                         ))}
                         
-                        {/* Empty cells for days before first day of month */}
                         {Array.from({ length: getFirstDayOfMonth(currentMonth) }, (_, i) => (
                           <div key={`empty-${i}`} className="w-8 h-8"></div>
                         ))}
                         
-                        {/* Days of month */}
                         {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => {
                           const day = i + 1;
                           const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
@@ -711,27 +610,16 @@ export default function StaffVitalSignsPage() {
                         })}
                       </div>
 
-                      {/* Today button */}
+                     
                       <div className="mt-3 pt-3 border-t border-gray-200">
                                                   <button
                             onClick={() => {
                               const today = new Date();
                               
-                              // Đảm bảo sử dụng ngày local
                               const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
                               
-                              // Áp dụng cùng logic timezone như getDateYYYYMMDDWithTimezone
-                              // Thêm 7 giờ để bù trừ cho việc trừ 7 giờ trong getDateYYYYMMDDWithTimezone
                               const adjustedToday = new Date(localToday.getTime() + 7 * 60 * 60 * 1000);
                               const isoDate = adjustedToday.toISOString().split('T')[0];
-                              
-                              console.log('Today button clicked with timezone adjustment:', {
-                                today: today,
-                                localToday: localToday,
-                                adjustedToday: adjustedToday,
-                                isoDate: isoDate,
-                                displayDate: formatDateDDMMYYYY(localToday)
-                              });
                               
                               setSelectedDate(isoDate);
                               setSelectedDateDisplay(formatDateDDMMYYYY(localToday));
@@ -751,7 +639,7 @@ export default function StaffVitalSignsPage() {
             </div>
           </div>
 
-          {/* Vital Signs List */}
+                  
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-200">
             <div className="p-6 border-b border-gray-100 bg-white">
               <div className="flex items-center justify-between">
@@ -792,7 +680,7 @@ export default function StaffVitalSignsPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1200px]">
+                  <table className="w-full min-w-[1400px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
@@ -821,6 +709,9 @@ export default function StaffVitalSignsPage() {
                         </th>
                         <th className="px-3 py-4 text-left text-xs font-semibold text-green-600 uppercase tracking-wider min-w-[120px]">
                           Ghi chú
+                        </th>
+                        <th className="px-3 py-4 text-left text-xs font-semibold text-blue-600 uppercase tracking-wider min-w-[180px]">
+                          Thao tác
                         </th>
                       </tr>
                     </thead>
@@ -909,7 +800,26 @@ export default function StaffVitalSignsPage() {
                           <td className="px-3 py-4 text-sm">
                             {vs.notes ? (
                               <span className="text-gray-700 font-medium text-xs">
-                                {vs.notes}
+                                {(() => {
+                                  const text = String(vs.notes);
+                                  const tooLong = text.length > 120;
+                                  const isExpanded = !!expandedNotes[vs.id];
+                                  const display = isExpanded || !tooLong ? text : text.slice(0, 120) + '...';
+                                  return (
+                                    <>
+                                      <span>{display}</span>
+                                      {tooLong && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setExpandedNotes(prev => ({ ...prev, [vs.id]: !isExpanded }))}
+                                          className="ml-1 text-[11px] text-red-600 hover:text-red-700 underline underline-offset-2"
+                                        >
+                                          {isExpanded ? 'Thu gọn' : 'Xem thêm'}
+                                        </button>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </span>
                             ) : (
                               <span className="text-gray-500 italic text-xs">
@@ -917,13 +827,25 @@ export default function StaffVitalSignsPage() {
                               </span>
                             )}
                           </td>
+                          <td className="px-3 py-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => router.push(`/staff/vital-signs/${vs.id}/edit`)}
+                                className="p-2 text-blue-600 hover:text-blue-800 transition-colors"
+                                title="Chỉnh sửa chỉ số sức khỏe"
+                              >
+                                <PencilIcon className="w-4 h-4" />
+                              </button>
+                              
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Pagination */}
+                
                 {totalPages > 1 && (
                   <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
@@ -932,7 +854,7 @@ export default function StaffVitalSignsPage() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {/* Previous Button */}
+                        
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
@@ -941,7 +863,7 @@ export default function StaffVitalSignsPage() {
                           <ChevronLeftIcon className="w-4 h-4" />
                         </button>
 
-                        {/* Page Numbers */}
+                        
                         <div className="flex items-center gap-1">
                           {getPageNumbers().map((page, index) => (
                             <button
@@ -961,7 +883,7 @@ export default function StaffVitalSignsPage() {
                           ))}
                         </div>
 
-                        {/* Next Button */}
+                        
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
@@ -979,7 +901,6 @@ export default function StaffVitalSignsPage() {
         </div>
       </div>
 
-      {/* Notification Center Button */}
       <div className="fixed top-6 right-8 z-50">
         <button
           onClick={() => setShowNotifications(v => !v)}
@@ -993,7 +914,7 @@ export default function StaffVitalSignsPage() {
           )}
         </button>
         
-        {/* Notification List Popup */}
+        
         {showNotifications && (
           <div className="absolute top-14 right-0 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 p-4">
             <div className="flex justify-between items-center mb-2">
@@ -1037,6 +958,71 @@ export default function StaffVitalSignsPage() {
           </div>
         )}
       </div>
+
+      
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-11/12 shadow-2xl border border-gray-200">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="bg-red-100 rounded-full p-3 flex items-center justify-center">
+                <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-red-800 m-0">
+                Xác nhận xóa
+              </h2>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                Bạn có chắc chắn muốn xóa chỉ số sức khỏe này?
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />
+                  <p className="text-red-700 text-sm font-medium">
+                    Hành động này không thể hoàn tác
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />
+                  <p className="text-red-700 text-sm font-medium">
+                    Dữ liệu sẽ bị xóa vĩnh viễn
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteTarget(null);
+                }}
+                className="px-6 py-3 bg-gray-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all hover:bg-gray-600"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={async () => {
+                  if (deleteTarget) {
+                    try {
+                      await vitalSignsAPI.delete(deleteTarget);
+                      setShowDeleteModal(false);
+                      setDeleteTarget(null);
+                      window.location.reload();
+                    } catch (error) {
+                      alert('Có lỗi xảy ra khi xóa chỉ số sức khỏe');
+                    }
+                  }
+                }}
+                className="px-6 py-3 bg-red-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all hover:bg-red-600"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 } 

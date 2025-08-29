@@ -362,9 +362,6 @@ export default function AddStaffPage() {
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
-
-
-
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Account Information */}
             <div>

@@ -26,7 +26,7 @@ export const TransitionLoading: React.FC<TransitionLoadingProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
       <div className="text-center max-w-md mx-auto px-6">
-        <LoadingSpinner size="large" />
+        <LoadingSpinner size="lg" />
         
         <div className="mt-8 space-y-4">
           

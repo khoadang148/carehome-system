@@ -15,7 +15,7 @@ export default function VisitSuccessModal({
 }: VisitSuccessModalProps) {
   useEffect(() => {
     if (open) {
-      // Auto close after 2 seconds for faster UX
+      
       const timer = setTimeout(onClose, 2000);
       return () => clearTimeout(timer);
     }
@@ -50,12 +50,15 @@ export default function VisitSuccessModal({
         <div className="visit-success-message">
           {scheduledResidents.length > 0 ? (
             <>
-              Đã đặt lịch thăm cho các người thân:
+              Đã đặt lịch thăm thành công cho các người thân đang ở viện:
               <ul className="visit-residents-list">
                 {scheduledResidents.map((name, index) => (
                   <li key={index} className="visit-resident-item">• {name}</li>
                 ))}
               </ul>
+              <p className="visit-note">
+                <strong>Lưu ý:</strong> Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện.
+              </p>
             </>
           ) : (
             <>

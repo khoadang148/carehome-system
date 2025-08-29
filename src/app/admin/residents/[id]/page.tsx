@@ -47,6 +47,15 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [bedNumber, setBedNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [bedLoading, setBedLoading] = useState(false);
   
+  // Lọc ra các gói dịch vụ còn active và chưa hết hạn
+  const now = new Date();
+  const activeAssignments = carePlanAssignments.filter((assignment: any) => {
+    const notExpired = !assignment?.end_date || new Date(assignment.end_date) >= now;
+    const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(assignment?.status || '').toLowerCase());
+    const isActive = assignment?.status === 'active' || !assignment?.status;
+    return notExpired && notCancelled && isActive;
+  });
+  
   // Get residentId from params using React.use()
   const residentId = React.use(params).id;
   
@@ -672,59 +681,75 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     Gói dịch vụ đang sử dụng
                   </h3>
                 </div>
-                {/* Render danh sách gói dịch vụ từ carePlanAssignments */}
-                {carePlanAssignments.length > 0 && carePlanAssignments[0].care_plan_ids && carePlanAssignments[0].care_plan_ids.length > 0 ? (
+                                {/* Render danh sách gói dịch vụ từ carePlanAssignments - chỉ hiển thị active và chưa hết hạn */}
+                {activeAssignments.length > 0 ? (
                   <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    {carePlanAssignments[0].care_plan_ids.map((plan: any, idx: number) => (
-                      <Link
-                        key={plan._id || idx}
-                        href={`/admin/residents/${residentId}/services/${carePlanAssignments[0]._id}`}
-                        style={{
+                    {activeAssignments.map((assignment: any, assignmentIdx: number) => (
+                      assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
+                        assignment.care_plan_ids.map((plan: any, planIdx: number) => (
+                          <div
+                            key={`${assignment._id}-${plan._id || planIdx}`}
+                            style={{
+                              background: 'rgba(255,255,255,0.8)',
+                              borderRadius: '0.5rem',
+                              padding: '1rem',
+                              border: '1px solid #d1fae5',
+                              marginBottom: '0.5rem'
+                            }}
+                          >
+                            <div style={{ 
+                              fontWeight: 600, 
+                              fontSize: '1rem', 
+                              color: '#059669'
+                            }}>
+                              <span>{plan.plan_name || 'Gói dịch vụ'}</span>
+                            </div>
+                            <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
+                              Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div key={`empty-assignment-${assignmentIdx}`} style={{
                           background: 'rgba(255,255,255,0.8)',
                           borderRadius: '0.5rem',
                           padding: '1rem',
                           border: '1px solid #d1fae5',
-                          marginBottom: '0.5rem',
-                          textDecoration: 'none',
-                          transition: 'all 0.2s ease',
-                          cursor: 'pointer',
-                          display: 'block'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
-                          e.currentTarget.style.borderColor = '#10b981';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
-                          e.currentTarget.style.borderColor = '#d1fae5';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      >
-                        <div style={{ 
-                          fontWeight: 600, 
-                          fontSize: '1rem', 
-                          color: '#059669',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
+                          fontSize: '0.875rem',
+                          color: '#64748b'
                         }}>
-                          <span>{plan.plan_name || 'Gói dịch vụ'}</span>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#10b981',
-                            fontWeight: 500
-                          }}>
-                            Xem chi tiết →
-                          </span>
+                          Assignment {assignmentIdx + 1}: Không có gói dịch vụ được gán
                         </div>
-                        <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
-                          Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
-                        </div>
-                      </Link>
+                      )
                     ))}
+                    
+                    <Link
+                      href={`/admin/residents/${residentId}/services/${activeAssignments[0]._id}`}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        borderRadius: '0.5rem',
+                        padding: '1rem',
+                        textAlign: 'center',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                        transition: 'all 0.2s ease',
+                        display: 'block'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      Xem chi tiết →
+                    </Link>
                   </div>
                 ) : (
                   <div>

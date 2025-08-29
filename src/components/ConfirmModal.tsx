@@ -48,7 +48,6 @@ export default function ConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 transform transition-all">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           <button
@@ -61,12 +60,10 @@ export default function ConfirmModal({
           </button>
         </div>
 
-        {/* Content */}
         <div className="mb-6">
           <p className="text-gray-600 leading-relaxed">{message}</p>
         </div>
-
-        {/* Actions */}
+    
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}

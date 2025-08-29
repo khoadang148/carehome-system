@@ -44,20 +44,20 @@ interface ActivitiesContextType {
 
 const ActivitiesContext = createContext<ActivitiesContextType | undefined>(undefined);
 
-// Map API activity to UI activity
+
 function mapApiActivity(api: any): Activity {
-  // Calculate duration if possible
+  
   let duration = 0;
   if (typeof api.duration === 'number') {
     duration = api.duration;
   } else if (api.scheduleTime && api.endTime) {
-    // If both scheduleTime and endTime are ISO strings, calculate duration in minutes
+    
     const start = new Date(api.scheduleTime);
     const end = new Date(api.endTime);
     duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
   }
 
-  // Tính endTime nếu chưa có, dựa vào scheduleTime và duration
+  
   let endTime = '';
   if (api.endTime) {
     endTime = api.endTime;
@@ -67,7 +67,7 @@ function mapApiActivity(api: any): Activity {
     endTime = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
   }
 
-  // Ensure we have a valid id - try _id first, then id, then generate a temporary one
+  
   const activityId = api._id || api.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   return {
@@ -100,7 +100,7 @@ export function ActivitiesProvider({ children }: { children: React.ReactNode }) 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load activities from API on mount
+        
   useEffect(() => {
     const fetchActivities = async () => {
       setLoading(true);

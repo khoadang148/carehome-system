@@ -33,12 +33,12 @@ export const processAvatarUrl = (avatarPath: string): string => {
 
 // Helper function để kiểm tra xem avatar có phải là mobile app path không
 export const isMobileAppPath = (avatarPath: string): boolean => {
-  return avatarPath && avatarPath.startsWith('file://');
+  return Boolean(avatarPath && avatarPath.startsWith('file://'));
 };
 
 // Helper function để kiểm tra xem avatar có phải là server path không
 export const isServerPath = (avatarPath: string): boolean => {
-  return avatarPath && !avatarPath.startsWith('http') && !avatarPath.startsWith('file://') && !avatarPath.startsWith('data:');
+  return Boolean(avatarPath && !avatarPath.startsWith('http') && !avatarPath.startsWith('file://') && !avatarPath.startsWith('data:'));
 };
 
 // Helper function để lấy default avatar URL
@@ -48,10 +48,10 @@ export const getDefaultAvatarUrl = (): string => {
 
 // Helper function để kiểm tra xem avatar có hợp lệ không
 export const isValidAvatar = (avatarPath: string): boolean => {
-  return avatarPath && 
+  return Boolean(avatarPath && 
          avatarPath.trim() !== '' && 
          avatarPath !== 'null' && 
-         avatarPath !== 'undefined';
+         avatarPath !== 'undefined');
 };
 
 // Helper function để lấy avatar URL với fallback

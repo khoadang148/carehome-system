@@ -35,7 +35,6 @@ export default function PhotoDetailPage() {
 
         const familyId = user.id;
         
-        // Sử dụng endpoint chính cho family
         let allPhotosData: any[] = [];
         try {
           const photos = await photosAPI.getAll({ family_member_id: familyId });
@@ -88,7 +87,6 @@ export default function PhotoDetailPage() {
           
           setAllPhotos(mapped);
           
-          // Find current photo
           const photoId = params.id as string;
           const photoIndex = mapped.findIndex((p: any) => p.id === photoId);
           
@@ -110,7 +108,7 @@ export default function PhotoDetailPage() {
     };
 
     loadPhotos();
-  }, [user, params.id]);
+  }, [user]);
 
   const navigateToPhoto = (direction: 'prev' | 'next') => {
     let newIndex = currentIndex;
@@ -125,7 +123,6 @@ export default function PhotoDetailPage() {
       const newPhoto = allPhotos[newIndex];
       setPhoto(newPhoto);
       setCurrentIndex(newIndex);
-      router.push(`/family/photos/${newPhoto.id}`);
     }
   };
 
@@ -168,7 +165,7 @@ export default function PhotoDetailPage() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, allPhotos]);
+  }, [currentIndex, allPhotos.length]);
 
   if (loading) {
     return (
@@ -210,16 +207,16 @@ export default function PhotoDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
+      
       <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
-          {/* Left: Back button + Icon + Title */}
+          
           <div className="flex items-center gap-8">
-            {/* Back button */}
+            
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/family/photos')}
               className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại trang trước"
+              title="Quay lại"
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
@@ -239,7 +236,7 @@ export default function PhotoDetailPage() {
             </div>
           </div>
 
-          {/* Right: Photo counter and navigation */}
+          
           <div className="flex items-center gap-6">
             <div className="bg-gradient-to-r from-red-500 to-orange-400 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-red-500/25 border border-red-400/20">
               {currentIndex + 1} / {allPhotos.length}
@@ -276,12 +273,12 @@ export default function PhotoDetailPage() {
         </div>
       </div>
 
-      {/* Main Content */}
+      
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid lg:grid-cols-2 gap-8 items-start">
-          {/* Photo Section */}
+          
           <div className="space-y-6">
-            {/* Main Photo */}
+            
             <div className="relative group">
               <div className="relative rounded-2xl overflow-hidden bg-white shadow-xl">
                 <img
@@ -308,12 +305,12 @@ export default function PhotoDetailPage() {
                   }}
                 />
                 
-                {/* Download button overlay */}
+                
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button
                     onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
                     className="bg-white/90 backdrop-blur-sm text-slate-700 hover:text-red-500 p-3 rounded-xl shadow-lg transition-all duration-200 hover:scale-105"
-                    title="Tải ảnh xuống"
+                    title="Tải ảnh"
                   >
                     <ArrowDownTrayIcon className="w-5 h-5" />
                   </button>
@@ -321,10 +318,10 @@ export default function PhotoDetailPage() {
               </div>
             </div>
 
-            {/* Photo Actions */}
+            
             <div className="flex items-center justify-center gap-4">
               <button
-                onClick={() => router.back()}
+                onClick={() => router.push('/family/photos')}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-all duration-200"
               >
                 <ArrowLeftIcon className="w-4 h-4" />
@@ -349,7 +346,7 @@ export default function PhotoDetailPage() {
                 className="flex items-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-colors duration-200"
               >
                 <ArrowDownTrayIcon className="w-4 h-4" />
-                Tải ảnh xuống
+                Tải ảnh
               </button>
               
               <button
@@ -367,9 +364,9 @@ export default function PhotoDetailPage() {
             </div>
           </div>
 
-          {/* Info Section */}
+          
           <div className="space-y-6">
-            {/* Photo Title */}
+            
               
             <div className="bg-white rounded-2xl p-6 shadow-lg">
             <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
@@ -383,7 +380,7 @@ export default function PhotoDetailPage() {
               </p>
             </div>
 
-            {/* Photo Details */}
+            
             <div className="bg-white rounded-xl p-5 shadow-md">
               <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
                 
@@ -419,7 +416,7 @@ export default function PhotoDetailPage() {
               </div>
             </div>
 
-            {/* Navigation Tips */}
+            
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
               <h3 className="text-lg font-semibold text-blue-800 mb-3">Mẹo điều hướng</h3>
               <div className="space-y-2 text-sm text-blue-700">

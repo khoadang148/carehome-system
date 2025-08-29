@@ -14,7 +14,7 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
   const [staffNames, setStaffNames] = useState<{[key: string]: string}>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [notesPerPage] = useState(5); // Hiển thị 5 ghi chú mỗi trang
+  const [notesPerPage] = useState(5);
   const requestedIds = useRef<Set<string>>(new Set());
 
   const formatDate = (dateString: string) => {
@@ -26,13 +26,11 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
     return { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' };
   };
 
-  // Fetch staff names by conducted_by if needed (fallback for non-populated data)
   useEffect(() => {
     (async () => {
       if (!careNotes) return;
       
       for (const note of careNotes) {
-        // Only fetch if conducted_by is a string ID and we don't have the staff name yet
         if (note.conducted_by && 
             typeof note.conducted_by === 'string' && 
             !staffNames[note.conducted_by] && 
@@ -53,10 +51,9 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
         }
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [careNotes]);
 
-  // Filter care notes based on search term
   const filteredCareNotes = careNotes.filter(note => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
@@ -69,20 +66,17 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
            recommendations.includes(searchLower);
   });
 
-  // Sort care notes by date (newest first)
   const sortedCareNotes = [...filteredCareNotes].sort((a, b) => {
     const dateA = new Date(a.date || 0);
     const dateB = new Date(b.date || 0);
     return dateB.getTime() - dateA.getTime();
   });
 
-  // Calculate pagination
   const totalPages = Math.ceil(sortedCareNotes.length / notesPerPage);
   const startIndex = (currentPage - 1) * notesPerPage;
   const endIndex = startIndex + notesPerPage;
   const currentCareNotes = sortedCareNotes.slice(startIndex, endIndex);
 
-  // Reset to first page when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -98,7 +92,6 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
 
   return (
     <div className="space-y-4">
-      {/* Search and Stats */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -117,22 +110,18 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
         </div>
       </div>
 
-      {/* Care Notes List */}
       <div className="space-y-4">
         {currentCareNotes.map((careNote, idx) => {
           const colors = getPriorityColor();
           const key = careNote.id || careNote._id || idx;
-          // Lấy tên nhân viên và position
           let staffName = '---';
           let staffPosition = '';
           
-          // Try multiple sources for staff name and position
           if (careNote.staff) {
             staffName = careNote.staff.split(',')[0]?.trim();
           } else if (careNote.conducted_by_name) {
             staffName = careNote.conducted_by_name;
           } else if (careNote.conducted_by && typeof careNote.conducted_by === 'object') {
-            // Handle populated conducted_by object from backend
             staffName = careNote.conducted_by.full_name || '---';
             staffPosition = careNote.conducted_by.position || '';
           } else if (careNote.conducted_by && staffNames[careNote.conducted_by]) {
@@ -144,11 +133,9 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
           } else if (careNote.full_name) {
             staffName = careNote.full_name;
           } else if (careNote.conducted_by && typeof careNote.conducted_by === 'string') {
-            // If we have conducted_by as string ID but no staff name yet, show loading
             staffName = 'Đang tải...';
           }
           
-          // Format staff display with position
           const staffDisplay = staffPosition;
           
           return (
@@ -156,7 +143,6 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
               key={key}
               className="bg-gray-50 border border-gray-200 rounded-xl p-5 border-l-4 border-l-gray-400 hover:shadow-md transition-shadow duration-200"
             >
-              {/* Nhân viên */}
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-2">
                   <UserIcon className="w-4 h-4 text-gray-600" />
@@ -169,7 +155,6 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
                 </span>
               </div>
 
-              {/* Assessment type */}
               {careNote.assessment_type && (
                 <div className="text-sm font-semibold text-green-600 mb-2">
                   Loại đánh giá: {careNote.assessment_type}
@@ -181,7 +166,6 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
                 {careNote.notes || careNote.note || careNote.content || 'Không có nội dung ghi chú'}
               </div>
 
-              {/* Recommendations */}
               {careNote.recommendations && (
                 <div className="text-xs text-blue-600 italic">
                   <span className="font-semibold">Khuyến nghị: </span>
@@ -193,7 +177,6 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
         })}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-600">
@@ -218,7 +201,6 @@ export default function CareNotesDisplay({ careNotes, isStaff = false }: CareNot
         </div>
       )}
 
-      {/* No results message */}
       {filteredCareNotes.length === 0 && careNotes.length > 0 && (
         <div className="p-6 text-center text-gray-500 bg-gray-50 rounded-xl border border-gray-200">
           <ClipboardDocumentListIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />

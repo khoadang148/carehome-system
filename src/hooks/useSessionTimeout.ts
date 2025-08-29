@@ -47,7 +47,6 @@ export function useSessionTimeout() {
     }
 
     timeoutRef.current = setTimeout(() => {
-      // Immediate logout when session expires
       logout();
     }, remainingTime);
 
@@ -133,8 +132,7 @@ export function useSessionTimeout() {
     }, newRemainingTime);
   };
 
-  const handleLogout = () => {
-    // Immediate logout without any delay
+  const handleLogout = () => {  
     logout();
   };
 

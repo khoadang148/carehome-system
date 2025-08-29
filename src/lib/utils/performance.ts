@@ -1,3 +1,5 @@
+import React from 'react';
+
 // Performance optimization utilities
 
 // Debounce function để tránh gọi API quá nhiều

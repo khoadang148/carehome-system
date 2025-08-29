@@ -28,7 +28,7 @@ const Avatar: React.FC<AvatarProps> = ({
   };
 
   const getAvatarUrl = (avatarPath: string | null | undefined) => {
-    return getAvatarUrlWithFallback(avatarPath, fallbackSrc);
+    return getAvatarUrlWithFallback(avatarPath || '', fallbackSrc);
   };
 
   const getInitials = (name: string) => {
@@ -45,7 +45,6 @@ const Avatar: React.FC<AvatarProps> = ({
 
   const isValidSrc = hasValidAvatar(src);
 
-  // Nếu không có avatar và muốn hiển thị chữ cái đầu
   if (!isValidSrc && showInitials && name) {
     const initials = getInitials(name);
     return (
@@ -58,7 +57,6 @@ const Avatar: React.FC<AvatarProps> = ({
     );
   }
 
-  // Nếu không có avatar hợp lệ, hiển thị avatar mặc định
   if (!isValidSrc) {
     return (
       <img

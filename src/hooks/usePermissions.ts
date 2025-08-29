@@ -26,7 +26,6 @@ export const usePermissions = (page?: string) => {
 
     const role = user.role;
     
-    // Define permissions based on role and page
     const getPermissions = (): PermissionConfig & { hasAccess: boolean } => {
       switch (role) {
         case 'admin':
@@ -39,7 +38,6 @@ export const usePermissions = (page?: string) => {
           };
           
         case 'staff':
-          // Staff has limited access
           switch (page) {
             case 'staff':
             case 'permissions':
@@ -69,8 +67,7 @@ export const usePermissions = (page?: string) => {
               };
           }
           
-        case 'family':
-          // Family has very limited access
+        case 'family':    
           switch (page) {
             case 'family':
             case 'services':

@@ -34,8 +34,8 @@ export default function AccountSuccessModal({
   open: boolean;
   onClose: () => void;
   accountInfo: AccountInfo;
-  offsetX?: number; // pixel to shift modal to the right
-  offsetY?: number; // pixel to shift modal downward
+  offsetX?: number;
+  offsetY?: number;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);

@@ -22,21 +22,29 @@ import {
   HeartIcon,
   UserGroupIcon,
   AcademicCapIcon,
-  SparklesIcon
+  SparklesIcon,
+  DevicePhoneMobileIcon,
+  KeyIcon
 } from '@heroicons/react/24/outline';
 import type { User } from '@/lib/contexts/auth-context';
 import { toast } from 'react-toastify';
 import React from 'react';
 import SuccessModal from '@/components/SuccessModal';
 import ErrorModal from '@/components/ErrorModal';
+import { authAPI } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
+  const [activeTab, setActiveTab] = useState<'email' | 'phone'>('email');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
   const hasRedirected = useRef(false);
   const [sessionDebug, setSessionDebug] = useState({});
   const [shouldRedirect, setShouldRedirect] = useState(false);
@@ -52,7 +60,19 @@ export default function LoginPage() {
   const { login, user, loading } = useAuth();
   const { startTransition: startPageTransition } = usePageTransition();
 
-  // Preload các trang đích để tăng tốc độ chuyển trang
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (otpCountdown > 0) {
+      interval = setInterval(() => {
+        setOtpCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [otpCountdown]);
+
   useEffect(() => {
     router.prefetch('/family');
     router.prefetch('/admin');
@@ -62,7 +82,6 @@ export default function LoginPage() {
     }
   }, [router, returnUrl]);
 
-  // Immediate redirect nếu user đã đăng nhập
   useEffect(() => {
     if (!user || loading) {
       hasRedirected.current = false;
@@ -90,7 +109,6 @@ export default function LoginPage() {
     }
   }, [user, loading, returnUrl]);
 
-  // Preload thêm khi user bắt đầu nhập thông tin để tăng tốc độ
   useEffect(() => {
     if (email.length > 0 || password.length > 0) {
       router.prefetch('/family');
@@ -102,7 +120,6 @@ export default function LoginPage() {
     }
   }, [email, password, router, returnUrl]);
 
-  // Khôi phục lỗi và thông báo thành công từ  nếu có
   useEffect(() => {
     const savedError = clientStorage.getItem('login_error');
     const savedSuccess = clientStorage.getItem('login_success');
@@ -148,8 +165,6 @@ export default function LoginPage() {
     }
   };
 
-
-
   const setSuccessWithStorage = (successMessage: string) => {
     setSuccess(successMessage);
     setMessageDisplayed(true);
@@ -193,7 +208,6 @@ export default function LoginPage() {
     });
   }, [user, loading]);
 
-  // Xóa thông báo khi user logout
   useEffect(() => {
     if (!user && !loading) {
       const hasLoggedOut = clientStorage.getItem('has_logged_out');
@@ -206,7 +220,6 @@ export default function LoginPage() {
     }
   }, [user, loading]);
 
-     // Đảm bảo thông báo không bị mất khi component re-render
    useEffect(() => {
      if (messageDisplayed && !errorMessage && !success) {
        const savedError = clientStorage.getItem('login_error');
@@ -222,64 +235,50 @@ export default function LoginPage() {
      }
    }, [messageDisplayed, errorMessage, success]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔍 handleSubmit called - preventing default reload');
     
     clientStorage.removeItem('login_error');
     
     if (!email.trim() || !password.trim()) {
-      console.log('❌ Validation failed - empty fields');
       setErrorWithModal('Vui lòng nhập đầy đủ email và mật khẩu');
       return;
     }
     
-    console.log('✅ Starting login process...');
     setIsLoading(true);
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 6000);
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 4000);
     });
 
     try {
-      console.log('🔄 Calling login API...');
       const user = await Promise.race([
         login(email, password),
         timeoutPromise
       ]);
       const typedUser = user as User | null;
       
-      // Kiểm tra nếu user là null hoặc undefined (đăng nhập thất bại)
       if (!typedUser) {
-        console.log('❌ Login failed: No user returned');
         setIsLoading(false);
         setShouldRedirect(false);
         setSuccess('');
         clientStorage.removeItem('login_success');
         setErrorWithModal('Email hoặc mật khẩu không đúng');
-        // Clear form khi đăng nhập thất bại
         setEmail('');
         setPassword('');
         return;
       }
       
-             console.log('✅ Login successful - user authenticated');
-       clientStorage.removeItem('login_error');
+      clientStorage.removeItem('login_error');
       setUserName(typedUser.name);
       
       clientStorage.setItem('login_success', `${typedUser.name || 'bạn'}!`);
-      
-      // Không cần redirect ở đây vì auth context đã xử lý redirect
-      // Loading state sẽ được reset bởi auth context khi redirect
-      // Không cần setIsLoading(false) ở đây
     } catch (err: any) {
-      console.log('❌ Login failed:', err.message);
       setIsLoading(false);
       setShouldRedirect(false);
       setSuccess('');
       clientStorage.removeItem('login_success');
 
-      // Xử lý lỗi dựa trên message từ API
       if (err.message?.includes('Email hoặc mật khẩu không chính xác')) {
         setErrorWithModal('Email hoặc mật khẩu không đúng');
       } else if (err.message?.includes('Kết nối chậm')) {
@@ -292,11 +291,115 @@ export default function LoginPage() {
         setErrorWithModal('Email hoặc mật khẩu không đúng');
       }
       
-      // Clear form khi có lỗi
       setEmail('');
       setPassword('');
-
       return;
+    }
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!phone.trim()) {
+      setErrorWithModal('Vui lòng nhập số điện thoại');
+      return;
+    }
+
+    const phoneRegex = /^(\+84|84|0)[3|5|7|8|9][0-9]{8}$/;
+    if (!phoneRegex.test(phone)) {
+      setErrorWithModal('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let formattedPhone = phone;
+      if (phone.startsWith('0')) {
+        formattedPhone = '+84' + phone.substring(1);
+      } else if (phone.startsWith('84')) {
+        formattedPhone = '+' + phone;
+      } else if (!phone.startsWith('+84')) {
+        formattedPhone = '+84' + phone;
+      }
+
+      await authAPI.sendOtp(formattedPhone);
+      
+      setOtpSent(true);
+      setOtpCountdown(60); 
+      setSuccess('OTP đã được gửi đến số điện thoại của bạn');
+      setErrorMessage('');
+      setShowErrorModal(false);
+    } catch (err: any) {
+      setErrorWithModal(err.message || 'Có lỗi xảy ra khi gửi OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!otp.trim() || otp.length !== 6) {
+      setErrorWithModal('Vui lòng nhập mã OTP 6 chữ số');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      
+      let formattedPhone = phone;
+      if (phone.startsWith('0')) {
+        formattedPhone = '+84' + phone.substring(1);
+      } else if (phone.startsWith('84')) {
+        formattedPhone = '+' + phone;
+      } else if (!phone.startsWith('+84')) {
+        formattedPhone = '+84' + phone;
+      }
+
+      const result = await authAPI.verifyOtp(formattedPhone, otp);
+      
+      if (result.success) {
+        setUserName(result.user?.full_name || result.user?.username);
+        setSuccessWithStorage(`${result.user?.full_name || result.user?.username || 'bạn'}!`);
+        clientStorage.removeItem('login_error');
+        setErrorMessage('');
+        setShowErrorModal(false);
+        setLoginAttempts(0);
+        clientStorage.removeItem('login_attempts');
+      }
+    } catch (err: any) {
+      setErrorWithModal(err.message || 'Có lỗi xảy ra khi xác thực OTP');
+      setOtp('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpCountdown > 0) return;
+    
+    setIsLoading(true);
+    
+    try {
+      let formattedPhone = phone;
+      if (phone.startsWith('0')) {
+        formattedPhone = '+84' + phone.substring(1);
+      } else if (phone.startsWith('84')) {
+        formattedPhone = '+' + phone;
+      } else if (!phone.startsWith('+84')) {
+        formattedPhone = '+84' + phone;
+      }
+
+      await authAPI.sendOtp(formattedPhone);
+      
+      setOtpCountdown(60);
+      setSuccess('OTP mới đã được gửi đến số điện thoại của bạn');
+    } catch (err: any) {
+      setErrorWithModal(err.message || 'Có lỗi xảy ra khi gửi lại OTP');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -308,7 +411,27 @@ export default function LoginPage() {
     setPassword(e.target.value);
   };
 
-  // Chặn mọi reload có thể xảy ra
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(e.target.value);
+  };
+
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(value);
+  };
+
+  const handleTabChange = (tab: 'email' | 'phone') => {
+    setActiveTab(tab);
+    setOtpSent(false);
+    setOtp('');
+    setOtpCountdown(0);
+    setSuccess('');
+    setErrorMessage('');
+    setShowErrorModal(false);
+    clientStorage.removeItem('login_error');
+    clientStorage.removeItem('login_success');
+  };
+
   useEffect(() => {
     const handleUnload = () => {
       console.log('🔄 Page unload detected');
@@ -321,7 +444,6 @@ export default function LoginPage() {
     };
   }, []);
 
-  // Log khi component mount/unmount
   useEffect(() => {
     console.log('📱 LoginPage mounted');
     return () => {
@@ -339,201 +461,67 @@ export default function LoginPage() {
         message={errorMessage}
         type="error"
       />
-      <div style={{ 
-        minHeight: '100vh',
-        background: 'linear-gradient(120deg, #f9e7c4 0%, #fbc2eb 100%)',
-        position: 'relative',
-        overflow: 'hidden',
-        fontFamily: 'inherit',
-      }}>
-        <div style={{
-          display: 'flex',
-          minHeight: '100vh',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          {/* Left Panel - Branding */}
-          <div style={{
-            flex: '1',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '3rem',
-            background: 'linear-gradient(135deg, #fffbe9 0%, #fbc2eb 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.8)',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.08)'
-          }}>
-            <div style={{ textAlign: 'center', position: 'relative', zIndex: 1, maxWidth: '400px' }}>
-              {/* Logo Section */}
-              <div style={{
-                width: '90px',
-                height: '90px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                borderRadius: '22px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 2rem auto',
-                boxShadow: '0 0 25px rgba(16, 185, 129, 0.25), 0 10px 20px rgba(0, 0, 0, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
-              }}>
-                <BuildingOffice2Icon style={{ 
-                  width: '45px', 
-                  height: '45px', 
-                  color: 'white'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
-                  width: '24px',
-                  height: '24px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 12px rgba(245, 158, 11, 0.4)',
-                  border: '1px solid rgba(255, 255, 255, 0.4)'
-                }}>
-                  <HeartIcon style={{ 
-                    width: '14px', 
-                    height: '14px', 
-                    color: 'white'
-                  }} />
+      <div className="min-h-screen bg-gradient-to-br from-amber-100 via-pink-200 to-purple-200 relative overflow-hidden">
+        <div className="flex min-h-screen relative z-10">
+          <div className="flex-1 flex flex-col items-center justify-center p-12 bg-gradient-to-br from-amber-50 to-pink-200 border border-white/80 shadow-2xl">
+            <div className="text-center relative z-10 max-w-md">
+              <div className="w-24 h-24 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl border border-white/30 relative">
+                <BuildingOffice2Icon className="w-12 h-12 text-white" />
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg border border-white/40">
+                  <HeartIcon className="w-4 h-4 text-white" />
                 </div>
               </div>
               
-              <h1 style={{
-                fontSize: '2.5rem',
-                fontWeight: 800,
-                background: 'linear-gradient(135deg, #059669 0%, #0ea5e9 50%, #f59e0b 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                margin: '0 0 1rem 0',
-                letterSpacing: '-0.025em'
-              }}>
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-emerald-600 via-blue-500 to-amber-500 bg-clip-text text-transparent mb-4 tracking-tight">
                 CareHome
               </h1>
               
-              <p style={{
-                fontSize: '1.125rem',
-                color: '#6b7280',
-                margin: '0 0 2.5rem 0',
-                fontWeight: 500,
-                lineHeight: 1.6
-              }}>
+              <p className="text-lg text-gray-600 mb-10 font-medium leading-relaxed">
                 Hệ thống quản lý viện dưỡng lão<br />
-                <span style={{ color: '#059669', fontWeight: 600 }}>Chuyên nghiệp • An toàn • Tận tâm</span>
+                <span className="text-emerald-600 font-semibold">Chuyên nghiệp • An toàn • Tận tâm</span>
               </p>
               
-              {/* Care Illustration */}
-              <div style={{
-                margin: '2rem 0',
-                padding: '2.5rem',
-                background: 'rgba(255,255,255,0.55)',
-                borderRadius: '32px',
-                border: '1.5px solid rgba(255,255,255,0.7)',
-                boxShadow: '0 12px 48px 0 rgba(16, 185, 129, 0.10), 0 2px 8px 0 rgba(0,0,0,0.04)',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  width: '100%',
-                  height: '280px',
-                  overflow: 'hidden',
-                  borderRadius: '24px',
-                  position: 'relative',
-                  zIndex: 4,
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.10)'
-                }}>
+              <div className="my-8 p-10 bg-white/55 rounded-3xl border-2 border-white/70 shadow-xl relative overflow-hidden">
+                <div className="flex justify-center items-center w-full h-72 overflow-hidden rounded-3xl relative z-10 shadow-lg">
                   <img
                     src="https://th.bing.com/th/id/OIP.nJ4wfcDXbII6LeT_CkbhOAHaHa?r=0&w=740&h=740&rs=1&pid=ImgDetMain"
                     alt="Elderly Care Services - Caregiver Support Illustration"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      borderRadius: '18px',
-                      filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.10)) brightness(1.08) contrast(1.08) saturate(1.15)'
-                    }}
+                    className="w-full h-full object-cover rounded-2xl filter drop-shadow-lg brightness-110 contrast-110 saturate-115"
                   />
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '60px',
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.18), transparent)',
-                    borderRadius: '0 0 18px 18px',
-                    pointerEvents: 'none'
-                  }} />
+                  <div className="absolute bottom-0 left-0 right-0 h-15 bg-gradient-to-t from-black/20 to-transparent rounded-b-2xl pointer-events-none" />
                 </div>
               </div>
               
-              {/* Feature Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="flex flex-col gap-4">
                 {[
                   {
                     icon: HeartIcon,
                     title: 'Chăm sóc tận tâm',
                     description: 'Theo dõi sức khỏe 24/7 với đội ngũ y bác sĩ chuyên nghiệp',
-                    color: '#ef4444'
+                    color: 'text-red-500'
                   },
                   {
                     icon: UserGroupIcon,
                     title: 'Kết nối gia đình',
                     description: 'Cập nhật thông tin thời gian thật cho người thân',
-                    color: '#8b5cf6'
+                    color: 'text-purple-500'
                   },
                   {
                     icon: ShieldCheckIcon,
                     title: 'Bảo mật cao',
                     description: 'Dữ liệu được bảo vệ theo tiêu chuẩn y tế quốc tế',
-                    color: '#0ea5e9'
+                    color: 'text-blue-500'
                   }
                 ].map((feature, index) => (
-                  <div key={index} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    padding: '1.25rem',
-                    background: 'rgba(255, 255, 255, 0.7)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
-                    backdropFilter: 'blur(10px)'
-                  }}>
-                    <div style={{
-                      width: '45px',
-                      height: '45px',
-                      background: `linear-gradient(135deg, ${feature.color}20, ${feature.color}10)`,
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      border: `1px solid ${feature.color}30`
-                    }}>
-                      <feature.icon style={{ width: '24px', height: '24px', color: feature.color }} />
+                  <div key={index} className="flex items-center gap-4 p-5 bg-white/70 rounded-xl border border-white/50 backdrop-blur-md">
+                    <div className={`w-12 h-12 bg-gradient-to-br from-${feature.color.split('-')[1]}-500/20 to-${feature.color.split('-')[1]}-500/10 rounded-lg flex items-center justify-center flex-shrink-0 border border-${feature.color.split('-')[1]}-500/30`}>
+                      <feature.icon className={`w-6 h-6 ${feature.color}`} />
                     </div>
-                    <div style={{ textAlign: 'left', flex: 1 }}>
-                      <div style={{
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
-                        color: '#374151',
-                        marginBottom: '0.25rem'
-                      }}>
+                    <div className="text-left flex-1">
+                      <div className="text-sm font-semibold text-gray-700 mb-1">
                         {feature.title}
                       </div>
-                      <div style={{
-                        fontSize: '0.8rem',
-                        color: '#6b7280',
-                        lineHeight: 1.4
-                      }}>
+                      <div className="text-xs text-gray-500 leading-relaxed">
                         {feature.description}
                       </div>
                     </div>
@@ -543,358 +531,317 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Right Panel - Login Form */}
-          <div style={{
-            flex: '1',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)'
-          }}>
-            <div style={{
-              width: '100%',
-              maxWidth: '520px',
-              maxHeight: '1100px',
-              background: 'white',
-              borderRadius: '20px',
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.15)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              overflow: 'hidden'
-            }}>
-              {/* Header */}
-              <div style={{
-                padding: '2.5rem 2.5rem 1.5rem 2.5rem',
-                background: 'linear-gradient(135deg,rgb(153, 228, 203) 0%,rgb(136, 209, 240) 100%)',
-                borderBottom: '1px solid #f3f4f6',
-                position: 'relative'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: 'linear-gradient(90deg, #10b981 0%, #0ea5e9 50%, #f59e0b 100%)'
-                }} />
+          <div className="flex-1 flex items-center justify-center p-8 bg-white/95 backdrop-blur-xl">
+            <div className="w-full max-w-lg max-h-screen bg-white rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+              <div className="p-10 pb-6 bg-gradient-to-br from-green-200 to-blue-200 border-b border-gray-100 relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-amber-500" />
                 
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    width: '60px',
-                    height: '60px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    borderRadius: '15px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1rem auto',
-                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
-                    position: 'relative'
-                  }}>
-                    <LockClosedIcon style={{ width: '28px', height: '28px', color: 'white' }} />
-                    <div style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      right: '-8px',
-                      width: '20px',
-                      height: '20px',
-                      background: '#f59e0b',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 8px rgba(245, 158, 11, 0.3)'
-                    }}>
-                      <HeartIcon style={{ width: '12px', height: '12px', color: 'white' }} />
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg relative">
+                    <LockClosedIcon className="w-7 h-7 text-white" />
+                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center shadow-md">
+                      <HeartIcon className="w-3 h-3 text-white" />
                     </div>
                   </div>
                   
-                  <h2 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 700,
-                    color: '#1e293b',
-                    margin: '0 0 0.5rem 0'
-                  }}>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
                     Đăng nhập
                   </h2>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b',
-                    margin: 0,
-                    lineHeight: 1.5
-                  }}>
-                    
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    Chọn phương thức đăng nhập phù hợp
                   </p>
                 </div>
               </div>
               
-              {/* Form */}
-              <div style={{ padding: '2.5rem' }}>
+              <div className="p-10">
+                <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
+                  <button
+                    onClick={() => handleTabChange('email')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === 'email'
+                        ? 'bg-white text-emerald-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    <EnvelopeIcon className="w-4 h-4" />
+                    Email
+                  </button>
+                  <button
+                    onClick={() => handleTabChange('phone')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === 'phone'
+                        ? 'bg-white text-emerald-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    <DevicePhoneMobileIcon className="w-4 h-4" />
+                    Số điện thoại
+                  </button>
+                </div>
+
                 {loginAttempts >= 3 && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem 1rem',
-                    background: '#fef3c7',
-                    color: '#92400e',
-                    borderRadius: '8px',
-                    marginBottom: '1rem',
-                    fontSize: '0.8rem',
-                    border: '1px solid #fbbf24',
-                    fontWeight: 500
-                  }}>
-                    <ExclamationTriangleIcon style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg mb-4 text-sm border border-amber-200 font-medium">
+                    <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0" />
                     <span>Quá nhiều lần đăng nhập sai. Vui lòng kiểm tra lại thông tin.</span>
                   </div>
                 )}
                 
                 {success && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '1rem 1.25rem',
-                    background: '#f0fdf4',
-                    color: '#166534',
-                    borderRadius: '8px',
-                    marginBottom: '1.5rem',
-                    fontSize: '0.875rem',
-                    border: '1px solid #bbf7d0',
-                    fontWeight: 500
-                  }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                  <div className="flex items-center gap-3 p-4 bg-green-50 text-green-800 rounded-lg mb-6 text-sm border border-green-200 font-medium">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                       <polyline points="22,4 12,14.01 9,11.01"></polyline>
                     </svg>
-                    <span style={{ fontWeight: 500 }}>{success}</span>
+                    <span className="font-medium">{success}</span>
                   </div>
                 )}
-                
-                
-                
-                <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}} noValidate>
-                  {/* Email Input */}
-                  <div>
-                    <label 
-                      htmlFor="email" 
-                      style={{
-                        display: 'block',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}
-                    >
-                      Địa chỉ email
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <div style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '1rem',
-                        transform: 'translateY(-50%)',
-                        pointerEvents: 'none',
-                        zIndex: 1
-                      }}>
-                        <EnvelopeIcon style={{ width: '18px', height: '18px', color: '#9ca3af' }} />
-                      </div>
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder={"example@email.com"}
-                        value={email}
-                        onChange={handleEmailChange}
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem 1rem 0.875rem 2.75rem',
-                          fontSize: '0.875rem',
-                          color: '#1e293b',
-                          background: 'white',
-                          borderRadius: '10px',
-                          border: '2px solid #e5e7eb',
-                          boxSizing: 'border-box'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#10b981';
-                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Password Input */}
-                  <div>
-                    <label 
-                      htmlFor="password" 
-                      style={{
-                        display: 'block',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}
-                    >
-                      Mật khẩu
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <div style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '1rem',
-                        transform: 'translateY(-50%)',
-                        pointerEvents: 'none',
-                        zIndex: 1
-                      }}>
-                        <LockClosedIcon style={{ width: '18px', height: '18px', color: '#9ca3af' }} />
-                      </div>
-                      <input
-                        id="password"
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Nhập mật khẩu của bạn"
-                        value={password}
-                        onChange={handlePasswordChange}
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem 2.75rem 0.875rem 2.75rem',
-                          fontSize: '0.875rem',
-                          color: '#1e293b',
-                          background: 'white',
-                          borderRadius: '10px',
-                          border: '2px solid #e5e7eb',
-                          boxSizing: 'border-box'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#10b981';
-                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          right: '1rem',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: '#9ca3af',
-                          padding: '4px',
-                          borderRadius: '4px'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.color = '#6b7280';
-                          e.currentTarget.style.background = '#f3f4f6';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.color = '#9ca3af';
-                          e.currentTarget.style.background = 'none';
-                        }}
-                      >
-                        {showPassword ? 
-                          <EyeSlashIcon style={{ width: '18px', height: '18px' }} /> :
-                          <EyeIcon style={{ width: '18px', height: '18px' }} />
-                        }
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Security Notice */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '10px',
-                    padding: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <ShieldCheckIcon style={{ width: '16px', height: '16px', color: 'white' }} />
-                    </div>
+
+                {activeTab === 'email' && (
+                  <form onSubmit={handleEmailSubmit} className="flex flex-col gap-6" noValidate>
                     <div>
-                      <div style={{ fontSize: '0.8rem', color: '#065f46', fontWeight: 600, marginBottom: '0.25rem' }}>
-                        Bảo mật thông tin
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#047857', lineHeight: 1.4 }}>
-                        Dữ liệu được mã hóa và bảo mật theo tiêu chuẩn y tế quốc tế
+                      <label 
+                        htmlFor="email" 
+                        className="block text-sm font-semibold text-gray-700 mb-2"
+                      >
+                        Địa chỉ email
+                      </label>
+                      <div className="relative">
+                        <div className="absolute top-1/2 left-4 transform -translate-y-1/2 pointer-events-none z-10">
+                          <EnvelopeIcon className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <input
+                          id="email"
+                          name="email"
+                          type="email"
+                          placeholder="example@email.com"
+                          value={email}
+                          onChange={handleEmailChange}
+                          className="w-full px-4 py-3.5 pl-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
+                        />
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                                         style={{
-                       width: '100%',
-                       padding: '1rem',
-                       fontSize: '0.9rem',
-                       fontWeight: 600,
-                       color: 'white',
-                       background: isLoading 
-                         ? '#6b7280'
-                         : success
-                         ? '#22c55e'
-                         : '#10b981',
-                       borderRadius: '12px',
-                       border: 'none',
-                       cursor: isLoading ? 'not-allowed' : 'pointer',
-                       marginTop: '0.5rem',
-                       boxShadow: isLoading 
-                         ? 'none' 
-                         : '0 4px 12px rgba(0, 0, 0, 0.15)'
-                     }}
-                  >
-                    {isLoading ? (
-                      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem'}}>
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          border: '2px solid rgba(255,255,255,0.3)',
-                          borderTopColor: 'white',
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite'
-                        }} />
-                        Đang xác thực...
+                    
+                    <div>
+                      <label 
+                        htmlFor="password" 
+                        className="block text-sm font-semibold text-gray-700 mb-2"
+                      >
+                        Mật khẩu
+                      </label>
+                      <div className="relative">
+                        <div className="absolute top-1/2 left-4 transform -translate-y-1/2 pointer-events-none z-10">
+                          <LockClosedIcon className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <input
+                          id="password"
+                          name="password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Nhập mật khẩu của bạn"
+                          value={password}
+                          onChange={handlePasswordChange}
+                          className="w-full px-4 py-3.5 pl-11 pr-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute top-1/2 right-4 transform -translate-y-1/2 bg-transparent border-none cursor-pointer text-gray-400 p-1 rounded hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                        >
+                          {showPassword ? 
+                            <EyeSlashIcon className="w-5 h-5" /> :
+                            <EyeIcon className="w-5 h-5" />
+                          }
+                        </button>
                       </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <ShieldCheckIcon className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-emerald-800 font-semibold mb-1">
+                          Bảo mật thông tin
+                        </div>
+                        <div className="text-xs text-emerald-700 leading-relaxed">
+                          Dữ liệu được mã hóa và bảo mật theo tiêu chuẩn y tế quốc tế
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-4 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer mt-2 shadow-lg disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Đang xác thực...
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <LockClosedIcon className="w-5 h-5" />
+                          Đăng nhập
+                        </div>
+                      )}
+                    </button>
+                  </form>
+                )}
+
+                {activeTab === 'phone' && (
+                  <div className="flex flex-col gap-6">
+                    {!otpSent ? (
+                      <form onSubmit={handleSendOtp} className="flex flex-col gap-6" noValidate>
+                        <div>
+                          <label 
+                            htmlFor="phone" 
+                            className="block text-sm font-semibold text-gray-700 mb-2"
+                          >
+                            Số điện thoại
+                          </label>
+                          <div className="relative">
+                            <div className="absolute top-1/2 left-4 transform -translate-y-1/2 pointer-events-none z-10">
+                              <DevicePhoneMobileIcon className="w-5 h-5 text-gray-400" />
+                            </div>
+                            <input
+                              id="phone"
+                              name="phone"
+                              type="tel"
+                              placeholder="0123456789"
+                              value={phone}
+                              onChange={handlePhoneChange}
+                              className="w-full px-4 py-3.5 pl-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Nhập số điện thoại đã đăng ký trong hệ thống
+                          </p>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <KeyIcon className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <div className="text-xs text-blue-800 font-semibold mb-1">
+                              Xác thực bằng OTP
+                            </div>
+                            <div className="text-xs text-blue-700 leading-relaxed">
+                              Mã OTP sẽ được gửi qua SMS đến số điện thoại của bạn
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className="w-full py-4 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer mt-2 shadow-lg disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center justify-center gap-3">
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Đang gửi OTP...
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              <DevicePhoneMobileIcon className="w-5 h-5" />
+                              Gửi mã OTP
+                            </div>
+                          )}
+                        </button>
+                      </form>
                     ) : (
-                      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'}}>
-                        <LockClosedIcon style={{ width: '18px', height: '18px' }} />
-                        Đăng nhập
-                      </div>
+                      <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6" noValidate>
+                        <div>
+                          <label 
+                            htmlFor="otp" 
+                            className="block text-sm font-semibold text-gray-700 mb-2"
+                          >
+                            Mã OTP
+                          </label>
+                          <div className="relative">
+                            <div className="absolute top-1/2 left-4 transform -translate-y-1/2 pointer-events-none z-10">
+                              <KeyIcon className="w-5 h-5 text-gray-400" />
+                            </div>
+                            <input
+                              id="otp"
+                              name="otp"
+                              type="text"
+                              placeholder="123456"
+                              value={otp}
+                              onChange={handleOtpChange}
+                              maxLength={6}
+                              className="w-full px-4 py-3.5 pl-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200 text-center tracking-widest"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-xs text-gray-500">
+                              Mã 6 chữ số đã được gửi đến {phone}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleResendOtp}
+                              disabled={otpCountdown > 0}
+                              className="text-xs text-emerald-600 hover:text-emerald-700 disabled:text-gray-400 disabled:cursor-not-allowed font-medium"
+                            >
+                              {otpCountdown > 0 ? `Gửi lại (${otpCountdown}s)` : 'Gửi lại'}
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <ClockIcon className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <div className="text-xs text-amber-800 font-semibold mb-1">
+                              Mã có hiệu lực trong 5 phút
+                            </div>
+                            <div className="text-xs text-amber-700 leading-relaxed">
+                              Vui lòng nhập mã OTP để hoàn tất đăng nhập
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className="w-full py-4 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer mt-2 shadow-lg disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center justify-center gap-3">
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Đang xác thực...
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              <KeyIcon className="w-5 h-5" />
+                              Xác thực OTP
+                            </div>
+                          )}
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOtpSent(false);
+                            setOtp('');
+                            setOtpCountdown(0);
+                          }}
+                          className="w-full py-3 text-sm font-medium text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-xl border-none cursor-pointer transition-all duration-200"
+                        >
+                          Quay lại nhập số điện thoại
+                        </button>
+                      </form>
                     )}
-                  </button>
-                </form>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Login Spinner */}
       <LoginSpinner isLoading={isLoading} />
     </>
   );

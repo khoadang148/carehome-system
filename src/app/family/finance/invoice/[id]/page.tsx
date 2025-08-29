@@ -31,8 +31,7 @@ export default function InvoiceDetailPage() {
         setLoading(true);
         const invoiceId = params.id as string;
         console.log('Fetching invoice with ID:', invoiceId);
-        
-        // Fetch invoice details
+
         const invoiceData = await billsAPI.getById(invoiceId);
         console.log('Invoice data:', invoiceData);
         
@@ -62,15 +61,15 @@ export default function InvoiceDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
-        return { bg: '#e6f9ed', color: '#16a34a', border: '#bbf7d0', text: 'Đã thanh toán' };
+        return { bg: 'bg-green-50', textColor: 'text-green-600', border: 'border-green-200', solidBg: 'bg-green-600', text: 'Đã thanh toán' };
       case 'pending':
-        return { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa', text: 'Chờ thanh toán' };
+        return { bg: 'bg-orange-50', textColor: 'text-orange-600', border: 'border-orange-200', solidBg: 'bg-orange-500', text: 'Chờ thanh toán' };
       case 'overdue':
-        return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', text: 'Quá hạn' };
+        return { bg: 'bg-red-50', textColor: 'text-red-600', border: 'border-red-200', solidBg: 'bg-red-600', text: 'Quá hạn' };
       case 'cancelled':
-        return { bg: '#f3f4f6', color: '#6b7280', border: '#d1d5db', text: 'Đã hủy' };
+        return { bg: 'bg-gray-100', textColor: 'text-gray-500', border: 'border-gray-300', solidBg: 'bg-gray-500', text: 'Đã hủy' };
       default:
-        return { bg: '#f3f4f6', color: '#6b7280', border: '#d1d5db', text: 'Không xác định' };
+        return { bg: 'bg-gray-100', textColor: 'text-gray-500', border: 'border-gray-300', solidBg: 'bg-gray-500', text: 'Không xác định' };
     }
   };
 
@@ -89,30 +88,10 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            width: '3rem',
-            height: '3rem',
-            border: '3px solid #e5e7eb',
-            borderTop: '3px solid #3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1rem'
-          }} />
-          <p style={{ color: '#6b7280', margin: 0 }}>Đang tải thông tin hóa đơn...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+        <div className="bg-white rounded-xl p-8 shadow-2xl text-center">
+          <div className="w-12 h-12 border-[3px] border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 m-0">Đang tải thông tin hóa đơn...</p>
         </div>
       </div>
     );
@@ -120,52 +99,14 @@ export default function InvoiceDetailPage() {
 
   if (error || !invoice) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '1rem',
-          padding: '2rem',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center',
-          maxWidth: '30rem'
-        }}>
-          <div style={{
-            width: '4rem',
-            height: '4rem',
-            background: '#fef2f2',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1rem'
-          }}>
-            <DocumentPlusIcon style={{ width: '2rem', height: '2rem', color: '#dc2626' }} />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+        <div className="bg-white rounded-xl p-8 shadow-2xl text-center max-w-[30rem]">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <DocumentPlusIcon className="w-8 h-8 text-red-600" />
           </div>
-          <h3 style={{ color: '#1f2937', margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>
-            Không tìm thấy hóa đơn
-          </h3>
-          <p style={{ color: '#6b7280', margin: '0 0 1.5rem 0' }}>
-            {error || 'Hóa đơn không tồn tại hoặc đã bị xóa'}
-          </p>
-          <button
-            onClick={() => router.back()}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: 600
-            }}
-          >
+          <h3 className="text-gray-800 mb-2 text-xl">Không tìm thấy hóa đơn</h3>
+          <p className="text-gray-500 mb-6">{error || 'Hóa đơn không tồn tại hoặc đã bị xóa'}</p>
+          <button onClick={() => router.back()} className="px-6 py-3 bg-blue-500 text-white rounded-md text-sm font-semibold">
             Quay lại
           </button>
         </div>
@@ -176,51 +117,10 @@ export default function InvoiceDetailPage() {
   const statusConfig = getStatusColor(invoice.status);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
-    }}>
-      {/* Background decorations */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.03) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none'
-      }} />
-
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '1.5rem',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)',
-          borderRadius: '1.5rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          width: '100%',
-          maxWidth: '1240px',
-          marginLeft: 'auto',
-          marginRight: 'auto',
-          fontFamily: 'Inter, Roboto, Arial, Helvetica, sans-serif',
-          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.05)',
-          backdropFilter: 'blur(10px)',
-          marginTop: '30px',
-          border: '1px solid #e2e8f0'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap' }}>
-            {/* Trái: Nút quay lại + Icon + Tiêu đề */}
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 to-slate-200">
+      <div className="max-w-[1200px] mx-auto p-6 relative z-[1]">
+        <div className="bg-gradient-to-br from-white to-slate-100 rounded-3xl p-6 mb-8 w-full max-w-[1240px] mx-auto font-sans shadow-[0_12px_30px_rgba(0,0,0,0.05)] backdrop-blur mt-[30px] border border-slate-200">
+          <div className="flex items-center justify-between gap-10 flex-wrap">
             <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
             <button
               onClick={() => router.back()}
@@ -230,110 +130,39 @@ export default function InvoiceDetailPage() {
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                <div style={{
-                  width: 54,
-                  height: 54,
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 6px 18px rgba(16,185,129,0.15)'
-                }}>
-                  <BanknotesIcon style={{ width: 32, height: 32, color: 'white' }} />
+              <div className="flex items-center gap-6">
+                <div className="w-[54px] h-[54px] bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.15)]">
+                  <BanknotesIcon className="w-8 h-8 text-white" />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{
-                    fontSize: '1.75rem',
-                    fontWeight: 700,
-                    background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    lineHeight: 1.1,
-                    letterSpacing: '-0.025em'
-                  }}>
-                    Chi tiết hóa đơn
-                  </span>
-                  <span style={{
-                    fontSize: '1.125rem',
-                    color: '#64748b',
-                    fontWeight: 500
-                  }}>
-                    Thông tin chi tiết về hóa đơn dịch vụ
-                  </span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[1.75rem] font-bold bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent leading-tight tracking-tight">Chi tiết hóa đơn</span>
+                  <span className="text-[1.125rem] text-slate-500 font-medium">Thông tin chi tiết về hóa đơn dịch vụ</span>
                 </div>
               </div>
             </div>
 
-            {/* Phải: Để trống hoặc có thể thêm thông tin khác */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
-        <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: '1fr 1fr' }}>
-          {/* Left Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Status Information */}
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                color: '#1e293b',
-                margin: '0 0 1rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <CheckCircleIcon style={{ width: '1.25rem', height: '1.25rem', color: statusConfig.color }} />
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+          <div className="flex flex-col gap-6">
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] border border-white/30">
+              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <CheckCircleIcon className={`${statusConfig.textColor} w-5 h-5`} />
                 Trạng thái hóa đơn
               </h2>
-              
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-                padding: '1rem',
-                background: statusConfig.bg,
-                borderRadius: '0.75rem',
-                border: `2px solid ${statusConfig.border}`
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '3rem',
-                  height: '3rem',
-                  background: statusConfig.color,
-                  borderRadius: '50%',
-                  color: 'white'
-                }}>
-                  {invoice.status === 'paid' && <CheckCircleIcon style={{ width: '1.5rem', height: '1.5rem' }} />}
-                  {invoice.status === 'pending' && <ClockIcon style={{ width: '1.5rem', height: '1.5rem' }} />}
-                  {invoice.status === 'overdue' && <ClockIcon style={{ width: '1.5rem', height: '1.5rem' }} />}
-                  {invoice.status === 'cancelled' && <DocumentPlusIcon style={{ width: '1.5rem', height: '1.5rem' }} />}
+              <div className={`flex items-center gap-4 p-4 rounded-lg border ${statusConfig.bg} ${statusConfig.border}`}>
+                <div className={`flex items-center justify-center w-12 h-12 rounded-full text-white ${statusConfig.solidBg}`}>
+                  {invoice.status === 'paid' && <CheckCircleIcon className="w-6 h-6" />}
+                  {invoice.status === 'pending' && <ClockIcon className="w-6 h-6" />}
+                  {invoice.status === 'overdue' && <ClockIcon className="w-6 h-6" />}
+                  {invoice.status === 'cancelled' && <DocumentPlusIcon className="w-6 h-6" />}
                 </div>
                 <div>
-                  <div style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 700,
-                    color: statusConfig.color,
-                    marginBottom: '0.25rem'
-                  }}>
-                    {statusConfig.text}
-                  </div>
-                  <div style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b'
-                  }}>
+                  <div className={`text-lg font-bold mb-1 ${statusConfig.textColor}`}>{statusConfig.text}</div>
+                  <div className="text-sm text-slate-500">
                     {invoice.status === 'paid' && 'Hóa đơn đã được thanh toán thành công'}
                     {invoice.status === 'pending' && 'Hóa đơn đang chờ thanh toán'}
                     {invoice.status === 'overdue' && 'Hóa đơn đã quá hạn thanh toán'}
@@ -343,515 +172,175 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            {/* Invoice Information */}
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                color: '#1e293b',
-                margin: '0 0 1rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <DocumentPlusIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] border border-white/30">
+              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <DocumentPlusIcon className="w-5 h-5 text-blue-500" />
                 Thông tin hóa đơn
               </h2>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  background: '#f8fafc',
-                  borderRadius: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Mã hóa đơn:</span>
-                  <span style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 700 }}>{invoice._id}</span>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md">
+                  <span className="text-sm text-slate-500 font-semibold">Mã hóa đơn:</span>
+                  <span className="text-sm text-slate-800 font-bold">{invoice._id}</span>
                 </div>
-                
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  background: '#f8fafc',
-                  borderRadius: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Mô tả:</span>
-                  <span style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 700, textAlign: 'right', maxWidth: '60%' }}>
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md">
+                  <span className="text-sm text-slate-500 font-semibold">Mô tả:</span>
+                  <span className="text-sm text-slate-800 font-bold text-right max-w-[60%]">
                     {invoice.care_plan_snapshot?.planName || invoice.notes || 'Hóa đơn dịch vụ'}
                   </span>
                 </div>
-                
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  background: '#f8fafc',
-                  borderRadius: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Số tiền:</span>
-                  <span style={{ fontSize: '1.125rem', color: '#16a34a', fontWeight: 700 }}>
-                    {formatCurrency(invoice.amount)}
-                  </span>
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md">
+                  <span className="text-sm text-slate-500 font-semibold">Số tiền:</span>
+                  <span className="text-lg text-green-600 font-bold">{formatCurrency(invoice.amount)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Payment Details */}
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                color: '#1e293b',
-                margin: '0 0 1rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <CalendarDaysIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] border border-white/30">
+              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <CalendarDaysIcon className="w-5 h-5 text-blue-500" />
                 Thông tin thanh toán
               </h2>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  background: '#eff6ff',
-                  borderRadius: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Hạn thanh toán:</span>
-                  <span style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 700 }}>
-                    {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('vi-VN') : 'N/A'}
-                  </span>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-md">
+                  <span className="text-sm text-slate-500 font-semibold">Hạn thanh toán:</span>
+                  <span className="text-sm text-slate-800 font-bold">{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('vi-VN') : 'N/A'}</span>
                 </div>
-                
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  background: '#eff6ff',
-                  borderRadius: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Ngày thanh toán:</span>
-                  <span style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 700 }}>
-                    {invoice.paid_date ? new Date(invoice.paid_date).toLocaleDateString('vi-VN') : 'Chưa thanh toán'}
-                  </span>
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-md">
+                  <span className="text-sm text-slate-500 font-semibold">Ngày thanh toán:</span>
+                  <span className="text-sm text-slate-800 font-bold">{invoice.paid_date ? new Date(invoice.paid_date).toLocaleDateString('vi-VN') : 'Chưa thanh toán'}</span>
                 </div>
-                
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  background: '#eff6ff',
-                  borderRadius: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Phương thức:</span>
-                  <span style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 700 }}>
-                    {invoice.payment_method || 'Chuyển khoản ngân hàng'}
-                  </span>
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-md">
+                  <span className="text-sm text-slate-500 font-semibold">Phương thức:</span>
+                  <span className="text-sm text-slate-800 font-bold">{invoice.payment_method || 'Chuyển khoản ngân hàng'}</span>
                 </div>
-                
               </div>
             </div>
           </div>
 
-          {/* Right Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Billing Details */}
-            {invoice.billing_details && (
-              <div style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
-              }}>
-                <h2 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  color: '#1e293b',
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <BuildingLibraryIcon style={{ width: '1.25rem', height: '1.25rem', color: '#3b82f6' }} />
-                  Chi tiết hóa đơn
-                </h2>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Chi tiết dịch vụ */}
-                  {invoice.billing_details.serviceDetails && invoice.billing_details.serviceDetails.length > 0 && (
-                    <div>
-                      <h3 style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: '#1e293b',
-                        margin: '0 0 0.75rem 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        📋 Gói dịch vụ:
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {invoice.billing_details.serviceDetails.map((service: any, index: number) => (
-                          <div key={index} style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '0.75rem',
-                            background: '#eff6ff',
-                            borderRadius: '0.5rem',
-                            border: '1px solid #dbeafe'
-                          }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{
-                                fontSize: '0.875rem',
-                                fontWeight: 600,
-                                color: '#1e293b',
-                                marginBottom: '0.25rem'
-                              }}>
-                                {service.plan_name}
-                              </div>
-                              {service.description && (
-                                <div style={{
-                                  fontSize: '0.75rem',
-                                  color: '#64748b',
-                                  lineHeight: 1.4
-                                }}>
-                                  {service.description}
-                                </div>
-                              )}
-                            </div>
-                            <div style={{
-                              fontSize: '0.875rem',
-                              fontWeight: 700,
-                              color: '#3b82f6',
-                              marginLeft: '1rem'
-                            }}>
-                              {formatCurrency(service.monthly_price)}
-                            </div>
+          <div className="flex flex-col gap-6">
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] border border-white/30">
+              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <BuildingLibraryIcon className="w-5 h-5 text-blue-500" />
+                Chi tiết hóa đơn
+              </h2>
+              <div className="flex flex-col gap-4">
+                {invoice.billing_details?.serviceDetails && invoice.billing_details.serviceDetails.length > 0 ? (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
+                    <div className="flex flex-col gap-2">
+                      {invoice.billing_details.serviceDetails.map((service: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-md border border-blue-100">
+                          <div className="flex-1">
+                            <div className="text-sm font-semibold text-slate-800 mb-1">{service.plan_name}</div>
+                            {service.description && (
+                              <div className="text-xs text-slate-500 leading-snug">{service.description}</div>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                      <div style={{
-                        marginTop: '0.75rem',
-                        padding: '0.75rem',
-                        background: '#f0f9ff',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #bae6fd'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: '0.875rem'
-                        }}>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>Tổng tiền dịch vụ:</span>
-                          <span style={{ fontWeight: 700, color: '#3b82f6' }}>
-                            {formatCurrency(invoice.billing_details.totalServiceCost || 0)}
-                          </span>
+                          <div className="text-sm font-bold text-blue-500 ml-4">{formatCurrency(service.monthly_price)}</div>
                         </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 p-3 bg-sky-50 rounded-md border border-sky-200">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-semibold text-slate-800">Tổng tiền dịch vụ:</span>
+                        <span className="font-bold text-blue-500">{formatCurrency(invoice.billing_details.totalServiceCost || 0)}</span>
                       </div>
                     </div>
-                  )}
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
+                    <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold text-slate-800 mb-1">{invoice.care_plan_snapshot?.planName || 'Gói chăm sóc cơ bản'}</div>
+                          <div className="text-xs text-slate-500 leading-snug">{invoice.care_plan_snapshot?.description || 'Dịch vụ chăm sóc và hỗ trợ hàng ngày'}</div>
+                        </div>
+                        <div className="text-sm font-bold text-blue-500 ml-4">{formatCurrency(invoice.amount * 0.7)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                  {/* Chi tiết phòng */}
-                  {invoice.billing_details.roomDetails && (
-                    <div>
-                      <h3 style={{
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: '#1e293b',
-                        margin: '0 0 0.75rem 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        🏠 Thông tin phòng:
-                      </h3>
-                      <div style={{
-                        padding: '0.75rem',
-                        background: '#f0fdf4',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #bbf7d0'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '0.5rem'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              color: '#1e293b',
-                              marginBottom: '0.25rem'
-                            }}>
-                              Phòng {invoice.billing_details.roomDetails.room_number}
-                            </div>
-                            
-                          </div>
-                          <div style={{
-                            fontSize: '0.875rem',
-                            fontWeight: 700,
-                            color: '#16a34a',
-                            marginLeft: '1rem'
-                          }}>
-                            {formatCurrency(invoice.billing_details.roomDetails.monthly_price)}
-                          </div>
+                {invoice.billing_details?.roomDetails ? (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
+                    <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold text-slate-800 mb-1">Phòng {invoice.billing_details.roomDetails.room_number}</div>
                         </div>
-                      </div>
-                      <div style={{
-                        marginTop: '0.75rem',
-                        padding: '0.75rem',
-                        background: '#f0fdf4',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #bbf7d0'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: '0.875rem'
-                        }}>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>Tổng tiền phòng:</span>
-                          <span style={{ fontWeight: 700, color: '#16a34a' }}>
-                            {formatCurrency(invoice.billing_details.totalRoomCost || 0)}
-                          </span>
-                        </div>
+                        <div className="text-sm font-bold text-green-600 ml-4">{formatCurrency(invoice.billing_details.roomDetails.monthly_price)}</div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
+                    <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold text-slate-800 mb-1">Phòng tiêu chuẩn</div>
+                          <div className="text-xs text-slate-500 leading-snug">Bao gồm giường, tủ, nhà vệ sinh riêng</div>
+                        </div>
+                        <div className="text-sm font-bold text-green-600 ml-4">{formatCurrency(invoice.amount * 0.3)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                  {/* Tổng cộng */}
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                    borderRadius: '0.75rem',
-                    border: '2px solid #cbd5e1'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '1rem',
-                      fontWeight: 700
-                    }}>
-                      <span style={{ color: '#1e293b' }}>TỔNG CỘNG:</span>
-                      <span style={{ color: '#3b82f6', fontSize: '1.125rem' }}>
-                        {formatCurrency(invoice.amount)}
-                      </span>
-                    </div>
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: '#64748b',
-                      textAlign: 'center',
-                      marginTop: '0.5rem'
-                    }}>
-                      mỗi tháng
-                    </div>
+                <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-lg border-2 border-slate-300">
+                  <div className="flex items-center justify-between text-base font-bold">
+                    <span className="text-slate-800">TỔNG CỘNG:</span>
+                    <span className="text-blue-500 text-lg">{formatCurrency(invoice.amount)}</span>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Fallback: Care Plan Information (nếu không có billing_details) */}
             {!invoice.billing_details && invoice.care_plan_snapshot && (
-              <div style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
-              }}>
-                <h2 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  color: '#1e293b',
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#f59e0b' }} />
+              <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-md border border-white/30">
+                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <UserGroupIcon className="w-5 h-5 text-amber-500" />
                   Thông tin gói chăm sóc
                 </h2>
-                
-                <div style={{
-                  background: '#fef3c7',
-                  borderRadius: '0.75rem',
-                  padding: '1rem',
-                  border: '1px solid #fde68a'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: 600 }}>Tên gói:</span>
-                    <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: 700 }}>
-                      {invoice.care_plan_snapshot.planName || 'N/A'}
-                    </span>
+                <div className="bg-amber-100 rounded-lg p-4 border border-amber-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-amber-800 font-semibold">Tên gói:</span>
+                    <span className="text-sm text-amber-800 font-bold">{invoice.care_plan_snapshot.planName || 'N/A'}</span>
                   </div>
-                  
                   {invoice.care_plan_snapshot.description && (
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem',
-                      marginTop: '0.5rem'
-                    }}>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        color: '#92400e',
-                        margin: 0,
-                        lineHeight: 1.5
-                      }}>
-                        {invoice.care_plan_snapshot.description}
-                      </p>
+                    <div className="bg-white rounded-md p-3 mt-2">
+                      <p className="text-sm text-amber-800 m-0 leading-relaxed">{invoice.care_plan_snapshot.description}</p>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Notes */}
             {invoice.notes && (
-              <div style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem',
-                padding: '1.5rem',
-                boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
-              }}>
-                <h2 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  color: '#1e293b',
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <DocumentPlusIcon style={{ width: '1.25rem', height: '1.25rem', color: '#64748b' }} />
+              <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-md border border-white/30">
+                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <DocumentPlusIcon className="w-5 h-5 text-slate-500" />
                   Ghi chú
                 </h2>
-                
-                <div style={{
-                  background: '#f8fafc',
-                  borderRadius: '0.75rem',
-                  padding: '1rem',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#64748b',
-                    margin: 0,
-                    lineHeight: 1.6
-                  }}>
-                    {invoice.notes}
-                  </p>
+                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p className="text-sm text-slate-500 m-0 leading-relaxed">{invoice.notes}</p>
                 </div>
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '1rem',
-              padding: '1.5rem',
-              boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                color: '#1e293b',
-                margin: '0 0 1rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <BanknotesIcon style={{ width: '1.25rem', height: '1.25rem', color: '#16a34a' }} />
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] border border-white/30">
+              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <BanknotesIcon className="w-5 h-5 text-green-600" />
                 Thao tác
               </h2>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <button
-                  onClick={() => router.back()}
-                  style={{
-                    padding: '0.875rem 1.5rem',
-                    background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
-                    border: 'none',
-                    borderRadius: '0.75rem',
-                    color: 'white',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 4px 6px -1px rgba(100, 116, 139, 0.3)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(100, 116, 139, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(100, 116, 139, 0.3)';
-                  }}
-                >
+              <div className="flex flex-col gap-3">
+                <button onClick={() => router.back()} className="px-6 py-[0.875rem] bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl text-white text-base font-semibold shadow-[0_4px_6px_-1px_rgba(100,116,139,0.3)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_8px_12px_-1px_rgba(100,116,139,0.4)]">
                   Quay lại
                 </button>
-                
                 {invoice.status !== 'paid' && (
-                  <button
-                    onClick={() => handlePayOnline(invoice)}
-                    style={{
-                      padding: '0.875rem 1.5rem',
-                      background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      color: 'white',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.3)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(22, 163, 74, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(22, 163, 74, 0.3)';
-                    }}
-                  >
+                  <button onClick={() => handlePayOnline(invoice)} className="px-6 py-[0.875rem] bg-gradient-to-br from-green-600 to-green-700 rounded-xl text-white text-base font-semibold shadow-[0_4px_6px_-1px_rgba(22,163,74,0.3)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_8px_12px_-1px_rgba(22,163,74,0.4)]">
                     Thanh toán ngay
                   </button>
                 )}

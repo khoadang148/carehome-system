@@ -1,6 +1,4 @@
-// Application Constants
 
-// UI Constants
 export const UI_CONSTANTS = {
   MODAL: {
     ANIMATION_DURATION: 300,
@@ -33,7 +31,7 @@ export const UI_CONSTANTS = {
   }
 } as const;
 
-// Color Theme
+
 export const COLORS = {
   PRIMARY: {
     50: '#eff6ff',
@@ -81,7 +79,7 @@ export const COLORS = {
   }
 } as const;
 
-// User Roles and Permissions
+
 export const USER_ROLES = {
   ADMIN: 'admin',
   STAFF: 'staff',
@@ -92,41 +90,41 @@ export const USER_ROLES = {
 } as const;
 
 export const PERMISSIONS = {
-  // Resident management
+  
   VIEW_RESIDENTS: 'view_residents',
   CREATE_RESIDENT: 'create_resident',
   EDIT_RESIDENT: 'edit_resident',
   DELETE_RESIDENT: 'delete_resident',
   
-  // Staff management
+  
   VIEW_STAFF: 'view_staff',
   CREATE_STAFF: 'create_staff',
   EDIT_STAFF: 'edit_staff',
   DELETE_STAFF: 'delete_staff',
   
-  // Activities
+  
   VIEW_ACTIVITIES: 'view_activities',
   CREATE_ACTIVITY: 'create_activity',
   EDIT_ACTIVITY: 'edit_activity',
   DELETE_ACTIVITY: 'delete_activity',
   
-  // Finance
+  
   VIEW_FINANCE: 'view_finance',
   CREATE_TRANSACTION: 'create_transaction',
   EDIT_TRANSACTION: 'edit_transaction',
   DELETE_TRANSACTION: 'delete_transaction',
   
-  // Reports
+  
   VIEW_REPORTS: 'view_reports',
   GENERATE_REPORTS: 'generate_reports',
   
-  // Administration
+  
   MANAGE_USERS: 'manage_users',
   MANAGE_PERMISSIONS: 'manage_permissions',
   SYSTEM_SETTINGS: 'system_settings',
 } as const;
 
-// Activity Categories
+
 export const ACTIVITY_CATEGORIES = {
   PHYSICAL: 'Thể chất',
   MENTAL: 'Tinh thần',
@@ -138,7 +136,7 @@ export const ACTIVITY_CATEGORIES = {
   SPIRITUAL: 'Tâm linh',
 } as const;
 
-// Health Conditions
+
 export const HEALTH_CONDITIONS = {
   EXCELLENT: 'Rất tốt',
   GOOD: 'Tốt',
@@ -147,7 +145,7 @@ export const HEALTH_CONDITIONS = {
   CRITICAL: 'Nguy hiểm',
 } as const;
 
-// Room Types
+
 export const ROOM_TYPES = {
   STANDARD: 'Phòng tiêu chuẩn',
   PREMIUM: 'Phòng cao cấp',
@@ -156,7 +154,7 @@ export const ROOM_TYPES = {
   SINGLE: 'Phòng đơn',
 } as const;
 
-// Transaction Types
+
 export const TRANSACTION_TYPES = {
   INCOME: 'Thu nhập',
   EXPENSE: 'Chi phí',
@@ -164,7 +162,6 @@ export const TRANSACTION_TYPES = {
   REFUND: 'Hoàn tiền',
 } as const;
 
-// Payment Methods
 export const PAYMENT_METHODS = {
   CASH: 'Tiền mặt',
   BANK_TRANSFER: 'Chuyển khoản',
@@ -173,7 +170,7 @@ export const PAYMENT_METHODS = {
   DIGITAL_WALLET: 'Ví điện tử',
 } as const;
 
-// Inventory Categories
+
 export const INVENTORY_CATEGORIES = {
   MEDICATION: 'Thuốc men',
   MEDICAL_EQUIPMENT: 'Thiết bị y tế',
@@ -183,7 +180,7 @@ export const INVENTORY_CATEGORIES = {
   SAFETY: 'An toàn',
 } as const;
 
-// Task Priorities
+
 export const TASK_PRIORITIES = {
   LOW: 'Thấp',
   MEDIUM: 'Trung bình',
@@ -191,7 +188,7 @@ export const TASK_PRIORITIES = {
   URGENT: 'Khẩn cấp',
 } as const;
 
-// Task Statuses
+
 export const TASK_STATUSES = {
   PENDING: 'Chờ xử lý',
   IN_PROGRESS: 'Đang thực hiện',
@@ -200,9 +197,8 @@ export const TASK_STATUSES = {
   OVERDUE: 'Quá hạn',
 } as const;
 
-// File Upload Constants
 export const FILE_UPLOAD = {
-  MAX_SIZE: 10 * 1024 * 1024, // 10MB
+  MAX_SIZE: 10 * 1024 * 1024, 
   ALLOWED_TYPES: {
     IMAGES: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
     DOCUMENTS: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
@@ -211,7 +207,6 @@ export const FILE_UPLOAD = {
   MAX_FILES_COUNT: 10,
 } as const;
 
-// Date and Time Formats
 export const DATE_FORMATS = {
   DISPLAY: 'dd/MM/yyyy',
   API: 'yyyy-MM-dd',
@@ -220,23 +215,20 @@ export const DATE_FORMATS = {
   MONTH_YEAR: 'MM/yyyy',
 } as const;
 
-// Pagination
 export const PAGINATION = {
   DEFAULT_PAGE_SIZE: 20,
   PAGE_SIZE_OPTIONS: [10, 20, 50, 100],
   MAX_VISIBLE_PAGES: 5,
 } as const;
 
-// API Configuration
 import { API_BASE_URL } from '../api';
 export const API_CONFIG = {
-  TIMEOUT: 30000, // 30 seconds
+  TIMEOUT: 30000, 
   RETRY_ATTEMPTS: 3,
-  RETRY_DELAY: 1000, // 1 second
+  RETRY_DELAY: 1000, 
   BASE_URL: API_BASE_URL,
 } as const;
 
-// Animation Durations
 export const ANIMATIONS = {
   FAST: '150ms',
   NORMAL: '300ms',
@@ -244,7 +236,6 @@ export const ANIMATIONS = {
   VERY_SLOW: '1000ms',
 } as const;
 
-// Breakpoints (responsive design)
 export const BREAKPOINTS = {
   SM: '640px',
   MD: '768px',
@@ -253,7 +244,6 @@ export const BREAKPOINTS = {
   '2XL': '1536px',
 } as const;
 
-// Z-Index layers
 export const Z_INDEX = {
   DROPDOWN: 1000,
   TOOLTIP: 1010,
@@ -262,7 +252,6 @@ export const Z_INDEX = {
   LOADING: 1040,
 } as const;
 
-// Status Indicators
 export const STATUS_INDICATORS = {
   ACTIVE: 'Hoạt động',
   INACTIVE: 'Không hoạt động',
@@ -272,7 +261,6 @@ export const STATUS_INDICATORS = {
   SUSPENDED: 'Tạm dừng',
 } as const;
 
-// Common Labels
 export const LABELS = {
   ACTIONS: 'Thao tác',
   STATUS: 'Trạng thái',
@@ -312,7 +300,6 @@ export const LABELS = {
   INFO: 'Thông tin',
 } as const;
 
-// Regular Expressions
 export const REGEX_PATTERNS = {
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   PHONE_VN: /^(\+84|84|0)?[3|5|7|8|9][0-9]{8}$/,
@@ -323,7 +310,7 @@ export const REGEX_PATTERNS = {
   URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
 } as const;
 
-// Common Validation Messages
+
 export const VALIDATION_MESSAGES = {
   REQUIRED: 'Trường này là bắt buộc',
   INVALID_EMAIL: 'Email không hợp lệ',
@@ -341,7 +328,7 @@ export const VALIDATION_MESSAGES = {
   INVALID_FORMAT: 'Định dạng không hợp lệ',
 } as const;
 
-// Export utility functions
+
 export const getColorByStatus = (status: string): string => {
   switch (status.toLowerCase()) {
     case 'active':
@@ -388,5 +375,5 @@ export const getBackgroundColorByStatus = (status: string): string => {
   }
 }; 
 
-// Cấu hình cho thời gian chuyển trang sau đăng nhập
-export const LOGIN_REDIRECT_DELAY = 0; // milliseconds - chuyển trang ngay lập tức 
+  
+export const LOGIN_REDIRECT_DELAY = 0; 

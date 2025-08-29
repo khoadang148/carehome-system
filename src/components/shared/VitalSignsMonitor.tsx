@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   HeartIcon,
-  FireIcon, // Use FireIcon instead of ThermometerIcon
+  FireIcon,
   ScaleIcon,
   PlusIcon,
   ExclamationTriangleIcon,
@@ -36,7 +36,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
   }, [residentId]);
 
   const loadVitalsData = () => {
-    // Mock data - trong thực tế sẽ load từ API
     const mockVitals: VitalSigns[] = [
       {
         date: new Date().toISOString(),
@@ -223,7 +222,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
         gap: '1rem',
         marginBottom: '1.5rem'
       }}>
-        {/* Blood Pressure */}
         <div style={{
           padding: '1rem',
           background: '#fef2f2',
@@ -241,7 +239,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>mmHg</p>
         </div>
 
-        {/* Heart Rate */}
         <div style={{
           padding: '1rem',
           background: '#fef2f2',
@@ -259,7 +256,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>bpm</p>
         </div>
 
-        {/* Temperature */}
         <div style={{
           padding: '1rem',
           background: '#fef3c7',
@@ -277,7 +273,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>°C</p>
         </div>
 
-        {/* Oxygen Saturation */}
         <div style={{
           padding: '1rem',
           background: '#eff6ff',
@@ -295,7 +290,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>%</p>
         </div>
 
-        {/* Weight */}
         <div style={{
           padding: '1rem',
           background: '#f3f4f6',
@@ -312,12 +306,8 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
           </p>
           <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>kg</p>
         </div>
-
-        {/* Blood Sugar (if available) */}
-        {/* Removed bloodSugar as it's not in the interface */}
       </div>
 
-      {/* Notes and Details */}
       <div style={{
         padding: '1rem',
         background: '#f9fafb',
@@ -353,7 +343,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
         </p>
       </div>
 
-      {/* Alert Messages */}
       {getAlertLevel(latestVitals) === 'critical' && (
         <div style={{
           marginTop: '1rem',
@@ -450,7 +439,6 @@ export default function VitalSignsMonitor({ residentId, showAddButton = false, o
         </div>
       )}
 
-      {/* History Section */}
       {vitals.length > 0 && (
         <div style={{ marginTop: '2rem' }}>
           <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1f2937', marginBottom: '1rem' }}>

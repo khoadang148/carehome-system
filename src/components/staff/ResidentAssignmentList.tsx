@@ -3,7 +3,6 @@ import {
   MagnifyingGlassIcon,
   XMarkIcon,
   CheckIcon,
-  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
 interface Resident {
@@ -40,14 +39,12 @@ export default function ResidentAssignmentList({
 }: ResidentAssignmentListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter assignments
   const filteredAssignments = assignments.filter((assignment) => {
     return assignment.resident_id.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (assignment.resident_id.bed_id?.room_id?.room_number && assignment.resident_id.bed_id.room_id.room_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (assignment.resident_id.room_number && assignment.resident_id.room_number.toLowerCase().includes(searchTerm.toLowerCase()));
   });
 
-  // Get status badge
   const getStatusBadge = (status: string) => {
     return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
       <CheckIcon className="w-3 h-3 mr-1" />
@@ -55,26 +52,23 @@ export default function ResidentAssignmentList({
     </span>;
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
-  // Calculate age
   const calculateAge = (dateOfBirth: string) => {
     return new Date().getFullYear() - new Date(dateOfBirth).getFullYear();
   };
 
   return (
     <div className="space-y-6">
-      {/* Search and Filter */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Tìm kiếm theo tên cư dân hoặc số phòng..."
+              placeholder="Tìm kiếm theo tên người cao tuổi hoặc số phòng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -83,7 +77,6 @@ export default function ResidentAssignmentList({
         </div>
       </div>
 
-      {/* Results Count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
           Hiển thị {filteredAssignments.length} trong tổng số {assignments.length} phân công
@@ -99,7 +92,6 @@ export default function ResidentAssignmentList({
         )}
       </div>
 
-      {/* Assignments Grid */}
       {filteredAssignments.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <div className="text-gray-500">
@@ -114,7 +106,6 @@ export default function ResidentAssignmentList({
               key={assignment._id}
               className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow"
             >
-              {/* Resident Info */}
               <div className="p-6 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -143,7 +134,6 @@ export default function ResidentAssignmentList({
                 </div>
               </div>
 
-              {/* Assignment Details */}
               <div className="p-4">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -164,7 +154,6 @@ export default function ResidentAssignmentList({
                   )}
                 </div>
 
-                {/* Actions */}
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex space-x-2">
                     <button
