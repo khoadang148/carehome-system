@@ -5,6 +5,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useChat } from '@/lib/contexts/chat-provider';
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { messagesAPI } from '@/lib/api';
+import './chat-widget.css';
 
 interface ChatFloatingButtonProps {
   unreadCount?: number;
@@ -14,27 +16,59 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
-  const { chatState } = useChat();
+  // Temporarily comment out useChat to debug
+  // const { chatState } = useChat();
   const [isVisible, setIsVisible] = useState(false);
   const [isBumping, setIsBumping] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [actualUnreadCount, setActualUnreadCount] = useState(0);
   const isDraggingRef = useRef(false);
   const movedRef = useRef(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const computedUnread = Object.values(chatState.unreadCounts).reduce((sum, count) => sum + count, 0);
-  const totalUnread = typeof chatState.totalUnread === 'number' ? chatState.totalUnread : computedUnread;
+  // Use actual unread count from API, fallback to props
+  const totalUnread = actualUnreadCount || unreadCount;
 
   useEffect(() => {
+    // Simple logic: show for family and staff, hide only on messages pages and auth pages
     const shouldShow = Boolean(user && 
       (user.role === 'family' || user.role === 'staff') && 
-      !pathname.includes('/family/messages') &&
-      !pathname.includes('/staff/messages') &&
+      !pathname.includes('/messages') &&
       !pathname.includes('/login') &&
       !pathname.includes('/register'));
     
+    // Debug logging
+    console.log('ChatFloatingButton Debug:', {
+      user: user ? { id: user.id, role: user.role } : null,
+      pathname,
+      shouldShow,
+      isOnMessagesPage: pathname.includes('/messages'),
+      isOnAuthPage: pathname.includes('/login') || pathname.includes('/register')
+    });
+    
     setIsVisible(shouldShow);
   }, [user, pathname]);
+
+  // Fetch unread count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await messagesAPI.getUnreadCount();
+        const newCount = response.unreadCount || 0;
+        setActualUnreadCount(newCount);
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    
+    // Poll every 15 seconds
+    const interval = setInterval(fetchUnreadCount, 15000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   useEffect(() => {
     if (totalUnread && totalUnread > 0) {
@@ -130,7 +164,7 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
   if (!position) return null;
 
   return (
-    <div className="fixed z-50" style={{ left: position.x, top: position.y }}>
+    <div className="fixed z-[9999]" style={{ left: position.x, top: position.y }}>
       <button
         onClick={handleClick}
         className="relative group fab-hover"

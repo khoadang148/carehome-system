@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   ArrowLeftIcon,
   DocumentPlusIcon,
   CalendarDaysIcon,
@@ -16,6 +16,7 @@ import {
   BuildingLibraryIcon
 } from '@heroicons/react/24/outline';
 import { billsAPI, paymentAPI } from '@/lib/api';
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 export default function InvoiceDetailPage() {
   const router = useRouter();
@@ -30,14 +31,11 @@ export default function InvoiceDetailPage() {
       try {
         setLoading(true);
         const invoiceId = params.id as string;
-        console.log('Fetching invoice with ID:', invoiceId);
 
         const invoiceData = await billsAPI.getById(invoiceId);
-        console.log('Invoice data:', invoiceData);
-        
+
         setInvoice(invoiceData);
       } catch (err: any) {
-        console.error('Error fetching invoice:', err);
         setError(err?.message || 'Không thể tải thông tin hóa đơn');
       } finally {
         setLoading(false);
@@ -48,15 +46,6 @@ export default function InvoiceDetailPage() {
       fetchInvoice();
     }
   }, [params.id]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { 
-      style: 'currency', 
-      currency: 'VND',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -122,14 +111,14 @@ export default function InvoiceDetailPage() {
         <div className="bg-gradient-to-br from-white to-slate-100 rounded-3xl p-6 mb-8 w-full max-w-[1240px] mx-auto font-sans shadow-[0_12px_30px_rgba(0,0,0,0.05)] backdrop-blur mt-[30px] border border-slate-200">
           <div className="flex items-center justify-between gap-10 flex-wrap">
             <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-            <button
-              onClick={() => router.back()}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
-              
+              <button
+                onClick={() => router.back()}
+                className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                title="Quay lại"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
+
               <div className="flex items-center gap-6">
                 <div className="w-[54px] h-[54px] bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.15)]">
                   <BanknotesIcon className="w-8 h-8 text-white" />
@@ -190,7 +179,7 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md">
                   <span className="text-sm text-slate-500 font-semibold">Số tiền:</span>
-                  <span className="text-lg text-green-600 font-bold">{formatCurrency(invoice.amount)}</span>
+                  <span className="text-lg text-green-600 font-bold">{formatDisplayCurrency(invoice.amount)}</span>
                 </div>
               </div>
             </div>
@@ -236,14 +225,14 @@ export default function InvoiceDetailPage() {
                               <div className="text-xs text-slate-500 leading-snug">{service.description}</div>
                             )}
                           </div>
-                          <div className="text-sm font-bold text-blue-500 ml-4">{formatCurrency(service.monthly_price)}</div>
+                          <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(service.monthly_price)}</div>
                         </div>
                       ))}
                     </div>
                     <div className="mt-3 p-3 bg-sky-50 rounded-md border border-sky-200">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-semibold text-slate-800">Tổng tiền dịch vụ:</span>
-                        <span className="font-bold text-blue-500">{formatCurrency(invoice.billing_details.totalServiceCost || 0)}</span>
+                        <span className="font-bold text-blue-500">{formatDisplayCurrency(invoice.billing_details.totalServiceCost || 0)}</span>
                       </div>
                     </div>
                   </div>
@@ -256,7 +245,7 @@ export default function InvoiceDetailPage() {
                           <div className="text-sm font-semibold text-slate-800 mb-1">{invoice.care_plan_snapshot?.planName || 'Gói chăm sóc cơ bản'}</div>
                           <div className="text-xs text-slate-500 leading-snug">{invoice.care_plan_snapshot?.description || 'Dịch vụ chăm sóc và hỗ trợ hàng ngày'}</div>
                         </div>
-                        <div className="text-sm font-bold text-blue-500 ml-4">{formatCurrency(invoice.amount * 0.7)}</div>
+                        <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(invoice.amount * 0.7)}</div>
                       </div>
                     </div>
                   </div>
@@ -270,7 +259,7 @@ export default function InvoiceDetailPage() {
                         <div className="flex-1">
                           <div className="text-sm font-semibold text-slate-800 mb-1">Phòng {invoice.billing_details.roomDetails.room_number}</div>
                         </div>
-                        <div className="text-sm font-bold text-green-600 ml-4">{formatCurrency(invoice.billing_details.roomDetails.monthly_price)}</div>
+                        <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(invoice.billing_details.roomDetails.monthly_price)}</div>
                       </div>
                     </div>
                   </div>
@@ -283,7 +272,7 @@ export default function InvoiceDetailPage() {
                           <div className="text-sm font-semibold text-slate-800 mb-1">Phòng tiêu chuẩn</div>
                           <div className="text-xs text-slate-500 leading-snug">Bao gồm giường, tủ, nhà vệ sinh riêng</div>
                         </div>
-                        <div className="text-sm font-bold text-green-600 ml-4">{formatCurrency(invoice.amount * 0.3)}</div>
+                        <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(invoice.amount * 0.3)}</div>
                       </div>
                     </div>
                   </div>
@@ -292,7 +281,7 @@ export default function InvoiceDetailPage() {
                 <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-lg border-2 border-slate-300">
                   <div className="flex items-center justify-between text-base font-bold">
                     <span className="text-slate-800">TỔNG CỘNG:</span>
-                    <span className="text-blue-500 text-lg">{formatCurrency(invoice.amount)}</span>
+                    <span className="text-blue-500 text-lg">{formatDisplayCurrency(invoice.amount)}</span>
                   </div>
                 </div>
               </div>

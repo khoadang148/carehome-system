@@ -5,16 +5,31 @@ import { XCircleIcon } from "@heroicons/react/24/outline";
 
 export default function PaymentCancelPage() {
   const router = useRouter();
+  
   useEffect(() => {
+    // Đảm bảo trang luôn ở giữa màn hình
+    document.body.style.overflow = 'hidden';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    
     const timer = setTimeout(() => {
       router.push("/family/finance");
     }, 3000);
-    return () => clearTimeout(timer);
+    
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = '';
+      document.body.style.margin = '';
+      document.body.style.padding = '';
+    };
   }, [router]);
 
   return (
     <div
       style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
         minHeight: "100vh",
         width: "100vw",
         display: "flex",
@@ -22,11 +37,24 @@ export default function PaymentCancelPage() {
         justifyContent: "center",
         background:
           "linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)",
-        padding: 0,
-        animation: "fadeIn 0.8s"
+        padding: "20px",
+        animation: "fadeIn 0.8s",
+        zIndex: 9999,
+        margin: 0
       }}
     >
       <style>{`
+        * {
+          box-sizing: border-box;
+        }
+        
+        html, body {
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          height: 100%;
+        }
+        
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(40px); }
           to { opacity: 1; transform: none; }
@@ -45,6 +73,8 @@ export default function PaymentCancelPage() {
           display: flex;
           flex-direction: column;
           align-items: center;
+          position: relative;
+          z-index: 10000;
         }
         .fail-badge {
           display: inline-flex;
@@ -110,11 +140,29 @@ export default function PaymentCancelPage() {
           transform: translateY(-2px) scale(1.03);
         }
         @media (max-width: 1100px) {
-          .fail-card { min-width: 0; max-width: 98vw; padding: 2.5rem 0.5rem; }
+          .fail-card { 
+            min-width: 0; 
+            max-width: 98vw; 
+            padding: 2.5rem 1rem;
+            margin: 0 10px;
+          }
         }
         @media (max-width: 700px) {
-          .fail-card { padding: 1.5rem 0.7rem; border-radius: 1.2rem; }
+          .fail-card { 
+            padding: 1.5rem 0.7rem; 
+            border-radius: 1.2rem;
+            margin: 0 5px;
+          }
           .fail-title { font-size: 1.3rem; }
+        }
+        @media (max-width: 480px) {
+          .fail-card { 
+            padding: 1rem 0.5rem; 
+            border-radius: 1rem;
+            margin: 0 2px;
+          }
+          .fail-title { font-size: 1.1rem; }
+          .fail-desc { font-size: 1rem; }
         }
       `}</style>
       <div className="fail-card">

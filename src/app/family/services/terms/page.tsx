@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   ArrowLeftIcon,
   DocumentPlusIcon,
   CheckCircleIcon,
@@ -16,7 +16,6 @@ import {
   HeartIcon
 } from '@heroicons/react/24/outline';
 
-// Business rules data
 const termsData = [
   {
     id: 'services',
@@ -212,7 +211,7 @@ export default function TermsPage() {
       router.push('/login');
       return;
     }
-    
+
     if (user?.role !== 'family') {
       router.push('/');
       return;
@@ -235,7 +234,7 @@ export default function TermsPage() {
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
-            
+
             <div className="flex items-center gap-6">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                 <DocumentPlusIcon className="w-8 h-8 text-white" />
@@ -263,7 +262,7 @@ export default function TermsPage() {
               Quy Tắc & Điều Khoản Dịch Vụ
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Để đảm bảo chất lượng dịch vụ tốt nhất và quyền lợi của tất cả khách hàng, 
+              Để đảm bảo chất lượng dịch vụ tốt nhất và quyền lợi của tất cả khách hàng,
               chúng tôi yêu cầu tuân thủ các quy tắc sau
             </p>
           </div>
@@ -276,18 +275,17 @@ export default function TermsPage() {
                 onClick={() => toggleTerm(term.id)}
               >
                 <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${term.color} opacity-5 rounded-full -translate-y-16 translate-x-16`}></div>
-                
+
                 <div className={`inline-flex items-center px-4 py-2 bg-gradient-to-r ${term.color} text-white rounded-full text-sm font-semibold mb-4 shadow-lg`}>
                   {term.title}
                 </div>
-                
+
                 <div className="space-y-4">
                   {term.content.map((item, itemIndex) => (
                     <div
                       key={itemIndex}
-                      className={`transition-all duration-300 ${
-                        expandedTerm === term.id ? 'opacity-100 transform translate-y-0' : 'opacity-90'
-                      }`}
+                      className={`transition-all duration-300 ${expandedTerm === term.id ? 'opacity-100 transform translate-y-0' : 'opacity-90'
+                        }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className={`flex-shrink-0 w-8 h-8 bg-gradient-to-br ${term.color} rounded-full flex items-center justify-center shadow-md`}>
@@ -305,10 +303,9 @@ export default function TermsPage() {
                     </div>
                   ))}
                 </div>
-                
-                <div className={`absolute bottom-4 right-4 transition-transform duration-300 ${
-                  expandedTerm === term.id ? 'rotate-180' : ''
-                }`}>
+
+                <div className={`absolute bottom-4 right-4 transition-transform duration-300 ${expandedTerm === term.id ? 'rotate-180' : ''
+                  }`}>
                   <div className={`w-8 h-8 bg-gradient-to-br ${term.color} rounded-full flex items-center justify-center shadow-md`}>
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -333,7 +330,7 @@ export default function TermsPage() {
                   Những điều cần lưu ý khi sử dụng dịch vụ
                 </p>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[
                   {
@@ -397,7 +394,7 @@ export default function TermsPage() {
                 Bằng việc sử dụng dịch vụ của chúng tôi, bạn đồng ý tuân thủ tất cả các điều khoản và quy định trên.
               </p>
             </div>
-            
+
             <button
               onClick={() => router.back()}
               className="group inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-105"

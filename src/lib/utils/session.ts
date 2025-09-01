@@ -60,21 +60,18 @@ export function extendSession() {
 export function initializeSession(token: string, userData: any) {
   const currentTime = Date.now().toString();
   
-  // Tối ưu: Sử dụng setTimeout để không block main thread
-  return new Promise<void>((resolve) => {
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        try {
-          clientStorage.setItems({
-            'access_token': token,
-            'user': JSON.stringify(userData),
-            'session_start': currentTime
-          });
-        } catch (error) {
-          // console.error('Error initializing session:', error);
-        }
-      }
-      resolve();
-    }, 0);
-  });
+  // Tối ưu: Khởi tạo session ngay lập tức, không cần setTimeout
+  if (typeof window !== 'undefined') {
+    try {
+      clientStorage.setItems({
+        'access_token': token,
+        'user': JSON.stringify(userData),
+        'session_start': currentTime
+      });
+    } catch (error) {
+      // console.error('Error initializing session:', error);
+    }
+  }
+  
+  return Promise.resolve();
 } 

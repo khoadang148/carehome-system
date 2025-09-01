@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -32,14 +32,12 @@ export default function StaffAssignmentDetailPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState('');
 
-  // Modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
 
-  // Form states
   const [formData, setFormData] = useState({
     staff_id: '',
     resident_id: '',
@@ -51,40 +49,30 @@ export default function StaffAssignmentDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Check permissions
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
       router.push('/');
     }
   }, [user, loading, router]);
 
-  // Load data
   useEffect(() => {
     if (!user || user.role !== 'admin' || !staffId) return;
-    
+
     const loadData = async () => {
       setLoadingData(true);
       setError('');
-      
+
       try {
-        console.log('Loading data for staffId:', staffId);
-        
         const [staffData, assignmentsData, residentsData] = await Promise.all([
           userAPI.getById(staffId),
           staffAssignmentsAPI.getByStaff(staffId),
           residentAPI.getAll(),
         ]);
-        
-        console.log('Staff data:', staffData);
-        console.log('Assignments data:', assignmentsData);
-        console.log('Residents data:', residentsData);
-        
+
         setStaff(staffData);
         setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
         setResidents(Array.isArray(residentsData) ? residentsData : []);
       } catch (err: any) {
-        console.error('Error loading data:', err);
-        console.error('Error response:', err.response?.data);
         setError(`Không thể tải dữ liệu: ${err.response?.data?.message || err.message}`);
       } finally {
         setLoadingData(false);
@@ -94,7 +82,6 @@ export default function StaffAssignmentDetailPage() {
     loadData();
   }, [user, staffId]);
 
-  // Handle update assignment
   const handleUpdate = async () => {
     if (!selectedAssignment) return;
 
@@ -107,14 +94,13 @@ export default function StaffAssignmentDetailPage() {
         notes: formData.notes,
         responsibilities: formData.responsibilities,
       });
-      
-      setAssignments(prev => 
+
+      setAssignments(prev =>
         prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a)
       );
       setShowEditModal(false);
       resetForm();
-      
-      // Show success message
+
       setSuccessData({
         type: 'update',
         message: 'Cập nhật phân công thành công!',
@@ -129,7 +115,6 @@ export default function StaffAssignmentDetailPage() {
     }
   };
 
-  // Handle create assignment
   const handleCreate = async () => {
     setSubmitting(true);
     try {
@@ -140,15 +125,14 @@ export default function StaffAssignmentDetailPage() {
         notes: formData.notes,
         responsibilities: formData.responsibilities,
       });
-      
-      // Refresh assignments list
+
+
       const updatedAssignments = await staffAssignmentsAPI.getByStaff(staffId);
       setAssignments(Array.isArray(updatedAssignments) ? updatedAssignments : []);
-      
+
       setShowCreateModal(false);
       resetForm();
-      
-      // Show success message
+
       setSuccessData({
         type: 'create',
         message: 'Tạo phân công thành công!',
@@ -163,7 +147,6 @@ export default function StaffAssignmentDetailPage() {
     }
   };
 
-  // Handle delete assignment
   const handleDelete = async () => {
     if (!selectedAssignment) return;
 
@@ -172,8 +155,7 @@ export default function StaffAssignmentDetailPage() {
       await staffAssignmentsAPI.delete(selectedAssignment._id);
       setAssignments(prev => prev.filter(a => a._id !== selectedAssignment._id));
       setShowDeleteModal(false);
-      
-      // Show success message
+
       setSuccessData({
         type: 'delete',
         message: 'Xóa phân công thành công!',
@@ -188,13 +170,11 @@ export default function StaffAssignmentDetailPage() {
     }
   };
 
-  // Handle success modal close
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
     setSuccessData(null);
   };
 
-  // Reset form
   const resetForm = () => {
     setFormData({
       staff_id: '',
@@ -206,12 +186,11 @@ export default function StaffAssignmentDetailPage() {
     setSelectedAssignment(null);
   };
 
-  // Open edit modal
   const openEditModal = (assignment: any) => {
     setSelectedAssignment(assignment);
     setFormData({
-      staff_id: assignment.staff_id._id || assignment.staff_id,
-      resident_id: assignment.resident_id._id || assignment.resident_id,
+      staff_id: assignment.staff_id?._id || assignment.staff_id,
+      resident_id: assignment.resident_id?._id || assignment.resident_id,
       end_date: assignment.end_date ? new Date(assignment.end_date).toISOString().split('T')[0] : '',
       notes: assignment.notes || '',
       responsibilities: assignment.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -219,18 +198,15 @@ export default function StaffAssignmentDetailPage() {
     setShowEditModal(true);
   };
 
-  // Open delete modal
   const openDeleteModal = (assignment: any) => {
     setSelectedAssignment(assignment);
     setShowDeleteModal(true);
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
-  // Get status badge
   const getStatusBadge = (status: string) => {
     return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
       <CheckIcon className="w-3 h-3 mr-1" />
@@ -263,7 +239,6 @@ export default function StaffAssignmentDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
       <div className="bg-white shadow-lg border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -292,7 +267,6 @@ export default function StaffAssignmentDetailPage() {
         </div>
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
           <div className="bg-red-50 border-l-4 border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md">
@@ -304,7 +278,6 @@ export default function StaffAssignmentDetailPage() {
         </div>
       )}
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loadingData ? (
           <div className="flex justify-center items-center h-64">
@@ -315,7 +288,6 @@ export default function StaffAssignmentDetailPage() {
           </div>
         ) : (
           <>
-            {/* Staff Info Card */}
             {staff && (
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 mb-8">
                 <div className="flex items-center justify-between">
@@ -339,7 +311,6 @@ export default function StaffAssignmentDetailPage() {
               </div>
             )}
 
-            {/* Assignments List */}
             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
               <div className="mb-8">
                 <h3 className="text-2xl font-bold text-gray-900 flex items-center">
@@ -350,7 +321,7 @@ export default function StaffAssignmentDetailPage() {
                 </h3>
                 <p className="text-sm text-gray-500 mt-2">Quản lý tất cả người cao tuổi được phân công cho nhân viên này</p>
               </div>
-              
+
               {assignments.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -378,7 +349,6 @@ export default function StaffAssignmentDetailPage() {
         )}
       </div>
 
-      {/* Edit Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -402,11 +372,10 @@ export default function StaffAssignmentDetailPage() {
                     <option value="">Chọn người cao tuổi</option>
                     {residents
                       .filter(resident => {
-                        // Ẩn những resident đã được phân công cho staff khác (trừ người cao tuổi hiện tại đang chỉnh sửa)
                         const isAssignedToOtherStaff = assignments.some(
-                          assignment => 
-                            assignment.resident_id._id === resident._id && 
-                            assignment.staff_id._id !== staffId &&
+                          assignment =>
+                            assignment.resident_id?._id === resident._id &&
+                            assignment.staff_id?._id !== staffId &&
                             assignment.status === 'active'
                         );
                         return !isAssignedToOtherStaff;
@@ -473,7 +442,6 @@ export default function StaffAssignmentDetailPage() {
         </div>
       )}
 
-      {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -497,10 +465,9 @@ export default function StaffAssignmentDetailPage() {
                     <option value="">Chọn người cao tuổi</option>
                     {residents
                       .filter(resident => {
-                        // Ẩn những resident đã được phân công cho bất kỳ staff nào
                         const isAssignedToAnyStaff = assignments.some(
-                          assignment => 
-                            assignment.resident_id._id === resident._id && 
+                          assignment =>
+                            assignment.resident_id?._id === resident._id &&
                             assignment.status === 'active'
                         );
                         return !isAssignedToAnyStaff;
@@ -567,7 +534,6 @@ export default function StaffAssignmentDetailPage() {
         </div>
       )}
 
-      {/* Delete Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -607,22 +573,18 @@ export default function StaffAssignmentDetailPage() {
         </div>
       )}
 
-      {/* Success Modal */}
       {showSuccessModal && successData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100">
             <div className="p-8 text-center">
-              {/* Success Icon */}
               <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <CheckCircleIcon className="w-12 h-12 text-white" />
               </div>
-              
-              {/* Success Title */}
+
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {successData.message}
               </h2>
-              
-              {/* Success Details */}
+
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mb-6">
                 <div className="space-y-3 text-left">
                   <div className="flex items-center justify-between">
@@ -651,8 +613,7 @@ export default function StaffAssignmentDetailPage() {
                   )}
                 </div>
               </div>
-              
-              {/* Action Button */}
+
               <button
                 onClick={handleSuccessClose}
                 className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"

@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   BanknotesIcon,
   DocumentPlusIcon,
   EyeIcon,
@@ -18,9 +18,10 @@ import { billsAPI, paymentAPI } from '@/lib/api';
 import Select from 'react-select';
 import { userAPI } from "@/lib/api";
 import { residentAPI } from "@/lib/api";
+import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 
 export default function FinancePage() {
-  
+
 
   const [selectedResident, setSelectedResident] = useState(0);
   const [familyFinancialData, setFamilyFinancialData] = useState<any[]>([]);
@@ -28,14 +29,14 @@ export default function FinancePage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  
+
   useEffect(() => {
     const fetchResidentsAndBills = async (familyMemberId: string) => {
       try {
         const residents = await residentAPI.getByFamilyMemberId(familyMemberId);
-        
+
         if (!Array.isArray(residents)) {
-          
+
           setFamilyFinancialData([]);
           return;
         }
@@ -43,9 +44,9 @@ export default function FinancePage() {
           let bills = [];
           try {
             bills = await billsAPI.getByResidentId(resident._id);
-            
+
           } catch (e) {
-            
+
             bills = [];
           }
           const payments = Array.isArray(bills) ? bills.map((bill: any, idx: number) => ({
@@ -83,13 +84,13 @@ export default function FinancePage() {
       }
     }
   }, [user]);
-  
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (user.role !== 'family') {
       router.push('/');
       return;
@@ -117,20 +118,20 @@ export default function FinancePage() {
     const today = new Date();
     const dueDate = new Date(payment.dueDate);
     const gracePeriodEnd = new Date(dueDate.getTime() + 5 * 24 * 60 * 60 * 1000);
-    
+
     if (payment.status === 'paid') return 'paid';
     if (payment.status === 'processing') return 'processing';
     if (today > gracePeriodEnd) return 'overdue';
     if (today > dueDate) return 'grace_period';
     return 'pending';
   };
-  
-  
+
+
   if (user?.role === 'family') {
     return (
       <div className="min-h-screen relative bg-gradient-to-br from-slate-50 to-slate-200">
         <div className="max-w-[1300px] mx-auto px-4 py-6 relative z-[1]">
-          
+
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-6 mb-6 shadow-md border border-white/30">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3.5">
@@ -140,12 +141,13 @@ export default function FinancePage() {
                 <div>
                   <h1 className="text-2xl font-bold m-0 bg-gradient-to-br from-green-600 to-green-700 bg-clip-text text-transparent tracking-tight leading-tight">Thông tin tài chính</h1>
                   <p className="text-sm text-slate-500 mt-0.5 font-medium">Theo dõi chi phí chăm sóc người thân</p>
+                 
                 </div>
               </div>
             </div>
           </div>
 
-          
+
           {familyFinancialData.length > 1 && (
             <div className="mb-10 max-w-full bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 shadow-xl border border-white/20 backdrop-blur">
               <div className="flex items-center gap-4 mb-6">
@@ -153,10 +155,10 @@ export default function FinancePage() {
                   <UsersIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold m-0 bg-gradient-to-br from-violet-500 to-violet-600 bg-clip-text text-transparent tracking-tight">Chọn người thân để xem thông tin tài chính</h3>
+                  <h3 className="text-base font-bold m-0 bg-gradient-to-br from-violet-500 to-violet-600 bg-clip-text text-transparent tracking-tight">Chọn người thân để xem thông tin hóa đơn thanh toán</h3>
                 </div>
               </div>
-              
+
               <Select
                 options={familyFinancialData.map((r, idx) => ({
                   value: idx,
@@ -167,13 +169,13 @@ export default function FinancePage() {
                 }))}
                 value={(() => {
                   const r = familyFinancialData[selectedResident];
-                                  return r ? {
-                  value: selectedResident,
-                  label: r.residentName || 'Chưa rõ',
-                  avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '/default-avatar.svg',
-                  roomNumber: r.room || 'Chưa hoàn tất đăng kí',
-                  relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
-                } : null;
+                  return r ? {
+                    value: selectedResident,
+                    label: r.residentName || 'Chưa rõ',
+                    avatar: r.avatar ? userAPI.getAvatarUrl(r.avatar) : '/default-avatar.svg',
+                    roomNumber: r.room || 'Chưa hoàn tất đăng kí',
+                    relationship: r.relationship || r.emergency_contact?.relationship || r.emergencyContact?.relationship || 'Chưa rõ'
+                  } : null;
                 })()}
                 onChange={opt => {
                   if (typeof opt?.value === 'number') setSelectedResident(opt.value);
@@ -187,8 +189,8 @@ export default function FinancePage() {
                     minHeight: 70,
                     fontSize: '1.125rem',
                     fontWeight: 600,
-                    boxShadow: state.isFocused 
-                      ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)' 
+                    boxShadow: state.isFocused
+                      ? '0 0 0 3px rgba(139, 92, 246, 0.1), 0 8px 25px -5px rgba(0, 0, 0, 0.1)'
                       : '0 4px 12px rgba(0, 0, 0, 0.05)',
                     borderColor: state.isFocused ? '#8b5cf6' : '#e5e7eb',
                     borderWidth: state.isFocused ? '2px' : '1px',
@@ -199,11 +201,11 @@ export default function FinancePage() {
                   }),
                   option: (base, state) => ({
                     ...base,
-                    background: state.isSelected 
-                      ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' 
-                      : state.isFocused 
-                      ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' 
-                      : '#fff',
+                    background: state.isSelected
+                      ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)'
+                      : state.isFocused
+                        ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+                        : '#fff',
                     color: state.isSelected ? '#7c3aed' : '#111827',
                     cursor: 'pointer',
                     paddingTop: '1rem',
@@ -257,7 +259,7 @@ export default function FinancePage() {
             </div>
           )}
 
-          
+
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-5 shadow-md border border-white/30">
             <h3 className="text-base font-semibold text-slate-900 mb-5">Lịch sử thanh toán - {familyFinancialData[selectedResident]?.residentName}</h3>
             <div className="overflow-x-auto">
@@ -275,158 +277,158 @@ export default function FinancePage() {
                 <tbody>
                   {Array.isArray(familyFinancialData[selectedResident]?.payments) && familyFinancialData[selectedResident].payments.length > 0
                     ? familyFinancialData[selectedResident].payments
-                        .sort((a: any, b: any) => {
-                          const statusA = getPaymentStatus(a);
-                          const statusB = getPaymentStatus(b);
-                          const statusPriority = {
-                            'overdue': 1,
-                            'grace_period': 2, 
-                            'pending': 3,
-                            'processing': 4,
-                            'paid': 5
-                          };
-                          if (statusPriority[statusA] !== statusPriority[statusB]) {
-                            return statusPriority[statusA] - statusPriority[statusB];
-                          }
-                          const dateA = new Date(a.dueDate || a.date);
-                          const dateB = new Date(b.dueDate || b.date);
-                          if (statusA === 'paid') {
-                            return dateB.getTime() - dateA.getTime();
-                          } else {
-                            return dateA.getTime() - dateB.getTime();
-                          }
-                        })
-                        .map((payment: any) => (
-                          <tr key={payment.id} className="border-b border-gray-100">
-                            <td className="py-4 px-3 text-sm text-slate-900">{payment.description}</td>
-                            <td className="py-4 px-3 text-sm font-semibold text-slate-900 text-center">{formatCurrency(payment.amount)}</td>
-                            <td className="py-4 px-3 text-sm text-center">
-                              <div className="flex flex-col gap-1 items-center">
-                                <span className="text-slate-900 font-medium">
-                                  {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
-                                </span>
-                                {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
-                                  <div className="text-[0.65rem] text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-md border border-red-200 w-fit inline-flex items-center gap-1">
-                                    Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-4 px-3 text-sm text-center">
-                              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-700">
-                                <BuildingLibraryIcon className="w-3.5 h-3.5" />
-                                Chuyển khoản
-                              </div>
-                            </td>
-                            <td className="py-4 px-3">
-                              {(() => {
-                                const status = getPaymentStatus(payment);
-                                const statusConfig = {
-                                  paid: { 
-                                    text: 'Đã thanh toán', 
-                                    label: 'Đã thanh toán',
-                                    bg: '#e6f9ed',
-                                    color: '#16a34a',
-                                    border: '#bbf7d0',
-                                    icon: null
-                                  },
-                                  processing: { 
-                                    text: 'Đang xử lý', 
-                                    label: 'Đang xử lý',
-                                    bg: '#f3f0fd',
-                                    color: '#7c3aed',
-                                    border: '#ede9fe',
-                                    icon: null
-                                  },
-                                  pending: { 
-                                    text: 'Chờ thanh toán', 
-                                    label: 'Chờ thanh toán',
-                                    bg: '#fff7ed',
-                                    color: '#ea580c',
-                                    border: '#fed7aa',
-                                    icon: null
-                                  },
-                                  grace_period: { 
-                                    text: 'Gia hạn',
-                                    label: 'Gia hạn',
-                                    bg: '#fefbe9',
-                                    color: '#b45309',
-                                    border: '#fde68a',
-                                    icon: null
-                                  },
-                                  overdue: { 
-                                    text: 'Quá hạn', 
-                                    label: 'Quá hạn',
-                                    bg: '#fff1f2',
-                                    color: '#e11d48',
-                                    border: '#fecdd3',
-                                    icon: (
-                                      <svg style={{width:'1em',height:'1em',marginRight:4,verticalAlign:'-0.15em'}} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2"/><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                                    )
-                                  }
-                                };
-                                
+                      .sort((a: any, b: any) => {
+                        const statusA = getPaymentStatus(a);
+                        const statusB = getPaymentStatus(b);
+                        const statusPriority = {
+                          'overdue': 1,
+                          'grace_period': 2,
+                          'pending': 3,
+                          'processing': 4,
+                          'paid': 5
+                        };
+                        if (statusPriority[statusA] !== statusPriority[statusB]) {
+                          return statusPriority[statusA] - statusPriority[statusB];
+                        }
+                        const dateA = new Date(a.dueDate || a.date);
+                        const dateB = new Date(b.dueDate || b.date);
+                        if (statusA === 'paid') {
+                          return dateB.getTime() - dateA.getTime();
+                        } else {
+                          return dateA.getTime() - dateB.getTime();
+                        }
+                      })
+                      .map((payment: any) => (
+                        <tr key={payment.id} className="border-b border-gray-100">
+                          <td className="py-4 px-3 text-sm text-slate-900">{payment.description}</td>
+                          <td className="py-4 px-3 text-sm font-semibold text-slate-900 text-center">{formatCurrency(payment.amount)}</td>
+                          <td className="py-4 px-3 text-sm text-center">
+                            <div className="flex flex-col gap-1 items-center">
+                              <span className="text-slate-900 font-medium">
+                                {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
+                              </span>
+                              {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
+                                <div className="text-[0.65rem] text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-md border border-red-200 w-fit inline-flex items-center gap-1">
+                                  Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-4 px-3 text-sm text-center">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-700">
+                              <BuildingLibraryIcon className="w-3.5 h-3.5" />
+                              Chuyển khoản
+                            </div>
+                          </td>
+                          <td className="py-4 px-3">
+                            {(() => {
+                              const status = getPaymentStatus(payment);
+                              const statusConfig = {
+                                paid: {
+                                  text: 'Đã thanh toán',
+                                  label: 'Đã thanh toán',
+                                  bg: '#e6f9ed',
+                                  color: '#16a34a',
+                                  border: '#bbf7d0',
+                                  icon: null
+                                },
+                                processing: {
+                                  text: 'Đang xử lý',
+                                  label: 'Đang xử lý',
+                                  bg: '#f3f0fd',
+                                  color: '#7c3aed',
+                                  border: '#ede9fe',
+                                  icon: null
+                                },
+                                pending: {
+                                  text: 'Chờ thanh toán',
+                                  label: 'Chờ thanh toán',
+                                  bg: '#fff7ed',
+                                  color: '#ea580c',
+                                  border: '#fed7aa',
+                                  icon: null
+                                },
+                                grace_period: {
+                                  text: 'Gia hạn',
+                                  label: 'Gia hạn',
+                                  bg: '#fefbe9',
+                                  color: '#b45309',
+                                  border: '#fde68a',
+                                  icon: null
+                                },
+                                overdue: {
+                                  text: 'Quá hạn',
+                                  label: 'Quá hạn',
+                                  bg: '#fff1f2',
+                                  color: '#e11d48',
+                                  border: '#fecdd3',
+                                  icon: (
+                                    <svg style={{ width: '1em', height: '1em', marginRight: 4, verticalAlign: '-0.15em' }} fill="none" stroke="#e11d48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#e11d48" strokeWidth="2" /><path stroke="#e11d48" strokeWidth="2" strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+                                  )
+                                }
+                              };
+
+                              return (
+                                <div className="flex justify-center">
+                                  <span className="inline-flex items-center gap-1 px-[0.7rem] py-[0.18rem] rounded-[0.8rem] text-[0.92rem] font-medium whitespace-nowrap shadow-sm tracking-[0.01em] leading-[1.32]" style={{ background: statusConfig[status].bg, color: statusConfig[status].color, border: `1px solid ${statusConfig[status].border}` }}>
+                                    {statusConfig[status].icon}
+                                    {statusConfig[status].label}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ padding: '1rem 0.75rem', textAlign: 'center' }}>
+                            {(() => {
+                              const status = getPaymentStatus(payment);
+
+                              if (status === 'paid') {
                                 return (
-                                  <div className="flex justify-center">
-                                    <span className="inline-flex items-center gap-1 px-[0.7rem] py-[0.18rem] rounded-[0.8rem] text-[0.92rem] font-medium whitespace-nowrap shadow-sm tracking-[0.01em] leading-[1.32]" style={{ background: statusConfig[status].bg, color: statusConfig[status].color, border: `1px solid ${statusConfig[status].border}` }}>
-                                      {statusConfig[status].icon}
-                                      {statusConfig[status].label}
-                                    </span>
+                                  <div className="flex flex-col gap-1.5 items-center">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/10 text-green-600 rounded-md text-xs font-semibold border border-green-500/30">
+                                      <CheckCircleIcon className="w-3.5 h-3.5" />
+                                      Hoàn thành
+                                    </div>
+                                    <button onClick={() => handleViewInvoice(payment)} className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br from-blue-500 to-blue-700 text-white border-none rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5">
+                                      <EyeIcon className="w-3.5 h-3.5" />
+                                      Xem chi tiết
+                                    </button>
                                   </div>
                                 );
-                              })()}
-                            </td>
-                            <td style={{padding: '1rem 0.75rem', textAlign: 'center'}}>
-                              {(() => {
-                                const status = getPaymentStatus(payment);
-                                
-                                if (status === 'paid') {
-                                  return (
-                                    <div className="flex flex-col gap-1.5 items-center">
-                                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/10 text-green-600 rounded-md text-xs font-semibold border border-green-500/30">
-                                        <CheckCircleIcon className="w-3.5 h-3.5" />
-                                        Hoàn thành
-                                      </div>
-                                      <button onClick={() => handleViewInvoice(payment)} className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br from-blue-500 to-blue-700 text-white border-none rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5">
-                                        <EyeIcon className="w-3.5 h-3.5" />
-                                        Xem chi tiết
-                                      </button>
-                                    </div>
-                                  );
-                                }
-                                
-                                if (status === 'processing') {
-                                  return (
-                                    <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-md text-xs font-semibold">
-                                      <div className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-500 rounded-full animate-spin" />
-                                      Đang xử lý
-                                    </span>
-                                  );
-                                }
-                                
-                                if (status === 'pending' || status === 'grace_period' || status === 'overdue') {
-                                  const isUrgent = status === 'overdue';
-                                  const isWarning = status === 'grace_period';
-                                  
-                                  return (
-                                    <div className="flex flex-col gap-1.5 items-center">
-                                      <button onClick={() => handlePayOnline(payment)} className={`${isUrgent ? 'from-red-600 to-red-700' : isWarning ? 'from-orange-600 to-orange-700' : 'from-green-600 to-green-700'} mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br text-white rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5`}>
-                                        <BanknotesIcon className="w-3.5 h-3.5" />
-                                        {isUrgent ? 'Thanh toán' : 'Thanh toán'}
-                                      </button>
-                                      <button onClick={() => handleViewInvoice(payment)} className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5">
-                                        <EyeIcon className="w-3.5 h-3.5" />
-                                        Xem chi tiết
-                                      </button>
-                                    </div>
-                                  );
-                                }
-                                
-                                return null;
-                              })()}
-                            </td>
-                          </tr>
-                        ))
+                              }
+
+                              if (status === 'processing') {
+                                return (
+                                  <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-md text-xs font-semibold">
+                                    <div className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-500 rounded-full animate-spin" />
+                                    Đang xử lý
+                                  </span>
+                                );
+                              }
+
+                              if (status === 'pending' || status === 'grace_period' || status === 'overdue') {
+                                const isUrgent = status === 'overdue';
+                                const isWarning = status === 'grace_period';
+
+                                return (
+                                  <div className="flex flex-col gap-1.5 items-center">
+                                    <button onClick={() => handlePayOnline(payment)} className={`${isUrgent ? 'from-red-600 to-red-700' : isWarning ? 'from-orange-600 to-orange-700' : 'from-green-600 to-green-700'} mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br text-white rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5`}>
+                                      <BanknotesIcon className="w-3.5 h-3.5" />
+                                      {isUrgent ? 'Thanh toán' : 'Thanh toán'}
+                                    </button>
+                                    <button onClick={() => handleViewInvoice(payment)} className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-md text-xs font-semibold cursor-pointer transition-all min-w-[90px] hover:-translate-y-0.5">
+                                      <EyeIcon className="w-3.5 h-3.5" />
+                                      Xem chi tiết
+                                    </button>
+                                  </div>
+                                );
+                              }
+
+                              return null;
+                            })()}
+                          </td>
+                        </tr>
+                      ))
                     : (
                       <tr>
                         <td colSpan={6} className="py-12 px-4 text-center">
@@ -447,20 +449,16 @@ export default function FinancePage() {
             </div>
           </div>
         </div>
-                                  </div>
-                                );
-                              }
-                              
-                              return null;
-} 
+      </div>
+    );
+  }
+
+  return null;
+}
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('vi-VN', { 
-    style: 'currency', 
-    currency: 'VND',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
+  // Use display currency for UI, but keep actual amount for calculations
+  return formatDisplayCurrency(amount);
 };
 
 interface ResidentOption {

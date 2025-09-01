@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { activitiesAPI } from '@/lib/api';
 import Link from 'next/link';
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { parse, format } from "date-fns";
+import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   ArrowLeftIcon, 
   CalendarIcon, 
@@ -20,6 +21,7 @@ import {
 
 export default function NewActivityPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [form, setForm] = useState({
     activity_name: '',
     description: '',
@@ -41,12 +43,95 @@ export default function NewActivityPage() {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customLocation, setCustomLocation] = useState('');
   const [showCustomLocationInput, setShowCustomLocationInput] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
+
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    if (!user.role || !['admin', 'staff'].includes(user.role)) {
+      router.push('/');
+      return;
+    }
+  }, [user, router]);
 
   const LOCATIONS = ['Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật', 'Khác'];
   const ACTIVITY_TYPES = ['Thể dục', 'Văn nghệ', 'Giải trí', 'Giáo dục', 'Khác'];
 
+  const validateField = (name: string, value: string) => {
+    let errorMessage = '';
+    
+    switch (name) {
+      case 'activity_name':
+        if (!value || !value.trim()) {
+          errorMessage = 'Tên hoạt động không được để trống';
+        } else if (value.trim().length < 3) {
+          errorMessage = 'Tên hoạt động phải có ít nhất 3 ký tự';
+        }
+        break;
+      case 'description':
+        if (!value || !value.trim()) {
+          errorMessage = 'Mô tả không được để trống';
+        } else if (value.trim().length < 10) {
+          errorMessage = 'Mô tả phải có ít nhất 10 ký tự';
+        }
+        break;
+      case 'duration':
+        if (!value) {
+          errorMessage = 'Thời lượng không được để trống';
+        } else if (isNaN(Number(value)) || Number(value) <= 0) {
+          errorMessage = 'Thời lượng phải là số nguyên dương';
+        } else if (Number(value) < 15) {
+          errorMessage = 'Thời lượng tối thiểu 15 phút';
+        } else if (Number(value) > 300) {
+          errorMessage = 'Thời lượng tối đa 300 phút';
+        }
+        break;
+      case 'capacity':
+        if (!value) {
+          errorMessage = 'Sức chứa không được để trống';
+        } else if (isNaN(Number(value)) || Number(value) <= 0) {
+          errorMessage = 'Sức chứa phải là số nguyên dương';
+        } else if (Number(value) > 100) {
+          errorMessage = 'Sức chứa tối đa 100 người';
+        }
+        break;
+      case 'activity_type':
+        if (!value) {
+          errorMessage = 'Loại hoạt động không được để trống';
+        }
+        break;
+      case 'location':
+        if (!value) {
+          errorMessage = 'Địa điểm không được để trống';
+        }
+        break;
+      case 'date':
+        if (!value) {
+          errorMessage = 'Ngày không được để trống';
+        }
+        break;
+      case 'time':
+        if (!value) {
+          errorMessage = 'Thời gian không được để trống';
+        }
+        break;
+    }
+    
+    setFieldErrors(prev => ({ ...prev, [name]: errorMessage }));
+    return errorMessage === '';
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    // Clear error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
     
     if (name === 'activity_type') {
       if (value === 'Khác') {
@@ -75,15 +160,29 @@ export default function NewActivityPage() {
   };
 
   const handleCustomActivityTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomActivityType(e.target.value);
-    setForm({ ...form, activity_type: e.target.value });
+    const value = e.target.value;
+    setCustomActivityType(value);
+    setForm({ ...form, activity_type: value });
+    
+    // Clear error when user starts typing
+    if (fieldErrors['activity_type']) {
+      setFieldErrors(prev => ({ ...prev, 'activity_type': '' }));
+    }
+    
     setError('');
     setSuccess('');
   };
 
   const handleCustomLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomLocation(e.target.value);
-    setForm({ ...form, location: e.target.value });
+    const value = e.target.value;
+    setCustomLocation(value);
+    setForm({ ...form, location: value });
+    
+    // Clear error when user starts typing
+    if (fieldErrors['location']) {
+      setFieldErrors(prev => ({ ...prev, 'location': '' }));
+    }
+    
     setError('');
     setSuccess('');
   };
@@ -116,29 +215,27 @@ export default function NewActivityPage() {
     setError('');
     setSuccess('');
     
-    // Validate activity type
-    if (showCustomInput && !customActivityType.trim()) {
-      setError('Vui lòng nhập loại hoạt động khi chọn "Khác".');
-      return;
-    }
-
-    // Validate location
-    if (showCustomLocationInput && !customLocation.trim()) {
-      setError('Vui lòng nhập địa điểm khi chọn "Khác".');
-      return;
+    // Validate all fields
+    const fieldsToValidate = [
+      { name: 'activity_name', value: form.activity_name },
+      { name: 'description', value: form.description },
+      { name: 'duration', value: form.duration },
+      { name: 'capacity', value: form.capacity },
+      { name: 'activity_type', value: showCustomInput ? customActivityType : form.activity_type },
+      { name: 'location', value: showCustomLocationInput ? customLocation : form.location },
+      { name: 'date', value: form.date },
+      { name: 'time', value: form.time }
+    ];
+    
+    let hasValidationError = false;
+    for (const field of fieldsToValidate) {
+      const isValid = validateField(field.name, field.value);
+      if (!isValid) {
+        hasValidationError = true;
+      }
     }
     
-    // Validate
-    if (!form.activity_name.trim() || !form.description.trim() || !form.duration || !form.date || !form.time || !form.location.trim() || !form.capacity || !form.activity_type) {
-      setError('Vui lòng điền đầy đủ tất cả các trường bắt buộc (*) để tiếp tục.');
-      return;
-    }
-    if (isNaN(Number(form.duration)) || Number(form.duration) <= 0) {
-      setError('Thời lượng hoạt động phải là số nguyên dương (ví dụ: 30, 45, 60 phút).');
-      return;
-    }
-    if (isNaN(Number(form.capacity)) || Number(form.capacity) <= 0) {
-      setError('Sức chứa phải là số nguyên dương (ví dụ: 10, 20, 50 người).');
+    if (hasValidationError) {
       return;
     }
 
@@ -176,7 +273,8 @@ export default function NewActivityPage() {
       schedule_time: scheduleDateTime,
       location: showCustomLocationInput ? customLocation : form.location,
       capacity: Number(form.capacity),
-      activity_type: showCustomInput ? customActivityType : form.activity_type
+      activity_type: showCustomInput ? customActivityType : form.activity_type,
+      staff_id: user?.id || '' // Thêm staff_id của user hiện tại
     };
     console.log('Payload gửi lên:', payload);
     setLoading(true);
@@ -337,13 +435,14 @@ export default function NewActivityPage() {
                   <input 
                     name="activity_name" 
                     value={form.activity_name} 
-                    onChange={handleChange} 
+                    onChange={handleChange}
+                    onBlur={() => validateField('activity_name', form.activity_name)}
                     required 
                     style={{ 
                       width: '100%', 
                       padding: '0.75rem', 
                       borderRadius: '0.5rem', 
-                      border: '2px solid #e5e7eb', 
+                      border: fieldErrors.activity_name ? '2px solid #ef4444' : '2px solid #e5e7eb', 
                       fontSize: '0.95rem', 
                       outline: 'none',
                       transition: 'border-color 0.2s',
@@ -351,6 +450,16 @@ export default function NewActivityPage() {
                     }}
                     placeholder="Nhập tên hoạt động"
                   />
+                  {fieldErrors.activity_name && (
+                    <p style={{
+                      marginTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: '#ef4444',
+                      fontWeight: 500
+                    }}>
+                      {fieldErrors.activity_name}
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -364,40 +473,54 @@ export default function NewActivityPage() {
                     Loại hoạt động <span style={{color: '#ef4444'}}>*</span>
                   </label>
                   {!showCustomInput ? (
-                    <select
-                      name="activity_type"
-                      value={form.activity_type}
-                      onChange={handleChange}
-                      required
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.75rem', 
-                        borderRadius: '0.5rem', 
-                        border: '2px solid #e5e7eb', 
-                        fontSize: '0.95rem', 
-                        outline: 'none',
-                        transition: 'border-color 0.2s',
-                        background: 'white'
-                      }}
-                    >
-                      <option value="">-- Chọn loại hoạt động --</option>
-                      {ACTIVITY_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
+                    <div>
+                      <select
+                        name="activity_type"
+                        value={form.activity_type}
+                        onChange={handleChange}
+                        onBlur={() => validateField('activity_type', form.activity_type)}
+                        required
+                        style={{ 
+                          width: '100%', 
+                          padding: '0.75rem', 
+                          borderRadius: '0.5rem', 
+                          border: fieldErrors.activity_type ? '2px solid #ef4444' : '2px solid #e5e7eb', 
+                          fontSize: '0.95rem', 
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                          background: 'white'
+                        }}
+                      >
+                        <option value="">-- Chọn loại hoạt động --</option>
+                        {ACTIVITY_TYPES.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                      {fieldErrors.activity_type && (
+                        <p style={{
+                          marginTop: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#ef4444',
+                          fontWeight: 500
+                        }}>
+                          {fieldErrors.activity_type}
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <div style={{ position: 'relative' }}>
                       <input
                         type="text"
                         value={customActivityType}
                         onChange={handleCustomActivityTypeChange}
+                        onBlur={() => validateField('activity_type', customActivityType)}
                         placeholder="Nhập loại hoạt động..."
                         required
                         style={{ 
                           width: '100%', 
                           padding: '0.75rem', 
                           borderRadius: '0.5rem', 
-                          border: '2px solid #667eea', 
+                          border: fieldErrors.activity_type ? '2px solid #ef4444' : '2px solid #667eea', 
                           fontSize: '0.95rem', 
                           outline: 'none',
                           transition: 'border-color 0.2s',
@@ -430,6 +553,16 @@ export default function NewActivityPage() {
                       >
                         ✕
                       </button>
+                      {fieldErrors.activity_type && (
+                        <p style={{
+                          marginTop: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#ef4444',
+                          fontWeight: 500
+                        }}>
+                          {fieldErrors.activity_type}
+                        </p>
+                      )}
                     </div>
                   )}
                   {showCustomInput && (
@@ -458,14 +591,15 @@ export default function NewActivityPage() {
                 <textarea 
                   name="description" 
                   value={form.description} 
-                  onChange={handleChange} 
+                  onChange={handleChange}
+                  onBlur={() => validateField('description', form.description)}
                   required 
                   rows={4} 
                   style={{ 
                     width: '100%', 
                     padding: '0.75rem', 
                     borderRadius: '0.5rem', 
-                    border: '2px solid #e5e7eb', 
+                    border: fieldErrors.description ? '2px solid #ef4444' : '2px solid #e5e7eb', 
                     fontSize: '0.95rem', 
                     outline: 'none',
                     transition: 'border-color 0.2s',
@@ -474,6 +608,16 @@ export default function NewActivityPage() {
                   }}
                   placeholder="Mô tả chi tiết về hoạt động..."
                 />
+                {fieldErrors.description && (
+                  <p style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.75rem',
+                    color: '#ef4444',
+                    fontWeight: 500
+                  }}>
+                    {fieldErrors.description}
+                  </p>
+                )}
               </div>
             </div>
 

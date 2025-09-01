@@ -5,16 +5,31 @@ import { CheckCircleIcon } from "@heroicons/react/24/outline";
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
+  
   useEffect(() => {
+    // Đảm bảo trang luôn ở giữa màn hình
+    document.body.style.overflow = 'hidden';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    
     const timer = setTimeout(() => {
       router.push("/family/finance");
     }, 3000);
-    return () => clearTimeout(timer);
+    
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = '';
+      document.body.style.margin = '';
+      document.body.style.padding = '';
+    };
   }, [router]);
 
   return (
     <div
       style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
         minHeight: "100vh",
         width: "100vw",
         display: "flex",
@@ -22,11 +37,24 @@ export default function PaymentSuccessPage() {
         justifyContent: "center",
         background:
           "linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)",
-        padding: 0,
-        animation: "fadeIn 0.8s"
+        padding: "20px",
+        animation: "fadeIn 0.8s",
+        zIndex: 9999,
+        margin: 0
       }}
     >
       <style>{`
+        * {
+          box-sizing: border-box;
+        }
+        
+        html, body {
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          height: 100%;
+        }
+        
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(40px); }
           to { opacity: 1; transform: none; }
@@ -35,7 +63,7 @@ export default function PaymentSuccessPage() {
           background: white;
           border-radius: 2.5rem;
           padding: 4rem 4.5rem 3.2rem 4.5rem;
-          box-shadow: 0 16px 64px rgba(16,185,129,0.15);
+          box-shadow: 0 16px 64px rgba(34,197,94,0.15);
           text-align: center;
           max-width: 720px;
           min-width: 520px;
@@ -45,6 +73,8 @@ export default function PaymentSuccessPage() {
           display: flex;
           flex-direction: column;
           align-items: center;
+          position: relative;
+          z-index: 10000;
         }
         .success-badge {
           display: inline-flex;
@@ -57,14 +87,14 @@ export default function PaymentSuccessPage() {
           border-radius: 9999px;
           padding: 0.18rem 1.1rem 0.18rem 0.7rem;
           margin-bottom: 1.5rem;
-          box-shadow: 0 2px 8px rgba(16,185,129,0.08);
+          box-shadow: 0 2px 8px rgba(34,197,94,0.08);
           letter-spacing: 0.01em;
           animation: fadeIn 1.2s 0.2s both;
         }
         .success-icon {
           width: 110px;
           height: 110px;
-          color: #22c55e;
+          color: #16a34a;
           margin-bottom: 36px;
           filter: drop-shadow(0 2px 12px #bbf7d0);
           animation: pop 0.7s cubic-bezier(.17,.67,.83,.67);
@@ -93,28 +123,46 @@ export default function PaymentSuccessPage() {
           margin-bottom: 2.2rem;
         }
         .back-btn {
-          background: linear-gradient(90deg, #22d3ee 0%, #16a34a 100%);
+          background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
           color: white;
           border: none;
           border-radius: 1.1rem;
           padding: 1.1rem 2.8rem;
           font-weight: 600;
           font-size: 1.18rem;
-          box-shadow: 0 2px 12px rgba(34,211,238,0.10);
+          box-shadow: 0 2px 12px rgba(34,197,94,0.10);
           cursor: pointer;
           transition: background 0.2s, transform 0.2s;
           margin-top: 0.2rem;
         }
         .back-btn:hover {
-          background: linear-gradient(90deg, #16a34a 0%, #22d3ee 100%);
+          background: linear-gradient(90deg, #16a34a 0%, #22c55e 100%);
           transform: translateY(-2px) scale(1.03);
         }
         @media (max-width: 1100px) {
-          .success-card { min-width: 0; max-width: 98vw; padding: 2.5rem 0.5rem; }
+          .success-card { 
+            min-width: 0; 
+            max-width: 98vw; 
+            padding: 2.5rem 1rem;
+            margin: 0 10px;
+          }
         }
         @media (max-width: 700px) {
-          .success-card { padding: 1.5rem 0.7rem; border-radius: 1.2rem; }
+          .success-card { 
+            padding: 1.5rem 0.7rem; 
+            border-radius: 1.2rem;
+            margin: 0 5px;
+          }
           .success-title { font-size: 1.3rem; }
+        }
+        @media (max-width: 480px) {
+          .success-card { 
+            padding: 1rem 0.5rem; 
+            border-radius: 1rem;
+            margin: 0 2px;
+          }
+          .success-title { font-size: 1.1rem; }
+          .success-desc { font-size: 1rem; }
         }
       `}</style>
       <div className="success-card">
@@ -125,7 +173,7 @@ export default function PaymentSuccessPage() {
         <CheckCircleIcon className="success-icon" />
         <div className="success-title">Thanh toán thành công!</div>
         <div className="success-desc">
-          Cảm ơn bạn đã thanh toán.<br />Bạn sẽ được chuyển về trang hóa đơn trong giây lát.
+          Giao dịch đã được xử lý thành công.<br />Bạn sẽ được chuyển về trang hóa đơn trong giây lát.
         </div>
         <div className="redirecting">Đang chuyển hướng...</div>
         <button

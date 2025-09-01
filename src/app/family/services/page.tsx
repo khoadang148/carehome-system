@@ -1,35 +1,72 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { DocumentPlusIcon } from '@heroicons/react/24/outline';
+import { DocumentPlusIcon, MagnifyingGlassIcon, FunnelIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
 import { carePlansAPI, residentAPI } from '@/lib/api';
-
-
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 export default function ServicesPage() {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [carePlans, setCarePlans] = useState<any[]>([]);
   const [loadingCarePlans, setLoadingCarePlans] = useState(true);
   const [carePlansError, setCarePlansError] = useState<string | null>(null);
-  
+
   const [relatives, setRelatives] = useState<any[]>([]);
-  
+
+  // Filtering and sorting state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [priceSort, setPriceSort] = useState<'none' | 'asc' | 'desc'>('none');
+
+  // Filtered and sorted care plans
+  const filteredCarePlans = useMemo(() => {
+    let filtered = carePlans.filter((pkg: any) => {
+      // Search filter
+      const matchesSearch = !searchTerm || 
+        pkg.plan_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pkg.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Category filter
+      const matchesCategory = categoryFilter === 'all' || pkg.category === categoryFilter;
+
+      return matchesSearch && matchesCategory;
+    });
+
+    // Sort: Main packages first, then supplementary packages
+    filtered.sort((a: any, b: any) => {
+      // Ưu tiên gói chính lên đầu
+      if (a.category === 'main' && b.category !== 'main') return -1;
+      if (a.category !== 'main' && b.category === 'main') return 1;
+      
+      // Nếu cùng loại, sắp xếp theo giá
+      if (priceSort !== 'none') {
+        const priceA = a.monthly_price || 0;
+        const priceB = b.monthly_price || 0;
+        return priceSort === 'asc' ? priceA - priceB : priceB - priceA;
+      }
+      
+      return 0;
+    });
+
+    return filtered;
+  }, [carePlans, searchTerm, categoryFilter, priceSort]);
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (user?.role !== 'family') {
       router.push('/');
       return;
     }
   }, [user, router]);
-  
+
   useEffect(() => {
     setLoadingCarePlans(true);
     setCarePlansError(null);
@@ -62,7 +99,7 @@ export default function ServicesPage() {
             {user?.role === 'family' ? 'Gói Chăm Sóc Cho Người Thân' : 'Gói Dịch Vụ Chăm Sóc'}
           </h1>
           <p className="text-xl opacity-90 max-w-3xl mx-auto leading-relaxed mb-8">
-            {user?.role === 'family' 
+            {user?.role === 'family'
               ? 'Lựa chọn gói chăm sóc phù hợp nhất cho người thân yêu của bạn. Chúng tôi cam kết mang lại sự an tâm và chất lượng chăm sóc tốt nhất.'
               : 'Chọn gói dịch vụ phù hợp để mang lại sự chăm sóc tốt nhất cho người thân của bạn'
             }
@@ -104,7 +141,90 @@ export default function ServicesPage() {
             </p>
           </div>
         )}
-        
+
+        {/* Filtering and Sorting Section */}
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
+          <h3 className="text-xl font-bold text-gray-800 mb-6 text-center flex items-center justify-center gap-3">
+            <FunnelIcon className="w-6 h-6 text-indigo-600" />
+            Tìm kiếm & Lọc gói dịch vụ
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            {/* Search Input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <MagnifyingGlassIcon className="w-4 h-4 text-indigo-600" />
+                Tìm kiếm:
+              </label>
+              <input
+                type="text"
+                placeholder="Tìm theo tên gói hoặc mô tả..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 bg-white text-gray-700 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200"
+              />
+            </div>
+
+            {/* Category Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <FunnelIcon className="w-4 h-4 text-indigo-600" />
+                Loại gói:
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 bg-white text-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 cursor-pointer"
+              >
+                <option value="all">Tất cả gói</option>
+                <option value="main">Gói chính</option>
+                <option value="supplementary">Gói bổ sung</option>
+              </select>
+            </div>
+
+            {/* Price Sort */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <ArrowsUpDownIcon className="w-4 h-4 text-indigo-600" />
+                Sắp xếp theo giá:
+              </label>
+              <select
+                value={priceSort}
+                onChange={(e) => setPriceSort(e.target.value as 'none' | 'asc' | 'desc')}
+                className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 bg-white text-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 cursor-pointer"
+              >
+                <option value="none">Không sắp xếp</option>
+                <option value="asc">Giá tăng dần</option>
+                <option value="desc">Giá giảm dần</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Clear Filters Button */}
+          {(searchTerm || categoryFilter !== 'all' || priceSort !== 'none') && (
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setCategoryFilter('all');
+                  setPriceSort('none');
+                }}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white border-2 border-red-500 rounded-xl font-semibold cursor-pointer transition-all duration-200 hover:from-red-600 hover:to-red-700 hover:-translate-y-1 hover:shadow-lg"
+              >
+                <FunnelIcon className="w-4 h-4" />
+                Xóa bộ lọc
+              </button>
+            </div>
+          )}
+
+          {/* Results Count */}
+          <div className="text-center mt-6 p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-200">
+            <span className="text-sm text-indigo-700 font-semibold">
+              Hiển thị {filteredCarePlans.length} / {carePlans.length} gói dịch vụ
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
           {loadingCarePlans ? (
             <div className="col-span-full text-center py-16">
@@ -134,7 +254,7 @@ export default function ServicesPage() {
                 </div>
               </div>
             </div>
-          ) : carePlans.length === 0 ? (
+          ) : filteredCarePlans.length === 0 ? (
             <div className="col-span-full text-center py-16">
               <div className="inline-flex flex-col items-center gap-6 bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-12 shadow-2xl max-w-lg">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
@@ -143,40 +263,42 @@ export default function ServicesPage() {
                   </svg>
                 </div>
                 <div className="text-xl text-blue-900 font-bold">
-                  Không có gói dịch vụ nào
+                  {searchTerm || categoryFilter !== 'all' || priceSort !== 'none' 
+                    ? 'Không tìm thấy gói dịch vụ phù hợp' 
+                    : 'Không có gói dịch vụ nào'
+                  }
                 </div>
                 <div className="text-blue-700 text-sm text-center">
-                  Vui lòng liên hệ quản trị viên để thêm gói dịch vụ mới
+                  {searchTerm || categoryFilter !== 'all' || priceSort !== 'none'
+                    ? 'Thử thay đổi bộ lọc để xem thêm kết quả'
+                    : 'Vui lòng liên hệ quản trị viên để thêm gói dịch vụ mới'
+                  }
                 </div>
               </div>
             </div>
-          ) : carePlans.map((pkg: any) => (
+          ) : filteredCarePlans.map((pkg: any) => (
             <div
               key={pkg._id}
-              className={`bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-lg border-2 p-8 max-w-full flex flex-col items-stretch font-sans transition-all duration-300 relative overflow-hidden backdrop-blur-md min-h-[600px] cursor-default ${
-                pkg.category === 'main' 
-                  ? 'border-red-500' 
+              className={`bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-lg border-2 p-8 max-w-full flex flex-col items-stretch font-sans transition-all duration-300 relative overflow-hidden backdrop-blur-md min-h-[600px] cursor-default ${pkg.category === 'main'
+                  ? 'border-red-500'
                   : 'border-gray-200/80'
-              }`}
+                }`}
             >
-              <div className={`absolute -top-12 -right-12 w-36 h-36 rounded-full z-0 ${
-                pkg.category === 'main'
+              <div className={`absolute -top-12 -right-12 w-36 h-36 rounded-full z-0 ${pkg.category === 'main'
                   ? 'bg-gradient-to-br from-red-500/10 to-red-600/5'
                   : 'bg-gradient-to-br from-blue-500/10 to-blue-600/5'
-              }`} />
-              
-              <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-3xl ${
-                pkg.category === 'main' 
+                }`} />
+
+              <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-3xl ${pkg.category === 'main'
                   ? 'bg-gradient-to-r from-red-500 to-red-600'
                   : 'bg-gradient-to-r from-blue-500 to-blue-600'
-              }`} />
-              
+                }`} />
+
               <div className="flex items-start gap-4 mb-6 pt-2 relative z-10">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg relative ${
-                  pkg.category === 'main'
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg relative ${pkg.category === 'main'
                     ? 'bg-gradient-to-br from-red-500 to-red-600'
                     : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                }`}>
+                  }`}>
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -187,40 +309,34 @@ export default function ServicesPage() {
                     {pkg.plan_name}
                   </h2>
                   <div className="text-sm text-gray-500 font-medium flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${
-                      pkg.category === 'main' ? 'bg-red-500' : 'bg-blue-500'
-                    }`} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${pkg.category === 'main' ? 'bg-red-500' : 'bg-blue-500'
+                      }`} />
                     {pkg.category === 'main' ? 'Gói dịch vụ chính' : 'Gói dịch vụ bổ sung'}
                   </div>
                 </div>
               </div>
 
-              <div className={`rounded-2xl p-4 mb-5 text-center relative overflow-hidden ${
-                pkg.category === 'main'
+              <div className={`rounded-2xl p-4 mb-5 text-center relative overflow-hidden ${pkg.category === 'main'
                   ? 'bg-gradient-to-br from-red-50 to-red-100 border border-red-200'
                   : 'bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200'
-              }`}>
-              
-                <div className={`absolute -top-4 -right-4 w-15 h-15 rounded-full ${
-                  pkg.category === 'main'
+                }`}>
+
+                <div className={`absolute -top-4 -right-4 w-15 h-15 rounded-full ${pkg.category === 'main'
                     ? 'bg-red-500/8'
                     : 'bg-blue-500/8'
-                }`} />
-                
-                <div className={`text-xs font-semibold mb-2 uppercase tracking-wider relative z-10 ${
-                  pkg.category === 'main' ? 'text-red-800' : 'text-blue-800'
-                }`}>
+                  }`} />
+
+                <div className={`text-xs font-semibold mb-2 uppercase tracking-wider relative z-10 ${pkg.category === 'main' ? 'text-red-800' : 'text-blue-800'
+                  }`}>
                   Giá hàng tháng
                 </div>
-                <div className={`text-3xl font-extrabold leading-none mb-0.5 relative z-10 ${
-                  pkg.category === 'main' ? 'text-red-600' : 'text-blue-700'
-                }`}>
-                  {new Intl.NumberFormat('vi-VN').format(pkg.monthly_price)}
+                <div className={`text-3xl font-extrabold leading-none mb-0.5 relative z-10 ${pkg.category === 'main' ? 'text-red-600' : 'text-blue-700'
+                  }`}>
+                  {formatDisplayCurrency(pkg.monthly_price)}
                   <span className="text-base font-semibold ml-1">đ</span>
                 </div>
-                <div className={`text-sm font-medium relative z-10 ${
-                  pkg.category === 'main' ? 'text-red-700' : 'text-blue-600'
-                }`}>
+                <div className={`text-sm font-medium relative z-10 ${pkg.category === 'main' ? 'text-red-700' : 'text-blue-600'
+                  }`}>
                   Thanh toán hàng tháng
                 </div>
               </div>
@@ -265,7 +381,7 @@ export default function ServicesPage() {
         <div className="mt-16 text-center p-12 bg-gradient-to-br from-white/95 to-gray-50/95 rounded-3xl backdrop-blur-xl border border-white/20 shadow-2xl relative overflow-hidden">
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full" />
           <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full" />
-          
+
           <div className="relative z-10">
             <h3 className="text-4xl font-bold text-gray-800 mb-4 bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
               Tại sao chọn chúng tôi?
@@ -288,7 +404,7 @@ export default function ServicesPage() {
                   Đội ngũ chuyên gia giàu kinh nghiệm với chứng chỉ quốc tế
                 </p>
               </div>
-              
+
               <div className="text-center p-8 bg-gradient-to-br from-white/80 to-gray-50/80 rounded-2xl border border-white/30 transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg relative">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,7 +419,7 @@ export default function ServicesPage() {
                   Trang thiết bị y tế tiên tiến và môi trường sống tiện nghi
                 </p>
               </div>
-              
+
               <div className="text-center p-8 bg-gradient-to-br from-white/80 to-gray-50/80 rounded-2xl border border-white/30 transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl">
                 <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg relative">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -333,7 +449,7 @@ export default function ServicesPage() {
               Quy Tắc & Điều Khoản Dịch Vụ
             </h3>
             <p className="text-gray-600 text-base max-w-2xl mx-auto leading-relaxed">
-              Để đảm bảo chất lượng dịch vụ tốt nhất và quyền lợi của tất cả khách hàng, 
+              Để đảm bảo chất lượng dịch vụ tốt nhất và quyền lợi của tất cả khách hàng,
               chúng tôi yêu cầu tuân thủ các quy tắc sau
             </p>
           </div>
@@ -348,7 +464,7 @@ export default function ServicesPage() {
               </h4>
               <p className="text-blue-900 leading-relaxed">
                 Mỗi người cao tuổi chỉ có thể đăng ký 1 gói dịch vụ chính và có thể đăng ký thêm nhiều gói dịch vụ bổ sung.
-                Việc đăng ký được thực hiện sau khi đội ngũ nhân viên đã tư vấn kỹ lưỡng, 
+                Việc đăng ký được thực hiện sau khi đội ngũ nhân viên đã tư vấn kỹ lưỡng,
                 dựa trên tình trạng sức khỏe và nhu cầu cá nhân của người cao tuổi,
                 nhằm đảm bảo lựa chọn phù hợp và tối ưu nhất.
               </p>
@@ -362,7 +478,7 @@ export default function ServicesPage() {
                 Hủy dịch vụ
               </h4>
               <p className="text-green-900 leading-relaxed">
-                Dịch vụ sẽ được hủy trực tiếp tại viện sau khi hoàn tất thủ tục. 
+                Dịch vụ sẽ được hủy trực tiếp tại viện sau khi hoàn tất thủ tục.
                 Tiền đặt cọc sẽ được hoàn lại (nếu có), và quá trình bàn giao người cao tuổi sẽ được thực hiện với gia đình.
               </p>
             </div>

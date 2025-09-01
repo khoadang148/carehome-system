@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import PaymentManagement from '@/components/admin/PaymentManagement';
 import ResidentStaffList from '@/components/admin/ResidentStaffList';
-import { 
+import {
   ChartBarIcon,
   UsersIcon,
   UserGroupIcon,
@@ -49,9 +49,7 @@ export default function AdminDashboardPage() {
         position: 'relative',
         zIndex: 1
       }}>
-        
 
-        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -68,7 +66,7 @@ export default function AdminDashboardPage() {
             gap: '1.5rem',
             flexWrap: 'wrap'
           }}>
-      
+
 
             <div style={{
               display: 'flex',
@@ -76,12 +74,12 @@ export default function AdminDashboardPage() {
               gap: '1rem'
             }}>
               <button
-              onClick={() => router.push('/admin')}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
+                onClick={() => router.push('/admin')}
+                className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                title="Quay lại"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
 
               <div style={{
                 width: '3rem',
@@ -95,7 +93,7 @@ export default function AdminDashboardPage() {
               }}>
                 <ChartBarIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
               </div>
-              
+
               <div>
                 <h1 style={{
                   fontSize: '1.75rem',
@@ -106,7 +104,7 @@ export default function AdminDashboardPage() {
                   WebkitTextFillColor: 'transparent',
                   lineHeight: 1.1
                 }}>
-                  Bảng điều khiển quản lý
+                  Bảng thống kê quản lý
                 </h1>
                 <p style={{
                   fontSize: '0.875rem',
@@ -118,7 +116,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             </div>
-            
+
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -139,7 +137,7 @@ export default function AdminDashboardPage() {
                 <UsersIcon style={{ width: '1rem', height: '1rem' }} />
                 <span>Người cao tuổi</span>
               </div>
-              
+
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -154,7 +152,7 @@ export default function AdminDashboardPage() {
                 <UserGroupIcon style={{ width: '1rem', height: '1rem' }} />
                 <span>Nhân viên</span>
               </div>
-              
+
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -173,19 +171,19 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Payment Management */}
+
         <div style={{ marginBottom: '2rem' }}>
-         
+
           <PaymentManagement />
         </div>
 
-        {/* Resident & Staff List */}
+
         <div style={{ marginBottom: '2rem' }}>
-          
+
           <ResidentStaffList />
         </div>
 
-        {/* Quick Actions */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.25rem',
@@ -201,7 +199,7 @@ export default function AdminDashboardPage() {
           }}>
             Thao tác nhanh
           </h2>
-          
+
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -272,7 +270,7 @@ export default function AdminDashboardPage() {
                   Quản lý phòng & giường
                 </div>
                 <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>
-                  Phân bổ phòng cho cư dân
+                  Phân bổ phòng cho người cao tuổi
                 </div>
               </div>
             </button>
@@ -307,7 +305,7 @@ export default function AdminDashboardPage() {
                   Chỉ số sức khỏe
                 </div>
                 <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>
-                  Theo dõi sức khỏe cư dân
+                  Theo dõi sức khỏe người cao tuổi
                 </div>
               </div>
             </button>

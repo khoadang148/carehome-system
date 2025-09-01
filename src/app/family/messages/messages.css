@@ -1,4 +1,3 @@
-
 .h-screen {
   height: 100vh;
 }
@@ -87,31 +86,31 @@
   .messages-container {
     flex-direction: column;
   }
-  
+
   .conversations-list {
     width: 100%;
     height: 40%;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
   }
-  
+
   .messages-area {
     height: 60%;
   }
-  
+
   .message-bubble {
     max-width: 12rem;
   }
-  
+
   .h-screen {
     height: 100vh;
   }
-  
+
   .px-4 {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
   }
-  
+
   .py-6 {
     padding-top: 1rem;
     padding-bottom: 1rem;
@@ -122,21 +121,21 @@
   .conversations-list {
     height: 35%;
   }
-  
+
   .messages-area {
     height: 65%;
   }
-  
+
   .message-bubble {
     max-width: 10rem;
     font-size: 0.75rem;
   }
-  
+
   .px-4 {
     padding-left: 0.25rem;
     padding-right: 0.25rem;
   }
-  
+
   .py-6 {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
@@ -232,6 +231,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -326,6 +326,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

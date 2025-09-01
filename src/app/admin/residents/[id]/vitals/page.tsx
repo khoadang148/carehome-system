@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
+import {
   ArrowLeftIcon,
   HeartIcon,
   ScaleIcon,
@@ -41,7 +41,7 @@ export default function VitalsPage() {
   const params = useParams();
   const router = useRouter();
   const residentId = params.id as string;
-  
+
   const [resident, setResident] = useState<Resident | null>(null);
   const [vitals, setVitals] = useState<VitalSigns[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -59,7 +59,6 @@ export default function VitalsPage() {
       const residentData = await residentAPI.getById(residentId);
       setResident(residentData);
     } catch (error) {
-      console.error('Error loading resident data:', error);
     }
   };
 
@@ -69,7 +68,6 @@ export default function VitalsPage() {
       const vitalsData = await vitalSignsAPI.getByResidentId(residentId);
       setVitals(vitalsData);
     } catch (error) {
-      console.error('Error loading vitals data:', error);
       setVitals([]);
     } finally {
       setLoading(false);
@@ -98,7 +96,7 @@ export default function VitalsPage() {
     const heartRateNormal = vital.heartRate >= 60 && vital.heartRate <= 100;
     const temperatureNormal = vital.temperature >= 36.0 && vital.temperature <= 37.5;
     const oxygenNormal = vital.oxygenLevel >= 95 && vital.oxygenLevel <= 100;
-    
+
     if (!heartRateNormal || !temperatureNormal || !oxygenNormal) {
       return 'warning';
     }
@@ -138,8 +136,8 @@ export default function VitalsPage() {
         <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg">
           <div className="flex justify-between items-start">
             <div>
-              <Link 
-                href={`/admin/residents/${residentId}`} 
+              <Link
+                href={`/admin/residents/${residentId}`}
                 className="inline-flex items-center gap-2 text-blue-600 no-underline mb-4 hover:text-blue-700 transition-colors"
               >
                 <ArrowLeftIcon className="w-4 h-4" />
@@ -321,11 +319,10 @@ export default function VitalsPage() {
               </thead>
               <tbody>
                 {vitals.map((vital, index) => (
-                  <tr 
-                    key={vital.id} 
-                    className={`border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      index < vitals.length - 1 ? 'border-b' : ''
-                    }`}
+                  <tr
+                    key={vital.id}
+                    className={`border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${index < vitals.length - 1 ? 'border-b' : ''
+                      }`}
                     onClick={() => setSelectedVital(vital)}
                   >
                     <td className="p-3 border-b border-gray-200">
@@ -337,23 +334,20 @@ export default function VitalsPage() {
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`font-semibold ${
-                        (vital.heartRate > 100 || vital.heartRate < 60) ? 'text-red-500' : 'text-green-600'
-                      }`}>
+                      <span className={`font-semibold ${(vital.heartRate > 100 || vital.heartRate < 60) ? 'text-red-500' : 'text-green-600'
+                        }`}>
                         {vital.heartRate}
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`font-semibold ${
-                        (vital.temperature > 37.2 || vital.temperature < 36.0) ? 'text-red-500' : 'text-green-600'
-                      }`}>
+                      <span className={`font-semibold ${(vital.temperature > 37.2 || vital.temperature < 36.0) ? 'text-red-500' : 'text-green-600'
+                        }`}>
                         {vital.temperature}°C
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`font-semibold ${
-                        (vital.oxygenSaturation || vital.oxygenLevel) < 95 ? 'text-red-500' : 'text-green-600'
-                      }`}>
+                      <span className={`font-semibold ${(vital.oxygenSaturation || vital.oxygenLevel) < 95 ? 'text-red-500' : 'text-green-600'
+                        }`}>
                         {(vital.oxygenSaturation || vital.oxygenLevel)}%
                       </span>
                     </td>
@@ -361,11 +355,10 @@ export default function VitalsPage() {
                       {vital.weight || 'N/A'} kg
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        getAlertLevel(vital) === 'normal' 
-                          ? 'bg-green-100 text-green-600' 
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getAlertLevel(vital) === 'normal'
+                          ? 'bg-green-100 text-green-600'
                           : 'bg-yellow-100 text-yellow-600'
-                      }`}>
+                        }`}>
                         {getAlertText(getAlertLevel(vital))}
                       </span>
                     </td>

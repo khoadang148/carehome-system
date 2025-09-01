@@ -1,10 +1,11 @@
-import { getUserFriendlyError } from '@/lib/utils/error-translations';
 "use client";
+
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   ArrowLeftIcon,
   PencilIcon,
   XMarkIcon,
@@ -19,8 +20,7 @@ export default function EditServicePage() {
   const params = useParams();
   const { user } = useAuth();
   const packageId = params.id as string;
-  
-  // Form state
+
   const [formData, setFormData] = useState({
     plan_name: '',
     description: '',
@@ -35,42 +35,42 @@ export default function EditServicePage() {
     contraindications: [],
     is_active: true
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [originalData, setOriginalData] = useState<any>(null);
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
 
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (user?.role !== 'admin') {
       router.push('/services');
       return;
     }
   }, [user, router]);
 
-  // Load package data
   useEffect(() => {
     if (!packageId) return;
-    
+
     const loadPackageData = async () => {
       try {
         setLoadingData(true);
         const packageData = await carePlansAPI.getById(packageId);
-        
-        setFormData({
+
+        const formDataToSet = {
           plan_name: packageData.plan_name || '',
           description: packageData.description || '',
           monthly_price: packageData.monthly_price?.toString() || '',
           plan_type: packageData.plan_type || 'cham_soc_dac_biet',
           category: packageData.category === 'regular' ? 'main' : (packageData.category || 'main'),
-          services_included: packageData.services_included?.length > 0 
-            ? packageData.services_included 
+          services_included: packageData.services_included?.length > 0
+            ? packageData.services_included
             : [''],
           staff_ratio: packageData.staff_ratio || '1:3',
           duration_type: packageData.duration_type || 'monthly',
@@ -78,9 +78,11 @@ export default function EditServicePage() {
           prerequisites: packageData.prerequisites || [],
           contraindications: packageData.contraindications || [],
           is_active: typeof packageData.is_active === 'boolean' ? packageData.is_active : true,
-        });
+        };
+        
+        setFormData(formDataToSet);
+        setOriginalData(formDataToSet);
       } catch (err: any) {
-        console.error('Error loading package data:', err);
         if (err.response?.status === 404) {
           setError('Không tìm thấy gói dịch vụ này');
         } else {
@@ -99,11 +101,21 @@ export default function EditServicePage() {
       ...prev,
       [field]: value
     }));
-    
-    // Clear error when user starts typing
+
     if (error) {
       setError(null);
     }
+
+    // Clear field error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+
+    // Real-time validation
+    validateField(field, value);
   };
 
   const handleServiceChange = (index: number, value: string) => {
@@ -113,11 +125,22 @@ export default function EditServicePage() {
       ...prev,
       services_included: newServices
     }));
-    
-    // Clear error when user starts typing
+
     if (error) {
       setError(null);
     }
+
+    // Clear service errors when user starts typing
+    const serviceKey = `service_${index}`;
+    if (fieldErrors[serviceKey]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [serviceKey]: ''
+      }));
+    }
+
+    // Real-time validation for services
+    validateServiceField(index, value);
   };
 
   const addService = () => {
@@ -137,71 +160,140 @@ export default function EditServicePage() {
     }
   };
 
+  // Check if form has changes
+  const hasChanges = () => {
+    if (!originalData) return false;
+    
+    // Compare basic fields
+    if (formData.plan_name !== originalData.plan_name ||
+        formData.description !== originalData.description ||
+        formData.monthly_price !== originalData.monthly_price ||
+        formData.category !== originalData.category ||
+        formData.is_active !== originalData.is_active) {
+      return true;
+    }
+    
+    // Compare services_included arrays
+    const currentServices = formData.services_included.filter(s => s.trim() !== '');
+    const originalServices = originalData.services_included.filter(s => s.trim() !== '');
+    
+    if (currentServices.length !== originalServices.length) return true;
+    
+    for (let i = 0; i < currentServices.length; i++) {
+      if (currentServices[i] !== originalServices[i]) return true;
+    }
+    
+    return false;
+  };
+
+  // Real-time field validation
+  const validateField = (field: string, value: any) => {
+    let errorMessage = '';
+
+    switch (field) {
+      case 'plan_name':
+        if (!value.trim()) {
+          errorMessage = 'Tên gói dịch vụ không được để trống';
+        } else if (value.trim().length < 3) {
+          errorMessage = 'Tên gói dịch vụ phải có ít nhất 3 ký tự';
+        } else if (value.trim().length > 100) {
+          errorMessage = 'Tên gói dịch vụ không được quá 100 ký tự';
+        }
+        break;
+      case 'description':
+        if (!value.trim()) {
+          errorMessage = 'Mô tả không được để trống';
+        } else if (value.trim().length < 10) {
+          errorMessage = 'Mô tả phải có ít nhất 10 ký tự';
+        } else if (value.trim().length > 500) {
+          errorMessage = 'Mô tả không được quá 500 ký tự';
+        }
+        break;
+      case 'monthly_price':
+        if (!value.trim()) {
+          errorMessage = 'Giá hàng tháng không được để trống';
+        }
+        break;
+    }
+
+    setFieldErrors(prev => ({
+      ...prev,
+      [field]: errorMessage
+    }));
+  };
+
+  // Real-time service validation
+  const validateServiceField = (index: number, value: string) => {
+    const serviceKey = `service_${index}`;
+    let errorMessage = '';
+
+    if (value.trim() !== '' && value.trim().length < 2) {
+      errorMessage = 'Dịch vụ phải có ít nhất 2 ký tự';
+    } else if (value.trim() !== '' && value.trim().length > 100) {
+      errorMessage = 'Dịch vụ không được quá 100 ký tự';
+    }
+
+    setFieldErrors(prev => ({
+      ...prev,
+      [serviceKey]: errorMessage
+    }));
+  };
+
+  // Check if form is valid
+  const isFormValid = () => {
+    return formData.plan_name.trim() !== '' &&
+           formData.description.trim() !== '' &&
+           formData.monthly_price.trim() !== '' &&
+           formData.services_included.some(service => service.trim() !== '') &&
+           Object.values(fieldErrors).every(error => !error);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Clear previous errors
+
     setError(null);
-    
-    // Validation
+
     if (!formData.plan_name.trim()) {
       setError('Tên gói dịch vụ không được để trống');
       return;
     }
-    
+
     if (formData.plan_name.trim().length < 3) {
       setError('Tên gói dịch vụ phải có ít nhất 3 ký tự');
       return;
     }
-    
+
     if (formData.plan_name.trim().length > 100) {
       setError('Tên gói dịch vụ không được quá 100 ký tự');
       return;
     }
-    
+
     if (!formData.description.trim()) {
       setError('Mô tả không được để trống');
       return;
     }
-    
+
     if (formData.description.trim().length < 10) {
       setError('Mô tả phải có ít nhất 10 ký tự');
       return;
     }
-    
+
     if (formData.description.trim().length > 500) {
       setError('Mô tả không được quá 500 ký tự');
       return;
     }
-    
+
     if (!formData.monthly_price || formData.monthly_price.trim() === '') {
       setError('Giá hàng tháng không được để trống');
       return;
     }
-    
-    const price = parseFloat(formData.monthly_price);
-    if (isNaN(price)) {
-      setError('Giá hàng tháng phải là số hợp lệ');
-      return;
-    }
-    
-    if (price <= 0) {
-      setError('Giá hàng tháng phải lớn hơn 0');
-      return;
-    }
-    
-    if (price > 1000000000) {
-      setError('Giá hàng tháng không được quá 1 tỷ VND');
-      return;
-    }
-    
+
     const validServices = formData.services_included.filter(service => service.trim() !== '');
     if (validServices.length === 0) {
       setError('Phải có ít nhất một dịch vụ được bao gồm');
       return;
     }
-    
-    // Validate each service
+
     for (let i = 0; i < validServices.length; i++) {
       const service = validServices[i];
       if (service.trim().length < 2) {
@@ -213,8 +305,7 @@ export default function EditServicePage() {
         return;
       }
     }
-    
-    // Check for duplicate services
+
     const uniqueServices = [...new Set(validServices.map(s => s.trim().toLowerCase()))];
     if (uniqueServices.length !== validServices.length) {
       setError('Không được có dịch vụ trùng lặp');
@@ -242,12 +333,11 @@ export default function EditServicePage() {
 
       await carePlansAPI.update(packageId, packageData);
       setSuccess(true);
-      
-      // Redirect after 2 seconds
+
       setTimeout(() => {
         router.push('/services');
       }, 2000);
-      
+
     } catch (err: any) {
       setError(err.message || 'Có lỗi xảy ra khi cập nhật gói dịch vụ');
     } finally {
@@ -257,8 +347,8 @@ export default function EditServicePage() {
 
   if (loadingData) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
+      <div style={{
+        minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
@@ -297,8 +387,8 @@ export default function EditServicePage() {
 
   if (error && !loadingData) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
+      <div style={{
+        minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
@@ -367,8 +457,8 @@ export default function EditServicePage() {
 
   if (success) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
+      <div style={{
+        minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
@@ -423,7 +513,6 @@ export default function EditServicePage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background pattern */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -436,7 +525,7 @@ export default function EditServicePage() {
         `,
         pointerEvents: 'none'
       }} />
-      
+
       <div style={{
         position: 'relative',
         zIndex: 1,
@@ -444,10 +533,9 @@ export default function EditServicePage() {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Header */}
         <div style={{
-          display: 'flex', 
-          alignItems: 'center', 
+          display: 'flex',
+          alignItems: 'center',
           marginBottom: '2rem',
           background: 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(10px)',
@@ -458,7 +546,7 @@ export default function EditServicePage() {
           <button
             onClick={() => router.push('/services')}
             style={{
-              marginRight: '1rem', 
+              marginRight: '1rem',
               color: '#667eea',
               display: 'flex',
               alignItems: 'center',
@@ -478,7 +566,7 @@ export default function EditServicePage() {
               e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)';
             }}
           >
-            <ArrowLeftIcon style={{height: '1.25rem', width: '1.25rem'}} />
+            <ArrowLeftIcon style={{ height: '1.25rem', width: '1.25rem' }} />
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
@@ -494,8 +582,8 @@ export default function EditServicePage() {
                 <PencilIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
               </div>
               <h1 style={{
-                fontSize: '1.875rem', 
-                fontWeight: 700, 
+                fontSize: '1.875rem',
+                fontWeight: 700,
                 margin: 0,
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 WebkitBackgroundClip: 'text',
@@ -515,8 +603,7 @@ export default function EditServicePage() {
             </p>
           </div>
         </div>
-        
-        {/* Form */}
+
         <div style={{
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
@@ -525,22 +612,21 @@ export default function EditServicePage() {
           overflow: 'hidden'
         }}>
           <form onSubmit={handleSubmit}>
-            {/* Basic Information Section */}
             <div style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <PencilIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <PencilIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Thông tin cơ bản
                 </h2>
               </div>
             </div>
-            
-            <div style={{padding: '2rem'}}>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem'}}>
+
+            <div style={{ padding: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div>
                   <label style={{
                     display: 'block',
@@ -549,7 +635,7 @@ export default function EditServicePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Tên gói dịch vụ <span style={{color: '#ef4444'}}>*</span>
+                    Tên gói dịch vụ <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -558,7 +644,7 @@ export default function EditServicePage() {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
+                       border: `2px solid ${fieldErrors.plan_name ? '#ef4444' : '#e5e7eb'}`,
                       borderRadius: '0.5rem',
                       fontSize: '0.95rem',
                       outline: 'none',
@@ -567,6 +653,16 @@ export default function EditServicePage() {
                     }}
                     placeholder="Nhập tên gói dịch vụ"
                   />
+                   {fieldErrors.plan_name && (
+                     <div style={{
+                       fontSize: '0.75rem',
+                       color: '#ef4444',
+                       marginTop: '0.25rem',
+                       fontWeight: 500
+                     }}>
+                       {fieldErrors.plan_name}
+                     </div>
+                   )}
                 </div>
 
                 <div>
@@ -577,14 +673,13 @@ export default function EditServicePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Giá hàng tháng (VND) <span style={{color: '#ef4444'}}>*</span>
+                    Giá hàng tháng (VND) <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="number"
                     value={formData.monthly_price}
                     onChange={(e) => {
                       const value = e.target.value;
-                      // Only allow positive numbers
                       if (value === '' || /^\d+$/.test(value)) {
                         handleInputChange('monthly_price', value);
                       }
@@ -592,7 +687,7 @@ export default function EditServicePage() {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
+                       border: `2px solid ${fieldErrors.monthly_price ? '#ef4444' : '#e5e7eb'}`,
                       borderRadius: '0.5rem',
                       fontSize: '0.95rem',
                       outline: 'none',
@@ -601,8 +696,17 @@ export default function EditServicePage() {
                     }}
                     placeholder="Nhập giá hàng tháng"
                     min="0"
-                    step="1000"
-                  />
+                   />
+                   {fieldErrors.monthly_price && (
+                     <div style={{
+                       fontSize: '0.75rem',
+                       color: '#ef4444',
+                       marginTop: '0.25rem',
+                       fontWeight: 500
+                     }}>
+                       {fieldErrors.monthly_price}
+                     </div>
+                   )}
                 </div>
 
                 <div>
@@ -629,67 +733,17 @@ export default function EditServicePage() {
                       background: 'white'
                     }}
                   >
-                    <option value="regular">Gói thường</option>
+                    <option value="regular">Gói bổ sung</option>
                     <option value="main">Gói chính</option>
                   </select>
                 </div>
 
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Kiểu gói
-                  </label>
-                  <select
-                    value={formData.plan_type}
-                    onChange={(e) => handleInputChange('plan_type', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.95rem',
-                      outline: 'none',
-                      transition: 'border-color 0.2s',
-                      background: 'white'
-                    }}
-                  >
-                    <option value="regular">Gói thường</option>
-                    <option value="cham_soc_dac_biet">Chăm sóc đặc biệt</option>
-                    <option value="cham_soc_cao_cap">Chăm sóc cao cấp</option>
-                    <option value="cham_soc_co_ban">Chăm sóc cơ bản</option>
-                  </select>
-                </div>
 
-                <div>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => handleInputChange('is_active', e.target.checked)}
-                      style={{
-                        width: '1rem',
-                        height: '1rem'
-                      }}
-                    />
-                    Kích hoạt gói dịch vụ
-                  </label>
-                </div>
+
+
               </div>
 
-              <div style={{marginBottom: '2rem'}}>
+              <div style={{ marginBottom: '2rem' }}>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
@@ -697,7 +751,7 @@ export default function EditServicePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Mô tả <span style={{color: '#ef4444'}}>*</span>
+                  Mô tả <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <textarea
                   value={formData.description}
@@ -706,7 +760,7 @@ export default function EditServicePage() {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
+                     border: `2px solid ${fieldErrors.description ? '#ef4444' : '#e5e7eb'}`,
                     borderRadius: '0.5rem',
                     fontSize: '0.95rem',
                     outline: 'none',
@@ -716,24 +770,33 @@ export default function EditServicePage() {
                   }}
                   placeholder="Mô tả chi tiết về gói dịch vụ"
                 />
+                 {fieldErrors.description && (
+                   <div style={{
+                     fontSize: '0.75rem',
+                     color: '#ef4444',
+                     marginTop: '0.25rem',
+                     fontWeight: 500
+                   }}>
+                     {fieldErrors.description}
+                   </div>
+                 )}
               </div>
             </div>
 
-            {/* Services Section */}
             <div style={{
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <DocumentTextIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <DocumentTextIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Dịch vụ bao gồm
                 </h2>
               </div>
             </div>
 
-            <div style={{padding: '2rem'}}>
+            <div style={{ padding: '2rem' }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -745,7 +808,7 @@ export default function EditServicePage() {
                   fontWeight: 600,
                   color: '#374151'
                 }}>
-                  Danh sách dịch vụ <span style={{color: '#ef4444'}}>*</span>
+                  Danh sách dịch vụ <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <button
                   type="button"
@@ -778,7 +841,8 @@ export default function EditServicePage() {
 
               {formData.services_included.map((service, index) => (
                 <div key={index} style={{
-                  display: 'flex',
+                   display: 'grid',
+                   gridTemplateColumns: '1fr auto',
                   gap: '0.5rem',
                   marginBottom: '0.5rem'
                 }}>
@@ -789,7 +853,7 @@ export default function EditServicePage() {
                     style={{
                       flex: 1,
                       padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
+                       border: `2px solid ${fieldErrors[`service_${index}`] ? '#ef4444' : '#e5e7eb'}`,
                       borderRadius: '0.5rem',
                       fontSize: '0.95rem',
                       outline: 'none',
@@ -798,6 +862,17 @@ export default function EditServicePage() {
                     }}
                     placeholder={`Dịch vụ ${index + 1}`}
                   />
+                   {fieldErrors[`service_${index}`] && (
+                     <div style={{
+                       fontSize: '0.75rem',
+                       color: '#ef4444',
+                       marginTop: '0.25rem',
+                       fontWeight: 500,
+                       gridColumn: '1 / -1'
+                     }}>
+                       {fieldErrors[`service_${index}`]}
+                     </div>
+                   )}
                   {formData.services_included.length > 1 && (
                     <button
                       type="button"
@@ -827,7 +902,6 @@ export default function EditServicePage() {
                 </div>
               ))}
 
-              {/* Error Message */}
               {error && (
                 <div style={{
                   background: '#fef2f2',
@@ -841,7 +915,6 @@ export default function EditServicePage() {
                 </div>
               )}
 
-              {/* Submit Buttons */}
               <div style={{
                 display: 'flex',
                 gap: '1rem',
@@ -873,6 +946,7 @@ export default function EditServicePage() {
                 >
                   Hủy
                 </button>
+                {hasChanges() && isFormValid() && (
                 <button
                   type="submit"
                   disabled={loading}
@@ -922,6 +996,7 @@ export default function EditServicePage() {
                     </>
                   )}
                 </button>
+                )}
               </div>
             </div>
           </form>

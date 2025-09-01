@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  ArrowLeftIcon, 
-  EyeIcon, 
-  PencilIcon, 
-  UserGroupIcon, 
+import {
+  ArrowLeftIcon,
+  EyeIcon,
+  PencilIcon,
+  UserGroupIcon,
   MagnifyingGlassIcon,
   CheckIcon,
   XMarkIcon,
@@ -39,7 +39,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const [participations, setParticipations] = useState<any[]>([]);
   const [evaluationMode, setEvaluationMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [evaluations, setEvaluations] = useState<{[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}}>({});
+  const [evaluations, setEvaluations] = useState<{ [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } }>({});
   const [saving, setSaving] = useState(false);
   const [addResidentModalOpen, setAddResidentModalOpen] = useState(false);
   const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
@@ -59,14 +59,29 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     type: 'info'
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Check if activity date has passed
+
   const isActivityDatePassed = () => {
     if (!activity?.date) return false;
     const activityDate = new Date(activity.date + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return activityDate < today;
+  };
+
+  const isActivityToday = () => {
+    if (!activity?.date) return false;
+    const activityDate = new Date(activity.date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return activityDate.getTime() === today.getTime();
+  };
+
+  const canEditOrEvaluate = () => {
+    return isActivityToday();
+  };
+
+  const canAddParticipants = () => {
+    return !isActivityDatePassed(); // Cho phép thêm người tham gia cho hoạt động trong tương lai và hiện tại
   };
 
   const showNotification = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -80,19 +95,19 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const closeNotification = () => {
     setNotificationModal(prev => ({ ...prev, isOpen: false }));
   };
-  
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (!user.role || !['admin', 'staff'].includes(user.role)) {
       router.push('/');
       return;
     }
   }, [user, router]);
-  
+
   useEffect(() => {
     const fetchActivity = async () => {
       try {
@@ -107,7 +122,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           setError('Không tìm thấy hoạt động');
         }
       } catch (error) {
-        console.error('Error fetching activity:', error);
         setError('Không thể tải thông tin hoạt động. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
@@ -119,29 +133,29 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const fetchStaffAssignments = async () => {
       if (!user?.id) return;
-      
+
       try {
         const assignments = await staffAssignmentsAPI.getMyAssignments();
-        
+
         setStaffAssignments(Array.isArray(assignments) ? assignments : []);
-        
-        const residentIds = Array.isArray(assignments) 
+
+        const residentIds = Array.isArray(assignments)
           ? assignments
-              .filter((assignment: any) => assignment.status === 'active' && assignment.resident_id)
-              .map((assignment: any) => 
-                typeof assignment.resident_id === 'object' 
-                  ? assignment.resident_id._id 
-                  : assignment.resident_id
-              )
+            .filter((assignment: any) => assignment.status === 'active' && assignment.resident_id)
+            .map((assignment: any) =>
+              typeof assignment.resident_id === 'object'
+                ? assignment.resident_id._id
+                : assignment.resident_id
+            )
           : [];
-        
+
         setAssignedResidentIds(residentIds);
       } catch (error) {
         setStaffAssignments([]);
         setAssignedResidentIds([]);
       }
     };
-    
+
     fetchStaffAssignments();
   }, [user?.id]);
 
@@ -149,14 +163,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     const seen = new Set();
     const duplicates: any[] = [];
     const uniqueParticipations: any[] = [];
-    
+
     participationsData.forEach((participation: any) => {
       const participationActivityId = participation.activity_id?._id || participation.activity_id;
       const participationResidentId = participation.resident_id?._id || participation.resident_id;
       const participationDate = participation.date ? new Date(participation.date).toISOString().split('T')[0] : null;
-      
+
       const key = `${participationActivityId}-${participationResidentId}-${participationDate}`;
-      
+
       if (seen.has(key)) {
         duplicates.push(participation);
       } else {
@@ -164,101 +178,80 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         uniqueParticipations.push(participation);
       }
     });
-    
+
     for (const duplicate of duplicates) {
       try {
         await activityParticipationsAPI.delete(duplicate._id);
       } catch (error) {
-        console.error('Error deleting duplicate participation:', error);
       }
     }
-    
-    if (duplicates.length > 0) {
-      console.log(`Cleaned up ${duplicates.length} duplicate participations`);
-    }
-    
+
     return uniqueParticipations;
   };
 
   useEffect(() => {
     const fetchParticipations = async () => {
       if (!activity?.id) return;
-      
+
       try {
         const participationsData = await activityParticipationsAPI.getByActivityId(
-          activity.id, 
+          activity.id,
           activity.date
         );
-        
+
         const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
         setParticipations(cleanedParticipations);
-        
-        const initialEvaluations: {[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}} = {};
-        
+
+        const initialEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
+
         for (const participation of participationsData) {
           const residentId = participation.resident_id?._id || participation.resident_id;
-          
-          console.log('Processing participation:', {
-            residentId,
-            attendance_status: participation.attendance_status,
-            performance_notes: participation.performance_notes
-          });
-          
-          // Chỉ set status nếu attendance_status rõ ràng, còn lại mặc định là pending
+
           let status: 'pending' | 'attended' | 'absent' = 'pending';
           if (participation.attendance_status === 'attended') {
             status = 'attended';
           } else if (participation.attendance_status === 'absent') {
             status = 'absent';
           }
-          // Nếu attendance_status là 'pending' hoặc undefined/null, giữ nguyên pending
-          
+
           let reason = participation.performance_notes || '';
-          
+
           if (status === 'absent' && reason.includes('Tham gia tích cực')) {
             reason = 'Lý do sức khỏe';
-            
+
             try {
               await activityParticipationsAPI.update(participation._id, {
                 performance_notes: 'Lý do sức khỏe'
               });
             } catch (error) {
-              console.error('Error updating database for resident:', residentId, error);
             }
           }
-          
+
           if (residentId) {
-            console.log('Setting evaluation for residentId:', residentId, 'status:', status, 'reason:', reason);
             initialEvaluations[residentId] = {
               status,
               reason
             };
           }
         }
-        console.log('Final initialEvaluations:', initialEvaluations);
-        console.log('Status counts:', {
-          attended: Object.values(initialEvaluations).filter(e => e.status === 'attended').length,
-          absent: Object.values(initialEvaluations).filter(e => e.status === 'absent').length,
-          pending: Object.values(initialEvaluations).filter(e => e.status === 'pending').length
-        });
         setEvaluations(initialEvaluations);
         setIsRefreshing(false);
       } catch (error) {
         setIsRefreshing(false);
       }
     };
-    
+
     fetchParticipations();
   }, [activity?.id, refreshTrigger]);
 
   useEffect(() => {
     if (!activity?.id) return;
-    
+
     const interval = setInterval(() => {
       setIsRefreshing(true);
       setRefreshTrigger(prev => prev + 1);
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [activity?.id]);
 
@@ -274,24 +267,20 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [addResidentModalOpen, activity?.id]);
 
-  useEffect(() => {
-    console.log('Evaluations state changed:', evaluations);
-  }, [evaluations]);
+
 
   const mapActivityFromAPI = (apiActivity: any) => {
     try {
       if (!apiActivity.schedule_time || typeof apiActivity.schedule_time !== 'string') {
-        console.warn('Invalid schedule_time for activity:', apiActivity._id);
         return null;
       }
 
-      const scheduleTimeStr = apiActivity.schedule_time.endsWith('Z') 
-        ? apiActivity.schedule_time 
+      const scheduleTimeStr = apiActivity.schedule_time.endsWith('Z')
+        ? apiActivity.schedule_time
         : `${apiActivity.schedule_time}Z`;
       const scheduleTime = new Date(scheduleTimeStr);
 
       if (isNaN(scheduleTime.getTime())) {
-        console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
         return null;
       }
 
@@ -299,16 +288,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       const endTime = new Date(scheduleTime.getTime() + durationInMinutes * 60000);
 
       if (isNaN(endTime.getTime())) {
-        console.error('Invalid end time calculated for activity:', apiActivity._id);
         return null;
       }
 
       const convertToVietnamTime = (utcTime: Date) => {
         const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
-        return vietnamTime.toLocaleTimeString('vi-VN', { 
-          hour: '2-digit', 
+        return vietnamTime.toLocaleTimeString('vi-VN', {
+          hour: '2-digit',
           minute: '2-digit',
-          hour12: false 
+          hour12: false
         });
       };
 
@@ -340,7 +328,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         notes: 'Không có ghi chú đặc biệt.',
       };
     } catch (error) {
-      console.error('Error mapping activity:', apiActivity._id, error);
       return null;
     }
   };
@@ -375,13 +362,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     const recurringMap: { [key: string]: string } = {
       'none': 'Không lặp lại',
       'daily': 'Hàng ngày',
-      'weekly': 'Hàng tuần', 
+      'weekly': 'Hàng tuần',
       'biweekly': 'Hai tuần một lần',
       'monthly': 'Hàng tháng'
     };
     return recurringMap[recurring] || recurring;
   };
-  
+
   const handleEditClick = () => {
     router.push(`/staff/activities/${activity.id}/edit`);
   };
@@ -390,7 +377,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     setEvaluations(prev => {
       const currentEvaluation = prev[residentId] || {};
       let newReason = currentEvaluation.reason || '';
-      
+
       if (status === 'attended') {
         newReason = '';
       } else if (status === 'absent') {
@@ -398,14 +385,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           newReason = 'Lý do sức khỏe';
         }
       }
-      
+
       return {
-      ...prev,
-      [residentId]: {
+        ...prev,
+        [residentId]: {
           ...currentEvaluation,
-        status,
+          status,
           reason: newReason
-      }
+        }
       };
     });
   };
@@ -422,11 +409,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
   const handleSelectAll = (status: 'pending' | 'attended' | 'absent') => {
     setEvaluations(prev => {
-      const newEvaluations: {[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}} = {};
+      const newEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
       Object.keys(prev).forEach(residentId => {
         const currentEvaluation = prev[residentId] || {};
         let newReason = currentEvaluation.reason || '';
-        
+
         if (status === 'attended') {
           newReason = '';
         } else if (status === 'absent') {
@@ -434,7 +421,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             newReason = 'Lý do sức khỏe';
           }
         }
-        
+
         newEvaluations[residentId] = {
           status,
           reason: newReason
@@ -446,11 +433,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
   const handleSaveEvaluations = async () => {
     if (!activity?.id) return;
-    
+
     const invalidEvaluations = Object.entries(evaluations).filter(([_, evaluation]) => {
       return evaluation.status === 'absent' && (!evaluation.reason || evaluation.reason.trim() === '');
     });
-    
+
     if (invalidEvaluations.length > 0) {
       showNotification(
         'Thiếu thông tin',
@@ -459,7 +446,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       );
       return;
     }
-    
+
     setSaving(true);
     try {
       for (const [residentId, evaluation] of Object.entries(evaluations)) {
@@ -471,79 +458,76 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             pDate === activity.date
           );
         });
-        
+
         if (existingParticipation) {
           const updateData: any = {
-            performance_notes: evaluation.status === 'attended' ? 
-              'Tham gia tích cực, tinh thần tốt' : 
+            performance_notes: evaluation.status === 'attended' ?
+              'Tham gia tích cực, tinh thần tốt' :
               (evaluation.reason || 'Lý do sức khỏe'),
             attendance_status: evaluation.status
           };
-          
+
           const currentStaffId = existingParticipation.staff_id?._id || existingParticipation.staff_id;
           const newStaffId = user?.id || "664f1b2c2f8b2c0012a4e750";
           if (currentStaffId !== newStaffId) {
             updateData.staff_id = newStaffId;
           }
-          
+
           await activityParticipationsAPI.update(existingParticipation._id, updateData);
         } else {
           const resident = residents.find(r => r.id === residentId);
           if (resident) {
-            const currentStaffId = participations.length > 0 ? 
-              (participations[0].staff_id?._id || participations[0].staff_id) : 
+            const currentStaffId = participations.length > 0 ?
+              (participations[0].staff_id?._id || participations[0].staff_id) :
               user?.id || "664f1b2c2f8b2c0012a4e750";
-            
+
             await activityParticipationsAPI.create({
               staff_id: currentStaffId,
               activity_id: activity.id,
               resident_id: resident.id,
               date: activity.date + "T00:00:00Z",
-              performance_notes: evaluation.status === 'attended' ? 
-                'Tham gia tích cực, tinh thần tốt' : 
-                 (evaluation.reason || 'Lý do sức khỏe'),
+              performance_notes: evaluation.status === 'attended' ?
+                'Tham gia tích cực, tinh thần tốt' :
+                (evaluation.reason || 'Lý do sức khỏe'),
               attendance_status: evaluation.status
             });
           }
         }
       }
-      
+
       const participationsData = await activityParticipationsAPI.getByActivityId(
-        activity.id, 
+        activity.id,
         activity.date
       );
-      
+
       const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
       setParticipations(cleanedParticipations);
-      
-      const updatedEvaluations: {[key: string]: {status: 'pending' | 'attended' | 'absent', reason?: string}} = {};
-      
+
+      const updatedEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
+
       for (const participation of cleanedParticipations) {
         const residentId = participation.resident_id?._id || participation.resident_id;
-        
-        // Chỉ set status nếu attendance_status rõ ràng, còn lại mặc định là pending
+
         let status: 'pending' | 'attended' | 'absent' = 'pending';
         if (participation.attendance_status === 'attended') {
           status = 'attended';
         } else if (participation.attendance_status === 'absent') {
           status = 'absent';
         }
-        // Nếu attendance_status là 'pending' hoặc undefined/null, giữ nguyên pending
-        
+
         let reason = participation.performance_notes || '';
-        
+
         if (status === 'absent' && reason.includes('Tham gia tích cực')) {
           reason = 'Lý do sức khỏe';
-          
+
           try {
             await activityParticipationsAPI.update(participation._id, {
               performance_notes: 'Lý do sức khỏe'
             });
           } catch (error) {
-            console.error('Error updating old data for resident:', residentId, error);
           }
         }
-        
+
         if (residentId) {
           updatedEvaluations[residentId] = {
             status,
@@ -552,15 +536,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         }
       }
       setEvaluations(updatedEvaluations);
-      
+
       setRefreshTrigger(prev => prev + 1);
-      
+
       setEvaluationMode(false);
-       
-       setTimeout(() => {
-         setRefreshTrigger(prev => prev + 1);
-       }, 1000);
-       
+
+      setTimeout(() => {
+        setRefreshTrigger(prev => prev + 1);
+      }, 1000);
+
       showNotification(
         'Lưu đánh giá thành công',
         'Đánh giá tham gia hoạt động đã được lưu thành công!',
@@ -568,13 +552,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       );
     } catch (error: any) {
       let errorMessage = 'Có lỗi xảy ra khi lưu đánh giá. Vui lòng thử lại.';
-      
+
       if (error.response?.data?.message) {
         errorMessage = `Lỗi: ${error.response.data.message}`;
       } else if (error.message) {
         errorMessage = `Lỗi: ${error.message}`;
       }
-      
+
       showNotification('Lỗi lưu đánh giá', errorMessage, 'error');
     } finally {
       setSaving(false);
@@ -627,14 +611,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         const participationActivityId = p.activity_id?._id || p.activity_id;
         const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
         const activityDate = activity?.date ? new Date(activity.date).toISOString().split('T')[0] : null;
-        
-        return pResidentId === residentId && 
-               participationActivityId === activity?.id && 
-               participationDate === activityDate;
+
+        return pResidentId === residentId &&
+          participationActivityId === activity?.id &&
+          participationDate === activityDate;
       });
-      
+
       const isAssigned = assignedResidentIds.includes(residentId);
-      
+
       return participation !== undefined && isAssigned;
     })
     .map(([residentId, evaluation]) => {
@@ -642,9 +626,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         const pResidentId = p.resident_id?._id || p.resident_id;
         return pResidentId === residentId;
       });
-      
+
       const residentInfo = residents.find((r: any) => r.id === residentId);
-      
+
       return {
         id: residentId,
         name: participation?.resident_id?.full_name || residentInfo?.name || 'N/A',
@@ -657,8 +641,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       };
     });
 
-  // Remove filteredResidents since we're now filtering directly in the render
-  
+
+
   const joinedResidentIds = Array.from(new Set(
     participations
       .filter((p: any) => {
@@ -669,28 +653,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       })
       .map((p: any) => p.resident_id?._id || p.resident_id)
   ));
-  console.log('Joined resident IDs:', joinedResidentIds);
-  console.log('Activity residents count:', activityResidents.length);
-  console.log('Current evaluations state:', evaluations);
-  console.log('Residents from evaluations:', residentsFromEvaluations);
-  console.log('Total evaluations entries:', Object.keys(evaluations).length);
-  console.log('Filtered residents for this activity:', residentsFromEvaluations.length);
-  console.log('Residents from evaluations details:', residentsFromEvaluations.map(r => ({
-    id: r.id,
-    name: r.name,
-    participated: r.participated,
-    reason: r.reason
-  })));
-  
+
   const participationCount = activityResidents.length;
-  console.log('Participation count:', participationCount);
-  
+
   const residentsNotJoined = staffAssignments
     .filter((assignment: any) => assignment.status === 'active')
     .map((assignment: any) => {
       const resident = assignment.resident_id;
       const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
-      
+
       return {
         id: resident._id,
         name: resident.full_name || '',
@@ -710,27 +681,27 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
   const handleAddResident = async () => {
     if (!selectedResidentId || !activity?.id || !activity.date) return;
-    
+
     const currentParticipantCount = participations.filter((p: any) => {
       const participationActivityId = p.activity_id?._id || p.activity_id;
       const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
       return participationActivityId === activity.id && participationDate === activity.date;
     }).length;
-    
+
     if (currentParticipantCount >= activity.capacity) {
       toast.error(`Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm người cao tuổi.`);
       return;
     }
-    
+
     const isAlreadyParticipating = participations.some((p: any) => {
       const participationActivityId = p.activity_id?._id || p.activity_id;
       const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
       const participationResidentId = p.resident_id?._id || p.resident_id;
-      return participationActivityId === activity.id && 
-             participationDate === activity.date && 
-             participationResidentId === selectedResidentId;
+      return participationActivityId === activity.id &&
+        participationDate === activity.date &&
+        participationResidentId === selectedResidentId;
     });
-    
+
     if (isAlreadyParticipating) {
       showNotification(
         'Người cao tuổi đã tham gia',
@@ -739,13 +710,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       );
       return;
     }
-    
+
     setAddingResident(true);
     try {
-      const currentStaffId = participations.length > 0 ? 
-        (participations[0].staff_id?._id || participations[0].staff_id) : 
+      const currentStaffId = participations.length > 0 ?
+        (participations[0].staff_id?._id || participations[0].staff_id) :
         user?.id || '';
-      
+
       await activityParticipationsAPI.create({
         staff_id: currentStaffId,
         activity_id: activity.id,
@@ -756,34 +727,33 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       });
       setAddResidentModalOpen(false);
       setSelectedResidentId(null);
-      
+
       showNotification(
         'Thêm người cao tuổi thành công',
         'Người cao tuổi đã được thêm vào hoạt động thành công!',
         'success'
       );
-      
+
       setRefreshTrigger(prev => prev + 1);
-      
+
       setTimeout(() => {
         setRefreshTrigger(prev => prev + 1);
       }, 1000);
     } catch (err: any) {
-      console.error('Error adding resident:', err);
       let errorMessage = 'Không thể thêm người cao tuổi vào hoạt động. Vui lòng thử lại.';
-      
+
       if (err.response?.data?.message) {
         errorMessage = `Lỗi: ${err.response.data.message}`;
       } else if (err.message) {
         errorMessage = `Lỗi: ${err.message}`;
       }
-      
+
       showNotification('Lỗi thêm người cao tuổi', errorMessage, 'error');
     } finally {
       setAddingResident(false);
     }
   };
-  
+
   if (loading || residentsLoading) {
     return (
       <div style={{
@@ -893,28 +863,28 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const renderCategory = (category: string) => {
-    const bgColor = 
-      category === 'Thể chất' ? 'rgba(16, 185, 129, 0.1)' : 
-      category === 'Sáng tạo' ? 'rgba(139, 92, 246, 0.1)' :
-      category === 'Trị liệu' ? 'rgba(245, 158, 11, 0.1)' :
-      category === 'Nhận thức' ? 'rgba(59, 130, 246, 0.1)' :
-      category === 'Xã hội' ? 'rgba(236, 72, 153, 0.1)' : 
-      category === 'Giáo dục' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(156, 163, 175, 0.1)';
-      
-    const textColor = 
-      category === 'Thể chất' ? '#10b981' : 
-      category === 'Sáng tạo' ? '#8b5cf6' :
-      category === 'Trị liệu' ? '#f59e0b' :
-      category === 'Nhận thức' ? '#3b82f6' :
-      category === 'Xã hội' ? '#ec4899' : 
-      category === 'Giáo dục' ? '#06b6d4' : '#9ca3af';
-      
+    const bgColor =
+      category === 'Thể chất' ? 'rgba(16, 185, 129, 0.1)' :
+        category === 'Sáng tạo' ? 'rgba(139, 92, 246, 0.1)' :
+          category === 'Trị liệu' ? 'rgba(245, 158, 11, 0.1)' :
+            category === 'Nhận thức' ? 'rgba(59, 130, 246, 0.1)' :
+              category === 'Xã hội' ? 'rgba(236, 72, 153, 0.1)' :
+                category === 'Giáo dục' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(156, 163, 175, 0.1)';
+
+    const textColor =
+      category === 'Thể chất' ? '#10b981' :
+        category === 'Sáng tạo' ? '#8b5cf6' :
+          category === 'Trị liệu' ? '#f59e0b' :
+            category === 'Nhận thức' ? '#3b82f6' :
+              category === 'Xã hội' ? '#ec4899' :
+                category === 'Giáo dục' ? '#06b6d4' : '#9ca3af';
+
     return (
       <span style={{
-        display: 'inline-flex', 
-        padding: '0.375rem 0.875rem', 
-        fontSize: '0.75rem', 
-        fontWeight: 600, 
+        display: 'inline-flex',
+        padding: '0.375rem 0.875rem',
+        fontSize: '0.75rem',
+        fontWeight: 600,
         borderRadius: '9999px',
         backgroundColor: bgColor,
         color: textColor,
@@ -926,24 +896,24 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const renderStatus = (status: string) => {
-    const bgColor = 
-      status === 'Đã lên lịch' ? 'rgba(99, 102, 241, 0.1)' : 
-      status === 'Đang diễn ra' ? 'rgba(16, 185, 129, 0.1)' :
-      status === 'Đã hoàn thành' ? 'rgba(156, 163, 175, 0.1)' :
-      status === 'Đã hủy' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(156, 163, 175, 0.1)';
-      
-    const textColor = 
-      status === 'Đã lên lịch' ? '#6366f1' : 
-      status === 'Đang diễn ra' ? '#10b981' :
-      status === 'Đã hoàn thành' ? '#9ca3af' :
-      status === 'Đã hủy' ? '#ef4444' : '#9ca3af';
-      
+    const bgColor =
+      status === 'Đã lên lịch' ? 'rgba(99, 102, 241, 0.1)' :
+        status === 'Đang diễn ra' ? 'rgba(16, 185, 129, 0.1)' :
+          status === 'Đã hoàn thành' ? 'rgba(156, 163, 175, 0.1)' :
+            status === 'Đã hủy' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(156, 163, 175, 0.1)';
+
+    const textColor =
+      status === 'Đã lên lịch' ? '#6366f1' :
+        status === 'Đang diễn ra' ? '#10b981' :
+          status === 'Đã hoàn thành' ? '#9ca3af' :
+            status === 'Đã hủy' ? '#ef4444' : '#9ca3af';
+
     return (
       <span style={{
-        display: 'inline-flex', 
-        padding: '0.375rem 0.875rem', 
-        fontSize: '0.75rem', 
-        fontWeight: 600, 
+        display: 'inline-flex',
+        padding: '0.375rem 0.875rem',
+        fontSize: '0.75rem',
+        fontWeight: 600,
         borderRadius: '9999px',
         backgroundColor: bgColor,
         color: textColor,
@@ -953,7 +923,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       </span>
     );
   };
-  
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -1016,7 +986,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 }}
               >
                 <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-          </Link>
+              </Link>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1032,8 +1002,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                   boxShadow: '0 8px 20px -5px rgba(245, 158, 11, 0.3)'
                 }}>
-                  <EyeIcon style={{ 
-                    width: '2rem', 
+                  <EyeIcon style={{
+                    width: '2rem',
                     height: '2rem',
                     color: 'white'
                   }} />
@@ -1060,10 +1030,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   </p>
                 </div>
               </div>
-        </div>
+            </div>
           </div>
-      </div>
-      
+        </div>
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -1078,9 +1048,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             padding: '2rem'
           }}>
             <div style={{
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'flex-start', 
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
               marginBottom: '1.5rem'
             }}>
               <div style={{ flex: 1 }}>
@@ -1096,7 +1066,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   </label>
                   <h2 style={{
                     fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)',
-                    fontWeight: 700, 
+                    fontWeight: 700,
                     margin: 0,
                     lineHeight: 1.2,
                     textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
@@ -1115,8 +1085,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     Mô tả:
                   </label>
                   <p style={{
-                    fontSize: '1.125rem', 
-                    margin: 0, 
+                    fontSize: '1.125rem',
+                    margin: 0,
                     opacity: 0.95,
                     lineHeight: 1.5,
                     textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
@@ -1126,9 +1096,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
               <div style={{
-                display: 'flex', 
+                display: 'flex',
                 flexDirection: 'column',
-                gap: '0.5rem', 
+                gap: '0.5rem',
                 marginLeft: '1.5rem',
                 alignItems: 'flex-end'
               }}>
@@ -1142,7 +1112,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
             </div>
-            
+
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -1151,8 +1121,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               fontWeight: 500
             }}>
               <div style={{
-                display: 'flex', 
-                alignItems: 'center', 
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.5rem',
                 background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
@@ -1167,8 +1137,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
               <div style={{
-                display: 'flex', 
-                alignItems: 'center', 
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.5rem',
                 background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
@@ -1183,8 +1153,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
               <div style={{
-                display: 'flex', 
-                alignItems: 'center', 
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.5rem',
                 background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
@@ -1199,8 +1169,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
               <div style={{
-                display: 'flex', 
-                alignItems: 'center', 
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.5rem',
                 background: 'rgba(255, 255, 255, 0.2)',
                 padding: '0.75rem',
@@ -1215,38 +1185,38 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     {participationCount}/{activity.capacity} người
                   </span>
                 </div>
+              </div>
             </div>
           </div>
-        </div>
-        
+
           <div style={{ padding: '2rem' }}>
             <div style={{
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
               gap: '1.5rem'
             }}>
-            
-            <div style={{
+
+              <div style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem', 
-                border: '1px solid #e5e7eb', 
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
                 padding: '1.5rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
               }}>
                 <h3 style={{
-                  fontSize: '1.125rem', 
-                  fontWeight: 600, 
-                  color: '#111827', 
-                  marginTop: 0, 
-                  marginBottom: '1.25rem', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  marginTop: 0,
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '0.5rem'
                 }}>
                   <ClockIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
-                Thông tin lịch trình
-              </h3>
-              
+                  Thông tin lịch trình
+                </h3>
+
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   <div style={{
                     display: 'flex',
@@ -1258,10 +1228,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Ngày:</span>
                     <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                    {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                      {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
                     </span>
                   </div>
-                  
+
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1274,8 +1244,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
                       {activity.scheduledTime}
                     </span>
-                </div>
-                
+                  </div>
+
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1288,8 +1258,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
                       {activity.endTime}
                     </span>
-                </div>
-                
+                  </div>
+
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1302,8 +1272,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
                       {activity.duration} phút
                     </span>
-                </div>
-                
+                  </div>
+
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1313,45 +1283,45 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     borderRadius: '0.5rem'
                   }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Địa điểm:</span>
-                    <span style={{ 
-                      fontSize: '0.875rem', 
-                      color: '#111827', 
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: '#111827',
                       fontWeight: 600,
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.25rem' 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
                     }}>
                       <MapPinIcon style={{ width: '0.875rem', height: '0.875rem', color: '#6366f1' }} />
-                    {activity.location}
+                      {activity.location}
                     </span>
+                  </div>
+
+
+
                 </div>
-                
-
-
               </div>
-            </div>
-            
-            <div style={{
+
+              <div style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                borderRadius: '1rem', 
-                border: '1px solid #e5e7eb', 
+                borderRadius: '1rem',
+                border: '1px solid #e5e7eb',
                 padding: '1.5rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
               }}>
                 <h3 style={{
-                  fontSize: '1.125rem', 
-                  fontWeight: 600, 
-                  color: '#111827', 
-                  marginTop: 0, 
-                  marginBottom: '1.25rem', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  marginTop: 0,
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '0.5rem'
                 }}>
                   <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
-                Thông tin tham gia
-              </h3>
-              
+                  Thông tin tham gia
+                </h3>
+
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   <div style={{
                     display: 'flex',
@@ -1374,7 +1344,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                    {!isActivityDatePassed() ? (
+                    {canAddParticipants() ? (
                       <button
                         onClick={() => {
                           if (participationCount >= activity.capacity) {
@@ -1389,12 +1359,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                         }}
                         disabled={participationCount >= activity.capacity}
                         style={{
-                          background: participationCount >= activity.capacity ? '#9ca3af' : '#10b981', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: 6, 
-                          padding: '0.5rem 1rem', 
-                          fontWeight: 600, 
+                          background: participationCount >= activity.capacity ? '#9ca3af' : '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '0.5rem 1rem',
+                          fontWeight: 600,
                           cursor: participationCount >= activity.capacity ? 'not-allowed' : 'pointer',
                           opacity: participationCount >= activity.capacity ? 0.6 : 1
                         }}
@@ -1422,523 +1392,518 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
                 </div>
               </div>
-            
-            
-          </div>
-          
-          
-          
 
 
-          <div style={{
-            marginTop: '1.5rem',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            border: '1px solid #e5e7eb',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.25rem'
-            }}>
-              <div>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
-                  Đánh giá tham gia hoạt động
-                  {activity.date && (
-                    <span style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      color: '#6b7280',
-                      marginLeft: '0.5rem'
-                    }}>
-                      - Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
-                    </span>
-                  )}
-                   {isRefreshing && (
-                     <span style={{
-                       fontSize: '0.75rem',
-                       fontWeight: 500,
-                       color: '#f59e0b',
-                       marginLeft: '0.5rem',
-                       display: 'flex',
-                       alignItems: 'center',
-                       gap: '0.25rem'
-                     }}>
-                       <div style={{
-                         width: '0.75rem',
-                         height: '0.75rem',
-                         border: '2px solid transparent',
-                         borderTopColor: '#f59e0b',
-                         borderRadius: '50%',
-                         animation: 'spin 1s linear infinite'
-                       }} />
-                       Đang cập nhật...
-                    </span>
-                  )}
-                </h3>
-                {Object.keys(evaluations).length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    marginTop: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#6b7280'
-                  }}>
-                    <span>Đã tham gia: <strong style={{ color: '#10b981' }}>{Object.values(evaluations).filter(e => e.status === 'attended').length}</strong></span>
-                    <span>Không tham gia: <strong style={{ color: '#dc2626' }}>{Object.values(evaluations).filter(e => e.status === 'absent').length}</strong></span>
-                    <span>Chưa tham gia: <strong style={{ color: '#6b7280' }}>{Object.values(evaluations).filter(e => e.status === 'pending').length}</strong></span>
-                    <span>Tổng: <strong>{Object.keys(evaluations).length}</strong></span>
-                  </div>
-                )}
-              </div>
-              {!evaluationMode && !isActivityDatePassed() && (
-                <button
-                  onClick={() => setEvaluationMode(true)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    background: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <PencilIcon style={{ width: '1rem', height: '1rem' }} />
-                  Đánh giá tham gia
-                </button>
-              )}
-              {!evaluationMode && isActivityDatePassed() && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  background: '#f3f4f6',
-                  color: '#6b7280',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600
-                }}>
-                  <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                  Hoạt động đã qua ngày - Không thể chỉnh sửa
-                </div>
-              )}
             </div>
 
-            {evaluationMode ? (
-              <div>
-                <div style={{
-                  display: 'flex',
-                  gap: '1rem',
-                  marginBottom: '1.5rem',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <MagnifyingGlassIcon style={{
-                      position: 'absolute',
-                      left: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      width: '1rem',
-                      height: '1rem',
-                      color: '#9ca3af'
-                    }} />
-                    <input
-                      type="text"
-                      placeholder="Tìm kiếm người cao tuổi theo tên hoặc phòng..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      style={{
-                        width: '100%',
-                        paddingLeft: '2.5rem',
-                        paddingRight: '1rem',
-                        paddingTop: '0.75rem',
-                        paddingBottom: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        fontSize: '0.875rem'
-                      }}
-                    />
-                  </div>
-                  {!isActivityDatePassed() && (
-                    <>
-                      <button
-                        onClick={() => handleSelectAll('attended')}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.5rem 1rem',
-                          background: '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <CheckIcon style={{ width: '1rem', height: '1rem' }} />
-                        Chọn tất cả Đã tham gia
-                      </button>
-                      <button
-                        onClick={() => handleSelectAll('absent')}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.5rem 1rem',
-                          background: '#dc2626',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
-                        Chọn tất cả Không tham gia
-                      </button>
-                      <button
-                        onClick={() => handleSelectAll('pending')}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.5rem 1rem',
-                          background: '#6b7280',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                        Chọn tất cả Chưa tham gia
-                      </button>
-                    </>
-                  )}
-                </div>
 
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }} key={`participants-${refreshTrigger}`}>
-                  {Object.entries(evaluations)
-                    .filter(([residentId, evaluation]) => {
-                      // Lấy thông tin resident từ participations
-                      const participation = participations.find((p: any) => {
-                        const pResidentId = p.resident_id?._id || p.resident_id;
-                        return pResidentId === residentId;
-                      });
-                      
-                      const residentInfo = residents.find((r: any) => r.id === residentId);
-                      const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
-                      const residentRoom = residentInfo?.room || '';
-                      
-                      // Filter by search term
-                      if (searchTerm && !residentName.toLowerCase().includes(searchTerm.toLowerCase()) && 
-                          !residentRoom.toLowerCase().includes(searchTerm.toLowerCase())) {
-                        return false;
-                      }
-                      return true;
-                    })
-                    .map(([residentId, evaluation]) => {
-                      // Lấy thông tin resident từ participations
-                      const participation = participations.find((p: any) => {
-                        const pResidentId = p.resident_id?._id || p.resident_id;
-                        return pResidentId === residentId;
-                      });
-                      
-                      const residentInfo = residents.find((r: any) => r.id === residentId);
-                      const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
-                      const residentRoom = residentInfo?.room || '';
-                    return (
-                                              <div
-                          key={`${residentId}-${refreshTrigger}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '1rem',
-                            borderBottom: '1px solid #e5e7eb',
-                            background: evaluation.status === 'attended' ? '#f0fdf4' : evaluation.status === 'absent' ? '#fef2f2' : '#f9fafb'
-                          }}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
-                              {residentName}
-                            </div>
-                            
-                          </div>
-                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            {!isActivityDatePassed() ? (
-                              <>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                  <input
-                                    type="radio"
-                                    name={`participation-${residentId}`}
-                                    checked={evaluation.status === 'attended'}
-                                    onChange={() => handleEvaluationChange(residentId, 'attended')}
-                                    style={{ cursor: 'pointer' }}
-                                    key={`attended-${residentId}-${refreshTrigger}`}
-                                  />
-                                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#10b981' }}>Đã tham gia</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                  <input
-                                    type="radio"
-                                    name={`participation-${residentId}`}
-                                    checked={evaluation.status === 'absent'}
-                                    onChange={() => handleEvaluationChange(residentId, 'absent')}
-                                    style={{ cursor: 'pointer' }}
-                                    key={`absent-${residentId}-${refreshTrigger}`}
-                                  />
-                                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#dc2626' }}>Không tham gia</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                  <input
-                                    type="radio"
-                                    name={`participation-${residentId}`}
-                                    checked={evaluation.status === 'pending'}
-                                    onChange={() => handleEvaluationChange(residentId, 'pending')}
-                                    style={{ cursor: 'pointer' }}
-                                    key={`pending-${residentId}-${refreshTrigger}`}
-                                  />
-                                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#6b7280' }}>Chưa tham gia</span>
-                                </label>
-                              </>
-                            ) : (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.5rem 1rem',
-                                background: '#f3f4f6',
-                                color: '#6b7280',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '0.5rem',
-                                fontSize: '0.875rem',
-                                fontWeight: 600
-                              }}>
-                                <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                                {evaluation.status === 'attended' ? 'Đã tham gia' : 
-                                 evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
-                              </div>
-                            )}
-                          </div>
-                          {evaluation.status === 'absent' && !isActivityDatePassed() && (
-                            <div style={{ marginTop: '0.5rem' }}>
-                              <input
-                                type="text"
-                                placeholder="Lý do vắng mặt..."
-                                value={evaluation.reason || ''}
-                                onChange={(e) => handleReasonChange(residentId, e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.5rem',
-                                  borderRadius: '0.375rem',
-                                  border: '1px solid #d1d5db',
-                                  fontSize: '0.875rem',
-                                  background: '#fef2f2'
-                                }}
-                                key={`reason-${residentId}-${refreshTrigger}`}
-                              />
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })}
-                  {Object.keys(evaluations).length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                      Chưa có đánh giá tham gia nào cho hoạt động này.
+
+
+
+            <div style={{
+              marginTop: '1.5rem',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1rem',
+              border: '1px solid #e5e7eb',
+              padding: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.25rem'
+              }}>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
+                    Đánh giá tham gia hoạt động
+                    {activity.date && (
+                      <span style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: '#6b7280',
+                        marginLeft: '0.5rem'
+                      }}>
+                        - Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                      </span>
+                    )}
+                    {isRefreshing && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        color: '#f59e0b',
+                        marginLeft: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        <div style={{
+                          width: '0.75rem',
+                          height: '0.75rem',
+                          border: '2px solid transparent',
+                          borderTopColor: '#f59e0b',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Đang cập nhật...
+                      </span>
+                    )}
+                  </h3>
+                  {Object.keys(evaluations).length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '1rem',
+                      marginTop: '0.5rem',
+                      fontSize: '0.875rem',
+                      color: '#6b7280'
+                    }}>
+                      <span>Đã tham gia: <strong style={{ color: '#10b981' }}>{Object.values(evaluations).filter(e => e.status === 'attended').length}</strong></span>
+                      <span>Không tham gia: <strong style={{ color: '#dc2626' }}>{Object.values(evaluations).filter(e => e.status === 'absent').length}</strong></span>
+                      <span>Chưa tham gia: <strong style={{ color: '#6b7280' }}>{Object.values(evaluations).filter(e => e.status === 'pending').length}</strong></span>
+                      <span>Tổng: <strong>{Object.keys(evaluations).length}</strong></span>
                     </div>
                   )}
-                  {Object.keys(evaluations).length > 0 && searchTerm && (() => {
-                    const filteredCount = Object.entries(evaluations).filter(([residentId, evaluation]) => {
-                      const participation = participations.find((p: any) => {
-                        const pResidentId = p.resident_id?._id || p.resident_id;
-                        return pResidentId === residentId;
-                      });
-                      const residentInfo = residents.find((r: any) => r.id === residentId);
-                      const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
-                      const residentRoom = residentInfo?.room || '';
-                      return residentName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             residentRoom.toLowerCase().includes(searchTerm.toLowerCase());
-                    }).length;
-                    
-                    if (filteredCount === 0) {
-                      return (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                          Không tìm thấy người cao tuổi nào phù hợp với từ khóa tìm kiếm.
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
                 </div>
-
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '1rem',
-                  marginTop: '1.5rem',
-                  paddingTop: '1rem',
-                  borderTop: '1px solid #e5e7eb'
-                }}>
+                {!evaluationMode && canEditOrEvaluate() && (
                   <button
-                    onClick={() => setEvaluationMode(false)}
+                    onClick={() => setEvaluationMode(true)}
                     style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#6b7280',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: '#10b981',
                       color: 'white',
                       border: 'none',
                       borderRadius: '0.5rem',
                       fontSize: '0.875rem',
                       fontWeight: 600,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    Hủy
+                    <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                    Đánh giá tham gia
                   </button>
-                  {!isActivityDatePassed() && (
+                )}
+                {!evaluationMode && !canEditOrEvaluate() && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    background: '#f3f4f6',
+                    color: '#6b7280',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 600
+                  }}>
+                    <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                    {isActivityDatePassed() ? 'Hoạt động đã qua ngày - Không thể chỉnh sửa' : 'Hoạt động trong tương lai - Không thể chỉnh sửa'}
+                  </div>
+                )}
+              </div>
+
+              {evaluationMode ? (
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <MagnifyingGlassIcon style={{
+                        position: 'absolute',
+                        left: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '1rem',
+                        height: '1rem',
+                        color: '#9ca3af'
+                      }} />
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm người cao tuổi theo tên hoặc phòng..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{
+                          width: '100%',
+                          paddingLeft: '2.5rem',
+                          paddingRight: '1rem',
+                          paddingTop: '0.75rem',
+                          paddingBottom: '0.75rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #d1d5db',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    {canEditOrEvaluate() && (
+                      <>
+                        <button
+                          onClick={() => handleSelectAll('attended')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <CheckIcon style={{ width: '1rem', height: '1rem' }} />
+                          Chọn tất cả Đã tham gia
+                        </button>
+                        <button
+                          onClick={() => handleSelectAll('absent')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            background: '#dc2626',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
+                          Chọn tất cả Không tham gia
+                        </button>
+                        <button
+                          onClick={() => handleSelectAll('pending')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            background: '#6b7280',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                          Chọn tất cả Chưa tham gia
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }} key={`participants-${refreshTrigger}`}>
+                    {Object.entries(evaluations)
+                      .filter(([residentId, evaluation]) => {
+                        const participation = participations.find((p: any) => {
+                          const pResidentId = p.resident_id?._id || p.resident_id;
+                          return pResidentId === residentId;
+                        });
+
+                        const residentInfo = residents.find((r: any) => r.id === residentId);
+                        const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
+                        const residentRoom = residentInfo?.room || '';
+
+                        if (searchTerm && !residentName.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                          !residentRoom.toLowerCase().includes(searchTerm.toLowerCase())) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map(([residentId, evaluation]) => {
+                        const participation = participations.find((p: any) => {
+                          const pResidentId = p.resident_id?._id || p.resident_id;
+                          return pResidentId === residentId;
+                        });
+
+                        const residentInfo = residents.find((r: any) => r.id === residentId);
+                        const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
+                        const residentRoom = residentInfo?.room || '';
+                        return (
+                          <div
+                            key={`${residentId}-${refreshTrigger}`}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '1rem',
+                              borderBottom: '1px solid #e5e7eb',
+                              background: evaluation.status === 'attended' ? '#f0fdf4' : evaluation.status === 'absent' ? '#fef2f2' : '#f9fafb'
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                                {residentName}
+                              </div>
+
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              {canEditOrEvaluate() ? (
+                                <>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <input
+                                      type="radio"
+                                      name={`participation-${residentId}`}
+                                      checked={evaluation.status === 'attended'}
+                                      onChange={() => handleEvaluationChange(residentId, 'attended')}
+                                      style={{ cursor: 'pointer' }}
+                                      key={`attended-${residentId}-${refreshTrigger}`}
+                                    />
+                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#10b981' }}>Đã tham gia</span>
+                                  </label>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <input
+                                      type="radio"
+                                      name={`participation-${residentId}`}
+                                      checked={evaluation.status === 'absent'}
+                                      onChange={() => handleEvaluationChange(residentId, 'absent')}
+                                      style={{ cursor: 'pointer' }}
+                                      key={`absent-${residentId}-${refreshTrigger}`}
+                                    />
+                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#dc2626' }}>Không tham gia</span>
+                                  </label>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <input
+                                      type="radio"
+                                      name={`participation-${residentId}`}
+                                      checked={evaluation.status === 'pending'}
+                                      onChange={() => handleEvaluationChange(residentId, 'pending')}
+                                      style={{ cursor: 'pointer' }}
+                                      key={`pending-${residentId}-${refreshTrigger}`}
+                                    />
+                                    <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#6b7280' }}>Chưa tham gia</span>
+                                  </label>
+                                </>
+                              ) : (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem',
+                                  padding: '0.5rem 1rem',
+                                  background: '#f3f4f6',
+                                  color: '#6b7280',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '0.5rem',
+                                  fontSize: '0.875rem',
+                                  fontWeight: 600
+                                }}>
+                                  <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                                  {evaluation.status === 'attended' ? 'Đã tham gia' :
+                                    evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
+                                </div>
+                              )}
+                            </div>
+                            {evaluation.status === 'absent' && canEditOrEvaluate() && (
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Lý do vắng mặt..."
+                                  value={evaluation.reason || ''}
+                                  onChange={(e) => handleReasonChange(residentId, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    borderRadius: '0.375rem',
+                                    border: '1px solid #d1d5db',
+                                    fontSize: '0.875rem',
+                                    background: '#fef2f2'
+                                  }}
+                                  key={`reason-${residentId}-${refreshTrigger}`}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    {Object.keys(evaluations).length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                        Chưa có đánh giá tham gia nào cho hoạt động này.
+                      </div>
+                    )}
+                    {Object.keys(evaluations).length > 0 && searchTerm && (() => {
+                      const filteredCount = Object.entries(evaluations).filter(([residentId, evaluation]) => {
+                        const participation = participations.find((p: any) => {
+                          const pResidentId = p.resident_id?._id || p.resident_id;
+                          return pResidentId === residentId;
+                        });
+                        const residentInfo = residents.find((r: any) => r.id === residentId);
+                        const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
+                        const residentRoom = residentInfo?.room || '';
+                        return residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          residentRoom.toLowerCase().includes(searchTerm.toLowerCase());
+                      }).length;
+
+                      if (filteredCount === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                            Không tìm thấy người cao tuổi nào phù hợp với từ khóa tìm kiếm.
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '1rem',
+                    marginTop: '1.5rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid #e5e7eb'
+                  }}>
                     <button
-                      onClick={handleSaveEvaluations}
-                      disabled={saving}
+                      onClick={() => setEvaluationMode(false)}
                       style={{
                         padding: '0.75rem 1.5rem',
-                        background: saving ? '#9ca3af' : '#10b981',
+                        background: '#6b7280',
                         color: 'white',
                         border: 'none',
                         borderRadius: '0.5rem',
                         fontSize: '0.875rem',
                         fontWeight: 600,
-                        cursor: saving ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
+                        cursor: 'pointer'
                       }}
                     >
-                      {saving && (
-                        <div style={{
-                          width: '1rem',
-                          height: '1rem',
-                          border: '2px solid transparent',
-                          borderTopColor: 'white',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} />
-                      )}
-                      {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
+                      Hủy
                     </button>
-                  )}
+                    {canEditOrEvaluate() && (
+                      <button
+                        onClick={handleSaveEvaluations}
+                        disabled={saving}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          background: saving ? '#9ca3af' : '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          cursor: saving ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        {saving && (
+                          <div style={{
+                            width: '1rem',
+                            height: '1rem',
+                            border: '2px solid transparent',
+                            borderTopColor: 'white',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }} />
+                        )}
+                        {saving ? 'Đang lưu...' : 'Lưu đánh giá'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9' }}>
-                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên người cao tuổi</th>
-                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Tham gia</th>
-                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Lý do (nếu vắng)</th>
-                      <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Ngày đánh giá</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(evaluations).map(([residentId, evaluation]) => {
-                      // Lấy thông tin resident từ participations
-                      const participation = participations.find((p: any) => {
-                        const pResidentId = p.resident_id?._id || p.resident_id;
-                        return pResidentId === residentId;
-                      });
-                      
-                      const residentInfo = residents.find((r: any) => r.id === residentId);
-                      const status = evaluation.status;
-                      
-                      // Validate performance notes for absent residents
-                      const performanceNotes = evaluation.reason || '';
-                      const isValidAbsenceReason = status === 'absent' && performanceNotes && 
-                        !performanceNotes.includes('Tham gia tích cực') && 
-                        !performanceNotes.includes('tinh thần tốt');
-                      
-                      const getStatusColor = (status: string) => {
-                        switch (status) {
-                          case 'attended': return '#10b981';
-                          case 'absent': return '#dc2626';
-                          case 'pending': return '#6b7280';
-                          default: return '#6b7280';
-                        }
-                      };
-                      
-                      const getStatusText = (status: string) => {
-                        switch (status) {
-                          case 'attended': return 'Đã tham gia';
-                          case 'absent': return 'Không tham gia';
-                          case 'pending': return 'Chưa tham gia';
-                          default: return 'Chưa tham gia';
-                        }
-                      };
-                      
-                      const getBackgroundColor = (status: string) => {
-                        switch (status) {
-                          case 'attended': return '#f0fdf4';
-                          case 'absent': return '#fef2f2';
-                          case 'pending': return '#f9fafb';
-                          default: return '#f9fafb';
-                        }
-                      };
-                      
-                      return (
-                        <tr key={residentId} style={{ background: getBackgroundColor(status) }}>
-                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', fontWeight: 500 }}>
-                            {participation?.resident_id?.full_name || residentInfo?.name || 'N/A'}
-                          </td>
-                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: getStatusColor(status), fontWeight: 600 }}>
-                            {getStatusText(status)}
-                          </td>
-                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
-                            {status === 'attended' ? '-' : status === 'absent' ? (
-                              isValidAbsenceReason ? performanceNotes : 
-                              <span style={{ color: '#f59e0b' }}>Chưa nhập lý do hoặc lý do không hợp lệ</span>
-                            ) : status === 'pending' ? '-' : '-'}
-                          </td>
-                          <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.875rem' }}>
-                            {participation?.date ? new Date(participation.date).toLocaleDateString('vi-VN') : 'N/A'}
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9' }}>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên người cao tuổi</th>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Tham gia</th>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Lý do (nếu vắng)</th>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Ngày đánh giá</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(evaluations).map(([residentId, evaluation]) => {
+                        const participation = participations.find((p: any) => {
+                          const pResidentId = p.resident_id?._id || p.resident_id;
+                          return pResidentId === residentId;
+                        });
+
+                        const residentInfo = residents.find((r: any) => r.id === residentId);
+                        const status = evaluation.status;
+
+                        const performanceNotes = evaluation.reason || '';
+                        const isValidAbsenceReason = status === 'absent' && performanceNotes &&
+                          !performanceNotes.includes('Tham gia tích cực') &&
+                          !performanceNotes.includes('tinh thần tốt');
+
+                        const getStatusColor = (status: string) => {
+                          switch (status) {
+                            case 'attended': return '#10b981';
+                            case 'absent': return '#dc2626';
+                            case 'pending': return '#6b7280';
+                            default: return '#6b7280';
+                          }
+                        };
+
+                        const getStatusText = (status: string) => {
+                          switch (status) {
+                            case 'attended': return 'Đã tham gia';
+                            case 'absent': return 'Không tham gia';
+                            case 'pending': return 'Chưa tham gia';
+                            default: return 'Chưa tham gia';
+                          }
+                        };
+
+                        const getBackgroundColor = (status: string) => {
+                          switch (status) {
+                            case 'attended': return '#f0fdf4';
+                            case 'absent': return '#fef2f2';
+                            case 'pending': return '#f9fafb';
+                            default: return '#f9fafb';
+                          }
+                        };
+
+                        return (
+                          <tr key={residentId} style={{ background: getBackgroundColor(status) }}>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', fontWeight: 500 }}>
+                              {participation?.resident_id?.full_name || residentInfo?.name || 'N/A'}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: getStatusColor(status), fontWeight: 600 }}>
+                              {getStatusText(status)}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
+                              {status === 'attended' ? '-' : status === 'absent' ? (
+                                isValidAbsenceReason ? performanceNotes :
+                                  <span style={{ color: '#f59e0b' }}>Chưa nhập lý do hoặc lý do không hợp lệ</span>
+                              ) : status === 'pending' ? '-' : '-'}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.875rem' }}>
+                              {participation?.date ? new Date(participation.date).toLocaleDateString('vi-VN') : 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {Object.keys(evaluations).length === 0 && (
+                        <tr>
+                          <td colSpan={4} style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>
+                            Chưa có đánh giá tham gia nào cho ngày này.
                           </td>
                         </tr>
-                      );
-                    })}
-                    {Object.keys(evaluations).length === 0 && (
-                      <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>
-                          Chưa có đánh giá tham gia nào cho ngày này.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1975,7 +1940,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               </button>
             </div>
           </Dialog.Panel>
-          </div>
+        </div>
       </Dialog>
 
       <Dialog open={notificationModal.isOpen} onClose={closeNotification} className="fixed z-50 inset-0 overflow-y-auto">
@@ -1983,12 +1948,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           <div className="fixed inset-0 bg-black opacity-30" />
           <Dialog.Panel className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
             <div className="flex items-start gap-4">
-              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                notificationModal.type === 'success' ? 'bg-green-100' :
-                notificationModal.type === 'error' ? 'bg-red-100' :
-                notificationModal.type === 'warning' ? 'bg-yellow-100' :
-                'bg-blue-100'
-              }`}>
+              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${notificationModal.type === 'success' ? 'bg-green-100' :
+                  notificationModal.type === 'error' ? 'bg-red-100' :
+                    notificationModal.type === 'warning' ? 'bg-yellow-100' :
+                      'bg-blue-100'
+                }`}>
                 {notificationModal.type === 'success' && (
                   <CheckCircleIcon className="w-6 h-6 text-green-600" />
                 )}
@@ -2002,21 +1966,20 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   <InformationCircleIcon className="w-6 h-6 text-blue-600" />
                 )}
               </div>
-              
+
               <div className="flex-1">
-                <Dialog.Title className={`text-lg font-semibold mb-2 ${
-                  notificationModal.type === 'success' ? 'text-green-800' :
-                  notificationModal.type === 'error' ? 'text-red-800' :
-                  notificationModal.type === 'warning' ? 'text-yellow-800' :
-                  'text-blue-800'
-                }`}>
+                <Dialog.Title className={`text-lg font-semibold mb-2 ${notificationModal.type === 'success' ? 'text-green-800' :
+                    notificationModal.type === 'error' ? 'text-red-800' :
+                      notificationModal.type === 'warning' ? 'text-yellow-800' :
+                        'text-blue-800'
+                  }`}>
                   {notificationModal.title}
                 </Dialog.Title>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   {notificationModal.message}
                 </p>
               </div>
-              
+
               <button
                 onClick={closeNotification}
                 className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
@@ -2024,16 +1987,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 <XMarkIcon className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-            
+
             <div className="mt-6 flex justify-end">
               <button
                 onClick={closeNotification}
-                className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
-                  notificationModal.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
-                  notificationModal.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
-                  notificationModal.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' :
-                  'bg-blue-600 hover:bg-blue-700'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${notificationModal.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                    notificationModal.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
+                      notificationModal.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' :
+                        'bg-blue-600 hover:bg-blue-700'
+                  }`}
               >
                 Đóng
               </button>

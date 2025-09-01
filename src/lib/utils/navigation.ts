@@ -80,17 +80,15 @@ export const preloadImportantPages = (router: AppRouterInstance) => {
  */
 export const preloadRolePages = (router: AppRouterInstance, role: string) => {
   const rolePages = {
-    admin: ['/admin', '/admin/residents', '/admin/staff-management'],
-    staff: ['/staff', '/staff/residents', '/staff/activities'],
-    family: ['/family', '/family/finance', '/family/photos']
+    admin: ['/admin'], // Chỉ preload trang chính để tăng tốc
+    staff: ['/staff'], 
+    family: ['/family']
   };
   
   const pages = rolePages[role as keyof typeof rolePages] || [];
   
-  // Tối ưu: Sử dụng Promise.all để preload song song
-  Promise.all(
-    pages.map(page => router.prefetch(page))
-  ).catch(() => {
-    // Ignore prefetch errors
+  // Tối ưu: Chỉ preload trang chính, các trang khác sẽ load khi cần
+  pages.forEach(page => {
+    router.prefetch(page);
   });
 };

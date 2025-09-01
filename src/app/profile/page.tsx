@@ -2,7 +2,7 @@
 
 import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { 
+import {
   UserCircleIcon,
   PhoneIcon,
   EnvelopeIcon,
@@ -30,7 +30,7 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,7 @@ export default function ProfilePage() {
 
   const validateFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; 
+    const maxSize = 5 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.type)) {
       return 'Chỉ hỗ trợ file ảnh định dạng JPG, PNG, WEBP';
@@ -78,7 +78,7 @@ export default function ProfilePage() {
 
     setUploadError(null);
     setSelectedFile(file);
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
@@ -108,7 +108,7 @@ export default function ProfilePage() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelect(e.dataTransfer.files[0]);
     }
@@ -125,34 +125,34 @@ export default function ProfilePage() {
     setIsUploading(true);
     setUploadProgress(0);
 
-    
+
     for (let i = 0; i <= 90; i += 10) {
       await new Promise(resolve => setTimeout(resolve, 100));
       setUploadProgress(i);
     }
-    
+
     if (selectedFile && user?.id) {
       try {
         const formData = new FormData();
         formData.append('avatar', selectedFile, selectedFile.name);
-        
+
         const response = await userAPI.updateAvatar(user.id, formData);
-        
+
         if (response.avatar) {
           setAvatarImage(response.avatar);
         }
-        
+
         if (userData) {
           setUserData((prev: any) => ({ ...prev, avatar: response.avatar }));
         }
-        
+
         setUploadProgress(100);
         setSuccessMessage('✅ Cập nhật ảnh đại diện thành công!');
         setShowSuccessModal(true);
       } catch (err: any) {
-        console.error('Avatar upload error:', err);
+
         let errorMessage = 'Lỗi khi cập nhật ảnh đại diện.';
-        
+
         if (err.response?.status === 403) {
           errorMessage = 'Tài khoản của bạn không có quyền thay đổi ảnh đại diện. Vui lòng liên hệ quản trị viên.';
         } else if (err.response?.status === 400) {
@@ -164,13 +164,13 @@ export default function ProfilePage() {
         } else if (err.message) {
           errorMessage = err.message;
         }
-        
+
         setUploadError(errorMessage);
         setIsUploading(false);
         return;
       }
     }
-    
+
     setIsUploading(false);
     setShowUploadModal(false);
     resetUploadState();
@@ -199,7 +199,7 @@ export default function ProfilePage() {
   const calculateAge = (dateOfBirth: string) => {
     const dob = new Date(dateOfBirth);
     if (isNaN(dob.getTime())) return '-- tuổi';
-    
+
     const today = new Date();
     let age = today.getFullYear() - dob.getFullYear();
     const m = today.getMonth() - dob.getMonth();
@@ -234,7 +234,7 @@ export default function ProfilePage() {
           setError('');
         })
         .catch((err) => {
-          console.error('Profile - Error fetching residents:', err);
+
           setError(getUserFriendlyError(error));
           setResidents([]);
         })
@@ -249,12 +249,12 @@ export default function ProfilePage() {
       setRoomNumber('Chưa hoàn tất đăng kí');
       return;
     }
-    
+
     setRoomLoading(true);
-    const residentId = typeof selectedResidentId === 'object' && (selectedResidentId as any)?._id 
-      ? (selectedResidentId as any)._id 
+    const residentId = typeof selectedResidentId === 'object' && (selectedResidentId as any)?._id
+      ? (selectedResidentId as any)._id
       : selectedResidentId;
-    
+
     bedAssignmentsAPI.getByResidentId(residentId)
       .then((assignments: any[]) => {
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
@@ -281,7 +281,7 @@ export default function ProfilePage() {
               const careAssignment = Array.isArray(careAssignments) ? careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
               const roomId = careAssignment?.bed_id?.room_id || careAssignment?.assigned_room_id;
               const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              
+
               if (roomIdString) {
                 return roomsAPI.getById(roomIdString)
                   .then((room: any) => {
@@ -308,12 +308,12 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto">
-        
 
-        
+
+
         <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
           <div className="flex items-center gap-4 mb-3">
-          <button
+            <button
               onClick={() => router.back()}
               className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
               title="Quay lại trang trước"
@@ -337,11 +337,10 @@ export default function ProfilePage() {
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
           <div className="flex items-center gap-6 mb-8 flex-wrap">
             <div className="relative flex-shrink-0">
-              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold border-2 overflow-hidden relative ${
-                !avatarImage ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white' : 'border-gray-200'
-              }`}>
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold border-2 overflow-hidden relative ${!avatarImage ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white' : 'border-gray-200'
+                }`}>
                 {avatarImage && getAvatarUrl(avatarImage) ? (
-                  <img 
+                  <img
                     src={getAvatarUrl(avatarImage)!}
                     alt="Avatar"
                     className="w-full h-full object-cover"
@@ -355,19 +354,18 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
-              
+
               <button
                 onClick={openUploadModal}
                 disabled={isUploading}
-                className={`absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-indigo-500 border-3 border-white flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110 ${
-                  isUploading ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
+                className={`absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-indigo-500 border-3 border-white flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110 ${isUploading ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
                 title="Thay đổi ảnh đại diện"
               >
                 <CameraIcon className="w-5 h-5 text-white" />
               </button>
             </div>
-            
+
             <div className="flex-1 min-w-[200px]">
               <h2 className="text-xl font-semibold text-gray-900">
                 {userData?.full_name || ''}
@@ -427,20 +425,20 @@ export default function ProfilePage() {
                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                       Email
                     </label>
-                                      <div className="flex items-center gap-2 text-sm text-gray-900">
-                    <EnvelopeIcon className="w-3 h-3 text-gray-400" />
-                    {userData?.email}
-                  </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-900">
+                      <EnvelopeIcon className="w-3 h-3 text-gray-400" />
+                      {userData?.email}
+                    </div>
                   </div>
 
                   <div>
                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
                       Số điện thoại
                     </label>
-                                      <div className="flex items-center gap-2 text-sm text-gray-900">
-                    <PhoneIcon className="w-3 h-3 text-gray-400" />
-                    {userData?.phone}
-                  </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-900">
+                      <PhoneIcon className="w-3 h-3 text-gray-400" />
+                      {userData?.phone}
+                    </div>
                   </div>
 
                   {user?.role === 'family' && (
@@ -474,7 +472,7 @@ export default function ProfilePage() {
                     </>
                   )}
                 </h3>
-                
+
                 <div className="space-y-3">
                   {user?.role === 'family' ? (
                     <div>
@@ -544,9 +542,8 @@ export default function ProfilePage() {
                           Trạng thái
                         </label>
                         <div className="flex items-center gap-2 text-sm text-gray-900">
-                          <div className={`w-2 h-2 rounded-full ${
-                            userData?.status === 'active' ? 'bg-green-500' : 'bg-red-500'
-                          }`} />
+                          <div className={`w-2 h-2 rounded-full ${userData?.status === 'active' ? 'bg-green-500' : 'bg-red-500'
+                            }`} />
                           {userData?.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ việc'}
                         </div>
                       </div>
@@ -584,7 +581,7 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </div>
-        
+
               <div className="p-8">
                 {!previewUrl && (
                   <div
@@ -592,21 +589,18 @@ export default function ProfilePage() {
                     onDragLeave={handleDragOut}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
-                    className={`border-3 border-dashed rounded-2xl p-16 text-center transition-all duration-300 cursor-pointer mb-6 group ${
-                      dragActive 
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-lg scale-105' 
+                    className={`border-3 border-dashed rounded-2xl p-16 text-center transition-all duration-300 cursor-pointer mb-6 group ${dragActive
+                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-lg scale-105'
                         : 'border-gray-200 bg-gradient-to-br from-gray-50 to-slate-50 hover:border-indigo-300 hover:shadow-lg hover:scale-[1.02]'
-                    }`}
+                      }`}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className={`w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                      dragActive 
-                        ? 'bg-indigo-100 shadow-lg' 
+                    <div className={`w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center transition-all duration-300 ${dragActive
+                        ? 'bg-indigo-100 shadow-lg'
                         : 'bg-white shadow-md group-hover:shadow-lg'
-                    }`}>
-                      <ArrowUpTrayIcon className={`w-10 h-10 transition-all duration-300 ${
-                        dragActive ? 'text-indigo-600 scale-110' : 'text-gray-400 group-hover:text-indigo-500 group-hover:scale-110'
-                      }`} />
+                      }`}>
+                      <ArrowUpTrayIcon className={`w-10 h-10 transition-all duration-300 ${dragActive ? 'text-indigo-600 scale-110' : 'text-gray-400 group-hover:text-indigo-500 group-hover:scale-110'
+                        }`} />
                     </div>
                     <h4 className="text-lg font-bold text-gray-800 mb-3">
                       {dragActive ? 'Thả ảnh vào đây' : 'Tải lên ảnh đại diện'}
@@ -620,7 +614,7 @@ export default function ProfilePage() {
                       </svg>
                       Hỗ trợ JPG, PNG, WEBP (tối đa 5MB)
                     </div>
-                    
+
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -639,7 +633,7 @@ export default function ProfilePage() {
                     <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-2xl p-6 border border-gray-200">
                       <div className="flex items-center gap-6">
                         <div className="relative">
-                          <div 
+                          <div
                             className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg bg-cover bg-center bg-no-repeat overflow-hidden"
                             style={{ backgroundImage: `url(${previewUrl})` }}
                           />
@@ -710,7 +704,7 @@ export default function ProfilePage() {
                           <span className="text-blue-700 font-bold">{uploadProgress}%</span>
                         </div>
                         <div className="w-full h-3 bg-blue-200 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500 ease-out rounded-full"
                             style={{ width: `${uploadProgress}%` }}
                           />
@@ -723,22 +717,20 @@ export default function ProfilePage() {
                   <button
                     onClick={closeUploadModal}
                     disabled={isUploading}
-                    className={`px-8 py-3 rounded-xl border-2 text-sm font-bold transition-all duration-200 ${
-                      isUploading 
-                        ? 'border-gray-200 text-gray-400 cursor-not-allowed' 
+                    className={`px-8 py-3 rounded-xl border-2 text-sm font-bold transition-all duration-200 ${isUploading
+                        ? 'border-gray-200 text-gray-400 cursor-not-allowed'
                         : 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     Hủy bỏ
                   </button>
                   <button
                     onClick={uploadAvatar}
                     disabled={!selectedFile || isUploading}
-                    className={`px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all duration-200 shadow-lg ${
-                      !selectedFile || isUploading 
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
+                    className={`px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all duration-200 shadow-lg ${!selectedFile || isUploading
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
                         : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 hover:shadow-xl hover:scale-105'
-                    }`}
+                      }`}
                   >
                     {isUploading ? (
                       <>
@@ -775,5 +767,5 @@ export default function ProfilePage() {
       </div>
     </div>
   );
-} 
+}
 

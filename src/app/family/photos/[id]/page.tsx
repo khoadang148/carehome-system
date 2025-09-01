@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react"
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownTrayIcon, XMarkIcon, CalendarIcon, UserIcon, HomeIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/contexts/auth-context";
@@ -34,7 +34,7 @@ export default function PhotoDetailPage() {
         }
 
         const familyId = user.id;
-        
+
         let allPhotosData: any[] = [];
         try {
           const photos = await photosAPI.getAll({ family_member_id: familyId });
@@ -42,17 +42,16 @@ export default function PhotoDetailPage() {
             allPhotosData = photos;
           }
         } catch (error) {
-          console.warn('Error fetching photos for family:', error);
           setError("Không thể tải danh sách ảnh. Có thể bạn không có quyền xem hoặc chưa có ảnh nào được chia sẻ.");
           setLoading(false);
           return;
         }
-        
+
         if (allPhotosData.length > 0) {
           const mapped = await Promise.all(allPhotosData.map(async (item: any) => {
             let senderName = item.uploadedByName;
             let senderPosition = '';
-            
+
             if (item.uploaded_by) {
               if (typeof item.uploaded_by === 'object' && item.uploaded_by.full_name) {
                 senderName = item.uploaded_by.full_name;
@@ -65,11 +64,10 @@ export default function PhotoDetailPage() {
                     senderPosition = userInfo.position || '';
                   }
                 } catch (e) {
-                  console.log('Error fetching user info:', e);
                 }
               }
             }
-            
+
             let imageUrl = item.file_path ? photosAPI.getPhotoUrl(item.file_path) : "";
             return {
               ...item,
@@ -84,12 +82,12 @@ export default function PhotoDetailPage() {
               residentId: item.resident_id,
             };
           }));
-          
+
           setAllPhotos(mapped);
-          
+
           const photoId = params.id as string;
           const photoIndex = mapped.findIndex((p: any) => p.id === photoId);
-          
+
           if (photoIndex !== -1) {
             setPhoto(mapped[photoIndex]);
             setCurrentIndex(photoIndex);
@@ -99,7 +97,7 @@ export default function PhotoDetailPage() {
         } else {
           setError("Chưa có ảnh nào được chia sẻ cho người thân của bạn hoặc bạn không có quyền xem.");
         }
-        
+
         setLoading(false);
       } catch (err: any) {
         setError(err.message || "Lỗi không xác định");
@@ -112,13 +110,13 @@ export default function PhotoDetailPage() {
 
   const navigateToPhoto = (direction: 'prev' | 'next') => {
     let newIndex = currentIndex;
-    
+
     if (direction === 'prev' && currentIndex > 0) {
       newIndex = currentIndex - 1;
     } else if (direction === 'next' && currentIndex < allPhotos.length - 1) {
       newIndex = currentIndex + 1;
     }
-    
+
     if (newIndex !== currentIndex) {
       const newPhoto = allPhotos[newIndex];
       setPhoto(newPhoto);
@@ -207,12 +205,12 @@ export default function PhotoDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      
+
       <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
-          
+
           <div className="flex items-center gap-8">
-            
+
             <button
               onClick={() => router.push('/family/photos')}
               className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
@@ -220,7 +218,7 @@ export default function PhotoDetailPage() {
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
-            
+
             <div className="flex items-center gap-6">
               <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-lg">
                 <PhotoIcon className="w-8 h-8 text-white" />
@@ -236,34 +234,32 @@ export default function PhotoDetailPage() {
             </div>
           </div>
 
-          
+
           <div className="flex items-center gap-6">
             <div className="bg-gradient-to-r from-red-500 to-orange-400 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-red-500/25 border border-red-400/20">
               {currentIndex + 1} / {allPhotos.length}
             </div>
-            
+
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigateToPhoto('prev')}
                 disabled={currentIndex <= 0}
-                className={`group p-3.5 rounded-full transition-all duration-300 ${
-                  currentIndex > 0
-                    ? 'bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5'
-                    : 'bg-slate-50 text-slate-400 cursor-not-allowed'
-                }`}
+                className={`group p-3.5 rounded-full transition-all duration-300 ${currentIndex > 0
+                  ? 'bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5'
+                  : 'bg-slate-50 text-slate-400 cursor-not-allowed'
+                  }`}
                 title="Ảnh trước"
               >
                 <ChevronLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
               </button>
-              
+
               <button
                 onClick={() => navigateToPhoto('next')}
                 disabled={currentIndex >= allPhotos.length - 1}
-                className={`group p-3.5 rounded-full transition-all duration-300 ${
-                  currentIndex < allPhotos.length - 1
-                    ? 'bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:translate-x-0.5'
-                    : 'bg-slate-50 text-slate-400 cursor-not-allowed'
-                }`}
+                className={`group p-3.5 rounded-full transition-all duration-300 ${currentIndex < allPhotos.length - 1
+                  ? 'bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:translate-x-0.5'
+                  : 'bg-slate-50 text-slate-400 cursor-not-allowed'
+                  }`}
                 title="Ảnh tiếp"
               >
                 <ChevronRightIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
@@ -273,12 +269,12 @@ export default function PhotoDetailPage() {
         </div>
       </div>
 
-      
+
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid lg:grid-cols-2 gap-8 items-start">
-          
+
           <div className="space-y-6">
-            
+
             <div className="relative group">
               <div className="relative rounded-2xl overflow-hidden bg-white shadow-xl">
                 <img
@@ -286,7 +282,6 @@ export default function PhotoDetailPage() {
                   alt={photo.caption}
                   className="w-full h-auto max-h-[70vh] object-contain"
                   onError={(e) => {
-                    console.error('Image failed to load:', photo.url);
                     e.currentTarget.style.display = 'none';
                     const placeholder = document.createElement('div');
                     placeholder.innerHTML = `
@@ -304,8 +299,8 @@ export default function PhotoDetailPage() {
                     e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
                   }}
                 />
-                
-                
+
+
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button
                     onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
@@ -318,7 +313,7 @@ export default function PhotoDetailPage() {
               </div>
             </div>
 
-            
+
             <div className="flex items-center justify-center gap-4">
               <button
                 onClick={() => router.push('/family/photos')}
@@ -327,20 +322,19 @@ export default function PhotoDetailPage() {
                 <ArrowLeftIcon className="w-4 h-4" />
                 Quay lại
               </button>
-              
+
               <button
                 onClick={() => navigateToPhoto('prev')}
                 disabled={currentIndex <= 0}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-                  currentIndex > 0
-                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    : 'bg-slate-50 text-slate-400 cursor-not-allowed'
-                }`}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${currentIndex > 0
+                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  : 'bg-slate-50 text-slate-400 cursor-not-allowed'
+                  }`}
               >
                 <ChevronLeftIcon className="w-4 h-4" />
                 Ảnh trước
               </button>
-              
+
               <button
                 onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
                 className="flex items-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-colors duration-200"
@@ -348,15 +342,14 @@ export default function PhotoDetailPage() {
                 <ArrowDownTrayIcon className="w-4 h-4" />
                 Tải ảnh
               </button>
-              
+
               <button
                 onClick={() => navigateToPhoto('next')}
                 disabled={currentIndex >= allPhotos.length - 1}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-                  currentIndex < allPhotos.length - 1
-                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    : 'bg-slate-50 text-slate-400 cursor-not-allowed'
-                }`}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${currentIndex < allPhotos.length - 1
+                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  : 'bg-slate-50 text-slate-400 cursor-not-allowed'
+                  }`}
               >
                 Ảnh tiếp
                 <ChevronRightIcon className="w-4 h-4" />
@@ -364,13 +357,13 @@ export default function PhotoDetailPage() {
             </div>
           </div>
 
-          
+
           <div className="space-y-6">
-            
-              
+
+
             <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
-              Mô tả
+              <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
+                Mô tả
               </h3>
               <h1 className="text-2xl font-bold text-slate-800 mb-2 leading-tight">
                 {photo.caption || "Ảnh không có chú thích"}
@@ -380,10 +373,10 @@ export default function PhotoDetailPage() {
               </p>
             </div>
 
-            
+
             <div className="bg-white rounded-xl p-5 shadow-md">
               <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
-                
+
                 Thông tin ảnh
               </h3>
               <div className="space-y-3">
@@ -400,13 +393,13 @@ export default function PhotoDetailPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <UserIcon className="w-5 h-5 text-green-500" />
                   <div>
                     <p className="text-sm text-slate-500">Người gửi</p>
                     <p className="font-medium text-slate-800">
-                      {photo.uploadedByPosition ? 
+                      {photo.uploadedByPosition ?
                         `${photo.uploadedByPosition} ${photo.uploadedByName || photo.uploadedBy || "Không rõ"}` :
                         (photo.uploadedByName || photo.uploadedBy || "Không rõ")
                       }
@@ -416,7 +409,7 @@ export default function PhotoDetailPage() {
               </div>
             </div>
 
-            
+
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
               <h3 className="text-lg font-semibold text-blue-800 mb-3">Mẹo điều hướng</h3>
               <div className="space-y-2 text-sm text-blue-700">

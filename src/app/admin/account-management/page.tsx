@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
-import { 
-  UserIcon, 
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
+import {
+  UserIcon,
   UsersIcon,
-  PlusIcon, 
-  PencilIcon, 
+  PlusIcon,
+  PencilIcon,
   TrashIcon,
   MagnifyingGlassIcon,
   EyeIcon,
@@ -26,7 +26,6 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { userAPI, residentAPI } from '@/lib/api';
 import axios from 'axios';
 
-// Interface cho user mới
 interface User {
   _id: string;
   avatar?: string | null;
@@ -40,16 +39,13 @@ interface User {
   notes?: string;
   created_at?: string;
   updated_at?: string;
-  // Các trường khác nếu cần
   [key: string]: any;
 }
 
-// Thêm hàm gọi API activate/deactivate
 const activateUser = async (id: string) => axios.patch(`/users/${id}/activate`);
 const deactivateUser = async (id: string) => axios.patch(`/users/${id}/deactivate`);
 
 export default function AccountManagementPage() {
-  // Add CSS animations for modals
   const modalAnimationStyles = `
     @keyframes fadeIn {
       from { opacity: 0; }
@@ -70,7 +66,6 @@ export default function AccountManagementPage() {
     }
   `;
 
-  // Inject styles
   React.useEffect(() => {
     const styleSheet = document.createElement('style');
     styleSheet.innerText = modalAnimationStyles;
@@ -82,7 +77,6 @@ export default function AccountManagementPage() {
     };
   }, []);
 
-  // State for managing data
   const [staffUsers, setStaffUsers] = useState<User[]>([]);
   const [familyAccounts, setFamilyAccounts] = useState<User[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -90,34 +84,29 @@ export default function AccountManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('Tất cả');
   const [statusFilter, setStatusFilter] = useState('all');
-  
-  // Modal states
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<User | null>(null);
-  
-  // Form data states
+
   const [formData, setFormData] = useState<any>({});
-  
-  // State for reset password modal
+
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
   const [resetPassword, setResetPassword] = useState('');
-  
-  // State for linked residents
+
   const [linkedResidents, setLinkedResidents] = useState<any[]>([]);
   const [loadingLinkedResidents, setLoadingLinkedResidents] = useState(false);
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState('');
   const [resetPasswordError, setResetPasswordError] = useState('');
   const [resetPasswordSuccess, setResetPasswordSuccess] = useState('');
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
-  
+
   const router = useRouter();
   const { user, loading } = useAuth();
 
-  // Check access permissions
   useEffect(() => {
     if (!loading && user && user.role !== 'admin') {
       if (user.role === 'staff') router.replace('/staff');
@@ -127,27 +116,22 @@ export default function AccountManagementPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    console.log('Modal states:', { showCreateModal, showEditModal, showDetailModal, showDeleteModal });
-    // Only hide header for modals, not the main page
     const hasModalOpen = showCreateModal || showEditModal || showDetailModal || showDeleteModal;
-    
+
     if (hasModalOpen) {
-      console.log('Modal is open - adding hide-header class');
       document.body.classList.add('hide-header');
       document.body.style.overflow = 'hidden';
     } else {
-      console.log('No modal open - removing hide-header class');
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     }
-    
+
     return () => {
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     };
   }, [showCreateModal, showEditModal, showDetailModal, showDeleteModal]);
 
-  // Fetch accounts từ API mới
   useEffect(() => {
     async function fetchAccounts() {
       setLoadingData(true);
@@ -166,7 +150,6 @@ export default function AccountManagementPage() {
     fetchAccounts();
   }, []);
 
-  // Reset linked residents when detail modal closes
   useEffect(() => {
     if (!showDetailModal) {
       setLinkedResidents([]);
@@ -174,7 +157,6 @@ export default function AccountManagementPage() {
     }
   }, [showDetailModal]);
 
-  // CRUD Functions
   const handleCreate = () => {
     setFormData(activeTab === 'staff' ? {
       selectedStaffId: '',
@@ -218,8 +200,6 @@ export default function AccountManagementPage() {
     setLoadingLinkedResidents(false);
   };
 
-
-
   const handleDelete = (account: User) => {
     setSelectedAccount(account);
     setShowDeleteModal(true);
@@ -237,8 +217,6 @@ export default function AccountManagementPage() {
           setLoadingData(false);
           return;
         }
-      } else {
-        
       }
       setShowDeleteModal(false);
       setSelectedAccount(null);
@@ -254,9 +232,7 @@ export default function AccountManagementPage() {
     try {
       if (activeTab === 'staff') {
         if (showCreateModal) {
-          // TODO: Gọi API tạo user khi có endpoint phù hợp
         } else if (showEditModal && selectedAccount) {
-          // Gọi API update user cho staff/admin
           await userAPI.update(String(selectedAccount._id), formData);
           toast.success(`Đã cập nhật tài khoản ${formData.name || formData.full_name} thành công!`);
           const data = await userAPI.getAll();
@@ -264,7 +240,6 @@ export default function AccountManagementPage() {
         }
       } else {
         if (showCreateModal) {
-          // TODO: Gọi API tạo user khi có endpoint phù hợp
         } else if (showEditModal && selectedAccount) {
           await userAPI.update(String(selectedAccount._id), formData);
           toast.success(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
@@ -282,7 +257,6 @@ export default function AccountManagementPage() {
     }
   };
 
-  // Helper function to get default permissions based on role
   const getDefaultPermissions = (role: string): string[] => {
     switch (role) {
       case 'Quản trị viên':
@@ -298,7 +272,6 @@ export default function AccountManagementPage() {
     }
   };
 
-  // Function to convert status to Vietnamese display
   const getStatusDisplay = (status: string): string => {
     switch (status) {
       case 'active': return 'Hoạt động';
@@ -326,7 +299,7 @@ export default function AccountManagementPage() {
           ? '#8b5cf6'
           : 'transparent',
         color: activeTab === tabKey ? 'white' : '#6b7280',
-        boxShadow: activeTab === tabKey 
+        boxShadow: activeTab === tabKey
           ? '0 2px 4px rgba(139, 92, 246, 0.2)'
           : 'none'
       }}
@@ -340,8 +313,8 @@ export default function AccountManagementPage() {
     return (
       <div
         style={{
-        display: 'flex',
-        alignItems: 'center',
+          display: 'flex',
+          alignItems: 'center',
           background: '#fff',
           borderRadius: '1rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -350,9 +323,9 @@ export default function AccountManagementPage() {
           marginBottom: '1.25rem',
           gap: '1.5rem',
           transition: 'box-shadow 0.2s',
-      }}
+        }}
       >
-        {/* Avatar */}
+
         <div
           style={{
             width: 56,
@@ -390,7 +363,7 @@ export default function AccountManagementPage() {
               }}
             />
           ) : null}
-          <div style={{ 
+          <div style={{
             display: user.avatar ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -401,29 +374,27 @@ export default function AccountManagementPage() {
           </div>
         </div>
 
-        {/* Info */}
+
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b', marginBottom: 8 }}>
-            {user.full_name}
+            <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Tên:</span> {user.full_name}
           </div>
           <div style={{ display: 'flex', gap: '2.5rem', marginBottom: 6 }}>
             <span style={{ color: '#6366f1', fontWeight: 600 }}>
               <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Chức vụ:</span> {user.position || user.role}
             </span>
-            <span style={{ color: '#64748b', fontWeight: 500 }}>
-              <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Username:</span> {user.username}
-              </span>
-            </div>
+            
+          </div>
           <div style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: 2 }}>
             <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Email:</span> {user.email}
-            </div>
           </div>
-          
-        {/* Status + Actions */}
+        </div>
+
+
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          {/* Status badge */}
+
           <span
-              style={{
+            style={{
               display: 'inline-block',
               padding: '0.25rem 0.75rem',
               borderRadius: '999px',
@@ -438,10 +409,10 @@ export default function AccountManagementPage() {
             {user.status === 'active'
               ? 'Hoạt động'
               : user.status === 'inactive'
-              ? 'Không hoạt động'
-              : 'Tạm khóa'}
+                ? 'Không hoạt động'
+                : 'Tạm khóa'}
           </span>
-          {/* Actions */}
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button title="Xem chi tiết" onClick={(e) => { e.stopPropagation(); handleView(user); }}
               style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
@@ -474,8 +445,8 @@ export default function AccountManagementPage() {
     return (
       <div
         style={{
-        display: 'flex',
-        alignItems: 'center',
+          display: 'flex',
+          alignItems: 'center',
           background: '#fff',
           borderRadius: '1rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -484,9 +455,9 @@ export default function AccountManagementPage() {
           marginBottom: '1.25rem',
           gap: '1.5rem',
           transition: 'box-shadow 0.2s',
-      }}
+        }}
       >
-        {/* Avatar */}
+
         <div
           style={{
             width: 56,
@@ -524,7 +495,7 @@ export default function AccountManagementPage() {
               }}
             />
           ) : null}
-          <div style={{ 
+          <div style={{
             display: account.avatar ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -535,28 +506,22 @@ export default function AccountManagementPage() {
           </div>
         </div>
 
-        {/* Info */}
+
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b', marginBottom: 8 }}>
+            <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Tên:</span>
             {account.full_name}
-            </div>
-          <div style={{ display: 'flex', gap: '2.5rem', marginBottom: 6 }}>
-            <span style={{ color: '#f59e42', fontWeight: 600 }}>
-              <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Username:</span> {account.username}
-            </span>
-            
-            
           </div>
           <div style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: 2 }}>
             <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Email:</span> {account.email}
-            </div>
           </div>
-          
-        {/* Status + Actions */}
+        </div>
+
+
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          {/* Status badge */}
+
           <span
-              style={{
+            style={{
               display: 'inline-block',
               padding: '0.25rem 0.75rem',
               borderRadius: '999px',
@@ -571,10 +536,10 @@ export default function AccountManagementPage() {
             {account.status === 'active'
               ? 'Hoạt động'
               : account.status === 'inactive'
-              ? 'Không hoạt động'
-              : 'Tạm khóa'}
+                ? 'Không hoạt động'
+                : 'Tạm khóa'}
           </span>
-          {/* Actions */}
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button title="Xem chi tiết" onClick={(e) => { e.stopPropagation(); handleView(account); }}
               style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', transition: 'background 0.2s' }}
@@ -603,7 +568,6 @@ export default function AccountManagementPage() {
     );
   };
 
-  // Thêm hàm mở modal reset mật khẩu
   const handleResetPassword = (user: User) => {
     setResetPasswordUser(user);
     setResetPassword('');
@@ -619,7 +583,7 @@ export default function AccountManagementPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background decorations */}
+
       <div style={{
         position: 'absolute',
         top: 0,
@@ -633,15 +597,15 @@ export default function AccountManagementPage() {
         `,
         pointerEvents: 'none'
       }} />
-      
+
       <div style={{
-        maxWidth: '1600px', 
-        margin: '0 auto', 
+        maxWidth: '1600px',
+        margin: '0 auto',
         padding: '3rem 2rem',
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Header Section */}
+
         <div style={{
           background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
           borderRadius: '1.5rem',
@@ -652,7 +616,7 @@ export default function AccountManagementPage() {
           position: 'relative',
           overflow: 'hidden'
         }}>
-          {/* Background pattern */}
+
           <div style={{
             position: 'absolute',
             top: 0,
@@ -665,16 +629,16 @@ export default function AccountManagementPage() {
             `,
             pointerEvents: 'none'
           }} />
-          
+
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{
-              display: 'flex', 
-              justifyContent: 'space-between', 
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
               gap: '2rem'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '1.5rem'}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                 <div style={{
                   width: '4rem',
                   height: '4rem',
@@ -687,12 +651,12 @@ export default function AccountManagementPage() {
                   border: '1px solid rgba(255, 255, 255, 0.3)',
                   boxShadow: '0 4px 16px rgba(255, 255, 255, 0.1)'
                 }}>
-                  <UsersIcon style={{width: '2rem', height: '2rem', color: 'white'}} />
+                  <UsersIcon style={{ width: '2rem', height: '2rem', color: 'white' }} />
                 </div>
                 <div>
                   <h1 style={{
-                    fontSize: '2rem', 
-                    fontWeight: 700, 
+                    fontSize: '2rem',
+                    fontWeight: 700,
                     margin: 0,
                     color: 'white',
                     letterSpacing: '-0.025em',
@@ -710,8 +674,8 @@ export default function AccountManagementPage() {
                   </p>
                 </div>
               </div>
-              
-              {/* Tab Navigation */}
+
+
               <div style={{
                 display: 'flex',
                 gap: '0.5rem',
@@ -724,7 +688,7 @@ export default function AccountManagementPage() {
                   Nhân viên
                 </TabButton>
                 <TabButton tabKey="family" icon={UserIcon}>
-                  Gia đình 
+                  Gia đình
                 </TabButton>
               </div>
             </div>
@@ -732,7 +696,7 @@ export default function AccountManagementPage() {
         </div>
 
 
-        {/* Search and Filters */}
+
         <div style={{
           background: '#ffffff',
           borderRadius: '0.75rem',
@@ -743,12 +707,12 @@ export default function AccountManagementPage() {
         }}>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
-              <label style={{ 
+              <label style={{
                 display: 'block',
-                fontSize: '0.875rem', 
-                color: '#6b7280', 
-                fontWeight: 600, 
-                marginBottom: '0.5rem' 
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                fontWeight: 600,
+                marginBottom: '0.5rem'
               }}>
                 Tìm kiếm
               </label>
@@ -784,12 +748,12 @@ export default function AccountManagementPage() {
                 />
               </div>
             </div>
-            
-            
+
+
           </div>
         </div>
 
-        {/* Content List */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -814,17 +778,17 @@ export default function AccountManagementPage() {
                     gap: '0.5rem'
                   }}>
                     <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                    Tài khoản nhân viên ({staffUsers.filter(user => 
+                    Tài khoản nhân viên ({staffUsers.filter(user =>
                       (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     ).length} tài khoản)
                   </div>
                   {staffUsers
-                    .filter(user => 
+                    .filter(user =>
                       (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     )
-                    .map((user, idx) => <StaffListItem key={user._id ? String(user._id) : `staff-${idx}`} user={user} /> )
+                    .map((user, idx) => <StaffListItem key={user._id ? String(user._id) : `staff-${idx}`} user={user} />)
                   }
                 </div>
               ) : (
@@ -839,14 +803,14 @@ export default function AccountManagementPage() {
                     gap: '0.5rem'
                   }}>
                     <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                    Tài khoản gia đình ({familyAccounts.filter(account => 
+                    Tài khoản gia đình ({familyAccounts.filter(account =>
                       (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
                     ).length} tài khoản)
                   </div>
                   {familyAccounts
-                    .filter(account => 
+                    .filter(account =>
                       (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
                       (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -859,55 +823,53 @@ export default function AccountManagementPage() {
           )}
         </div>
 
-        {/* Empty State - show inside the content area if no results */}
-        {((activeTab === 'staff' && staffUsers.filter(user => 
+
+        {((activeTab === 'staff' && staffUsers.filter(user =>
           (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
-        ).length === 0) || 
-        (activeTab === 'family' && familyAccounts.filter(account => 
-          (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
-        ).length === 0)) && searchTerm && (
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '1rem',
-            padding: '4rem 2rem',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-            textAlign: 'center',
-            marginTop: '2rem'
-          }}>
+        ).length === 0) ||
+          (activeTab === 'family' && familyAccounts.filter(account =>
+            (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
+          ).length === 0)) && searchTerm && (
             <div style={{
-              width: '4rem',
-              height: '4rem',
-              background: 'linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
               borderRadius: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem'
+              padding: '4rem 2rem',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+              textAlign: 'center',
+              marginTop: '2rem'
             }}>
-              <MagnifyingGlassIcon style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} />
+              <div style={{
+                width: '4rem',
+                height: '4rem',
+                background: 'linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem'
+              }}>
+                <MagnifyingGlassIcon style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} />
+              </div>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: 600,
+                color: '#374151',
+                margin: '0 0 0.5rem 0'
+              }}>
+                Không tìm thấy kết quả
+              </h3>
+              <p style={{ color: '#6b7280', margin: 0 }}>
+                Không có {activeTab === 'staff' ? 'nhân viên' : 'tài khoản gia đình'} nào phù hợp với từ khóa "{searchTerm}".
+              </p>
             </div>
-            <h3 style={{ 
-              fontSize: '1.25rem', 
-              fontWeight: 600, 
-              color: '#374151', 
-              margin: '0 0 0.5rem 0' 
-            }}>
-              Không tìm thấy kết quả
-            </h3>
-            <p style={{ color: '#6b7280', margin: 0 }}>
-              Không có {activeTab === 'staff' ? 'nhân viên' : 'tài khoản gia đình'} nào phù hợp với từ khóa "{searchTerm}".
-            </p>
-          </div>
-        )}
+          )}
       </div>
 
-      {/* Modals */}
       {showCreateModal && <CreateAccountModal />}
       {showEditModal && <EditAccountModal />}
-      {/* Chi tiết đã chuyển sang trang riêng */}
       {showDeleteModal && <DeleteConfirmModal />}
       {showResetPasswordModal && (
         <div style={{
@@ -977,7 +939,6 @@ export default function AccountManagementPage() {
     </div>
   );
 
-  // Modal Components
   function CreateAccountModal() {
     return (
       <div style={{
@@ -1006,7 +967,7 @@ export default function AccountManagementPage() {
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           border: '1px solid #f1f5f9'
         }}>
-          {/* Modal Header */}
+
           <div style={{
             background: 'white',
             padding: '1.5rem 2rem',
@@ -1014,429 +975,428 @@ export default function AccountManagementPage() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            
+
           }}>
-            
+
           </div>
 
-          {/* Modal Body */}
-          <div style={{ 
+
+          <div style={{
             padding: '2rem',
             maxHeight: 'calc(90vh - 10rem)',
             overflow: 'auto'
           }}>
 
-          {activeTab === 'staff' ? (
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
-              <div>
-                <label style={{ 
-                  display: 'block', 
-                  marginBottom: '0.75rem', 
-                  fontWeight: 600, 
-                  color: '#1f2937',
-                  fontSize: '0.875rem'
-                }}>
-                  Chọn nhân viên <span style={{ color: '#ef4444' }}>*</span>
-                  <span style={{ 
-                    fontSize: '0.75rem', 
-                    color: '#6b7280', 
-                    fontWeight: 400,
+            {activeTab === 'staff' ? (
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <label style={{
                     display: 'block',
-                    marginTop: '0.25rem'
+                    marginBottom: '0.75rem',
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    fontSize: '0.875rem'
                   }}>
-                    Những nhân viên chưa có tài khoản
-                  </span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  {/* TODO: Bổ sung select nhân viên chưa có tài khoản */}
+                    Chọn nhân viên <span style={{ color: '#ef4444' }}>*</span>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 400,
+                      display: 'block',
+                      marginTop: '0.25rem'
+                    }}>
+                      Những nhân viên chưa có tài khoản
+                    </span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                  </div>
                 </div>
-              </div>
-              
-              {formData.selectedStaffId && (
-                <>
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.75rem',
-                      marginBottom: '1rem'
+
+                {formData.selectedStaffId && (
+                  <>
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      padding: '1rem',
+                      marginBottom: '0.5rem'
                     }}>
                       <div style={{
-                        width: '2rem',
-                        height: '2rem',
-                        background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-                        borderRadius: '0.5rem',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        gap: '0.75rem',
+                        marginBottom: '1rem'
                       }}>
-                        <UserIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                        <div style={{
+                          width: '2rem',
+                          height: '2rem',
+                          background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                          borderRadius: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <UserIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                        </div>
+                        <div>
+                          <h3 style={{
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            margin: 0,
+                            color: '#0f172a'
+                          }}>
+                            Thông tin nhân viên được chọn
+                          </h3>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#475569',
+                            margin: '0.25rem 0 0 0'
+                          }}>
+                            Dữ liệu sẽ được tự động điền
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 style={{ 
-                          fontSize: '0.875rem', 
-                          fontWeight: 600, 
-                          margin: 0, 
-                          color: '#0f172a' 
-                        }}>
-                          Thông tin nhân viên được chọn
-                        </h3>
-                        <p style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#475569', 
-                          margin: '0.25rem 0 0 0' 
-                        }}>
-                          Dữ liệu sẽ được tự động điền
-                        </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            fontSize: '0.75rem'
+                          }}>
+                            Họ và tên
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.name || ''}
+                            disabled
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              color: '#475569',
+                              fontWeight: 500
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            fontSize: '0.75rem'
+                          }}>
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            value={formData.email || ''}
+                            disabled
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              color: '#475569',
+                              fontWeight: 500
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            fontSize: '0.75rem'
+                          }}>
+                            Chức vụ
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.role || ''}
+                            disabled
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              color: '#475569',
+                              fontWeight: 500
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            fontSize: '0.75rem'
+                          }}>
+                            Phòng ban
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.department || ''}
+                            disabled
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.875rem',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              color: '#475569',
+                              fontWeight: 500
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
-                    
+                  </>
+                )}
+
+                <div>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem',
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    fontSize: '0.875rem'
+                  }}>
+                    <KeyIcon style={{ width: '1rem', height: '1rem', color: '#059669' }} />
+                    Mật khẩu <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 1rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#10b981';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e2e8f0';
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    fontSize: '0.875rem'
+                  }}>
+                    Chọn người giám hộ <span style={{ color: '#ef4444' }}>*</span>
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 400, display: 'block', marginTop: '0.25rem' }}>
+                      Người thân chưa có tài khoản
+                    </span>
+                  </label>
+                  <select
+                    value={formData.selectedGuardianId || ''}
+                    onChange={(e) => setFormData({ ...formData, selectedGuardianId: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 1rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      background: 'white',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 1rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  >
+                    <option value="">-- Chọn người giám hộ --</option>
+
+                  </select>
+                </div>
+
+                {formData.selectedGuardianId && (
+                  <>
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      padding: '1rem',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.5rem' }}>
+                        Thông tin người cao tuổi
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#374151' }}>
+                        <strong>Người cao tuổi:</strong> {formData.residentName} (ID: {formData.residentId})
+                        <br />
+                        <strong>Mối quan hệ:</strong> {formData.relationship}
+                      </div>
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label style={{ 
-                          display: 'block', 
-                          marginBottom: '0.5rem', 
-                          fontWeight: 600, 
-                          color: '#1e293b',
-                          fontSize: '0.75rem'
-                        }}>
-                          Họ và tên
-                        </label>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Tên đăng nhập *</label>
                         <input
                           type="text"
-                          value={formData.name || ''}
-                          disabled
+                          value={formData.username || ''}
+                          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                          placeholder="Tự động tạo từ tên"
                           style={{
                             width: '100%',
-                            padding: '0.75rem',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '0.375rem',
+                            padding: '0.875rem',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '0.5rem',
                             fontSize: '0.875rem',
-                            background: 'rgba(255, 255, 255, 0.8)',
-                            color: '#475569',
-                            fontWeight: 500
+                            outline: 'none',
+                            transition: 'border-color 0.2s'
                           }}
+                          onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
+                          onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                         />
                       </div>
                       <div>
-                        <label style={{ 
-                          display: 'block', 
-                          marginBottom: '0.5rem', 
-                          fontWeight: 600, 
-                          color: '#1e293b',
-                          fontSize: '0.75rem'
-                        }}>
-                          Email
-                        </label>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Họ và tên</label>
+                        <input
+                          type="text"
+                          value={formData.fullName || ''}
+                          disabled
+                          style={{
+                            width: '100%',
+                            padding: '0.875rem',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            background: '#f9fafb',
+                            color: '#6b7280'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Email</label>
                         <input
                           type="email"
                           value={formData.email || ''}
                           disabled
                           style={{
                             width: '100%',
-                            padding: '0.75rem',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '0.375rem',
+                            padding: '0.875rem',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '0.5rem',
                             fontSize: '0.875rem',
-                            background: 'rgba(255, 255, 255, 0.8)',
-                            color: '#475569',
-                            fontWeight: 500
+                            background: '#f9fafb',
+                            color: '#6b7280'
                           }}
                         />
                       </div>
                       <div>
-                        <label style={{ 
-                          display: 'block', 
-                          marginBottom: '0.5rem', 
-                          fontWeight: 600, 
-                          color: '#1e293b',
-                          fontSize: '0.75rem'
-                        }}>
-                          Chức vụ
-                        </label>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Số điện thoại</label>
                         <input
-                          type="text"
-                          value={formData.role || ''}
+                          type="tel"
+                          value={formData.phone || ''}
                           disabled
                           style={{
                             width: '100%',
-                            padding: '0.75rem',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '0.375rem',
+                            padding: '0.875rem',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '0.5rem',
                             fontSize: '0.875rem',
-                            background: 'rgba(255, 255, 255, 0.8)',
-                            color: '#475569',
-                            fontWeight: 500
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ 
-                          display: 'block', 
-                          marginBottom: '0.5rem', 
-                          fontWeight: 600, 
-                          color: '#1e293b',
-                          fontSize: '0.75rem'
-                        }}>
-                          Phòng ban
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.department || ''}
-                          disabled
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '0.375rem',
-                            fontSize: '0.875rem',
-                            background: 'rgba(255, 255, 255, 0.8)',
-                            color: '#475569',
-                            fontWeight: 500
+                            background: '#f9fafb',
+                            color: '#6b7280'
                           }}
                         />
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
-              
-              <div>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem', 
-                  fontWeight: 600, 
-                  color: '#1f2937',
-                  fontSize: '0.875rem'
-                }}>
-                  <KeyIcon style={{ width: '1rem', height: '1rem', color: '#059669' }} />
-                  Mật khẩu <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="password"
-                  value={formData.password || ''}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem 1rem',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#10b981';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e2e8f0';
-                  }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              <div>
-                <label style={{ 
-                  display: 'block', 
-                  marginBottom: '0.5rem', 
-                  fontWeight: 600, 
-                  color: '#374151',
-                  fontSize: '0.875rem'
-                }}>
-                  Chọn người giám hộ <span style={{ color: '#ef4444' }}>*</span>
-                  <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 400, display: 'block', marginTop: '0.25rem' }}>
-                    Người thân chưa có tài khoản
-                  </span>
-                </label>
-                <select
-                  value={formData.selectedGuardianId || ''}
-                  onChange={(e) => setFormData({...formData, selectedGuardianId: e.target.value})}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem 1rem',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                    background: 'white',
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 1rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                >
-                  <option value="">-- Chọn người giám hộ --</option>
-                  {/* TODO: Hiển thị danh sách người giám hộ chưa có tài khoản */}
-                </select>
-              </div>
+                  </>
+                )}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Mật khẩu *</label>
+                  <input
+                    type="password"
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
 
-              {formData.selectedGuardianId && (
-                <>
-                  <div style={{ 
-                    background: '#f8fafc', 
-                    border: '1px solid #e2e8f0', 
-                    borderRadius: '0.5rem', 
-                    padding: '1rem',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.5rem' }}>
-                      Thông tin người cao tuổi
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#374151' }}>
-                      <strong>Người cao tuổi:</strong> {formData.residentName} (ID: {formData.residentId})
-                      <br />
-                      <strong>Mối quan hệ:</strong> {formData.relationship}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Tên đăng nhập *</label>
-                      <input
-                        type="text"
-                        value={formData.username || ''}
-                        onChange={(e) => setFormData({...formData, username: e.target.value})}
-                        placeholder="Tự động tạo từ tên"
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          outline: 'none',
-                          transition: 'border-color 0.2s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
-                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Họ và tên</label>
-                      <input
-                        type="text"
-                        value={formData.fullName || ''}
-                        disabled
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          background: '#f9fafb',
-                          color: '#6b7280'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Email</label>
-                      <input
-                        type="email"
-                        value={formData.email || ''}
-                        disabled
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          background: '#f9fafb',
-                          color: '#6b7280'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Số điện thoại</label>
-                      <input
-                        type="tel"
-                        value={formData.phone || ''}
-                        disabled
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          background: '#f9fafb',
-                          color: '#6b7280'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Mật khẩu *</label>
-                <input
-                  type="password"
-                  value={formData.password || ''}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Ghi chú</label>
+                  <textarea
+                    value={formData.notes || ''}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Nhập ghi chú về tài khoản (tùy chọn)"
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
               </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>Ghi chú</label>
-                <textarea
-                  value={formData.notes || ''}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Nhập ghi chú về tài khoản (tùy chọn)"
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
-              </div>
-            </div>
-          )}
+            )}
           </div>
 
-          {/* Modal Footer */}
+
           <div style={{
             background: '#f8fafc',
-            padding: '1rem 2rem 1rem 2rem', // giảm padding dưới
+            padding: '1rem 2rem 1rem 2rem',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '1rem',
-            marginTop: '-1rem' // đẩy footer lên gần body hơn
+            marginTop: '-1rem'
           }}>
             <button
               onClick={() => setShowCreateModal(false)}
@@ -1505,11 +1465,11 @@ export default function AccountManagementPage() {
   function EditAccountModal() {
     if (!selectedAccount) return null;
 
-    const [errors, setErrors] = useState<{[key: string]: string}>({});
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const isStaff = 'role' in selectedAccount;
 
     const validateForm = () => {
-      const newErrors: {[key: string]: string} = {};
+      const newErrors: { [key: string]: string } = {};
 
       if (isStaff) {
         if (!formData.name?.trim()) newErrors.name = 'Tên không được để trống';
@@ -1563,15 +1523,15 @@ export default function AccountManagementPage() {
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
-          {/* Header */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
+
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             marginBottom: '2rem',
             paddingBottom: '1rem',
             borderBottom: '1px solid #e2e8f0',
-            
+
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{
@@ -1587,36 +1547,36 @@ export default function AccountManagementPage() {
                 <PencilIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
               </div>
               <div>
-                <h2 style={{ 
-                  fontSize: '1.7rem', 
-                  fontWeight: 600, 
-                  margin: 0, 
+                <h2 style={{
+                  fontSize: '1.7rem',
+                  fontWeight: 600,
+                  margin: 0,
                   color: '#3b82f6',
                   marginBottom: '0.25rem'
                 }}>
                   Chỉnh sửa tài khoản {isStaff ? 'nhân viên' : 'gia đình'}
                 </h2>
-                <p style={{ 
-                  fontSize: '0.875rem', 
-                  color: '#1d4ed8', 
-                  margin: 0 
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#1d4ed8',
+                  margin: 0
                 }}>
                   Cập nhật thông tin tài khoản
                 </p>
               </div>
             </div>
           </div>
-          
-          {/* Form */}
+
+
           <div style={{ display: 'grid', gap: '1.5rem' }}>
             {isStaff ? (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1644,10 +1604,10 @@ export default function AccountManagementPage() {
                     {errors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.name}</span>}
                   </div>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1657,8 +1617,8 @@ export default function AccountManagementPage() {
                       type="email"
                       value={formData.email || ''}
                       onChange={(e) => {
-                        setFormData({...formData, email: e.target.value});
-                        if (errors.email) setErrors({...errors, email: ''});
+                        setFormData({ ...formData, email: e.target.value });
+                        if (errors.email) setErrors({ ...errors, email: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1677,10 +1637,10 @@ export default function AccountManagementPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1689,8 +1649,8 @@ export default function AccountManagementPage() {
                     <select
                       value={formData.role || ''}
                       onChange={(e) => {
-                        setFormData({...formData, role: e.target.value});
-                        if (errors.role) setErrors({...errors, role: ''});
+                        setFormData({ ...formData, role: e.target.value });
+                        if (errors.role) setErrors({ ...errors, role: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1713,10 +1673,10 @@ export default function AccountManagementPage() {
                     {errors.role && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.role}</span>}
                   </div>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1726,7 +1686,7 @@ export default function AccountManagementPage() {
                       type="text"
                       value={formData.position || ''}
                       onChange={(e) => {
-                        setFormData({...formData, position: e.target.value});
+                        setFormData({ ...formData, position: e.target.value });
                       }}
                       style={{
                         width: '100%',
@@ -1742,13 +1702,13 @@ export default function AccountManagementPage() {
                     />
                   </div>
                 </div>
-                
-                {/* Status Field for Staff */}
+
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    marginBottom: '0.5rem', 
-                    fontWeight: 600, 
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 600,
                     color: '#374151',
                     fontSize: '0.875rem'
                   }}>
@@ -1756,7 +1716,7 @@ export default function AccountManagementPage() {
                   </label>
                   <select
                     value={formData.status || 'active'}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '0.875rem',
@@ -1779,10 +1739,10 @@ export default function AccountManagementPage() {
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1792,8 +1752,8 @@ export default function AccountManagementPage() {
                       type="text"
                       value={formData.username || ''}
                       onChange={(e) => {
-                        setFormData({...formData, username: e.target.value});
-                        if (errors.username) setErrors({...errors, username: ''});
+                        setFormData({ ...formData, username: e.target.value });
+                        if (errors.username) setErrors({ ...errors, username: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1810,10 +1770,10 @@ export default function AccountManagementPage() {
                     {errors.username && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.username}</span>}
                   </div>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1823,8 +1783,8 @@ export default function AccountManagementPage() {
                       type="text"
                       value={formData.fullName || ''}
                       onChange={(e) => {
-                        setFormData({...formData, fullName: e.target.value});
-                        if (errors.fullName) setErrors({...errors, fullName: ''});
+                        setFormData({ ...formData, fullName: e.target.value });
+                        if (errors.fullName) setErrors({ ...errors, fullName: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1843,10 +1803,10 @@ export default function AccountManagementPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1856,8 +1816,8 @@ export default function AccountManagementPage() {
                       type="email"
                       value={formData.email || ''}
                       onChange={(e) => {
-                        setFormData({...formData, email: e.target.value});
-                        if (errors.email) setErrors({...errors, email: ''});
+                        setFormData({ ...formData, email: e.target.value });
+                        if (errors.email) setErrors({ ...errors, email: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1874,10 +1834,10 @@ export default function AccountManagementPage() {
                     {errors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.email}</span>}
                   </div>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1887,8 +1847,8 @@ export default function AccountManagementPage() {
                       type="tel"
                       value={formData.phone || ''}
                       onChange={(e) => {
-                        setFormData({...formData, phone: e.target.value});
-                        if (errors.phone) setErrors({...errors, phone: ''});
+                        setFormData({ ...formData, phone: e.target.value });
+                        if (errors.phone) setErrors({ ...errors, phone: '' });
                       }}
                       style={{
                         width: '100%',
@@ -1907,10 +1867,10 @@ export default function AccountManagementPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1919,7 +1879,7 @@ export default function AccountManagementPage() {
                     <input
                       type="text"
                       value={formData.address || ''}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       style={{
                         width: '100%',
                         padding: '0.875rem',
@@ -1934,10 +1894,10 @@ export default function AccountManagementPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      marginBottom: '0.5rem', 
-                      fontWeight: 600, 
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
                       color: '#374151',
                       fontSize: '0.875rem'
                     }}>
@@ -1946,7 +1906,7 @@ export default function AccountManagementPage() {
                     <input
                       type="tel"
                       value={formData.emergencyContact || ''}
-                      onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, emergencyContact: e.target.value })}
                       style={{
                         width: '100%',
                         padding: '0.875rem',
@@ -1961,13 +1921,13 @@ export default function AccountManagementPage() {
                     />
                   </div>
                 </div>
-                
-                {/* Status Field for Family */}
+
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    marginBottom: '0.5rem', 
-                    fontWeight: 600, 
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 600,
                     color: '#374151',
                     fontSize: '0.875rem'
                   }}>
@@ -1975,7 +1935,7 @@ export default function AccountManagementPage() {
                   </label>
                   <select
                     value={formData.status || 'active'}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '0.875rem',
@@ -1998,11 +1958,11 @@ export default function AccountManagementPage() {
             )}
           </div>
 
-          {/* Actions */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '1rem', 
-            justifyContent: 'flex-end', 
+
+          <div style={{
+            display: 'flex',
+            gap: '1rem',
+            justifyContent: 'flex-end',
             marginTop: '2rem',
             paddingTop: '1rem',
             borderTop: '1px solid #e2e8f0'
@@ -2063,7 +2023,6 @@ export default function AccountManagementPage() {
   function DetailModal() {
     if (!selectedAccount) return null;
 
-    // Determine role
     const isStaff = selectedAccount.role === 'staff' || selectedAccount.role === 'admin';
     const isFamily = selectedAccount.role === 'family';
 
@@ -2095,29 +2054,29 @@ export default function AccountManagementPage() {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          {/* Header */}
-          <div style={{ 
+
+          <div style={{
             background: isStaff ? 'linear-gradient(135deg, #6366f1 0%, #60a5fa 100%)' : 'linear-gradient(135deg, #f59e42 0%, #fbbf24 100%)',
             padding: '2rem 2.5rem',
             borderRadius: '1rem 1rem 0 0',
             color: 'white',
-              display: 'flex',
+            display: 'flex',
             alignItems: 'center',
             gap: '1.5rem',
-            }}>
-                <div style={{
+          }}>
+            <div style={{
               width: 64,
               height: 64,
               borderRadius: '50%',
               background: selectedAccount.avatar ? 'transparent' : 'rgba(255,255,255,0.18)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               fontSize: 32,
               fontWeight: 700,
               border: isStaff ? '2px solid #e0e7ff' : '2px solid #fde68a',
               overflow: 'hidden',
-                }}>
+            }}>
               {selectedAccount.avatar ? (
                 <img
                   src={selectedAccount.avatar.startsWith('http') ? selectedAccount.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${selectedAccount.avatar}`}
@@ -2138,7 +2097,7 @@ export default function AccountManagementPage() {
                   }}
                 />
               ) : null}
-              <div style={{ 
+              <div style={{
                 display: selectedAccount.avatar ? 'none' : 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2151,36 +2110,36 @@ export default function AccountManagementPage() {
                   <UserIcon style={{ width: 40, height: 40, color: '#fff' }} />
                 )}
               </div>
-                </div>
-                <div>
+            </div>
+            <div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
                 {selectedAccount.full_name}
-                  </h2>
+              </h2>
               <div style={{ fontSize: '1rem', opacity: 0.9, marginTop: 4 }}>
                 {isStaff ? 'Nhân viên/Quản trị viên' : 'Tài khoản Gia đình'}
-                </div>
-                        </div>
-                        <span style={{
+              </div>
+            </div>
+            <span style={{
               marginLeft: 'auto',
               alignSelf: 'flex-start',
               display: 'inline-block',
-                          padding: '0.25rem 0.75rem',
+              padding: '0.25rem 0.75rem',
               borderRadius: '999px',
               background: selectedAccount.status === 'active' ? '#dcfce7' : selectedAccount.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
               color: selectedAccount.status === 'active' ? '#16a34a' : selectedAccount.status === 'inactive' ? '#64748b' : '#b45309',
-                          fontWeight: 600, 
-                          fontSize: '0.95rem',
+              fontWeight: 600,
+              fontSize: '0.95rem',
             }}>
               {selectedAccount.status === 'active'
                 ? 'Hoạt động'
                 : selectedAccount.status === 'inactive'
-                ? 'Không hoạt động'
-                : 'Tạm khóa'}
+                  ? 'Không hoạt động'
+                  : 'Tạm khóa'}
             </span>
-                  </div>
+          </div>
 
-          {/* Body */}
-                  <div style={{
+
+          <div style={{
             padding: '2rem 2.5rem',
             overflow: 'auto',
             background: '#fafafa',
@@ -2188,66 +2147,66 @@ export default function AccountManagementPage() {
             minHeight: 0
           }}>
             <div style={{ display: 'grid', gap: '1.25rem' }}>
-              {/* Thông tin chung */}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
                   <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Họ và tên:</div>
                   <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.full_name}</div>
-                        </div>
+                </div>
                 <div>
                   <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Username:</div>
                   <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.username}</div>
-                        </div>
+                </div>
                 <div>
                   <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Email:</div>
                   <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.email}</div>
-                      </div>
+                </div>
                 <div>
                   <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Số điện thoại:</div>
                   <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.phone}</div>
-                    </div>
-                  </div>
+                </div>
+              </div>
 
-              {/* Thông tin riêng theo role */}
+
               {isStaff && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                   <div>
                     <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Chức vụ:</div>
                     <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.position || selectedAccount.role}</div>
-                        </div>
+                  </div>
                   <div>
                     <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Bằng cấp:</div>
                     <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.qualification || '—'}</div>
-                        </div>
+                  </div>
                   <div>
                     <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Ngày vào làm:</div>
                     <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.join_date ? new Date(selectedAccount.join_date).toLocaleDateString('vi-VN') : '—'}</div>
-                      </div>
+                  </div>
                   <div>
                     <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Ghi chú:</div>
                     <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.notes || '—'}</div>
-                        </div>
-                        </div>
+                  </div>
+                </div>
               )}
               {isFamily && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                   <div>
                     <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Địa chỉ:</div>
                     <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.address || '—'}</div>
-                      </div>
+                  </div>
                   <div>
                     <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Ghi chú:</div>
                     <div style={{ color: '#1e293b', fontWeight: 600 }}>{selectedAccount.notes || '—'}</div>
-                    </div>
-                      </div>
+                  </div>
+                </div>
               )}
 
-              {/* Thông tin người cao tuổi được liên kết */}
+
               {isFamily && (
                 <div style={{ marginTop: '1.5rem' }}>
-                  <div style={{ 
-                    color: '#64748b', 
-                    fontWeight: 600, 
+                  <div style={{
+                    color: '#64748b',
+                    fontWeight: 600,
                     fontSize: '1rem',
                     marginBottom: '1rem',
                     display: 'flex',
@@ -2257,11 +2216,11 @@ export default function AccountManagementPage() {
                     <UserIcon style={{ width: 20, height: 20 }} />
                     Người cao tuổi được liên kết
                   </div>
-                  
+
                   {loadingLinkedResidents ? (
-                    <div style={{ 
-                      padding: '1rem', 
-                      background: '#f8fafc', 
+                    <div style={{
+                      padding: '1rem',
+                      background: '#f8fafc',
                       borderRadius: '0.5rem',
                       textAlign: 'center',
                       color: '#64748b'
@@ -2300,9 +2259,9 @@ export default function AccountManagementPage() {
                           </div>
                           <div>
                             <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.9rem' }}>Trạng thái:</div>
-                            <div style={{ 
-                              color: resident.status === 'active' ? '#16a34a' : '#64748b', 
-                              fontWeight: 600 
+                            <div style={{
+                              color: resident.status === 'active' ? '#16a34a' : '#64748b',
+                              fontWeight: 600
                             }}>
                               {resident.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}
                             </div>
@@ -2311,9 +2270,9 @@ export default function AccountManagementPage() {
                       ))}
                     </div>
                   ) : (
-                    <div style={{ 
-                      padding: '1rem', 
-                      background: '#fef2f2', 
+                    <div style={{
+                      padding: '1rem',
+                      background: '#fef2f2',
                       borderRadius: '0.5rem',
                       border: '1px solid #fecaca',
                       color: '#dc2626',
@@ -2325,25 +2284,25 @@ export default function AccountManagementPage() {
                 </div>
               )}
 
-              {/* Thông tin hệ thống */}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
                   <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Trạng thái:</div>
                   <div style={{ color: selectedAccount.status === 'active' ? '#16a34a' : selectedAccount.status === 'inactive' ? '#64748b' : '#b45309', fontWeight: 700 }}>
                     {selectedAccount.status === 'active' ? 'Hoạt động' : selectedAccount.status === 'inactive' ? 'Không hoạt động' : 'Tạm khóa'}
-                        </div>
-                      </div>
+                  </div>
+                </div>
 
-                        </div>
-                      </div>
-                    </div>
+              </div>
+            </div>
+          </div>
 
-          {/* Footer */}
-          <div style={{ 
+
+          <div style={{
             background: 'white',
             padding: '1.5rem 2.5rem',
             borderTop: '1px solid #e5e7eb',
-            display: 'flex', 
+            display: 'flex',
             justifyContent: 'flex-end',
             borderRadius: '0 0 1rem 1rem',
             flexShrink: 0
@@ -2413,12 +2372,12 @@ export default function AccountManagementPage() {
               Xác nhận xóa tài khoản
             </h2>
           </div>
-          
+
           <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280', textAlign: 'center' }}>
             Bạn có chắc chắn muốn xóa tài khoản{' '}
             <strong style={{ color: '#1f2937' }}>
-              {activeTab === 'staff' 
-                ? (selectedAccount as User).full_name 
+              {activeTab === 'staff'
+                ? (selectedAccount as User).full_name
                 : (selectedAccount as User).full_name}
             </strong>?
             <br />

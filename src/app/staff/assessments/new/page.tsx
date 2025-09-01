@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { 
+import {
   ArrowLeftIcon,
   HeartIcon,
   CheckCircleIcon,
@@ -43,7 +43,7 @@ export default function NewCareNotePage() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  
+
   const { user } = useAuth();
   const [staffName, setStaffName] = useState<string>('');
 
@@ -115,11 +115,11 @@ export default function NewCareNotePage() {
             >
               <ArrowLeftIcon className="w-6 h-6" />
             </button>
-            
+
             <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/30">
               <HeartIcon className="w-7 h-7 text-white" />
             </div>
-            
+
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 Thêm ghi chú mới
@@ -136,12 +136,12 @@ export default function NewCareNotePage() {
                   <UserIcon className="w-5 h-5 text-blue-500" />
                   Tên người cao tuổi *
                 </label>
-                                 <input
-                   {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
-                   className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none bg-gray-100/80 cursor-not-allowed transition-all duration-300 shadow-sm"
-                   placeholder="Nhập tên người cao tuổi"
-                   readOnly
-                 />
+                <input
+                  {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
+                  className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none bg-gray-100/80 cursor-not-allowed transition-all duration-300 shadow-sm"
+                  placeholder="Nhập tên người cao tuổi"
+                  readOnly
+                />
                 {errors.residentName && (
                   <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
                     <span className="w-1 h-1 bg-red-500 rounded-full"></span>
@@ -191,7 +191,7 @@ export default function NewCareNotePage() {
                 Nội dung ghi chú *
               </label>
               <textarea
-                {...register('noteContent', { 
+                {...register('noteContent', {
                   required: 'Vui lòng nhập nội dung ghi chú',
                   minLength: { value: 10, message: 'Ghi chú phải có ít nhất 10 ký tự' }
                 })}
@@ -210,7 +210,7 @@ export default function NewCareNotePage() {
                   {watchedValues.noteContent?.length || 0} ký tự
                 </p>
                 <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
                     style={{ width: `${Math.min((watchedValues.noteContent?.length || 0) / 2, 100)}%` }}
                   ></div>
@@ -234,7 +234,7 @@ export default function NewCareNotePage() {
                   {watchedValues.recommendations?.length || 0} ký tự
                 </p>
                 <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-300"
                     style={{ width: `${Math.min((watchedValues.recommendations?.length || 0) / 2, 100)}%` }}
                   ></div>
@@ -253,11 +253,10 @@ export default function NewCareNotePage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`flex items-center justify-center gap-3 px-8 py-4 text-white border-none rounded-2xl text-sm font-semibold transition-all duration-300 shadow-lg order-1 sm:order-2 ${
-                  isSubmitting 
-                    ? 'bg-gray-400 cursor-not-allowed' 
+                className={`flex items-center justify-center gap-3 px-8 py-4 text-white border-none rounded-2xl text-sm font-semibold transition-all duration-300 shadow-lg order-1 sm:order-2 ${isSubmitting
+                    ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-600 cursor-pointer hover:from-blue-600 hover:via-purple-600 hover:to-indigo-700 hover:scale-105 hover:shadow-xl active:scale-95'
-                }`}
+                  }`}
               >
                 {isSubmitting ? (
                   <>

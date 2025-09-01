@@ -1,0 +1,142 @@
+/* Notification Bell Custom Styles */
+.notification-bell-container {
+  overflow: visible !important;
+}
+
+.notification-bell-glow {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+.notification-bell-glow:hover {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+}
+
+/* Dark background variant for header */
+.notification-bell-glow-dark {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.notification-bell-glow-dark:hover {
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+}
+
+.notification-badge-pulse {
+  animation: notificationPulse 2s infinite;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+@keyframes notificationPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.notification-bell-bounce {
+  animation: notificationBounce 1s infinite;
+}
+
+@keyframes notificationBounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+.notification-glow-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #ef4444, #dc2626, #ef4444);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.notification-bell-container:hover .notification-glow-ring {
+  opacity: 0.3;
+  animation: glowRotate 2s linear infinite;
+}
+
+@keyframes glowRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ripple effect for notification bell */
+.notification-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.3);
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  pointer-events: none;
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Enhanced bounce animation */
+.notification-bell-bounce-enhanced {
+  animation: enhancedBounce 2s infinite;
+}
+
+@keyframes enhancedBounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  40%, 43% {
+    transform: translate3d(0, -10px, 0) scale(1.05);
+  }
+  70% {
+    transform: translate3d(0, -5px, 0) scale(1.02);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0) scale(1.01);
+  }
+}
+
+/* Shake animation for urgent notifications */
+.notification-bell-shake {
+  animation: shake 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes shake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}

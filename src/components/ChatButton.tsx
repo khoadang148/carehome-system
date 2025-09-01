@@ -37,8 +37,11 @@ export default function ChatButton({
       
       try {
         setIsLoading(true);
+        console.log('Fetching unread count for staffId:', staffId);
         const response = await messagesAPI.getUnreadCount();
+        console.log('Unread count API response:', response);
         const newCount = response.unreadCount || 0;
+        console.log('Parsed unread count:', newCount);
         
         // Trigger pulse animation if count increased
         if (newCount > unreadCount) {
@@ -48,6 +51,7 @@ export default function ChatButton({
         
         setUnreadCount(newCount);
       } catch (error) {
+        console.error('Error fetching unread count:', error);
         // Silent error handling
       } finally {
         setIsLoading(false);
@@ -62,6 +66,7 @@ export default function ChatButton({
   }, [staffId, unreadCount]);
 
   const handleClick = () => {
+    // Luôn cho phép mở chat để giữ lịch sử, ngay cả khi không có staff assignment
     onChatOpen(residentId, staffId, residentName, staffName);
   };
 
@@ -70,7 +75,7 @@ export default function ChatButton({
   return (
     <button
       onClick={handleClick}
-      disabled={!staffId || isLoading}
+      disabled={isLoading}
       className={`
         relative inline-flex items-center justify-center p-2 rounded-full
         transition-all duration-200 ease-in-out
@@ -78,13 +83,13 @@ export default function ChatButton({
           ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg' 
           : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800'
         }
-        ${!staffId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+        ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
         ${isPulsing ? 'animate-pulse' : ''}
         ${className}
       `}
       title={staffId 
         ? `Chat với ${staffName || 'nhân viên'} phụ trách ${residentName}${hasUnread ? ` (${unreadCount} tin nhắn mới)` : ''}`
-        : 'Chưa có nhân viên được phân công'
+        : `Chat với ${residentName}${hasUnread ? ` (${unreadCount} tin nhắn mới)` : ''} - Lịch sử chat được giữ lại`
       }
     >
       {hasUnread ? (

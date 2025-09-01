@@ -46,6 +46,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const getStaffForResident = async (residentId: string) => {
     try {
       const assignments = await staffAssignmentsAPI.getByResident(residentId);
+      
+      // Ưu tiên tìm staff assignment đang active
       const activeAssignment = assignments.find((assignment: any) => 
         assignment.status === 'active' && 
         (!assignment.end_date || new Date(assignment.end_date) > new Date())
@@ -55,6 +57,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return {
           staffId: activeAssignment.staff_id,
           staffName: activeAssignment.staff_name || 'Nhân viên'
+        };
+      }
+      
+      // Nếu không có assignment active, tìm assignment gần nhất để giữ lịch sử chat
+      const recentAssignment = assignments
+        .filter((assignment: any) => assignment.staff_id)
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.assigned_date || a.createdAt || 0);
+          const dateB = new Date(b.assigned_date || b.createdAt || 0);
+          return dateB.getTime() - dateA.getTime();
+        })[0];
+      
+      if (recentAssignment) {
+        return {
+          staffId: recentAssignment.staff_id,
+          staffName: recentAssignment.staff_name || 'Nhân viên (trước đây)'
         };
       }
       
@@ -78,6 +96,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (staffInfo) {
         finalStaffId = staffInfo.staffId;
         finalStaffName = staffInfo.staffName;
+      }
+    }
+
+    // Nếu có staffId nhưng không có tên, thử lấy tên từ assignment
+    if (finalStaffId && !finalStaffName) {
+      try {
+        const assignments = await staffAssignmentsAPI.getByResident(residentId);
+        const assignment = assignments.find((a: any) => 
+          a.staff_id === finalStaffId || a.staff_id?._id === finalStaffId
+        );
+        if (assignment) {
+          finalStaffName = assignment.staff_name || 'Nhân viên';
+        }
+      } catch (error) {
+        // Ignore error, use default name
       }
     }
 

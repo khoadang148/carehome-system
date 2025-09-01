@@ -233,7 +233,23 @@ export default function EditVitalSignsPage({ params }: { params: Promise<{ id: s
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalErrors, setModalErrors] = useState<{ [key: string]: string }>({});
   const [originalData, setOriginalData] = useState<any>(null);
+  const [hasChanges, setHasChanges] = useState(false);
   
+  // Function to check if form data has changed from original
+  const checkForChanges = (currentData: VitalSigns) => {
+    if (!originalData) return false;
+    
+    return (
+      currentData.bloodPressure !== (originalData.blood_pressure || originalData.bloodPressure || '') ||
+      currentData.heartRate !== (originalData.heart_rate || originalData.heartRate) ||
+      currentData.temperature !== originalData.temperature ||
+      currentData.oxygenSaturation !== (originalData.oxygen_level || originalData.oxygen_saturation || originalData.oxygenSaturation) ||
+      currentData.respiratoryRate !== (originalData.respiratory_rate || originalData.respiratoryRate) ||
+      currentData.weight !== originalData.weight ||
+      currentData.notes !== (originalData.notes || '')
+    );
+  };
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -363,9 +379,7 @@ export default function EditVitalSignsPage({ params }: { params: Promise<{ id: s
   const validateForm = (data: VitalSigns) => {
     const errors: { [key: string]: string } = {};
     
-    if (!data.residentId) {
-      errors.residentId = 'Vui lòng chọn người cao tuổi';
-    }
+    // Remove residentId validation since it's not changeable
     
     if (data.temperature !== undefined && data.temperature !== null && !isNaN(Number(data.temperature))) {
       const temp = Number(data.temperature);
@@ -426,10 +440,15 @@ export default function EditVitalSignsPage({ params }: { params: Promise<{ id: s
   };
 
   const handleInputChange = (field: keyof VitalSigns, value: any) => {
-    setFormData(prev => ({
-      ...prev,
+    const newFormData = {
+      ...formData,
       [field]: value
-    }));
+    };
+    
+    setFormData(newFormData);
+    
+    // Check if there are any changes
+    setHasChanges(checkForChanges(newFormData));
     
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
@@ -565,27 +584,17 @@ export default function EditVitalSignsPage({ params }: { params: Promise<{ id: s
                 </label>
                 <select
                   value={formData.residentId}
-                  onChange={(e) => handleInputChange('residentId', e.target.value)}
-                  className={`w-full p-4 border rounded-xl text-lg outline-none transition-all focus:ring-4 ${
-                    validationErrors.residentId 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-100' 
-                      : 'border-gray-300 focus:border-red-500 focus:ring-red-100'
-                  }`}
-                  disabled={isSubmitting}
+                  className="w-full p-4 border rounded-xl text-lg outline-none transition-all border-gray-300 bg-gray-100 cursor-not-allowed"
+                  disabled={true}
                 >
-                  <option value="">Chọn người cao tuổi</option>
-                  {residents.map(resident => (
-                    <option key={resident.id} value={resident.id}>
-                      {resident.name} - Phòng {roomNumbers[resident.id] || 'Chưa hoàn tất đăng kí'}
-                    </option>
-                  ))}
+                  <option value={formData.residentId}>
+                    {residents.find(r => r.id === formData.residentId)?.name || 'Đang tải...'} - Phòng {roomNumbers[formData.residentId] || 'Chưa hoàn tất đăng kí'}
+                  </option>
                 </select>
-                {validationErrors.residentId && (
-                  <p className="text-red-600 text-sm flex items-center gap-1">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    {validationErrors.residentId}
-                  </p>
-                )}
+                <p className="text-gray-500 text-sm flex items-center gap-1">
+                  <ExclamationTriangleIcon className="w-4 h-4" />
+                  Không thể thay đổi người cao tuổi khi chỉnh sửa chỉ số sức khỏe
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -780,23 +789,31 @@ export default function EditVitalSignsPage({ params }: { params: Promise<{ id: s
                 >
                   Hủy bỏ
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white border-none rounded-xl text-lg font-semibold cursor-pointer transition-all hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang cập nhật...
-                    </>
-                  ) : (
-                    <>
-                      <PencilIcon className="w-5 h-5" />
-                      Cập nhật chỉ số
-                    </>
-                  )}
-                </button>
+                {hasChanges && (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white border-none rounded-xl text-lg font-semibold cursor-pointer transition-all hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Đang cập nhật...
+                      </>
+                    ) : (
+                      <>
+                        <PencilIcon className="w-5 h-5" />
+                        Cập nhật chỉ số
+                      </>
+                    )}
+                  </button>
+                )}
+                {!hasChanges && (
+                  <div className="px-8 py-4 bg-gray-100 text-gray-500 border-none rounded-xl text-lg font-semibold flex items-center gap-2">
+                    <PencilIcon className="w-5 h-5" />
+                    Chưa có thay đổi
+                  </div>
+                )}
               </div>
             </form>
           </div>

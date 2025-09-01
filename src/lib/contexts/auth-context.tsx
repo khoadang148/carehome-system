@@ -9,8 +9,11 @@ import {
   isSessionValid
 } from '@/lib/utils/session';
 import { clientStorage } from '@/lib/utils/clientStorage';
+import { isTokenValid } from '@/lib/utils/tokenUtils';
 import { redirectByRole, preloadRolePages, navigateToLogin } from '@/lib/utils/navigation';
 import { optimizedLogout, instantLogout } from '@/lib/utils/fastLogout';
+import { fastLogin } from '@/lib/utils/fastLogin';
+import { loadingOptimizer } from '@/lib/utils/loadingOptimizer';
 
 export type UserRole = 'admin' | 'staff' | 'family';
 
@@ -45,14 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
 
-  
   const checkUserSession = useCallback(() => {
-    
     if (isLoggingOut) {
       return;
     }
     
-    if (!isSessionValid()) {
+    if (!isSessionValid() || !isTokenValid()) {
       clearSessionData();
       setUser(null);
       setLoading(false);
@@ -75,13 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoggingOut]);
 
   useEffect(() => {
-
     checkUserSession();
   }, [checkUserSession]);
 
   const login = useCallback(async (email: string, password: string) => {
-    try {
-      
+    return loadingOptimizer.fastLoading(async () => {
       const response = await authAPI.login(email, password);
       
       if (response.access_token) {
@@ -96,35 +95,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
-          
           setUser(userObj);
-          setLoading(false);
           
-          
-          Promise.all([
-            initializeSession(response.access_token, userObj),
-            preloadRolePages(router, userRole)
-          ]).then(() => {
-            redirectByRole(router, userRole);
-          }).catch((error) => {
-            
-          });
+          // Sử dụng fastLogin để tối ưu hóa
+          fastLogin.handleLogin(router, response.access_token, userObj, userRole);
           
           return userObj;
         }
       }
       return null;
-    } catch (error) {
-      
-      setLoading(false);
-      
-      throw error;
-    }
+    }, setLoading);
   }, [router]);
 
   const loginWithOtp = useCallback(async (phone: string, otp: string) => {
-    try {
-      
+    return loadingOptimizer.fastLoading(async () => {
       const response = await authAPI.verifyOtp(phone, otp);
       
       if (response.access_token) {
@@ -139,58 +123,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
-          
           setUser(userObj);
-          setLoading(false);
           
-          
-          Promise.all([
-            initializeSession(response.access_token, userObj),
-            preloadRolePages(router, userRole)
-          ]).then(() => {
-            redirectByRole(router, userRole);
-          }).catch((error) => {
-            
-          });
+          // Sử dụng fastLogin để tối ưu hóa
+          fastLogin.handleLogin(router, response.access_token, userObj, userRole);
           
           return userObj;
         }
       }
       return null;
-    } catch (error) {
-            
-      setLoading(false);
-      
-      throw error;
-    }
+    }, setLoading);
   }, [router]);
 
   const logout = useCallback(() => {
     setIsLoggingOut(true);
-    
-    
     instantLogout(router);
-    
-    
     setUser(null);
     setIsLoggingOut(false);
     
-    
     Promise.resolve(authAPI.logout()).catch(() => {
-      console.warn('Logout API call failed, but user already logged out');
     });
   }, [router]);
 
   const refreshUser = useCallback(async () => {
     try {
-
       checkUserSession();
     } catch (error) {
-      console.error('Refresh user error:', error);
     }
   }, [checkUserSession]);
 
-  
   const contextValue = useMemo(() => ({
     user,
     login,

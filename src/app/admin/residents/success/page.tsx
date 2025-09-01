@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { clientStorage } from '@/lib/utils/clientStorage';
-import { 
-  CheckCircleIcon, 
-  UserIcon, 
+import {
+  CheckCircleIcon,
+  UserIcon,
   KeyIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -34,7 +34,6 @@ export default function ResidentSuccessPage() {
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
 
   useEffect(() => {
-    // Lấy thông tin từ URL params
     const residentName = searchParams.get('residentName');
     const username = searchParams.get('username');
     const password = searchParams.get('password');
@@ -46,7 +45,6 @@ export default function ResidentSuccessPage() {
 
     if (residentName) {
       if (existingAccount === 'true' && familyName && familyUsername) {
-        // Trường hợp gán vào tài khoản hiện có
         setAccountInfo({
           residentName,
           username: familyUsername,
@@ -58,7 +56,6 @@ export default function ResidentSuccessPage() {
           familyUsername
         });
       } else if (username && password && email && role) {
-        // Trường hợp tạo tài khoản mới
         setAccountInfo({
           residentName,
           username,
@@ -67,19 +64,16 @@ export default function ResidentSuccessPage() {
           role
         });
       } else {
-        // Nếu không có param
         const storedInfo = clientStorage.getItem('newResidentAccount');
         if (storedInfo) {
           setAccountInfo(JSON.parse(storedInfo));
-          
+
           clientStorage.removeItem('newResidentAccount');
         } else {
-          // Nếu không có thông tin, chuyển về trang residents
           router.push('/admin/residents');
         }
       }
     } else {
-      // Nếu không có thông tin, chuyển về trang residents
       router.push('/admin/residents');
     }
   }, [searchParams, router]);
@@ -90,7 +84,6 @@ export default function ResidentSuccessPage() {
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
     }
   };
 
@@ -144,7 +137,6 @@ export default function ResidentSuccessPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background pattern */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -157,7 +149,7 @@ export default function ResidentSuccessPage() {
         `,
         pointerEvents: 'none'
       }} />
-      
+
       <div style={{
         position: 'relative',
         zIndex: 1,
@@ -165,10 +157,9 @@ export default function ResidentSuccessPage() {
         maxWidth: '800px',
         margin: '0 auto'
       }}>
-        {/* Header */}
         <div style={{
-          display: 'flex', 
-          alignItems: 'center', 
+          display: 'flex',
+          alignItems: 'center',
           marginBottom: '2rem',
           background: 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(10px)',
@@ -177,7 +168,7 @@ export default function ResidentSuccessPage() {
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
         }}>
           <Link href="/admin/residents" style={{
-            marginRight: '1rem', 
+            marginRight: '1rem',
             color: '#22c55e',
             display: 'flex',
             alignItems: 'center',
@@ -189,7 +180,7 @@ export default function ResidentSuccessPage() {
             transition: 'all 0.2s',
             textDecoration: 'none'
           }}>
-            <ArrowLeftIcon style={{height: '1.25rem', width: '1.25rem'}} />
+            <ArrowLeftIcon style={{ height: '1.25rem', width: '1.25rem' }} />
           </Link>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
@@ -205,8 +196,8 @@ export default function ResidentSuccessPage() {
                 <CheckCircleIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
               </div>
               <h1 style={{
-                fontSize: '1.875rem', 
-                fontWeight: 700, 
+                fontSize: '1.875rem',
+                fontWeight: 700,
                 margin: 0,
                 background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                 WebkitBackgroundClip: 'text',
@@ -227,7 +218,6 @@ export default function ResidentSuccessPage() {
           </div>
         </div>
 
-        {/* Success Card */}
         <div style={{
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
@@ -236,7 +226,6 @@ export default function ResidentSuccessPage() {
           overflow: 'hidden',
           marginBottom: '2rem'
         }}>
-          {/* Success Header */}
           <div style={{
             background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
             padding: '2rem',
@@ -268,7 +257,6 @@ export default function ResidentSuccessPage() {
             </p>
           </div>
 
-          {/* Account Information */}
           <div style={{ padding: '2rem' }}>
             <div style={{
               display: 'flex',
@@ -276,16 +264,16 @@ export default function ResidentSuccessPage() {
               gap: '0.5rem',
               marginBottom: '1.5rem',
               padding: '1rem',
-              background: accountInfo.existingAccount 
+              background: accountInfo.existingAccount
                 ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
                 : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
               borderRadius: '0.75rem',
               border: accountInfo.existingAccount ? '1px solid #86efac' : '1px solid #bae6fd'
             }}>
-              <UserIcon style={{ 
-                width: '1.25rem', 
-                height: '1.25rem', 
-                color: accountInfo.existingAccount ? '#16a34a' : '#0284c7' 
+              <UserIcon style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                color: accountInfo.existingAccount ? '#16a34a' : '#0284c7'
               }} />
               <h3 style={{
                 fontSize: '1.125rem',
@@ -299,7 +287,6 @@ export default function ResidentSuccessPage() {
 
             <div style={{ display: 'grid', gap: '1.5rem' }}>
               {accountInfo.existingAccount ? (
-                // Hiển thị thông tin tài khoản hiện có
                 <>
                   <div>
                     <label style={{
@@ -381,9 +368,7 @@ export default function ResidentSuccessPage() {
                   </div>
                 </>
               ) : (
-                // Hiển thị thông tin tài khoản mới
                 <>
-                  {/* Username */}
                   <div>
                     <label style={{
                       display: 'block',
@@ -437,7 +422,6 @@ export default function ResidentSuccessPage() {
                     </div>
                   </div>
 
-                  {/* Password */}
                   <div>
                     <label style={{
                       display: 'block',
@@ -510,7 +494,6 @@ export default function ResidentSuccessPage() {
                     </div>
                   </div>
 
-                  {/* Email */}
                   <div>
                     <label style={{
                       display: 'block',
@@ -563,7 +546,6 @@ export default function ResidentSuccessPage() {
                     </div>
                   </div>
 
-                  {/* Role */}
                   <div>
                     <label style={{
                       display: 'block',
@@ -593,11 +575,10 @@ export default function ResidentSuccessPage() {
               )}
             </div>
 
-            {/* Important Notice */}
             <div style={{
               marginTop: '2rem',
               padding: '1.5rem',
-              background: accountInfo.existingAccount 
+              background: accountInfo.existingAccount
                 ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
                 : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
               border: accountInfo.existingAccount ? '1px solid #16a34a' : '1px solid #f59e0b',
@@ -661,7 +642,6 @@ export default function ResidentSuccessPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -688,7 +668,7 @@ export default function ResidentSuccessPage() {
             <UserIcon style={{ width: '1.25rem', height: '1.25rem' }} />
             Xem danh sách người cao tuổi
           </Link>
-          
+
           <Link
             href="/admin/account-management"
             style={{
@@ -709,7 +689,7 @@ export default function ResidentSuccessPage() {
             <KeyIcon style={{ width: '1.25rem', height: '1.25rem' }} />
             Quản lý người dùng
           </Link>
-          
+
           <Link
             href="/"
             style={{

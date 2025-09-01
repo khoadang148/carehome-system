@@ -4,8 +4,8 @@ import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  ArrowLeftIcon, 
+import {
+  ArrowLeftIcon,
   PencilIcon,
   UserIcon,
   HeartIcon,
@@ -22,7 +22,9 @@ import {
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI, bedAssignmentsAPI, roomsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 import Avatar from '@/components/Avatar';
+import ChatFloatingButton from '@/components/ChatFloatingButton';
 
 export default function CarePlanAssignmentDetailPage() {
   const router = useRouter();
@@ -52,103 +54,68 @@ export default function CarePlanAssignmentDetailPage() {
     fetchAssignmentDetails();
   }, [user, router, assignmentId]);
 
-  // Debug effect để theo dõi thay đổi của carePlanDetails và roomTypeDetails
-  useEffect(() => {
-    if (carePlanDetails.length > 0) {
-      console.log('Care plan details updated:', carePlanDetails);
-      console.log('Valid care plans:', getValidCarePlans());
-      console.log('Calculated total service cost:', calculateTotalServiceCost());
-      console.log('Calculated total monthly cost:', calculateTotalMonthlyCost());
-    }
-  }, [carePlanDetails, roomTypeDetails]);
 
-  // Debug effect để theo dõi thay đổi của assignment
-  useEffect(() => {
-    if (assignment) {
-      console.log('Assignment updated:', assignment);
-      console.log('Assignment room_monthly_cost:', assignment.room_monthly_cost);
-      console.log('Assignment selected_room_type:', assignment.selected_room_type);
-      console.log('Calculated room cost:', calculateRoomCost());
-    }
-  }, [assignment]);
+
+
 
   const fetchAssignmentDetails = async () => {
     if (!assignmentId) return;
-    
+
     setLoading(true);
     setError(null);
     try {
       const data = await carePlanAssignmentsAPI.getById(assignmentId);
-      console.log('Assignment data received:', data);
-      console.log('Family member ID from assignment:', data.family_member_id);
-      console.log('Assigned room ID:', data.assigned_room_id);
-      console.log('Assigned bed ID:', data.assigned_bed_id);
-      console.log('Full assignment object:', JSON.stringify(data, null, 2));
       setAssignment(data);
-      
-      // Fetch resident details
+
       if (data.resident_id?._id) {
         try {
           const residentData = await residentAPI.getById(data.resident_id._id);
           setResidentDetails(residentData);
-          
-          // Lấy thông tin phòng và giường từ bedAssignmentsAPI (giống như trang staff/residents)
+
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(data.resident_id._id);
             const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-            
+
             if (bedAssignment?.bed_id?.room_id) {
-              // Nếu room_id đã có thông tin đầy đủ
               if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
                 setRoomNumber(bedAssignment.bed_id.room_id.room_number);
                 setRoomFloor(bedAssignment.bed_id.room_id.floor || '');
-                console.log(`Room ${bedAssignment.bed_id.room_id.room_number} (from bed assignment)`);
               } else {
-                // Nếu chỉ có _id, fetch thêm thông tin
-                const roomId = typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id?._id ? 
+                const roomId = typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id?._id ?
                   bedAssignment.bed_id.room_id._id : bedAssignment.bed_id.room_id;
                 if (roomId) {
                   const room = await roomsAPI.getById(roomId);
                   setRoomNumber(room?.room_number || 'N/A');
                   setRoomFloor(room?.floor || '');
-                  console.log(`Room ${room?.room_number} (fetched from room ID)`);
                 }
               }
-              
-              // Lấy thông tin giường
+
               if (bedAssignment.bed_id) {
                 if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
                   setBedNumber(bedAssignment.bed_id.bed_number);
-                  console.log(`Bed ${bedAssignment.bed_id.bed_number} (from bed assignment)`);
                 } else {
-                  const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ? 
+                  const bedId = typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id?._id ?
                     bedAssignment.bed_id._id : bedAssignment.bed_id;
-                  // Có thể cần fetch thông tin giường từ bedsAPI nếu cần
                   setBedNumber(bedId || 'Chưa phân giường');
                 }
               }
             } else {
-              // Fallback: sử dụng thông tin từ care plan assignment
               if (data.assigned_room_id && typeof data.assigned_room_id === 'object') {
                 const room = data.assigned_room_id;
                 setRoomNumber(room.room_number || 'N/A');
                 setRoomFloor(room.floor || '');
-                console.log(`Room ${room.room_number} (fallback from assignment data)`);
               } else {
                 setRoomNumber('Chưa phân phòng');
               }
-              
+
               if (data.assigned_bed_id && typeof data.assigned_bed_id === 'object') {
                 const bed = data.assigned_bed_id;
                 setBedNumber(bed.bed_number || 'Chưa phân giường');
-                console.log(`Bed ${bed.bed_number} (fallback from assignment data)`);
               } else {
                 setBedNumber('Chưa phân giường');
               }
             }
           } catch (error) {
-            console.error('Error fetching bed assignment:', error);
-            // Fallback: sử dụng thông tin từ care plan assignment
             if (data.assigned_room_id && typeof data.assigned_room_id === 'object') {
               const room = data.assigned_room_id;
               setRoomNumber(room.room_number || 'N/A');
@@ -156,7 +123,7 @@ export default function CarePlanAssignmentDetailPage() {
             } else {
               setRoomNumber('Chưa phân phòng');
             }
-            
+
             if (data.assigned_bed_id && typeof data.assigned_bed_id === 'object') {
               const bed = data.assigned_bed_id;
               setBedNumber(bed.bed_number || 'Chưa phân giường');
@@ -168,90 +135,57 @@ export default function CarePlanAssignmentDetailPage() {
           console.error('Error fetching resident details:', err);
         }
       }
-      
-      // Fetch family member details
+
       const familyMemberId = data.family_member_id?._id || data.family_member_id;
       if (familyMemberId) {
         try {
-          console.log('Fetching family member with ID:', familyMemberId);
           const familyData = await userAPI.getById(familyMemberId);
-          console.log('Family member data received:', familyData);
           setFamilyMemberDetails(familyData);
         } catch (err) {
-          console.error('Error fetching family member details:', err);
         }
-      } else {
-        console.log('No family_member_id found in assignment data');
       }
 
-      // Fetch care plans từ assignment hiện tại
       if (Array.isArray(data.care_plan_ids) && data.care_plan_ids.length > 0) {
         try {
-          console.log('Fetching care plans from current assignment:', data.care_plan_ids);
-          console.log('Assignment room_monthly_cost:', data.room_monthly_cost);
-          console.log('Assignment total_monthly_cost:', data.total_monthly_cost);
-          
           const carePlanPromises = data.care_plan_ids.map(async (plan: any) => {
             const planId = plan._id || plan;
-            console.log('Fetching care plan with ID:', planId);
             try {
               const planData = await carePlansAPI.getById(planId);
-              console.log('Care plan data received for ID', planId, ':', planData);
-              console.log('Care plan monthly_price:', planData?.monthly_price);
               return planData;
             } catch (err) {
-              console.error('Error fetching care plan with ID', planId, ':', err);
-              return plan; // Return original plan data if fetch fails
+              return plan;
             }
           });
-          
+
           const carePlanData = await Promise.all(carePlanPromises);
-          console.log('Care plan details received:', carePlanData);
-          console.log('Total care plans fetched:', carePlanData.length);
           setCarePlanDetails(carePlanData);
         } catch (err) {
-          console.error('Error fetching care plan details:', err);
           setCarePlanDetails([]);
         }
       } else {
-        console.log('No care plans found in current assignment');
         setCarePlanDetails([]);
       }
 
-      // Fetch tất cả care plan assignments của resident để hiển thị lịch sử (không dùng để tính tiền)
       if (data.resident_id?._id) {
         try {
-          console.log('Fetching all care plan assignments for resident history:', data.resident_id._id);
           const allAssignments = await carePlanAssignmentsAPI.getByResidentId(data.resident_id._id);
-          console.log('All assignments for resident:', allAssignments);
           setCarePlanAssignments(allAssignments);
         } catch (err) {
-          console.error('Error fetching all care plan assignments:', err);
           setCarePlanAssignments([]);
         }
       } else {
-        console.log('No resident ID found in assignment data');
         setCarePlanAssignments([]);
       }
 
-      // Fetch room type details
       if (data.selected_room_type) {
         try {
-          console.log('Fetching room types to find:', data.selected_room_type);
           const roomTypes = await roomTypesAPI.getAll();
           const matchingRoomType = roomTypes.find((rt: any) => rt.room_type === data.selected_room_type);
           if (matchingRoomType) {
-            console.log('Room type details found:', matchingRoomType);
-            console.log('Room type monthly price:', matchingRoomType.monthly_price);
             setRoomTypeDetails(matchingRoomType);
-          } else {
-            console.log('No matching room type found for:', data.selected_room_type);
           }
         } catch (err) {
-          console.error('Error fetching room type details:', err);
         }
-      } else {
-        console.log('No selected_room_type found in assignment data');
       }
     } catch (err: any) {
       setError(err.message || 'Không thể tải chi tiết đăng ký dịch vụ');
@@ -260,19 +194,13 @@ export default function CarePlanAssignmentDetailPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+
 
   const getStatusText = (status: string, endDate?: string) => {
-    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
     if (endDate && new Date(endDate) < new Date()) {
       return 'Đã hết hạn';
     }
-    
+
     const statusMap: { [key: string]: string } = {
       'active': 'Đang sử dụng',
       'cancelled': 'Đã hủy',
@@ -283,11 +211,10 @@ export default function CarePlanAssignmentDetailPage() {
   };
 
   const getStatusColor = (status: string, endDate?: string) => {
-    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
     if (endDate && new Date(endDate) < new Date()) {
-      return '#ef4444'; // Màu đỏ cho trạng thái hết hạn
+      return '#ef4444';
     }
-    
+
     const colorMap: { [key: string]: string } = {
       'active': '#059669',
       'cancelled': '#ef4444',
@@ -316,107 +243,79 @@ export default function CarePlanAssignmentDetailPage() {
     }));
   };
 
-  // Function để tìm assignment cho từng care plan (chỉ từ assignment hiện tại)
   const getAssignmentForCarePlan = (carePlanId: string) => {
     if (!assignment || !Array.isArray(assignment.care_plan_ids)) return null;
-    
-    // Kiểm tra xem care plan có thuộc assignment hiện tại không
+
     const hasCarePlan = assignment.care_plan_ids.some((plan: any) => {
       const planId = plan._id || plan;
       return planId === carePlanId;
     });
-    
+
     return hasCarePlan ? assignment : null;
   };
 
-  // Function để tính tổng tiền dịch vụ từ tất cả care plans
   const calculateTotalServiceCost = () => {
     if (!Array.isArray(carePlanDetails)) return 0;
-    
+
     const total = carePlanDetails.reduce((total, carePlan) => {
-      // Chỉ tính care plans hợp lệ có monthly_price và thuộc assignment hiện tại
-      if (carePlan && 
-          typeof carePlan.monthly_price === 'number' && 
-          carePlan.monthly_price > 0 &&
-          carePlan._id) {
-        
-        // Kiểm tra xem care plan có thuộc assignment hiện tại không
+      if (carePlan &&
+        typeof carePlan.monthly_price === 'number' &&
+        carePlan.monthly_price > 0 &&
+        carePlan._id) {
+
         const isInCurrentAssignment = assignment?.care_plan_ids?.some((plan: any) => {
           const planId = plan._id || plan;
           return planId === carePlan._id;
         });
-        
+
         if (isInCurrentAssignment) {
-          console.log(`Adding care plan ${carePlan.plan_name} with price ${carePlan.monthly_price}`);
           return total + carePlan.monthly_price;
         }
       }
       return total;
     }, 0);
-    
-    console.log('Care plan details for calculation:', carePlanDetails);
-    console.log('Total service cost calculated:', total);
-    
+
     return total;
   };
 
-  // Helper function để filter care plans hợp lệ từ assignment hiện tại
   const getValidCarePlans = () => {
     const validPlans = carePlanDetails.filter((carePlan: any) => {
       if (!carePlan || !carePlan._id || !carePlan.plan_name) return false;
-      
+
       const isInCurrentAssignment = assignment?.care_plan_ids?.some((plan: any) => {
         const planId = plan._id || plan;
         return planId === carePlan._id;
       });
-      
+
       return isInCurrentAssignment;
     });
-    
-    console.log('Valid care plans for current assignment:', validPlans);
+
     return validPlans;
   };
 
-  // Function để tính tiền phòng
   const calculateRoomCost = () => {
-    // Ưu tiên lấy từ assignment trước
     if (assignment?.room_monthly_cost && typeof assignment.room_monthly_cost === 'number' && assignment.room_monthly_cost > 0) {
-      console.log('Room cost from assignment:', assignment.room_monthly_cost);
       return assignment.room_monthly_cost;
     }
-    
-    // Fallback: lấy từ room type details
+
     if (roomTypeDetails?.monthly_price && typeof roomTypeDetails.monthly_price === 'number' && roomTypeDetails.monthly_price > 0) {
-      console.log('Room cost from room type details:', roomTypeDetails.monthly_price);
       return roomTypeDetails.monthly_price;
     }
-    
-    // Fallback: lấy từ assignment data khác
+
     if (assignment?.selected_room_type) {
-      console.log('Selected room type:', assignment.selected_room_type);
-      // Có thể cần fetch room type price từ API
     }
-    
-    console.log('No room cost found, returning 0');
+
     return 0;
   };
 
-  // Function để tính tổng tiền hàng tháng (phòng + dịch vụ)
   const calculateTotalMonthlyCost = () => {
     const roomCost = calculateRoomCost();
     const serviceCost = calculateTotalServiceCost();
     const total = roomCost + serviceCost;
-    
-    console.log('Assignment data:', assignment);
-    console.log('Room type details:', roomTypeDetails);
-    console.log('Room cost:', roomCost);
-    console.log('Service cost:', serviceCost);
-    console.log('Total monthly cost:', total);
-    
+
     return total;
   };
 
-  // Show loading state while fetching data
   if (loading) {
     return (
       <div style={{
@@ -521,7 +420,7 @@ export default function CarePlanAssignmentDetailPage() {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Header */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -553,24 +452,24 @@ export default function CarePlanAssignmentDetailPage() {
             >
               <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
             </Link>
-            
+
             <div style={{ flex: 1 }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '1.5rem'
               }}>
-                {/* Avatar */}
+
                 <Avatar
                   src={residentDetails?.avatar ? userAPI.getAvatarUrl(residentDetails.avatar) : undefined}
                   alt={`Avatar của ${residentDetails?.full_name || residentDetails?.name}`}
-                  size="xlarge"
+                  size="large"
                   showInitials={true}
                   name={residentDetails?.full_name || residentDetails?.name || 'N/A'}
                   className="flex-shrink-0"
                 />
-                
-                {/* Thông tin cơ bản */}
+
+
                 <div style={{ flex: 1 }}>
                   <div style={{ marginBottom: '0.5rem' }}>
                     <span style={{
@@ -582,26 +481,26 @@ export default function CarePlanAssignmentDetailPage() {
                     }}>
                       Tên người cao tuổi:
                     </span>
-                <h1 style={{
+                    <h1 style={{
                       fontSize: '1.875rem',
-                  fontWeight: 700,
-                  margin: 0,
+                      fontWeight: 700,
+                      margin: 0,
                       color: '#1e293b'
                     }}>
                       {residentDetails?.full_name || residentDetails?.name || assignment?.resident_id?.full_name || assignment?.resident_id?.name || 'N/A'}
-                </h1>
-              </div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
+                    </h1>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '1rem',
                     marginTop: '0.5rem',
                     flexWrap: 'wrap'
                   }}>
-                    {/* Tuổi */}
+
                     <span style={{
                       display: 'inline-flex',
-                  alignItems: 'center',
+                      alignItems: 'center',
                       gap: '0.25rem',
                       fontSize: '1rem',
                       color: '#64748b',
@@ -613,11 +512,11 @@ export default function CarePlanAssignmentDetailPage() {
                       <UserIcon style={{ width: '1rem', height: '1rem' }} />
                       <span>Tuổi:</span>
                       <span>{residentDetails?.date_of_birth ? (new Date().getFullYear() - new Date(residentDetails.date_of_birth).getFullYear()) : 'N/A'} tuổi</span>
-                  </span>
-                {/* Người thân */}
+                    </span>
+
                     <span style={{
                       display: 'inline-flex',
-                  alignItems: 'center',
+                      alignItems: 'center',
                       gap: '0.25rem',
                       fontSize: '1rem',
                       color: '#64748b',
@@ -629,11 +528,11 @@ export default function CarePlanAssignmentDetailPage() {
                       <PhoneIcon style={{ width: '1rem', height: '1rem' }} />
                       <span>Người thân:</span>
                       <span>{familyMemberDetails?.full_name || familyMemberDetails?.name || assignment?.family_member_id?.full_name || assignment?.family_member_id?.name || 'N/A'}</span>
-                  </span>
-                {/* Trạng thái */}
+                    </span>
+
                     <span style={{
                       display: 'inline-flex',
-                  alignItems: 'center',
+                      alignItems: 'center',
                       gap: '0.25rem',
                       fontSize: '1rem',
                       color: '#64748b',
@@ -643,7 +542,7 @@ export default function CarePlanAssignmentDetailPage() {
                       fontWeight: 500
                     }}>
                       <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
-                  <span>Trạng thái:</span>
+                      <span>Trạng thái:</span>
                       <span style={{ color: getStatusColor(assignment?.status, assignment?.end_date), fontWeight: 600 }}>{getStatusText(assignment?.status, assignment?.end_date)}</span>
                     </span>
                   </div>
@@ -672,8 +571,8 @@ export default function CarePlanAssignmentDetailPage() {
               Chỉnh sửa
             </button>
           </div>
-          
-          {/* Page Title */}
+
+
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -711,8 +610,8 @@ export default function CarePlanAssignmentDetailPage() {
             </div>
           </div>
         </div>
-        
-        {/* Content */}
+
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -721,31 +620,31 @@ export default function CarePlanAssignmentDetailPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{ display: 'grid', gap: '2rem' }}>
-          
-            {/* Service Cost Overview */}
+
+
             <div style={{
               background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
               borderRadius: '1rem',
               padding: '2rem',
               border: '1px solid #93c5fd'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '1rem',
                 marginBottom: '1.5rem'
-                }}>
-                  <div style={{
+              }}>
+                <div style={{
                   width: '3rem',
                   height: '3rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   borderRadius: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <CurrencyDollarIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-                  </div>
+                </div>
                 <div>
                   <h3 style={{
                     fontSize: '1.25rem',
@@ -764,7 +663,7 @@ export default function CarePlanAssignmentDetailPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div style={{ textAlign: 'center' }}>
                 <p style={{
                   fontSize: '2.5rem',
@@ -772,7 +671,7 @@ export default function CarePlanAssignmentDetailPage() {
                   color: '#1d4ed8',
                   margin: '0 0 0.5rem 0'
                 }}>
-                  {formatCurrency(calculateTotalMonthlyCost())}
+                  {formatDisplayCurrency(calculateTotalMonthlyCost())}
                 </p>
                 <p style={{
                   fontSize: '1rem',
@@ -781,7 +680,7 @@ export default function CarePlanAssignmentDetailPage() {
                 }}>
                   Mỗi tháng
                 </p>
-                
+
                 <div style={{
                   background: 'rgba(255, 255, 255, 0.9)',
                   borderRadius: '0.75rem',
@@ -807,19 +706,19 @@ export default function CarePlanAssignmentDetailPage() {
                         color: calculateRoomCost() > 0 ? '#1e293b' : '#ef4444',
                         margin: 0
                       }}>
-                        {calculateRoomCost() > 0 ? formatCurrency(calculateRoomCost()) : 'Chưa cập nhật'}
-                    </p>
-                    {calculateRoomCost() === 0 && (
-                      <p style={{
-                        fontSize: '0.75rem',
-                        color: '#ef4444',
-                        margin: '0.25rem 0 0 0',
-                        fontStyle: 'italic'
-                      }}>
-                        Cần cập nhật giá phòng trong assignment
+                        {calculateRoomCost() > 0 ? formatDisplayCurrency(calculateRoomCost()) : 'Chưa cập nhật'}
                       </p>
-                    )}
-                  </div>
+                      {calculateRoomCost() === 0 && (
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#ef4444',
+                          margin: '0.25rem 0 0 0',
+                          fontStyle: 'italic'
+                        }}>
+                          Cần cập nhật giá phòng trong assignment
+                        </p>
+                      )}
+                    </div>
                     <div style={{ textAlign: 'center' }}>
                       <p style={{
                         fontSize: '0.875rem',
@@ -834,38 +733,38 @@ export default function CarePlanAssignmentDetailPage() {
                         color: '#1e293b',
                         margin: 0
                       }}>
-                        {formatCurrency(calculateTotalServiceCost())}
-                    </p>
+                        {formatDisplayCurrency(calculateTotalServiceCost())}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-            {/* Service Packages */}
+
             <div style={{
               background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
               borderRadius: '1rem',
               padding: '2rem',
               border: '1px solid #7dd3fc'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '1rem',
                 marginBottom: '1.5rem'
-                }}>
-                  <div style={{
+              }}>
+                <div style={{
                   width: '3rem',
                   height: '3rem',
                   background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
                   borderRadius: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <DocumentTextIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-                  </div>
+                </div>
                 <div style={{ flex: 1 }}>
                   <h3 style={{
                     fontSize: '1.25rem',
@@ -881,9 +780,9 @@ export default function CarePlanAssignmentDetailPage() {
                     margin: '0.25rem 0 0 0'
                   }}>
                     Chi tiết các dịch vụ đang sử dụng
-                    </p>
-                  </div>
-                  <div>
+                  </p>
+                </div>
+                <div>
                   <span style={{
                     background: 'rgba(14, 165, 233, 0.1)',
                     color: '#0c4a6e',
@@ -895,230 +794,229 @@ export default function CarePlanAssignmentDetailPage() {
                   }}>
                     Tổng: {getValidCarePlans().length} gói dịch vụ
                   </span>
-            </div>
-          </div>
+                </div>
+              </div>
 
               <div style={{ display: 'grid', gap: '1.5rem' }}>
                 {getValidCarePlans().map((carePlan: any, index: number) => {
                   const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
                   return (
-                  <div key={index} style={{
-                    background: 'rgba(255, 255, 255, 0.9)',
-              borderRadius: '1rem',
-                    padding: '1.5rem',
-                    border: '1px solid #bae6fd',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    transition: 'all 0.2s ease'
-                  }}>
-                    {/* Header with name and price */}
-                <div style={{
-                  display: 'flex',
-                      alignItems: 'flex-start',
-                      justifyContent: 'space-between',
-                      marginBottom: '1.5rem'
+                    <div key={index} style={{
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      borderRadius: '1rem',
+                      padding: '1.5rem',
+                      border: '1px solid #bae6fd',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
                     }}>
-                      <div style={{ flex: 1 }}>
-                        <h4 style={{
-                          fontSize: '1.25rem',
-                          fontWeight: 700,
-                          color: '#1e293b',
-                          margin: '0 0 0.5rem 0'
-                        }}>
-                          {carePlan.plan_name}
-                        </h4>
-                        <p style={{
-                          fontSize: '0.875rem',
-                          color: '#64748b',
-                          lineHeight: '1.6',
-                          margin: 0
-                        }}>
-                          {carePlan.description}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right', marginLeft: '1rem' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                          gap: '0.5rem',
-                          marginBottom: '0.25rem'
-                        }}>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#64748b'
-                          }}>
-                            Giá:
-                          </span>
-                          <span style={{
-                            fontSize: '1.25rem',
-                            fontWeight: 700,
-                            color: '#0c4a6e'
-                          }}>
-                            {formatCurrency(carePlan.monthly_price || 0)}
-                          </span>
-                </div>
-                        <p style={{
-                          fontSize: '0.75rem',
-                          color: '#64748b',
-                          margin: 0
-                        }}>
-                          mỗi tháng
-                        </p>
-            </div>
-          </div>
 
-                    {/* Time Information */}
-            <div style={{
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      marginBottom: '1.5rem',
-                      border: '1px solid #bbf7d0'
-            }}>
-              <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                        gap: '1rem'
-                      }}>
-                        <div style={{ textAlign: 'center' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '0.5rem'
-                          }}>
-                            <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#16a34a' }} />
-                            <span style={{
-                              fontSize: '0.75rem',
-                    fontWeight: 600,
-                              color: '#15803d'
-                  }}>
-                              Ngày bắt đầu
-                            </span>
-                </div>
-                          <p style={{
-                            fontSize: '0.875rem',
-                      fontWeight: 600, 
-                            color: '#1e293b',
-                            margin: 0
-                          }}>
-                            {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : (assignment?.start_date ? formatDate(assignment.start_date) : 'N/A')}
-                          </p>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '0.5rem'
-                          }}>
-                            <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#7c3aed' }} />
-                            <span style={{
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              color: '#6d28d9'
-                            }}>
-                              Ngày kết thúc
-                            </span>
-                              </div>
-                          <p style={{
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            color: '#1e293b',
-                            margin: 0
-                          }}>
-                            {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : (assignment?.end_date ? formatDate(assignment.end_date) : 'Không có thời hạn')}
-                          </p>
-                                </div>
-                                </div>
-                          </div>
-                          
-                    {/* Services Included */}
-                    <div style={{
-                      borderTop: '1px solid #e2e8f0',
-                      paddingTop: '1.5rem'
-                    }}>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: '#374151',
-                        margin: '0 0 1rem 0'
-                      }}>
-                                Dịch vụ bao gồm:
-                      </p>
                       <div style={{
                         display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '0.75rem'
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        marginBottom: '1.5rem'
                       }}>
-                        {(carePlan.services_included || []).slice(0, expandedServices[index] ? undefined : 4).map((service: string, serviceIndex: number) => (
-                                  <span key={serviceIndex} style={{
-                            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                            color: '#1e40af',
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{
+                            fontSize: '1.25rem',
+                            fontWeight: 700,
+                            color: '#1e293b',
+                            margin: '0 0 0.5rem 0'
+                          }}>
+                            {carePlan.plan_name}
+                          </h4>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            color: '#64748b',
+                            lineHeight: '1.6',
+                            margin: 0
+                          }}>
+                            {carePlan.description}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right', marginLeft: '1rem' }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            <span style={{
+                              fontSize: '0.75rem',
+                              color: '#64748b'
+                            }}>
+                              Giá:
+                            </span>
+                            <span style={{
+                              fontSize: '1.25rem',
+                              fontWeight: 700,
+                              color: '#0c4a6e'
+                            }}>
+                              {formatDisplayCurrency(carePlan.monthly_price || 0)}
+                            </span>
+                          </div>
+                          <p style={{
                             fontSize: '0.75rem',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '9999px',
-                            border: '1px solid #93c5fd',
-                                    fontWeight: 500
-                                  }}>
-                                    {service}
-                                  </span>
-                                ))}
-                        {(carePlan.services_included || []).length > 4 && !expandedServices[index] && (
-                          <button
-                            onClick={() => toggleServiceExpansion(index)}
-                            style={{
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              color: '#1d4ed8',
+                            color: '#64748b',
+                            margin: 0
+                          }}>
+                            mỗi tháng
+                          </p>
+                        </div>
+                      </div>
+
+
+                      <div style={{
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                        borderRadius: '0.75rem',
+                        padding: '1rem',
+                        marginBottom: '1.5rem',
+                        border: '1px solid #bbf7d0'
+                      }}>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                          gap: '1rem'
+                        }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#16a34a' }} />
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: '#15803d'
+                              }}>
+                                Ngày bắt đầu
+                              </span>
+                            </div>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              color: '#1e293b',
+                              margin: 0
+                            }}>
+                              {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : (assignment?.start_date ? formatDate(assignment.start_date) : 'N/A')}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#7c3aed' }} />
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: '#6d28d9'
+                              }}>
+                                Ngày kết thúc
+                              </span>
+                            </div>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              color: '#1e293b',
+                              margin: 0
+                            }}>
+                              {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : (assignment?.end_date ? formatDate(assignment.end_date) : 'Không có thời hạn')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{
+                        borderTop: '1px solid #e2e8f0',
+                        paddingTop: '1.5rem'
+                      }}>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#374151',
+                          margin: '0 0 1rem 0'
+                        }}>
+                          Dịch vụ bao gồm:
+                        </p>
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem'
+                        }}>
+                          {(carePlan.services_included || []).slice(0, expandedServices[index] ? undefined : 4).map((service: string, serviceIndex: number) => (
+                            <span key={serviceIndex} style={{
+                              background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                              color: '#1e40af',
                               fontSize: '0.75rem',
                               padding: '0.5rem 1rem',
                               borderRadius: '9999px',
-                              border: '1px solid rgba(59, 130, 246, 0.2)',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <span>+{(carePlan.services_included || []).length - 4} dịch vụ khác</span>
-                            <svg style={{ width: '0.75rem', height: '0.75rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                        )}
-                        {(carePlan.services_included || []).length > 4 && expandedServices[index] && (
-                          <button
-                            onClick={() => toggleServiceExpansion(index)}
-                            style={{
-                              background: 'rgba(107, 114, 128, 0.1)',
-                              color: '#374151',
-                              fontSize: '0.75rem',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '9999px',
-                              border: '1px solid rgba(107, 114, 128, 0.2)',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <span>Thu gọn danh sách</span>
-                            <svg style={{ width: '0.75rem', height: '0.75rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                            </svg>
-                          </button>
+                              border: '1px solid #93c5fd',
+                              fontWeight: 500
+                            }}>
+                              {service}
+                            </span>
+                          ))}
+                          {(carePlan.services_included || []).length > 4 && !expandedServices[index] && (
+                            <button
+                              onClick={() => toggleServiceExpansion(index)}
+                              style={{
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                color: '#1d4ed8',
+                                fontSize: '0.75rem',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '9999px',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <span>+{(carePlan.services_included || []).length - 4} dịch vụ khác</span>
+                              <svg style={{ width: '0.75rem', height: '0.75rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          )}
+                          {(carePlan.services_included || []).length > 4 && expandedServices[index] && (
+                            <button
+                              onClick={() => toggleServiceExpansion(index)}
+                              style={{
+                                background: 'rgba(107, 114, 128, 0.1)',
+                                color: '#374151',
+                                fontSize: '0.75rem',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '9999px',
+                                border: '1px solid rgba(107, 114, 128, 0.2)',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <span>Thu gọn danh sách</span>
+                              <svg style={{ width: '0.75rem', height: '0.75rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            </button>
                           )}
                         </div>
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
                 })}
-                
+
                 {getValidCarePlans().length === 0 && (
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <DocumentTextIcon style={{
@@ -1128,8 +1026,8 @@ export default function CarePlanAssignmentDetailPage() {
                       margin: '0 auto 1rem'
                     }} />
                     <p style={{
-                      fontSize: '1rem', 
-                      fontWeight: 600, 
+                      fontSize: '1rem',
+                      fontWeight: 600,
                       color: '#6b7280',
                       margin: '0 0 0.5rem 0'
                     }}>
@@ -1142,35 +1040,35 @@ export default function CarePlanAssignmentDetailPage() {
                     }}>
                       Hãy đăng ký dịch vụ để bắt đầu
                     </p>
-                          </div>
+                  </div>
                 )}
-                          </div>
-                        </div>
+              </div>
+            </div>
 
-            {/* Room & Bed Information */}
-                <div style={{ 
+
+            <div style={{
               background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  borderRadius: '1rem',
-                  padding: '2rem',
+              borderRadius: '1rem',
+              padding: '2rem',
               border: '1px solid #86efac'
             }}>
               <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                 gap: '1rem',
                 marginBottom: '1.5rem'
-                  }}>
-                    <div style={{
+              }}>
+                <div style={{
                   width: '3rem',
                   height: '3rem',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   borderRadius: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <HomeIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-                    </div>
+                </div>
                 <div>
                   <h3 style={{
                     fontSize: '1.25rem',
@@ -1186,19 +1084,19 @@ export default function CarePlanAssignmentDetailPage() {
                     margin: '0.25rem 0 0 0'
                   }}>
                     Vị trí lưu trú hiện tại
-                    </p>
-                  </div>
+                  </p>
                 </div>
+              </div>
 
-                <div style={{
+              <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                 gap: '1.5rem'
               }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{
+                  <div style={{
                     background: 'rgba(255, 255, 255, 0.9)',
-                      borderRadius: '0.75rem',
+                    borderRadius: '0.75rem',
                     padding: '1.5rem',
                     border: '1px solid #bbf7d0'
                   }}>
@@ -1216,13 +1114,13 @@ export default function CarePlanAssignmentDetailPage() {
                       margin: 0
                     }}>
                       {roomTypeDetails?.type_name || assignment?.selected_room_type || 'N/A'}
-                      </p>
-                    </div>
+                    </p>
+                  </div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{
+                  <div style={{
                     background: 'rgba(255, 255, 255, 0.9)',
-                      borderRadius: '0.75rem',
+                    borderRadius: '0.75rem',
                     padding: '1.5rem',
                     border: '1px solid #bbf7d0'
                   }}>
@@ -1241,7 +1139,7 @@ export default function CarePlanAssignmentDetailPage() {
                     }}>
                       {roomNumber}
                       {roomFloor && roomNumber !== 'Chưa phân phòng' && ` (Tầng ${roomFloor})`}
-                      </p>
+                    </p>
 
                     {roomNumber === 'Chưa phân phòng' && (
                       <p style={{
@@ -1253,10 +1151,10 @@ export default function CarePlanAssignmentDetailPage() {
                         Cần gán phòng cho assignment này
                       </p>
                     )}
-                    </div>
                   </div>
+                </div>
                 <div style={{ textAlign: 'center' }}>
-              <div style={{
+                  <div style={{
                     background: 'rgba(255, 255, 255, 0.9)',
                     borderRadius: '0.75rem',
                     padding: '1.5rem',
@@ -1276,7 +1174,7 @@ export default function CarePlanAssignmentDetailPage() {
                       margin: 0
                     }}>
                       {bedNumber}
-                          </p>
+                    </p>
 
                     {bedNumber === 'Chưa phân giường' && (
                       <p style={{
@@ -1288,13 +1186,15 @@ export default function CarePlanAssignmentDetailPage() {
                         Cần gán giường cho assignment này
                       </p>
                     )}
-                        </div>
-                      </div>
-                        </div>
-                      </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <ChatFloatingButton />
 
       <style jsx>{`
         @keyframes spin {

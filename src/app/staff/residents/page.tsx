@@ -177,7 +177,7 @@ export default function StaffResidentsPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold m-0 bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent tracking-tight">
-                  Danh sách người cao tuổi được phân công
+                  Danh sách người cao tuổi được phân công chăm sóc
                 </h1>
                 <p className="text-base text-slate-600 mt-1 font-medium">
                   Tổng số: {residentsData.length} người cao tuổi đang được phân công cho bạn

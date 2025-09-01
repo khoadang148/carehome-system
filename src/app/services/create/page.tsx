@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   ArrowLeftIcon,
   PlusIcon,
   XMarkIcon,
@@ -16,47 +16,90 @@ import { carePlansAPI } from '@/lib/api';
 export default function CreateServicePage() {
   const router = useRouter();
   const { user } = useAuth();
-  
-  // Form state
+
   const [formData, setFormData] = useState({
     plan_name: '',
     description: '',
     monthly_price: '',
     plan_type: 'cham_soc_dac_biet',
-    category: 'main', // sửa từ 'regular' thành 'main'
+     category: 'supplementary',
     services_included: [''],
-    staff_ratio: '1:3', // gán mặc định
+    staff_ratio: '1:3',
     duration_type: 'monthly',
     default_medications: [],
     prerequisites: [],
     contraindications: [],
     is_active: true,
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
 
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (user?.role !== 'admin') {
       router.push('/services');
       return;
     }
   }, [user, router]);
 
+  const validateField = (name: string, value: any): string => {
+    switch (name) {
+      case 'plan_name':
+        if (!value || !value.trim()) {
+          return 'Tên gói dịch vụ không được để trống';
+        }
+        if (value.trim().length < 3) {
+          return 'Tên gói dịch vụ phải có ít nhất 3 ký tự';
+        }
+        if (value.trim().length > 100) {
+          return 'Tên gói dịch vụ không được quá 100 ký tự';
+        }
+        break;
+      case 'description':
+        if (!value || !value.trim()) {
+          return 'Mô tả không được để trống';
+        }
+        if (value.trim().length < 10) {
+          return 'Mô tả phải có ít nhất 10 ký tự';
+        }
+        if (value.trim().length > 500) {
+          return 'Mô tả không được quá 500 ký tự';
+        }
+        break;
+             case 'monthly_price':
+         if (!value || !value.trim()) {
+           return 'Giá hàng tháng không được để trống';
+         }
+         const price = parseFloat(value);
+         if (isNaN(price) || price <= 0) {
+           return 'Giá hàng tháng phải là số dương';
+         }
+         break;
+    }
+    return '';
+  };
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-    
-    // Clear error when user starts typing
+
+    // Clear field-specific error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+
     if (error) {
       setError(null);
     }
@@ -69,8 +112,16 @@ export default function CreateServicePage() {
       ...prev,
       services_included: newServices
     }));
-    
-    // Clear error when user starts typing
+
+    // Clear service-specific error when user starts typing
+    const serviceFieldName = `service_${index}`;
+    if (fieldErrors[serviceFieldName]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [serviceFieldName]: ''
+      }));
+    }
+
     if (error) {
       setError(null);
     }
@@ -95,85 +146,62 @@ export default function CreateServicePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Clear previous errors
+
     setError(null);
-    
-    // Validation
-    if (!formData.plan_name.trim()) {
-      setError('Tên gói dịch vụ không được để trống');
-      return;
+    setFieldErrors({});
+
+    // Validate all fields
+    const newFieldErrors: {[key: string]: string} = {};
+    let hasValidationError = false;
+
+    // Validate plan_name
+    const planNameError = validateField('plan_name', formData.plan_name);
+    if (planNameError) {
+      newFieldErrors.plan_name = planNameError;
+      hasValidationError = true;
     }
-    
-    if (formData.plan_name.trim().length < 3) {
-      setError('Tên gói dịch vụ phải có ít nhất 3 ký tự');
-      return;
+
+    // Validate description
+    const descriptionError = validateField('description', formData.description);
+    if (descriptionError) {
+      newFieldErrors.description = descriptionError;
+      hasValidationError = true;
     }
-    
-    if (formData.plan_name.trim().length > 100) {
-      setError('Tên gói dịch vụ không được quá 100 ký tự');
-      return;
+
+    // Validate monthly_price
+    const monthlyPriceError = validateField('monthly_price', formData.monthly_price);
+    if (monthlyPriceError) {
+      newFieldErrors.monthly_price = monthlyPriceError;
+      hasValidationError = true;
     }
-    
-    if (!formData.description.trim()) {
-      setError('Mô tả không được để trống');
-      return;
-    }
-    
-    if (formData.description.trim().length < 10) {
-      setError('Mô tả phải có ít nhất 10 ký tự');
-      return;
-    }
-    
-    if (formData.description.trim().length > 500) {
-      setError('Mô tả không được quá 500 ký tự');
-      return;
-    }
-    
-    if (!formData.monthly_price || formData.monthly_price.trim() === '') {
-      setError('Giá hàng tháng không được để trống');
-      return;
-    }
-    
-    const price = parseFloat(formData.monthly_price);
-    if (isNaN(price)) {
-      setError('Giá hàng tháng phải là số hợp lệ');
-      return;
-    }
-    
-    if (price <= 0) {
-      setError('Giá hàng tháng phải lớn hơn 0');
-      return;
-    }
-    
-    if (price > 1000000000) {
-      setError('Giá hàng tháng không được quá 1 tỷ VND');
-      return;
-    }
-    
+
+    // Validate services
     const validServices = formData.services_included.filter(service => service.trim() !== '');
     if (validServices.length === 0) {
-      setError('Phải có ít nhất một dịch vụ được bao gồm');
-      return;
-    }
-    
-    // Validate each service
+      newFieldErrors.services = 'Phải có ít nhất một dịch vụ được bao gồm';
+      hasValidationError = true;
+    } else {
     for (let i = 0; i < validServices.length; i++) {
       const service = validServices[i];
       if (service.trim().length < 2) {
-        setError(`Dịch vụ ${i + 1} phải có ít nhất 2 ký tự`);
-        return;
+          newFieldErrors[`service_${i}`] = `Dịch vụ ${i + 1} phải có ít nhất 2 ký tự`;
+          hasValidationError = true;
       }
       if (service.trim().length > 100) {
-        setError(`Dịch vụ ${i + 1} không được quá 100 ký tự`);
-        return;
+          newFieldErrors[`service_${i}`] = `Dịch vụ ${i + 1} không được quá 100 ký tự`;
+          hasValidationError = true;
       }
     }
-    
-    // Check for duplicate services
+
     const uniqueServices = [...new Set(validServices.map(s => s.trim().toLowerCase()))];
     if (uniqueServices.length !== validServices.length) {
-      setError('Không được có dịch vụ trùng lặp');
+        newFieldErrors.services = 'Không được có dịch vụ trùng lặp';
+        hasValidationError = true;
+      }
+    }
+
+    if (hasValidationError) {
+      setFieldErrors(newFieldErrors);
       return;
     }
 
@@ -184,7 +212,7 @@ export default function CreateServicePage() {
       const packageData = {
         plan_name: formData.plan_name.trim(),
         description: formData.description.trim(),
-        monthly_price: parseFloat(formData.monthly_price),
+         monthly_price: parseFloat(formData.monthly_price.trim()),
         plan_type: formData.plan_type,
         category: formData.category,
         services_included: validServices,
@@ -198,12 +226,11 @@ export default function CreateServicePage() {
 
       await carePlansAPI.create(packageData);
       setSuccess(true);
-      
-      // Redirect after 2 seconds
+
       setTimeout(() => {
         router.push('/services');
       }, 2000);
-      
+
     } catch (err: any) {
       setError(err.message || 'Có lỗi xảy ra khi tạo gói dịch vụ');
     } finally {
@@ -213,8 +240,8 @@ export default function CreateServicePage() {
 
   if (success) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
+      <div style={{
+        minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
@@ -269,7 +296,6 @@ export default function CreateServicePage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background pattern */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -282,7 +308,7 @@ export default function CreateServicePage() {
         `,
         pointerEvents: 'none'
       }} />
-      
+
       <div style={{
         position: 'relative',
         zIndex: 1,
@@ -290,10 +316,9 @@ export default function CreateServicePage() {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Header */}
         <div style={{
-          display: 'flex', 
-          alignItems: 'center', 
+          display: 'flex',
+          alignItems: 'center',
           marginBottom: '2rem',
           background: 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(10px)',
@@ -304,7 +329,7 @@ export default function CreateServicePage() {
           <button
             onClick={() => router.push('/services')}
             style={{
-              marginRight: '1rem', 
+              marginRight: '1rem',
               color: '#667eea',
               display: 'flex',
               alignItems: 'center',
@@ -324,7 +349,7 @@ export default function CreateServicePage() {
               e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)';
             }}
           >
-            <ArrowLeftIcon style={{height: '1.25rem', width: '1.25rem'}} />
+            <ArrowLeftIcon style={{ height: '1.25rem', width: '1.25rem' }} />
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
@@ -340,8 +365,8 @@ export default function CreateServicePage() {
                 <PlusIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
               </div>
               <h1 style={{
-                fontSize: '1.875rem', 
-                fontWeight: 700, 
+                fontSize: '1.875rem',
+                fontWeight: 700,
                 margin: 0,
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 WebkitBackgroundClip: 'text',
@@ -361,8 +386,7 @@ export default function CreateServicePage() {
             </p>
           </div>
         </div>
-        
-        {/* Form */}
+
         <div style={{
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
@@ -371,22 +395,21 @@ export default function CreateServicePage() {
           overflow: 'hidden'
         }}>
           <form onSubmit={handleSubmit}>
-            {/* Basic Information Section */}
             <div style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <PlusIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Thông tin cơ bản
                 </h2>
               </div>
             </div>
-            
-            <div style={{padding: '2rem'}}>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem'}}>
+
+            <div style={{ padding: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div>
                   <label style={{
                     display: 'block',
@@ -395,16 +418,23 @@ export default function CreateServicePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Tên gói dịch vụ <span style={{color: '#ef4444'}}>*</span>
+                    Tên gói dịch vụ <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.plan_name}
                     onChange={(e) => handleInputChange('plan_name', e.target.value)}
+                     onBlur={(e) => {
+                       const error = validateField('plan_name', e.target.value);
+                       setFieldErrors(prev => ({
+                         ...prev,
+                         plan_name: error
+                       }));
+                     }}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
+                       border: fieldErrors.plan_name ? '2px solid #ef4444' : '2px solid #e5e7eb',
                       borderRadius: '0.5rem',
                       fontSize: '0.95rem',
                       outline: 'none',
@@ -413,6 +443,15 @@ export default function CreateServicePage() {
                     }}
                     placeholder="Nhập tên gói dịch vụ"
                   />
+                   {fieldErrors.plan_name && (
+                     <div style={{
+                       color: '#ef4444',
+                       fontSize: '0.75rem',
+                       marginTop: '0.25rem'
+                     }}>
+                       {fieldErrors.plan_name}
+                     </div>
+                   )}
                 </div>
 
                 <div>
@@ -423,22 +462,28 @@ export default function CreateServicePage() {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Giá hàng tháng (VND) <span style={{color: '#ef4444'}}>*</span>
+                    Giá hàng tháng (VND) <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="number"
                     value={formData.monthly_price}
                     onChange={(e) => {
                       const value = e.target.value;
-                      // Only allow positive numbers
                       if (value === '' || /^\d+$/.test(value)) {
                         handleInputChange('monthly_price', value);
                       }
                     }}
+                     onBlur={(e) => {
+                       const error = validateField('monthly_price', e.target.value);
+                       setFieldErrors(prev => ({
+                         ...prev,
+                         monthly_price: error
+                       }));
+                    }}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
+                       border: fieldErrors.monthly_price ? '2px solid #ef4444' : '2px solid #e5e7eb',
                       borderRadius: '0.5rem',
                       fontSize: '0.95rem',
                       outline: 'none',
@@ -446,9 +491,16 @@ export default function CreateServicePage() {
                       background: 'white'
                     }}
                     placeholder="Nhập giá hàng tháng"
-                    min="0"
-                    step="1000"
-                  />
+                   />
+                   {fieldErrors.monthly_price && (
+                     <div style={{
+                       color: '#ef4444',
+                       fontSize: '0.75rem',
+                       marginTop: '0.25rem'
+                     }}>
+                       {fieldErrors.monthly_price}
+                     </div>
+                   )}
                 </div>
 
                 <div>
@@ -475,67 +527,17 @@ export default function CreateServicePage() {
                       background: 'white'
                     }}
                   >
-                    <option value="regular">Gói bổ sung</option>
+                                         <option value="supplementary">Gói bổ sung</option>
                     <option value="main">Gói chính</option>
                   </select>
                 </div>
 
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Kiểu gói
-                  </label>
-                  <select
-                    value={formData.plan_type}
-                    onChange={(e) => handleInputChange('plan_type', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.95rem',
-                      outline: 'none',
-                      transition: 'border-color 0.2s',
-                      background: 'white'
-                    }}
-                  >
-                    <option value="regular">Gói thường</option>
-                    <option value="cham_soc_dac_biet">Chăm sóc đặc biệt</option>
-                    <option value="cham_soc_cao_cap">Chăm sóc cao cấp</option>
-                    <option value="cham_soc_co_ban">Chăm sóc cơ bản</option>
-                  </select>
-                </div>
 
-                <div>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => handleInputChange('is_active', e.target.checked)}
-                      style={{
-                        width: '1rem',
-                        height: '1rem'
-                      }}
-                    />
-                    Kích hoạt gói dịch vụ
-                  </label>
-                </div>
+
+
               </div>
 
-              <div style={{marginBottom: '2rem'}}>
+              <div style={{ marginBottom: '2rem' }}>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
@@ -543,16 +545,23 @@ export default function CreateServicePage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Mô tả <span style={{color: '#ef4444'}}>*</span>
+                  Mô tả <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
+                   onBlur={(e) => {
+                     const error = validateField('description', e.target.value);
+                     setFieldErrors(prev => ({
+                       ...prev,
+                       description: error
+                     }));
+                   }}
                   rows={4}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
+                     border: fieldErrors.description ? '2px solid #ef4444' : '2px solid #e5e7eb',
                     borderRadius: '0.5rem',
                     fontSize: '0.95rem',
                     outline: 'none',
@@ -562,24 +571,32 @@ export default function CreateServicePage() {
                   }}
                   placeholder="Mô tả chi tiết về gói dịch vụ"
                 />
+                 {fieldErrors.description && (
+                   <div style={{
+                     color: '#ef4444',
+                     fontSize: '0.75rem',
+                     marginTop: '0.25rem'
+                   }}>
+                     {fieldErrors.description}
+                   </div>
+                 )}
               </div>
             </div>
 
-            {/* Services Section */}
             <div style={{
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <DocumentTextIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <DocumentTextIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Dịch vụ bao gồm
                 </h2>
               </div>
             </div>
 
-            <div style={{padding: '2rem'}}>
+            <div style={{ padding: '2rem' }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -591,7 +608,7 @@ export default function CreateServicePage() {
                   fontWeight: 600,
                   color: '#374151'
                 }}>
-                  Danh sách dịch vụ <span style={{color: '#ef4444'}}>*</span>
+                  Danh sách dịch vụ <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <button
                   type="button"
@@ -628,14 +645,30 @@ export default function CreateServicePage() {
                   gap: '0.5rem',
                   marginBottom: '0.5rem'
                 }}>
+                   <div style={{ flex: 1 }}>
                   <input
                     type="text"
                     value={service}
                     onChange={(e) => handleServiceChange(index, e.target.value)}
+                       onBlur={(e) => {
+                         const serviceFieldName = `service_${index}`;
+                         let error = '';
+                         if (!e.target.value.trim()) {
+                           error = `Dịch vụ ${index + 1} không được để trống`;
+                         } else if (e.target.value.trim().length < 2) {
+                           error = `Dịch vụ ${index + 1} phải có ít nhất 2 ký tự`;
+                         } else if (e.target.value.trim().length > 100) {
+                           error = `Dịch vụ ${index + 1} không được quá 100 ký tự`;
+                         }
+                         setFieldErrors(prev => ({
+                           ...prev,
+                           [serviceFieldName]: error
+                         }));
+                       }}
                     style={{
-                      flex: 1,
+                         width: '100%',
                       padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
+                         border: fieldErrors[`service_${index}`] ? '2px solid #ef4444' : '2px solid #e5e7eb',
                       borderRadius: '0.5rem',
                       fontSize: '0.95rem',
                       outline: 'none',
@@ -644,6 +677,16 @@ export default function CreateServicePage() {
                     }}
                     placeholder={`Dịch vụ ${index + 1}`}
                   />
+                     {fieldErrors[`service_${index}`] && (
+                       <div style={{
+                         color: '#ef4444',
+                         fontSize: '0.75rem',
+                         marginTop: '0.25rem'
+                       }}>
+                         {fieldErrors[`service_${index}`]}
+                       </div>
+                     )}
+                   </div>
                   {formData.services_included.length > 1 && (
                     <button
                       type="button"
@@ -673,8 +716,7 @@ export default function CreateServicePage() {
                 </div>
               ))}
 
-              {/* Error Message */}
-              {error && (
+                             {(error || fieldErrors.services) && (
                 <div style={{
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
@@ -683,11 +725,10 @@ export default function CreateServicePage() {
                   marginBottom: '1rem',
                   color: '#dc2626'
                 }}>
-                  {error}
+                   {error || fieldErrors.services}
                 </div>
               )}
 
-              {/* Submit Buttons */}
               <div style={{
                 display: 'flex',
                 gap: '1rem',

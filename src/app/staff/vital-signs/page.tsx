@@ -6,7 +6,6 @@ import {
   HeartIcon,
   PlusIcon,
   ArrowLeftIcon,
-  BellIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   PencilIcon,
@@ -53,8 +52,7 @@ export default function StaffVitalSignsPage() {
   const [selectedDateDisplay, setSelectedDateDisplay] = useState<string>('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [notifications, setNotifications] = useState<{ id: number, message: string, type: 'success' | 'error', time: string }[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -900,65 +898,6 @@ export default function StaffVitalSignsPage() {
           </div>
         </div>
       </div>
-
-      <div className="fixed top-6 right-8 z-50">
-        <button
-          onClick={() => setShowNotifications(v => !v)}
-          className="relative bg-white border border-gray-300 rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow"
-        >
-          <BellIcon className="w-6 h-6 text-red-500" />
-          {notifications.length > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs font-bold px-2 py-1 min-w-5 text-center leading-none">
-              {notifications.length}
-            </span>
-          )}
-        </button>
-        
-        
-        {showNotifications && (
-          <div className="absolute top-14 right-0 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="font-bold text-base text-gray-900">Thông báo</span>
-              <button 
-                onClick={() => setShowNotifications(false)} 
-                className="bg-none border-none text-red-500 font-bold cursor-pointer text-xl hover:text-red-600"
-              >
-                ×
-              </button>
-            </div>
-            {notifications.length === 0 ? (
-              <div className="text-gray-500 text-center py-4">Không có thông báo nào</div>
-            ) : (
-              <ul className="space-y-3">
-                {notifications.map(n => (
-                  <li key={n.id} className={`p-3 rounded-xl border flex items-center gap-3 ${
-                    n.type === 'success' 
-                      ? 'bg-green-50 border-green-300' 
-                      : 'bg-red-50 border-red-300'
-                  }`}>
-                    <span className="text-xl">{n.type === 'success' ? '✅' : '❌'}</span>
-                    <div className="flex-1">
-                      <div className={`font-medium ${
-                        n.type === 'success' ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {n.message}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">{n.time}</div>
-                    </div>
-                    <button 
-                      onClick={() => setNotifications(prev => prev.filter(x => x.id !== n.id))} 
-                      className="bg-none border-none text-gray-500 text-xl cursor-pointer hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-
       
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
-import { 
-  ArrowLeftIcon, 
-  UserIcon, 
-  PhoneIcon, 
+import {
+  ArrowLeftIcon,
+  UserIcon,
+  PhoneIcon,
   DocumentTextIcon,
   CheckCircleIcon,
   PlusIcon,
@@ -48,71 +48,60 @@ type ResidentFormData = {
   care_level: string;
   status: string;
   notes: string;
-  // Thêm trường mới để chọn loại tài khoản family
   family_account_type: 'new' | 'existing';
   existing_family_id?: string;
 };
 
 const validateAge = (dateOfBirth: string) => {
   if (!dateOfBirth) return "Ngày sinh là bắt buộc";
-  
+
   const today = new Date();
   const birthDate = new Date(dateOfBirth);
-  
-  // Kiểm tra nếu ngày sinh không hợp lệ
+
   if (isNaN(birthDate.getTime())) {
     return "Ngày sinh không hợp lệ";
   }
-  
-  // Kiểm tra nếu ngày sinh trong tương lai
+
   if (birthDate > today) {
     return "Ngày sinh không thể trong tương lai";
   }
-  
-  // Tính tuổi chính xác
+
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  
-  // Nếu chưa đến sinh nhật trong năm nay, trừ đi 1 tuổi
+
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
-  
-  console.log('Date of birth:', dateOfBirth, 'Age calculated:', age);
-  
+
   return age >= 50 || "Người cao tuổi phải từ 50 tuổi trở lên";
 };
 
 const validatePhone = (phone: string) => {
   if (!phone) return "Số điện thoại là bắt buộc";
-  
-  // Loại bỏ khoảng trắng và ký tự đặc biệt
+
   const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-  
-  // Kiểm tra định dạng số điện thoại Việt Nam
+
   const phoneRegex = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
-  
+
   if (!phoneRegex.test(cleanPhone)) {
     return "Số điện thoại không đúng định dạng (VD: 0987654321 hoặc +84987654321)";
   }
-  
+
   return true;
 };
 
 const validateEmail = (email: string) => {
   if (!email) return "Email là bắt buộc";
-  
-  // Kiểm tra định dạng email
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
+
   if (!emailRegex.test(email)) {
     return "Email không đúng định dạng (VD: example@email.com)";
   }
-  
+
   return true;
 };
 
-// Thêm các hàm chuyển đổi định dạng ngày
 function formatDateToDisplay(dateStr: string) {
   if (!dateStr) return '';
   if (dateStr.includes('/')) return dateStr;
@@ -129,36 +118,28 @@ function formatDateToISO(dateStr: string) {
   return [y, m, d].join('-');
 }
 
-// Validate ngày tháng
 function validateDate(dateStr: string, fieldName: string = 'Ngày') {
-  console.log(`Validating ${fieldName}:`, dateStr);
   if (!dateStr) return `${fieldName} là bắt buộc`;
-  
-  // Kiểm tra định dạng dd/mm/yyyy (đơn giản hơn)
+
   const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-  console.log('Testing regex against:', dateStr);
-  console.log('Regex result:', dateRegex.test(dateStr));
   if (!dateRegex.test(dateStr)) {
-    console.log('Regex validation failed');
     return `${fieldName} phải có định dạng dd/mm/yyyy`;
   }
-  
+
   const [d, m, y] = dateStr.split('/');
   const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-  
-  // Kiểm tra ngày hợp lệ
+
   if (date.getDate() !== parseInt(d) || date.getMonth() !== parseInt(m) - 1 || date.getFullYear() !== parseInt(y)) {
     return `${fieldName} không hợp lệ`;
   }
-  
-  // Kiểm tra không phải tương lai (chỉ áp dụng cho ngày sinh)
+
   if (fieldName === 'Ngày sinh') {
     const today = new Date();
     if (date > today) {
       return `${fieldName} không thể trong tương lai`;
     }
   }
-  
+
   return true;
 }
 
@@ -167,23 +148,21 @@ export default function AddResidentPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState('https://example.com/avatar.jpg');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [medications, setMedications] = useState<Medication[]>([
     { medication_name: '', dosage: '', frequency: '' }
   ]);
   const [allergies, setAllergies] = useState<string[]>(['']);
-  // Thêm state để lưu danh sách tài khoản family hiện có
   const [existingFamilyAccounts, setExistingFamilyAccounts] = useState<any[]>([]);
-  
-  // State để lưu giá trị hiển thị của ngày nhập viện
+
   const [admissionDateDisplay, setAdmissionDateDisplay] = useState('');
-  
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors }, 
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
     reset,
     watch,
     setValue,
@@ -192,21 +171,19 @@ export default function AddResidentPage() {
     defaultValues: {
       status: 'active',
       avatar: '/default-avatar.svg',
-      family_member_id: '', // Sẽ được set sau khi tạo tài khoản
+      family_member_id: '',
       relationship: '',
       relationship_other: '',
       admission_date: '',
       current_medications: [],
       allergies: [],
-      family_account_type: 'new' // Mặc định tạo tài khoản mới
+      family_account_type: 'new'
     },
     mode: 'onBlur'
   });
 
-  // Theo dõi loại tài khoản family được chọn
   const familyAccountType = watch('family_account_type');
 
-  // Load danh sách tài khoản family hiện có
   useEffect(() => {
     const loadFamilyAccounts = async () => {
       try {
@@ -214,7 +191,6 @@ export default function AddResidentPage() {
         const familyAccounts = allUsers.filter((user: any) => user.role === 'family');
         setExistingFamilyAccounts(familyAccounts);
       } catch (error) {
-        console.error('Error loading family accounts:', error);
       }
     };
     loadFamilyAccounts();
@@ -255,35 +231,30 @@ export default function AddResidentPage() {
   const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Kiểm tra loại file
       if (!file.type.startsWith('image/')) {
         toast.error('Vui lòng chọn file ảnh hợp lệ (JPG, PNG, GIF)');
         return;
       }
-      
-      // Kiểm tra kích thước file (max 1MB thay vì 5MB)
+
       if (file.size > 1 * 1024 * 1024) {
         toast.error('File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 1MB');
         return;
       }
 
       setAvatarFile(file);
-      
-      // Tạo preview với kích thước nhỏ hơn
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        
-        // Tạo canvas để resize ảnh
+
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          
-          // Resize ảnh xuống 300x300px để giảm kích thước
+
           const maxSize = 300;
           let { width, height } = img;
-          
+
           if (width > height) {
             if (width > maxSize) {
               height = (height * maxSize) / width;
@@ -295,13 +266,13 @@ export default function AddResidentPage() {
               height = maxSize;
             }
           }
-          
+
           canvas.width = width;
           canvas.height = height;
-          
+
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const resizedImage = canvas.toDataURL('image/jpeg', 0.7); // Chất lượng 70%
+            const resizedImage = canvas.toDataURL('image/jpeg', 0.7);
             setAvatarPreview(resizedImage);
           }
         };
@@ -310,24 +281,22 @@ export default function AddResidentPage() {
       reader.readAsDataURL(file);
     }
   };
-  
+
   const onSubmit = async (data: ResidentFormData) => {
     setIsSubmitting(true);
     try {
-      // Validate required fields
       if (!data.full_name?.trim()) {
         toast.error('Họ và tên là bắt buộc');
         setIsSubmitting(false);
         return;
       }
-      
+
       if (!data.date_of_birth) {
         toast.error('Ngày sinh là bắt buộc');
         setIsSubmitting(false);
         return;
       }
-      
-      // Validate date format
+
       const formattedDate = formatDateToDisplay(data.date_of_birth);
       const dateValidation = validateDate(formattedDate, 'Ngày sinh');
       if (dateValidation !== true) {
@@ -335,15 +304,14 @@ export default function AddResidentPage() {
         setIsSubmitting(false);
         return;
       }
-      
-      // Validate age
+
       const ageValidation = validateAge(data.date_of_birth);
       if (ageValidation !== true) {
         toast.error(ageValidation);
         setIsSubmitting(false);
         return;
       }
-      
+
       if (!data.gender) {
         toast.error('Giới tính là bắt buộc');
         setIsSubmitting(false);
@@ -355,55 +323,52 @@ export default function AddResidentPage() {
         setIsSubmitting(false);
         return;
       }
-      
+
       if (data.relationship === 'khác' && !data.relationship_other?.trim()) {
         toast.error('Vui lòng nhập mối quan hệ cụ thể');
         setIsSubmitting(false);
         return;
       }
-      
-      // Validate emergency contact chỉ khi tạo tài khoản mới
+
       if (data.family_account_type === 'new') {
         if (!data.emergency_contact?.name?.trim()) {
           toast.error('Tên người liên hệ khẩn cấp là bắt buộc');
           setIsSubmitting(false);
           return;
         }
-        
+
         if (!data.emergency_contact?.phone?.trim()) {
           toast.error('Số điện thoại khẩn cấp là bắt buộc');
           setIsSubmitting(false);
           return;
         }
-        
-        // Validate phone number
+
         const phoneValidation = validatePhone(data.emergency_contact.phone);
         if (phoneValidation !== true) {
           toast.error(phoneValidation);
           setIsSubmitting(false);
           return;
         }
-        
+
         if (!data.emergency_contact?.email?.trim()) {
           toast.error('Email là bắt buộc');
           setIsSubmitting(false);
           return;
         }
-        
-        // Validate email
+
         const emailValidation = validateEmail(data.emergency_contact.email);
         if (emailValidation !== true) {
           toast.error(emailValidation);
           setIsSubmitting(false);
           return;
         }
-        
+
         if (!data.emergency_contact?.relationship?.trim()) {
           toast.error('Mối quan hệ với người liên hệ là bắt buộc');
           setIsSubmitting(false);
           return;
         }
-        
+
         if (data.emergency_contact.relationship === 'khác' && !data.emergency_contact.relationship_other?.trim()) {
           toast.error('Vui lòng nhập mối quan hệ cụ thể với người liên hệ');
           setIsSubmitting(false);
@@ -411,14 +376,12 @@ export default function AddResidentPage() {
         }
       }
 
-      // Validate tài khoản family hiện có
       if (data.family_account_type === 'existing' && !data.existing_family_id) {
         toast.error('Vui lòng chọn tài khoản gia đình hiện có');
         setIsSubmitting(false);
         return;
       }
 
-      // Xác định family_member_id và emergency_contact dựa trên lựa chọn
       let familyMemberId = '';
       let emergencyContactInfo = {
         name: '',
@@ -427,7 +390,6 @@ export default function AddResidentPage() {
         relationship: ''
       };
 
-      // Nếu chọn tài khoản hiện có, lấy thông tin từ tài khoản đó
       if (data.family_account_type === 'existing' && data.existing_family_id) {
         const selectedFamilyAccount = existingFamilyAccounts.find(acc => acc._id === data.existing_family_id);
         if (selectedFamilyAccount) {
@@ -440,7 +402,6 @@ export default function AddResidentPage() {
           };
         }
       } else if (data.family_account_type === 'new') {
-        // Nếu tạo tài khoản mới, sử dụng thông tin từ form
         emergencyContactInfo = {
           name: data.emergency_contact.name || '',
           phone: data.emergency_contact.phone || '',
@@ -449,27 +410,19 @@ export default function AddResidentPage() {
         };
       }
 
-      // Debug: Kiểm tra định dạng ngày tháng
-      console.log('Debug - data.date_of_birth:', data.date_of_birth);
-      console.log('Debug - data.date_of_birth type:', typeof data.date_of_birth);
-      
       const convertedDateOfBirth = convertDDMMYYYYToISO(data.date_of_birth);
-      console.log('Debug - convertDDMMYYYYToISO result:', convertedDateOfBirth);
-      
-      // Validate date_of_birth
+
       if (!convertedDateOfBirth) {
         toast.error('Ngày sinh không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy');
         setIsSubmitting(false);
         return;
       }
-      
-      // Khai báo biến cho tài khoản mới
+
       let username = '';
       let password = '';
       let email = '';
       let createdFamilyAccountId = null;
 
-      // Prepare the payload according to API specification
       const payload: any = {
         full_name: data.full_name,
         date_of_birth: convertedDateOfBirth,
@@ -484,26 +437,21 @@ export default function AddResidentPage() {
         status: data.status
       };
 
-      // Nếu chọn tài khoản hiện có, thêm family_member_id vào payload
       if (data.family_account_type === 'existing' && data.existing_family_id) {
         payload.family_member_id = familyMemberId;
       }
-      // Nếu tạo tài khoản mới, tạo tài khoản family trước để có family_member_id
       else if (data.family_account_type === 'new') {
-        // Tạo tài khoản family trước để có family_member_id
         try {
-          // Chuẩn bị thông tin tài khoản
           const tempUsername = data.full_name.toLowerCase()
             .replace(/[^a-z0-9]/g, '')
             .substring(0, 15) + Math.floor(Math.random() * 1000);
-          
-          const tempPassword = Math.random().toString(36).substring(2, 10) + 
-                          Math.random().toString(36).substring(2, 10).toUpperCase() + 
-                          Math.floor(Math.random() * 10);
-          
+
+          const tempPassword = Math.random().toString(36).substring(2, 10) +
+            Math.random().toString(36).substring(2, 10).toUpperCase() +
+            Math.floor(Math.random() * 10);
+
           const tempEmail = data.emergency_contact.email || `${tempUsername}@example.com`;
-          
-          // Tạo tài khoản family
+
           const accountData = new FormData();
           accountData.append("username", tempUsername);
           accountData.append("password", tempPassword);
@@ -514,18 +462,17 @@ export default function AddResidentPage() {
           accountData.append("status", "active");
           accountData.append("created_at", new Date().toISOString());
           accountData.append("updated_at", new Date().toISOString());
-          
+
           if (data.emergency_contact.address) {
             accountData.append("address", data.emergency_contact.address);
           }
-          
+
           const userResponse = await userAPI.create(accountData);
-          
+
           if (userResponse.status === 201) {
             const user = userResponse.data;
             payload.family_member_id = user._id;
-            
-            // Lưu thông tin tài khoản để hiển thị sau
+
             username = tempUsername;
             password = tempPassword;
             email = tempEmail;
@@ -534,14 +481,12 @@ export default function AddResidentPage() {
             throw new Error('Failed to create family account');
           }
         } catch (accountError: any) {
-          console.error('Error creating family account:', accountError);
           handleAPIError(accountError, 'Có lỗi xảy ra khi tạo tài khoản gia đình. Vui lòng thử lại.');
           setIsSubmitting(false);
           return;
         }
       }
 
-      // Đảm bảo các trường array không rỗng
       if (!payload.current_medications.length) {
         payload.current_medications = [];
       }
@@ -549,31 +494,20 @@ export default function AddResidentPage() {
         payload.allergies = [];
       }
 
-      console.log('Sending payload to API:', payload);
       const residentResponse = await residentAPI.create(payload);
-      
-      // Nếu tạo resident thành công, kiểm tra xem có cần rollback không
+
       if (residentResponse.status === 201) {
-        console.log('✅ Resident created successfully:', residentResponse.data._id);
       }
-      
-      // Chuyển hướng đến trang thành công
+
       if (data.family_account_type === 'new') {
         router.push(`/admin/residents/success?residentName=${encodeURIComponent(data.full_name)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&email=${encodeURIComponent(email)}&role=family`);
       } else if (data.family_account_type === 'existing' && data.existing_family_id) {
-        // Lấy thông tin tài khoản family để hiển thị
         const selectedFamilyAccount = existingFamilyAccounts.find(acc => acc._id === data.existing_family_id);
         router.push(`/admin/residents/success?residentName=${encodeURIComponent(data.full_name)}&existingAccount=true&familyName=${encodeURIComponent(selectedFamilyAccount?.full_name || '')}&familyUsername=${encodeURIComponent(selectedFamilyAccount?.username || '')}`);
       } else {
         router.push(`/admin/residents/success?residentName=${encodeURIComponent(data.full_name)}`);
       }
     } catch (error: any) {
-      console.error('Error submitting form:', error);
-      
-      // Nếu có lỗi và đã tạo resident thành công nhưng chưa tạo family account
-      // thì không cần rollback vì resident có thể tồn tại độc lập
-      
-      // Log chi tiết lỗi
       handleAPIError(error, 'Có lỗi xảy ra khi tạo người cao tuổi. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setIsSubmitting(false);
@@ -632,14 +566,13 @@ export default function AddResidentPage() {
       </div>
     );
   }
-  
+
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background pattern */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -652,7 +585,7 @@ export default function AddResidentPage() {
         `,
         pointerEvents: 'none'
       }} />
-      
+
       <div style={{
         position: 'relative',
         zIndex: 1,
@@ -660,10 +593,9 @@ export default function AddResidentPage() {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Header */}
         <div style={{
-          display: 'flex', 
-          alignItems: 'center', 
+          display: 'flex',
+          alignItems: 'center',
           marginBottom: '2rem',
           background: 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(10px)',
@@ -672,7 +604,7 @@ export default function AddResidentPage() {
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
         }}>
           <Link href="/admin/residents" style={{
-            marginRight: '1rem', 
+            marginRight: '1rem',
             color: '#667eea',
             display: 'flex',
             alignItems: 'center',
@@ -684,7 +616,7 @@ export default function AddResidentPage() {
             transition: 'all 0.2s',
             textDecoration: 'none'
           }}>
-            <ArrowLeftIcon style={{height: '1.25rem', width: '1.25rem'}} />
+            <ArrowLeftIcon style={{ height: '1.25rem', width: '1.25rem' }} />
           </Link>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
@@ -700,8 +632,8 @@ export default function AddResidentPage() {
                 <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
               </div>
               <h1 style={{
-                fontSize: '1.875rem', 
-                fontWeight: 700, 
+                fontSize: '1.875rem',
+                fontWeight: 700,
                 margin: 0,
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 WebkitBackgroundClip: 'text',
@@ -721,8 +653,7 @@ export default function AddResidentPage() {
             </p>
           </div>
         </div>
-        
-        {/* Form */}
+
         <div style={{
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
@@ -731,28 +662,26 @@ export default function AddResidentPage() {
           overflow: 'hidden'
         }}>
           <form onSubmit={handleSubmit(onSubmit)}>
-            {/* Personal Information Section */}
             <div style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <UserIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Thông tin cá nhân
                 </h2>
               </div>
             </div>
-            
-            <div style={{padding: '2rem'}}>
-              {/* Avatar Section - Full Width */}
-              <div style={{marginBottom: '2rem'}}>
+
+            <div style={{ padding: '2rem' }}>
+              <div style={{ marginBottom: '2rem' }}>
                 <label style={{
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: 600, 
-                  color: '#374151', 
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
                   marginBottom: '1rem'
                 }}>
                   Ảnh đại diện
@@ -780,9 +709,9 @@ export default function AddResidentPage() {
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
                   }}>
                     {(avatarFile && avatarPreview) ? (
-                      <img 
-                        src={avatarPreview} 
-                        alt="Avatar preview" 
+                      <img
+                        src={avatarPreview}
+                        alt="Avatar preview"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -797,9 +726,9 @@ export default function AddResidentPage() {
                         }}
                       />
                     ) : (
-                      <img 
-                        src="/default-avatar.svg" 
-                        alt="Default avatar" 
+                      <img
+                        src="/default-avatar.svg"
+                        alt="Default avatar"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -828,7 +757,7 @@ export default function AddResidentPage() {
                       {watch('full_name') ? watch('full_name').charAt(0).toUpperCase() : 'U'}
                     </div>
                   </div>
-                  <div style={{flex: 1, maxWidth: '400px'}}>
+                  <div style={{ flex: 1, maxWidth: '400px' }}>
                     <label style={{
                       display: 'block',
                       fontSize: '0.875rem',
@@ -877,17 +806,16 @@ export default function AddResidentPage() {
                 </div>
               </div>
 
-              {/* Personal Information Grid */}
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem'}}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div>
                   <label style={{
-                    display: 'block', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Họ và tên <span style={{color: '#ef4444'}}>*</span>
+                    Họ và tên <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -902,7 +830,7 @@ export default function AddResidentPage() {
                       background: errors.full_name ? '#fef2f2' : 'white'
                     }}
                     placeholder="Nhập họ và tên đầy đủ"
-                    {...register('full_name', { 
+                    {...register('full_name', {
                       required: 'Họ và tên là bắt buộc',
                       minLength: { value: 2, message: 'Tên phải có ít nhất 2 ký tự' },
                       maxLength: { value: 100, message: 'Tên không được quá 100 ký tự' },
@@ -913,21 +841,21 @@ export default function AddResidentPage() {
                     })}
                   />
                   {errors.full_name && (
-                    <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                    <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                       {errors.full_name.message}
                     </p>
                   )}
                 </div>
-                
+
                 <div>
                   <label style={{
-                    display: 'block', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Ngày sinh <span style={{color: '#ef4444'}}>*</span>
+                    Ngày sinh <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -942,7 +870,7 @@ export default function AddResidentPage() {
                       background: errors.date_of_birth ? '#fef2f2' : 'white'
                     }}
                     placeholder="dd/mm/yyyy"
-                    {...register('date_of_birth', { 
+                    {...register('date_of_birth', {
                       required: 'Ngày sinh là bắt buộc',
                       validate: (value) => {
                         if (!value) return 'Ngày sinh là bắt buộc';
@@ -954,13 +882,12 @@ export default function AddResidentPage() {
                         setValue('date_of_birth', formattedDate);
                       },
                       onBlur: (e) => {
-                        // Validate ngày tháng khi blur
                         const dateValidation = validateDate(e.target.value, 'Ngày sinh');
                         if (dateValidation !== true) {
                           setValue('date_of_birth', '', { shouldValidate: true });
                           return;
                         }
-                        
+
                         const formattedDate = formatDateToISO(e.target.value);
                         if (formattedDate) {
                           setValue('date_of_birth', formattedDate, { shouldValidate: true });
@@ -970,21 +897,21 @@ export default function AddResidentPage() {
                     value={watch('date_of_birth') ? formatDateToDisplay(watch('date_of_birth')) : ''}
                   />
                   {errors.date_of_birth && (
-                    <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                    <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                       {errors.date_of_birth.message}
                     </p>
                   )}
                 </div>
-                
+
                 <div>
                   <label style={{
-                    display: 'block', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Giới tính <span style={{color: '#ef4444'}}>*</span>
+                    Giới tính <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     style={{
@@ -1004,7 +931,7 @@ export default function AddResidentPage() {
                     <option value="female">Nữ</option>
                   </select>
                   {errors.gender && (
-                    <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                    <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                       {errors.gender.message}
                     </p>
                   )}
@@ -1012,10 +939,10 @@ export default function AddResidentPage() {
 
                 <div>
                   <label style={{
-                    display: 'block', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
                     Ngày nhập viện
@@ -1033,10 +960,9 @@ export default function AddResidentPage() {
                       background: errors.admission_date ? '#fef2f2' : 'white'
                     }}
                     placeholder="dd/mm/yyyy (để trống để lấy ngày hiện tại)"
-                    {...register('admission_date', { 
+                    {...register('admission_date', {
                       validate: (value) => {
-                        if (!value) return true; // Cho phép để trống
-                        // Validate giá trị hiển thị thay vì giá trị đã format
+                        if (!value) return true;
                         if (admissionDateDisplay) {
                           const dateValidation = validateDate(admissionDateDisplay, 'Ngày nhập viện');
                           return dateValidation;
@@ -1050,15 +976,11 @@ export default function AddResidentPage() {
                       },
                       onBlur: (e) => {
                         if (e.target.value) {
-                          console.log('Validating date:', e.target.value);
                           const dateValidation = validateDate(e.target.value, 'Ngày nhập viện');
-                          console.log('Validation result:', dateValidation);
                           if (dateValidation !== true) {
-                            console.log('Validation failed, keeping original value');
                             return;
                           }
                           const formattedDate = formatDateToISO(e.target.value);
-                          console.log('Formatted date:', formattedDate);
                           if (formattedDate) {
                             setValue('admission_date', formattedDate, { shouldValidate: true });
                           }
@@ -1068,22 +990,21 @@ export default function AddResidentPage() {
                     value={admissionDateDisplay || (watch('admission_date') ? formatDateToDisplay(watch('admission_date')) : '')}
                   />
                   {errors.admission_date && (
-                    <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                    <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                       {errors.admission_date.message}
                     </p>
                   )}
                 </div>
 
-                {/* Mối quan hệ với người cao tuổi */}
                 <div>
                   <label style={{
-                    display: 'block', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Mối quan hệ với người cao tuổi (người giám hộ) <span style={{color: '#ef4444'}}>*</span>
+                    Mối quan hệ với người cao tuổi (người giám hộ) <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     style={{
@@ -1096,7 +1017,7 @@ export default function AddResidentPage() {
                       transition: 'border-color 0.2s',
                       background: errors.relationship ? '#fef2f2' : 'white'
                     }}
-                    {...register('relationship', { 
+                    {...register('relationship', {
                       required: 'Mối quan hệ với gia đình là bắt buộc'
                     })}
                     onChange={(e) => {
@@ -1115,7 +1036,7 @@ export default function AddResidentPage() {
                     <option value="khác">Khác</option>
                   </select>
                   {watch('relationship') === 'khác' && (
-                    <div style={{marginTop: '0.75rem'}}>
+                    <div style={{ marginTop: '0.75rem' }}>
                       <input
                         type="text"
                         placeholder="Nhập mối quan hệ cụ thể..."
@@ -1129,39 +1050,38 @@ export default function AddResidentPage() {
                           transition: 'border-color 0.2s',
                           background: errors.relationship_other ? '#fef2f2' : 'white'
                         }}
-                        {...register('relationship_other', { 
+                        {...register('relationship_other', {
                           required: watch('relationship') === 'khác' ? 'Vui lòng nhập mối quan hệ cụ thể' : false,
                           minLength: { value: 2, message: 'Mối quan hệ phải có ít nhất 2 ký tự' },
                           maxLength: { value: 50, message: 'Mối quan hệ không được quá 50 ký tự' }
                         })}
                       />
                       {errors.relationship_other && (
-                        <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                           {errors.relationship_other.message}
                         </p>
                       )}
                     </div>
                   )}
                   {errors.relationship && (
-                    <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                    <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                       {errors.relationship.message}
                     </p>
                   )}
                 </div>
 
-                {/* Thêm phần chọn loại tài khoản family */}
-                <div style={{ 
-                  gridColumn: '1 / -1', 
-                  border: '2px solid #e5e7eb', 
-                  borderRadius: '0.75rem', 
+                <div style={{
+                  gridColumn: '1 / -1',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '0.75rem',
                   padding: '1.5rem',
                   backgroundColor: '#f9fafb',
                   marginTop: '1rem'
                 }}>
-                  <h3 style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: 600, 
-                    color: '#374151', 
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#374151',
                     marginBottom: '1rem',
                     display: 'flex',
                     alignItems: 'center',
@@ -1172,16 +1092,16 @@ export default function AddResidentPage() {
                     </svg>
                     Tài khoản gia đình
                   </h3>
-                  
+
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{
-                      display: 'block', 
-                      fontSize: '0.875rem', 
-                      fontWeight: 600, 
-                      color: '#374151', 
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      color: '#374151',
                       marginBottom: '0.5rem'
                     }}>
-                      Loại tài khoản gia đình <span style={{color: '#ef4444'}}>*</span>
+                      Loại tài khoản gia đình <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       <label style={{
@@ -1203,7 +1123,7 @@ export default function AddResidentPage() {
                         />
                         <span style={{ fontWeight: 500 }}>Tạo tài khoản mới</span>
                       </label>
-                      
+
                       <label style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1225,23 +1145,22 @@ export default function AddResidentPage() {
                       </label>
                     </div>
                     {errors.family_account_type && (
-                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                         {errors.family_account_type.message}
                       </p>
                     )}
                   </div>
 
-                  {/* Hiển thị dropdown chọn tài khoản family hiện có nếu chọn "existing" */}
                   {familyAccountType === 'existing' && (
                     <div>
                       <label style={{
-                        display: 'block', 
-                        fontSize: '0.875rem', 
-                        fontWeight: 600, 
-                        color: '#374151', 
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
                         marginBottom: '0.5rem'
                       }}>
-                        Chọn tài khoản gia đình <span style={{color: '#ef4444'}}>*</span>
+                        Chọn tài khoản gia đình <span style={{ color: '#ef4444' }}>*</span>
                       </label>
                       <select
                         style={{
@@ -1254,8 +1173,8 @@ export default function AddResidentPage() {
                           transition: 'border-color 0.2s',
                           background: errors.existing_family_id ? '#fef2f2' : 'white'
                         }}
-                        {...register('existing_family_id', { 
-                          required: familyAccountType === 'existing' ? 'Vui lòng chọn tài khoản gia đình' : false 
+                        {...register('existing_family_id', {
+                          required: familyAccountType === 'existing' ? 'Vui lòng chọn tài khoản gia đình' : false
                         })}
                       >
                         <option value="">-- Chọn tài khoản gia đình --</option>
@@ -1266,19 +1185,18 @@ export default function AddResidentPage() {
                         ))}
                       </select>
                       {errors.existing_family_id && (
-                        <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>
                           {errors.existing_family_id.message}
                         </p>
                       )}
                       {existingFamilyAccounts.length === 0 && (
-                        <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#f59e0b', fontWeight: 500}}>
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#f59e0b', fontWeight: 500 }}>
                           Không có tài khoản gia đình nào trong hệ thống. Vui lòng chọn "Tạo tài khoản mới".
                         </p>
                       )}
                     </div>
                   )}
 
-                  {/* Hiển thị thông tin tài khoản mới sẽ được tạo */}
                   {familyAccountType === 'new' && (
                     <div style={{
                       padding: '1rem',
@@ -1287,9 +1205,9 @@ export default function AddResidentPage() {
                       borderRadius: '0.5rem',
                       marginTop: '1rem'
                     }}>
-                      <p style={{ 
-                        fontSize: '0.875rem', 
-                        color: '#0c4a6e', 
+                      <p style={{
+                        fontSize: '0.875rem',
+                        color: '#0c4a6e',
                         margin: 0,
                         display: 'flex',
                         alignItems: 'center',
@@ -1311,58 +1229,55 @@ export default function AddResidentPage() {
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <PhoneIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <PhoneIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Thông tin liên hệ khẩn cấp
                 </h2>
               </div>
             </div>
-            <div style={{padding: '2rem'}}>
+            <div style={{ padding: '2rem' }}>
               {familyAccountType === 'new' && (
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem'}}>
-                  {/* Họ tên người liên hệ */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                   <div>
-                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
-                      Họ tên người liên hệ <span style={{color: '#ef4444'}}>*</span>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                      Họ tên người liên hệ <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
                       type="text"
-                      style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.name ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.name ? '#fef2f2' : 'white'}}
+                      style={{ width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.name ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.name ? '#fef2f2' : 'white' }}
                       placeholder="Họ tên người thân"
                       {...register('emergency_contact.name', { required: 'Người liên hệ khẩn cấp là bắt buộc', minLength: { value: 2, message: 'Tên phải có ít nhất 2 ký tự' }, maxLength: { value: 100, message: 'Tên không được quá 100 ký tự' }, pattern: { value: /^[a-zA-ZÀ-ỹ\s]+$/, message: 'Tên chỉ được chứa chữ cái và khoảng trắng' } })}
                     />
                     {errors.emergency_contact?.name && (
-                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.name.message}</p>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>{errors.emergency_contact.name.message}</p>
                     )}
                   </div>
-                  {/* Số điện thoại khẩn cấp */}
                   <div>
-                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
-                      Số điện thoại khẩn cấp <span style={{color: '#ef4444'}}>*</span>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                      Số điện thoại khẩn cấp <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
                       type="tel"
-                      style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.phone ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.phone ? '#fef2f2' : 'white'}}
+                      style={{ width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.phone ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.phone ? '#fef2f2' : 'white' }}
                       placeholder="0987654321"
                       {...register('emergency_contact.phone', { required: 'Số điện thoại khẩn cấp là bắt buộc', validate: validatePhone, onChange: (e) => { let value = e.target.value.replace(/\D/g, ''); if (value.length > 0 && !value.startsWith('0') && !value.startsWith('84')) { value = '0' + value; } if (value.length > 11) { value = value.substring(0, 11); } e.target.value = value; } })}
                     />
                     {errors.emergency_contact?.phone && (
-                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.phone.message}</p>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>{errors.emergency_contact.phone.message}</p>
                     )}
                   </div>
-                  
-                  {/* Email người liên hệ */}
+
                   <div>
-                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
-                      Email người liên hệ <span style={{color: '#ef4444'}}>*</span>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                      Email người liên hệ <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
                       type="email"
-                      style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.email ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.email ? '#fef2f2' : 'white'}}
+                      style={{ width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.email ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.email ? '#fef2f2' : 'white' }}
                       placeholder="example@email.com"
-                      {...register('emergency_contact.email', { 
-                        required: 'Email là bắt buộc', 
+                      {...register('emergency_contact.email', {
+                        required: 'Email là bắt buộc',
                         validate: validateEmail,
                         pattern: {
                           value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -1371,28 +1286,26 @@ export default function AddResidentPage() {
                       })}
                     />
                     {errors.emergency_contact?.email && (
-                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.email.message}</p>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>{errors.emergency_contact.email.message}</p>
                     )}
                   </div>
-                  {/* Địa chỉ người liên hệ */}
                   <div>
-                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
                       Địa chỉ người liên hệ
                     </label>
                     <input
                       type="text"
-                      style={{width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb', borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: 'white'}}
+                      style={{ width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb', borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: 'white' }}
                       placeholder="Nhập địa chỉ của người liên hệ"
                       {...register('emergency_contact.address')}
                     />
                   </div>
-                  {/* Mối quan hệ với người cao tuổi */}
                   <div>
-                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
-                      Mối quan hệ với người cao tuổi (người liên hệ khẩn cấp) <span style={{color: '#ef4444'}}>*</span>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                      Mối quan hệ với người cao tuổi (người liên hệ khẩn cấp) <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <select
-                      style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.relationship ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.relationship ? '#fef2f2' : 'white'}}
+                      style={{ width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.relationship ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.relationship ? '#fef2f2' : 'white' }}
                       {...register('emergency_contact.relationship', { required: 'Mối quan hệ là bắt buộc' })}
                       onChange={(e) => { if (e.target.value === 'khác') { setValue('emergency_contact.relationship_other', ''); } }}
                     >
@@ -1406,20 +1319,20 @@ export default function AddResidentPage() {
                       <option value="khác">Khác</option>
                     </select>
                     {watch('emergency_contact.relationship') === 'khác' && (
-                      <div style={{marginTop: '0.75rem'}}>
+                      <div style={{ marginTop: '0.75rem' }}>
                         <input
                           type="text"
                           placeholder="Nhập mối quan hệ cụ thể..."
-                          style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.relationship_other ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.relationship_other ? '#fef2f2' : 'white'}}
+                          style={{ width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.relationship_other ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.relationship_other ? '#fef2f2' : 'white' }}
                           {...register('emergency_contact.relationship_other', { required: watch('emergency_contact.relationship') === 'khác' ? 'Vui lòng nhập mối quan hệ cụ thể' : false, minLength: { value: 2, message: 'Mối quan hệ phải có ít nhất 2 ký tự' }, maxLength: { value: 50, message: 'Mối quan hệ không được quá 50 ký tự' } })}
                         />
                         {errors.emergency_contact?.relationship_other && (
-                          <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.relationship_other.message}</p>
+                          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>{errors.emergency_contact.relationship_other.message}</p>
                         )}
                       </div>
                     )}
                     {errors.emergency_contact?.relationship && (
-                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.relationship.message}</p>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500 }}>{errors.emergency_contact.relationship.message}</p>
                     )}
                   </div>
                 </div>
@@ -1432,7 +1345,7 @@ export default function AddResidentPage() {
                   borderRadius: '0.75rem',
                   marginBottom: '2rem'
                 }}>
-                  <h4 style={{fontSize: '1rem', fontWeight: 600, color: '#166534', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#166534', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -1468,27 +1381,26 @@ export default function AddResidentPage() {
               )}
             </div>
 
-            {/* Medical Information Section */}
             <div style={{
               background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
               padding: '1.5rem',
               color: 'white'
             }}>
-              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                <DocumentTextIcon style={{width: '1.25rem', height: '1.25rem'}} />
-                <h2 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <DocumentTextIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
                   Thông tin y tế
                 </h2>
               </div>
             </div>
 
-            <div style={{padding: '2rem'}}>
-              <div style={{marginBottom: '2rem'}}>
+            <div style={{ padding: '2rem' }}>
+              <div style={{ marginBottom: '2rem' }}>
                 <label style={{
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: 600, 
-                  color: '#374151', 
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
                   Tiền sử bệnh lý
@@ -1510,12 +1422,11 @@ export default function AddResidentPage() {
                 />
               </div>
 
-              {/* Medications Section */}
-              <div style={{marginBottom: '2rem'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem'}}>
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <label style={{
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
                     color: '#374151'
                   }}>
                     Thuốc đang sử dụng
@@ -1538,11 +1449,11 @@ export default function AddResidentPage() {
                       transition: 'all 0.2s'
                     }}
                   >
-                    <PlusIcon style={{width: '1rem', height: '1rem'}} />
+                    <PlusIcon style={{ width: '1rem', height: '1rem' }} />
                     Thêm thuốc
                   </button>
                 </div>
-                
+
                 {medications.map((medication, index) => (
                   <div key={index} style={{
                     display: 'grid',
@@ -1603,19 +1514,18 @@ export default function AddResidentPage() {
                           cursor: 'pointer'
                         }}
                       >
-                        <XMarkIcon style={{width: '1rem', height: '1rem'}} />
+                        <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
                       </button>
                     )}
                   </div>
                 ))}
               </div>
 
-              {/* Allergies Section */}
-              <div style={{marginBottom: '2rem'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem'}}>
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <label style={{
-                    fontSize: '0.875rem', 
-                    fontWeight: 600, 
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
                     color: '#374151'
                   }}>
                     Dị ứng
@@ -1638,11 +1548,11 @@ export default function AddResidentPage() {
                       transition: 'all 0.2s'
                     }}
                   >
-                    <PlusIcon style={{width: '1rem', height: '1rem'}} />
+                    <PlusIcon style={{ width: '1rem', height: '1rem' }} />
                     Thêm dị ứng
                   </button>
                 </div>
-                
+
                 {allergies.map((allergy, index) => (
                   <div key={index} style={{
                     display: 'flex',
@@ -1676,7 +1586,7 @@ export default function AddResidentPage() {
                           cursor: 'pointer'
                         }}
                       >
-                        <XMarkIcon style={{width: '1rem', height: '1rem'}} />
+                        <XMarkIcon style={{ width: '1rem', height: '1rem' }} />
                       </button>
                     )}
                   </div>
@@ -1685,16 +1595,15 @@ export default function AddResidentPage() {
 
 
 
-              {/* Action Buttons */}
               <div style={{
-                display: 'flex', 
-                justifyContent: 'flex-end', 
+                display: 'flex',
+                justifyContent: 'flex-end',
                 gap: '1rem',
                 paddingTop: '1.5rem',
                 borderTop: '1px solid #e5e7eb'
               }}>
-                <Link 
-                  href="/admin/residents" 
+                <Link
+                  href="/admin/residents"
                   style={{
                     padding: '0.75rem 2rem',
                     border: '2px solid #e5e7eb',
@@ -1720,7 +1629,7 @@ export default function AddResidentPage() {
                     fontSize: '0.95rem',
                     fontWeight: 600,
                     color: 'white',
-                    background: isSubmitting 
+                    background: isSubmitting
                       ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
                       : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     cursor: isSubmitting ? 'not-allowed' : 'pointer',

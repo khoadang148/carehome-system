@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import ClientLayout from "@/components/layout/ClientLayout";
+import ClientLayout from "@/app/ClientLayout";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ResidentsProvider } from "@/lib/contexts/residents-context";
 import { ActivitiesProvider } from "@/lib/contexts/activities-context";
 import { ChatProvider } from "@/lib/contexts/chat-provider";
-import { ToastProvider } from "@/components/ToastProvider";
-import ChatFloatingButton from "@/components/ChatFloatingButton";
-import { Suspense, lazy } from 'react';
+import { NotificationProvider } from "@/lib/contexts/notification-context";
+import PreloadData from "@/components/PreloadData";
 
 const inter = Inter({ subsets: ["latin"] });
-
-  
-const PerformanceMonitor = lazy(() => import('@/components/PerformanceMonitor'));
 
 export const metadata: Metadata = {
   title: "CareHome - Hệ thống quản lý viện dưỡng lão",
@@ -57,18 +53,18 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <ResidentsProvider>
-            <ActivitiesProvider>
-              <ChatProvider>
-                <ClientLayout>{children}</ClientLayout>
-                <ToastProvider />
-                <ChatFloatingButton />
-                <Suspense fallback={null}>
-                  <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
-                </Suspense>
-              </ChatProvider>
-            </ActivitiesProvider>
-          </ResidentsProvider>
+          <NotificationProvider>
+            <ResidentsProvider>
+              <ActivitiesProvider>
+                <ChatProvider>
+                  <ClientLayout>
+                    {children}
+                    <PreloadData />
+                  </ClientLayout>
+                </ChatProvider>
+              </ActivitiesProvider>
+            </ResidentsProvider>
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>

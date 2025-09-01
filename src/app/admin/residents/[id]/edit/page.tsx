@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
-import { 
-  ArrowLeftIcon, 
-  CheckCircleIcon, 
+import {
+  ArrowLeftIcon,
+  CheckCircleIcon,
   ExclamationTriangleIcon,
   UserIcon,
   HeartIcon,
@@ -22,7 +22,6 @@ import { getErrorMessage } from '@/lib/utils/api-error-handler';
 import { Fragment } from 'react';
 import { userAPI } from "@/lib/api";
 
-// Sửa lại type ResidentFormData cho đồng bộ API mới
 type ResidentFormData = {
   full_name: string;
   date_of_birth: string;
@@ -44,7 +43,6 @@ type ResidentFormData = {
   relationship: string;
 };
 
-// Professional validation rules with high business logic
 const validationRules = {
   full_name: {
     required: 'Tên là bắt buộc',
@@ -128,7 +126,6 @@ const validationRules = {
   relationship: {}
 };
 
-// Care level options with modern styling
 const careLevelOptions = [
   { value: 'Cơ bản', label: 'Gói Cơ bản', color: '#3b82f6', bg: '#dbeafe' },
   { value: 'Nâng cao', label: 'Gói Nâng cao', color: '#10b981', bg: '#dcfce7' },
@@ -152,7 +149,6 @@ const mobilityOptions = [
   'Nằm liệt giường'
 ];
 
-// Helper function chuyển đổi từ yyyy-mm-dd sang dd/mm/yyyy
 const convertToDisplayDate = (dateString: string): string => {
   if (!dateString) return '';
   const [year, month, day] = dateString.split('-');
@@ -162,16 +158,14 @@ const convertToDisplayDate = (dateString: string): string => {
   return dateString;
 };
 
-// Helper function chuyển đổi từ dd/mm/yyyy hoặc yyyy-mm-dd sang ISO yyyy-mm-dd
 const convertToApiDate = (dateString: string): string => {
   if (!dateString) return '';
   const trimmed = dateString.trim();
-  // Support yyyy-mm-dd directly
+
   const isoLike = /^\d{4}-\d{2}-\d{2}$/;
   if (isoLike.test(trimmed)) {
     return `${trimmed}T00:00:00.000Z`;
   }
-  // Support dd/mm/yyyy via existing util
   const converted = convertDDMMYYYYToISO(trimmed);
   if (!converted) return '';
   return `${converted}T00:00:00.000Z`;
@@ -186,39 +180,102 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
   const [formSection, setFormSection] = useState<string>('personal'); // personal, medical, contact, additional
   const [residentData, setResidentData] = useState<any>(null);
   const residentId = React.use(params).id;
-  
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors, isValid, touchedFields }, 
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid, touchedFields },
     reset,
     getValues,
     trigger
   } = useForm<ResidentFormData>({ mode: 'onBlur' });
 
-  // Xóa watchedFields để tránh re-render liên tục
-  // const watchedFields = watch();
-  
-  // State cho danh sách thuốc và dị ứng
   const [medications, setMedications] = useState<{ medication_name: string; dosage: string; frequency: string }[]>([]);
   const [allergyList, setAllergyList] = useState<string[]>([]);
 
-  // Thêm state cho upload ảnh
   const [avatarUploading, setAvatarUploading] = useState(false);
+
+  // Kiểm tra có thay đổi hay không
+  const hasChanges = () => {
+    if (!originalData) return false;
+    
+    const currentValues = getValues();
+    
+
+    
+    // So sánh các trường cơ bản
+    if (currentValues.full_name !== (originalData.full_name || '') ||
+        currentValues.gender !== (originalData.gender || '') ||
+        currentValues.care_level !== (originalData.care_level || '') ||
+        currentValues.status !== (originalData.status || 'active') ||
+        currentValues.emergency_contact_name !== (originalData.emergency_contact?.name || '') ||
+        currentValues.emergency_contact_relationship !== (originalData.emergency_contact?.relationship || '') ||
+        currentValues.emergency_contact_phone !== (originalData.emergency_contact?.phone || '') ||
+        currentValues.contact_phone !== (originalData.contact_phone || '') ||
+        currentValues.medical_history !== (typeof originalData.medical_history === 'string' ? originalData.medical_history : (Array.isArray(originalData.medical_history) ? originalData.medical_history.join(', ') : '')) ||
+        currentValues.notes !== (originalData.notes || '')) {
+      return true;
+    }
+
+    // So sánh ngày sinh
+    const originalDateOfBirth = originalData.date_of_birth ? convertToDisplayDate(originalData.date_of_birth.slice(0, 10)) : '';
+    if (currentValues.date_of_birth !== originalDateOfBirth) {
+      return true;
+    }
+
+    // So sánh ngày nhập viện
+    const originalAdmissionDate = originalData.admission_date ? convertToDisplayDate(originalData.admission_date.slice(0, 10)) : '';
+    if (currentValues.admission_date !== originalAdmissionDate) {
+      return true;
+    }
+
+    // So sánh ngày xuất viện
+    const originalDischargeDate = originalData.discharge_date ? convertToDisplayDate(originalData.discharge_date.slice(0, 10)) : '';
+    if (currentValues.discharge_date !== originalDischargeDate) {
+      return true;
+    }
+
+    // So sánh medications - chuẩn hóa dữ liệu trước khi so sánh
+    const originalMedications = Array.isArray(originalData.current_medications) ? originalData.current_medications : [];
+    const normalizedOriginalMeds = originalMedications.map(med => ({
+      medication_name: med.medication_name || '',
+      dosage: med.dosage || '',
+      frequency: med.frequency || ''
+    }));
+    const normalizedCurrentMeds = medications.map(med => ({
+      medication_name: med.medication_name || '',
+      dosage: med.dosage || '',
+      frequency: med.frequency || ''
+    }));
+    
+    if (JSON.stringify(normalizedCurrentMeds) !== JSON.stringify(normalizedOriginalMeds)) {
+      return true;
+    }
+
+    // So sánh allergies - chuẩn hóa dữ liệu trước khi so sánh
+    const originalAllergies = Array.isArray(originalData.allergies) ? originalData.allergies : [];
+    const normalizedOriginalAllergies = originalAllergies.map(alg => alg || '').filter(alg => alg !== '');
+    const normalizedCurrentAllergies = allergyList.map(alg => alg || '').filter(alg => alg !== '');
+    
+    if (JSON.stringify(normalizedCurrentAllergies) !== JSON.stringify(normalizedOriginalAllergies)) {
+      return true;
+    }
+
+    return false;
+  };
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
+  const [originalData, setOriginalData] = useState<any>(null);
 
   useEffect(() => {
-    // Fetch resident từ API thật
     const fetchResident = async () => {
       setLoading(true);
       try {
         const data = await residentAPI.getById(residentId);
-        setResidentData(data); // chỉ set state, không gọi reset ở đây
+        setResidentData(data);
+        setOriginalData(data);
       } catch (error) {
-        console.error('Error fetching resident:', error);
-        // Redirect về danh sách thay vì hiển thị trang "Không tìm thấy"
         router.push('/admin/residents');
       } finally {
         setLoading(false);
@@ -227,7 +284,6 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
     fetchResident();
   }, [residentId, router]);
 
-  // Đảm bảo chỉ có 1 useEffect gọi reset khi residentData thay đổi
   useEffect(() => {
     if (residentData) {
       reset({
@@ -255,7 +311,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [residentData]);
-  
+
   const onSubmit = async (data: ResidentFormData) => {
     setIsSubmitting(true);
     try {
@@ -264,13 +320,8 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         setIsSubmitting(false);
         return;
       }
-      // Debug: Kiểm tra định dạng ngày tháng
-      console.log('Debug - data.date_of_birth:', data.date_of_birth);
-      console.log('Debug - data.date_of_birth type:', typeof data.date_of_birth);
-      
       const convertedDateOfBirth = convertToApiDate(data.date_of_birth);
-      console.log('Debug - convertToApiDate result:', convertedDateOfBirth);
-      
+
       // Validate date_of_birth
       if (!convertedDateOfBirth) {
         setModalMessage('Ngày sinh không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy');
@@ -279,8 +330,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         setIsSubmitting(false);
         return;
       }
-      
-      // Map dữ liệu form sang request body API chuẩn
+
       const body: any = {
         full_name: data.full_name,
         date_of_birth: convertedDateOfBirth,
@@ -300,31 +350,26 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         relationship: data.relationship,
       };
 
-      // Chỉ gửi admission_date nếu có giá trị hợp lệ
       const convertedAdmissionDate = data.admission_date ? convertToApiDate(data.admission_date) : '';
       if (convertedAdmissionDate) {
         body.admission_date = convertedAdmissionDate;
       }
-      
-      // Xử lý discharge_date - cho phép user xóa ngày xuất viện
+
       if (data.discharge_date && data.discharge_date.trim() !== '') {
         const convertedDischargeDate = convertToApiDate(data.discharge_date);
         if (convertedDischargeDate) {
           body.discharge_date = convertedDischargeDate;
-          // Fallback for backends expecting camelCase
           (body as any).dischargeDate = convertedDischargeDate;
         }
       } else {
-        // Nếu user xóa ngày xuất viện, gửi null để backend cập nhật
         body.discharge_date = null;
         (body as any).dischargeDate = null;
       }
-      
-      // Validate discharge_date vs admission_date
+
       if (body.discharge_date && convertedAdmissionDate) {
         const admissionDate = new Date(convertedAdmissionDate);
         const dischargeDate = new Date(body.discharge_date);
-        
+
         if (dischargeDate < admissionDate) {
           setModalMessage('Ngày xuất viện không thể trước ngày nhập viện');
           setModalType('error');
@@ -333,37 +378,23 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
           return;
         }
       }
-      
-      // Debug: Log request body
-      console.log('🚀 Sending update request with body:', JSON.stringify(body, null, 2));
-      console.log('📅 discharge_date value:', body.discharge_date);
-      console.log('📅 discharge_date type:', typeof body.discharge_date);
-      console.log('🔍 Request body keys:', Object.keys(body));
-      console.log('🔍 discharge_date in body keys:', 'discharge_date' in body);
-      
+
       const updateResponse = await residentAPI.update(residentId, body);
-      console.log('✅ Update response:', updateResponse);
-      console.log('🔍 discharge_date in response:', updateResponse.discharge_date);
-      console.log('🔍 All response fields:', Object.keys(updateResponse));
-      
-      // Refresh dữ liệu sau khi update thành công
+
       try {
         const updatedData = await residentAPI.getById(residentId);
         setResidentData(updatedData);
+        setOriginalData(updatedData);
       } catch (error) {
-        console.error('Error refreshing resident data:', error);
       }
-      
+
       setSuccessMessage('Thông tin người cao tuổi đã được cập nhật thành công!');
       setTimeout(() => {
         router.push(`/admin/residents/${residentId}`);
       }, 2000);
     } catch (error: any) {
-      console.error('Error updating resident:', error);
-      
-      // Xử lý lỗi chi tiết hơn
       const errorMessage = getErrorMessage(error, 'Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
-      
+
       setModalMessage(errorMessage);
       setModalType('error');
       setShowModal(true);
@@ -371,8 +402,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       setIsSubmitting(false);
     }
   };
-  
-  // Show loading state while fetching data
+
   if (loading || !residentId) {
     return (
       <div style={{
@@ -405,8 +435,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       </div>
     );
   }
-  
-  // If resident is not found
+
   if (notFound) {
     return (
       <div style={{
@@ -467,10 +496,9 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
       </div>
     );
   }
-  
-  // Success message
+
   if (successMessage) {
-  return (
+    return (
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
@@ -507,40 +535,37 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
           }}>
             {successMessage}
           </p>
-      </div>
+        </div>
       </div>
     );
   }
 
-  // Form sections navigation
   const formSections = [
     { id: 'personal', label: 'Thông tin cá nhân', icon: UserIcon, color: '#3b82f6' },
     { id: 'medical', label: 'Thông tin y tế', icon: HeartIcon, color: '#ef4444' },
     { id: 'contact', label: 'Thông tin liên hệ', icon: PhoneIcon, color: '#10b981' }
   ];
 
-  // Professional Input component với validation styling
-  const FormInput = ({ 
-    label, 
-    name, 
-    type = 'text', 
-    placeholder, 
+  const FormInput = ({
+    label,
+    name,
+    type = 'text',
+    placeholder,
     required = false,
     options = null,
-    isTextarea = false 
+    isTextarea = false
   }: {
     label: string;
     name: keyof ResidentFormData;
     type?: string;
     placeholder?: string;
     required?: boolean;
-    options?: Array<{value: string, label: string, color?: string, bg?: string}> | null;
+    options?: Array<{ value: string, label: string, color?: string, bg?: string }> | null;
     isTextarea?: boolean;
   }) => {
     const hasError = errors[name];
     const isTouched = touchedFields[name];
-    const hasValue = getValues(name); // Thay watchedFields bằng getValues
-    // Sửa lỗi validationRules: chỉ truyền nếu có, nếu không thì truyền {}
+    const hasValue = getValues(name);
     const validation = Object.prototype.hasOwnProperty.call(validationRules, String(name)) ? validationRules[name as keyof typeof validationRules] : {};
     return (
       <div style={{ marginBottom: '1.5rem' }}>
@@ -649,7 +674,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
         maxWidth: '1000px',
         margin: '0 auto'
       }}>
-        {/* Header */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -666,7 +691,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
           }}>
             <Link
               href={`/admin/residents/${residentId}`}
-                  style={{
+              style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -709,9 +734,9 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                 Cập nhật thông tin chi tiết và tình trạng chăm sóc
               </p>
             </div>
-              </div>
-              
-          {/* Form sections navigation */}
+          </div>
+
+
           <div style={{
             display: 'flex',
             gap: '0.5rem',
@@ -722,18 +747,18 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                 key={section.id}
                 onClick={() => setFormSection(section.id)}
                 type="button"
-                  style={{
+                style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.75rem 1rem',
-                  background: formSection === section.id ? 
+                  background: formSection === section.id ?
                     `linear-gradient(135deg, ${section.color} 0%, ${section.color}dd 100%)` :
                     'rgba(248, 250, 252, 0.8)',
                   color: formSection === section.id ? 'white' : section.color,
                   border: `1px solid ${formSection === section.id ? section.color : '#e2e8f0'}`,
                   borderRadius: '0.75rem',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
@@ -744,9 +769,9 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
               </button>
             ))}
           </div>
-              </div>
-              
-        {/* Form */}
+        </div>
+
+
         <form onSubmit={handleSubmit(onSubmit)}>
           <div style={{
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -755,7 +780,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
             border: '1px solid rgba(255, 255, 255, 0.2)'
           }}>
-            {/* Personal Information Section */}
+
             {formSection === 'personal' && (
               <div>
                 <div style={{
@@ -785,7 +810,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                       Thông tin cá nhân
                     </h2>
                     <p style={{
-                    fontSize: '0.875rem',
+                      fontSize: '0.875rem',
                       color: '#64748b',
                       margin: 0
                     }}>
@@ -860,38 +885,32 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            
-                            // Kiểm tra kích thước file (max 5MB)
+
                             if (file.size > 5 * 1024 * 1024) {
                               toast.error('File quá lớn. Vui lòng chọn file nhỏ hơn 5MB.');
                               return;
                             }
-                            
+
                             setAvatarUploading(true);
                             const formData = new FormData();
                             formData.append('avatar', file);
-                            
+
                             try {
-                              // Sử dụng endpoint avatar của resident
                               const response = await apiClient.patch(`/residents/${residentId}/avatar`, formData, {
                                 headers: {
                                   'Content-Type': 'multipart/form-data',
                                 },
                               });
-                              console.log('Upload response:', response);
-                              
-                              // Sau khi upload thành công, cập nhật form với tên file
+
                               reset({ ...getValues(), avatar: file.name });
                               setModalMessage('Upload ảnh thành công!');
                               setModalType('success');
                               setShowModal(true);
-                              
-                              // Refresh lại dữ liệu resident để cập nhật avatar
+
                               const updatedData = await residentAPI.getById(residentId);
                               setResidentData(updatedData);
-                              
+
                             } catch (error: any) {
-                              console.error('Upload error:', error);
                               if (error.response?.status === 400) {
                                 setModalMessage('File không hợp lệ. Vui lòng chọn file ảnh khác.');
                                 setModalType('error');
@@ -904,8 +923,8 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                               setAvatarUploading(false);
                             }
                           }}
-                          style={{ 
-                            display: 'block', 
+                          style={{
+                            display: 'block',
                             width: '100%',
                             padding: '0.5rem',
                             border: '1px solid #d1d5db',
@@ -919,13 +938,13 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                           </span>
                         )}
                       </div>
-                      </div>
                     </div>
                   </div>
                 </div>
-              )}
-              
-            {/* Medical Information Section */}
+              </div>
+            )}
+
+
             {formSection === 'medical' && (
               <div>
                 <div style={{
@@ -955,14 +974,14 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                       Thông tin y tế
                     </h2>
                     <p style={{
-                    fontSize: '0.875rem',
+                      fontSize: '0.875rem',
                       color: '#64748b',
                       margin: 0
                     }}>
                       Tình trạng sức khỏe, thuốc men và dị ứng
                     </p>
-              </div>
-            </div>
+                  </div>
+                </div>
 
                 <div style={{
                   display: 'grid',
@@ -975,7 +994,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     placeholder="VD: Hypertension, Arthritis, Diabetes (cách nhau bằng dấu phẩy)"
                     isTextarea
                   />
-                  
+
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
                       Thuốc đang sử dụng
@@ -1020,7 +1039,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     ))}
                     <button type="button" onClick={() => setMedications(meds => [...meds, { medication_name: '', dosage: '', frequency: '' }])} style={{ color: '#3b82f6', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer', marginTop: 4 }}>+ Thêm thuốc</button>
                   </div>
-                  
+
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
                       Dị ứng
@@ -1043,14 +1062,14 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     ))}
                     <button type="button" onClick={() => setAllergyList(algs => [...algs, ''])} style={{ color: '#3b82f6', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer', marginTop: 4 }}>+ Thêm dị ứng</button>
                   </div>
-                  
-          </div>
+
+                </div>
               </div>
             )}
-          
-          {/* Contact Information Section */}
+
+
             {formSection === 'contact' && (
-          <div>
+              <div>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1075,18 +1094,18 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                       margin: 0,
                       color: '#1e293b'
                     }}>
-              Thông tin liên hệ khẩn cấp
-            </h2>
+                      Thông tin liên hệ khẩn cấp
+                    </h2>
                     <p style={{
-                    fontSize: '0.875rem',
+                      fontSize: '0.875rem',
                       color: '#64748b',
                       margin: 0
                     }}>
                       Người liên hệ trong trường hợp khẩn cấp
                     </p>
                   </div>
-              </div>
-              
+                </div>
+
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -1098,14 +1117,14 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     placeholder="VD: Bob Johnson"
                     required
                   />
-                  
+
                   <FormInput
                     label="Quan hệ với người liên hệ*"
                     name="emergency_contact_relationship"
                     placeholder="VD: Bố, vợ, con, người thân"
                     required
                   />
-                  
+
                   <FormInput
                     label="Số điện thoại liên hệ khẩn cấp*"
                     name="emergency_contact_phone"
@@ -1113,7 +1132,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     placeholder="VD: 0123456789 hoặc +84123456789"
                     required
                   />
-              </div>
+                </div>
 
                 <div style={{
                   marginTop: '1.5rem',
@@ -1136,7 +1155,7 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     }}>
                       Lưu ý về thông tin liên hệ
                     </span>
-            </div>
+                  </div>
                   <ul style={{
                     margin: 0,
                     paddingLeft: '1.25rem',
@@ -1148,11 +1167,11 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
                     <li>Người liên hệ sẽ được thông báo trong trường hợp khẩn cấp</li>
                     <li>Thông tin này sẽ được bảo mật theo quy định</li>
                   </ul>
-          </div>
+                </div>
               </div>
             )}
-            
-            {/* Form Actions */}
+
+
             <div style={{
               marginTop: '2rem',
               paddingTop: '2rem',
@@ -1161,68 +1180,70 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
               gap: '1rem',
               justifyContent: 'flex-end'
             }}>
-            <Link 
+              <Link
                 href={`/admin/residents/${residentId}`}
-              style={{
+                style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.75rem 1.5rem',
-                border: '1px solid #d1d5db', 
+                  border: '1px solid #d1d5db',
                   borderRadius: '0.5rem',
                   backgroundColor: 'white',
                   color: '#374151',
                   textDecoration: 'none',
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                  transition: 'all 0.2s ease'
-              }}
-            >
-                Hủy bỏ
-            </Link>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1.5rem',
-                  background: isSubmitting ? '#d1d5db' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
                   transition: 'all 0.2s ease'
                 }}
               >
-                {isSubmitting ? (
-                  <>
-                    <div style={{
-                      width: '1rem',
-                      height: '1rem',
-                      borderRadius: '50%',
-                      border: '2px solid transparent',
-                      borderTop: '2px solid white',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    Đang cập nhật...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
-                    Cập nhật thông tin
-                  </>
-                )}
-            </button>
+                Hủy bỏ
+              </Link>
+              {hasChanges() && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.5rem',
+                    background: isSubmitting ? '#d1d5db' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div style={{
+                        width: '1rem',
+                        height: '1rem',
+                        borderRadius: '50%',
+                        border: '2px solid transparent',
+                        borderTop: '2px solid white',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon style={{ width: '1rem', height: '1rem' }} />
+                      Cập nhật thông tin
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>
       </div>
 
-      {/* Custom Modal */}
+
       {showModal && (
         <div style={{
           position: 'fixed',
@@ -1277,28 +1298,28 @@ export default function EditResidentPage({ params }: { params: Promise<{ id: str
             }}>
               {modalMessage}
             </p>
-              <button
-                onClick={() => setShowModal(false)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-                  }}
-                >
+            <button
+              onClick={() => setShowModal(false)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+              }}
+            >
               OK
-                </button>
+            </button>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   ArrowLeftIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -41,7 +41,7 @@ interface PhotoData {
 export default function PhotoGalleryPage() {
   const { user } = useAuth();
   const router = useRouter();
-  
+
   const [photos, setPhotos] = useState<PhotoData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterResident, setFilterResident] = useState('');
@@ -76,7 +76,7 @@ export default function PhotoGalleryPage() {
     };
     fetchPhotos();
   }, [filterResident, filterActivityType, filterDateRange]);
-   
+
   // Load residents from API cho dropdown filter - chỉ lấy những resident đã hoàn tất đăng ký
   useEffect(() => {
     const fetchResidents = async () => {
@@ -126,7 +126,7 @@ export default function PhotoGalleryPage() {
         }
         return p.resident_id;
       })));
-      
+
       for (const residentId of residentIds) {
         if (!residentId || roomNumbers[residentId]) {
           continue;
@@ -134,9 +134,9 @@ export default function PhotoGalleryPage() {
         try {
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
+            const bedAssignment = Array.isArray(bedAssignments) ?
               bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-            
+
             if (bedAssignment?.bed_id?.room_id) {
               if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
                 setRoomNumbers((prev) => ({ ...prev, [residentId]: bedAssignment.bed_id.room_id.room_number }));
@@ -152,11 +152,11 @@ export default function PhotoGalleryPage() {
             }
           } catch (bedError) {
             const assignments = await carePlansAPI.getByResidentId(residentId);
-            
+
             const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
             const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-            
+
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
               setRoomNumbers((prev) => ({ ...prev, [residentId]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
@@ -187,14 +187,14 @@ export default function PhotoGalleryPage() {
       document.body.style.overflow = 'unset';
     };
   }, [showModal]);
-  
+
   // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (!['admin', 'staff', 'family'].includes(String(user.role))) {
       router.push('/');
       return;
@@ -207,8 +207,8 @@ export default function PhotoGalleryPage() {
       (getResidentNameByResidentId(photo.resident_id).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (Array.isArray(photo.tags) && photo.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm.toLowerCase())));
 
-    const photoResidentId = typeof photo.resident_id === 'object' && photo.resident_id && '_id' in photo.resident_id 
-      ? (photo.resident_id as any)._id 
+    const photoResidentId = typeof photo.resident_id === 'object' && photo.resident_id && '_id' in photo.resident_id
+      ? (photo.resident_id as any)._id
       : photo.resident_id;
     const matchesResident = filterResident === '' || photoResidentId === filterResident;
     const matchesActivityType = filterActivityType === '' || photo.activity_type === filterActivityType;
@@ -255,7 +255,7 @@ export default function PhotoGalleryPage() {
   const handlePhotoClick = (photo: PhotoData) => {
     setSelectedPhoto(photo);
     setShowModal(true);
-    
+
     // No viewCount in new API, just open modal
   };
 
@@ -270,7 +270,9 @@ export default function PhotoGalleryPage() {
     return photosAPI.getPhotoUrl(photo.file_path);
   };
 
-  const getResidentNameByResidentId = (residentId: string | { _id: string, full_name: string, date_of_birth: string, gender: string }) => {
+  const getResidentNameByResidentId = (residentId: string | { _id: string, full_name: string, date_of_birth: string, gender: string } | null) => {
+    if (!residentId) return 'Không rõ';
+    
     if (typeof residentId === 'object') {
       if (residentId.full_name) return residentId.full_name;
       if (residentId._id) {
@@ -283,7 +285,9 @@ export default function PhotoGalleryPage() {
     return resident ? resident.full_name : 'Không rõ';
   };
 
-  const getStaffNameById = (staffId: string | { _id: string, full_name: string, position: string }) => {
+  const getStaffNameById = (staffId: string | { _id: string, full_name: string, position: string } | null) => {
+    if (!staffId) return 'Không rõ';
+    
     if (typeof staffId === 'object' && staffId?.full_name) return staffId.full_name;
     const staff = staffs.find((s: any) => s._id === (typeof staffId === 'object' ? staffId._id : staffId));
     return staff ? staff.full_name : 'Không rõ';
@@ -319,16 +323,16 @@ export default function PhotoGalleryPage() {
 
           <div className="p-8">
             <div className="grid [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] gap-4 mb-4">
-               <div className="relative">
-                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-[1]" />
-                 <input
-                   type="text"
-                   placeholder="Tìm kiếm theo mô tả, tên cụ, tags..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="w-full pl-11 pr-3 py-3 rounded-xl border-2 border-gray-200 text-[0.95rem] outline-none bg-white"
-                 />
-               </div>
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-[1]" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo mô tả, tên cụ, tags..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-11 pr-3 py-3 rounded-xl border-2 border-gray-200 text-[0.95rem] outline-none bg-white"
+                />
+              </div>
 
               <select
                 value={filterResident}
@@ -372,8 +376,8 @@ export default function PhotoGalleryPage() {
               Chưa có ảnh nào
             </h3>
             <p className="text-gray-500 m-0">
-              {photos.length === 0 
-                ? 'Chưa có ảnh nào được đăng tải.' 
+              {photos.length === 0
+                ? 'Chưa có ảnh nào được đăng tải.'
                 : 'Không tìm thấy ảnh nào phù hợp với bộ lọc hiện tại.'
               }
             </p>
@@ -430,7 +434,7 @@ export default function PhotoGalleryPage() {
                       <span className="font-semibold">Ngày đăng:</span>
                       <span className="text-slate-500">{formatDate(photo.upload_date)}</span>
                     </div>
-                    
+
                   </div>
                 </div>
               </div>

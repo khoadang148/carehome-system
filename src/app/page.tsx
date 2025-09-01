@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -10,26 +11,45 @@ export default function Home() {
   const pathname = usePathname();
   
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        if (pathname !== '/login') {
-          router.push('/login');
-        }
-      } else {
-        if (user.role === 'family') {
-          router.push('/family');
-        } else if (user.role === 'admin') {
-          router.push('/admin');
-        } else if (user.role === 'staff') {
-          router.push('/staff');
-        } else {
-          router.push('/login');
-        }
+    if (!loading && user) {
+      const targetPath = user.role === 'family' ? '/family' : 
+                        user.role === 'admin' ? '/admin' : 
+                        user.role === 'staff' ? '/staff' : '/login';
+      
+      if (pathname === '/') {
+        router.replace(targetPath);
       }
     }
-  }, [user, router, pathname]);
+  }, [user, loading, router, pathname]);
   
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
   
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600">Chuyển hướng đến trang đăng nhập...</p>
+        </div>
+      </div>
+    );
+  }
   
-  return null;
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
+      <div className="text-center">
+        <LoadingSpinner size="lg" />
+        <p className="mt-4 text-gray-600">Đang chuyển hướng...</p>
+      </div>
+    </div>
+  );
 }

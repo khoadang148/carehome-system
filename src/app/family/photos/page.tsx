@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react"
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from "next/navigation";
 import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownTrayIcon, XMarkIcon, EyeIcon, UsersIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/contexts/auth-context";
@@ -22,9 +22,6 @@ export default function FamilyPhotosPage() {
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>('all');
 
-
-
-
   useEffect(() => {
     staffAPI.getAll().then(data => {
       setStaffList(Array.isArray(data) ? data : []);
@@ -33,7 +30,7 @@ export default function FamilyPhotosPage() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     if (!user) {
       setLoading(false);
       setError("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
@@ -47,14 +44,14 @@ export default function FamilyPhotosPage() {
     }
     setLoading(true);
     setError(null);
-    
+
     photosAPI.getAll({ family_member_id: user.id })
       .then(async (allPhotosData) => {
-        
+
         const mapped = await Promise.all(allPhotosData.map(async item => {
           let senderName = item.uploadedByName;
           let senderPosition = '';
-          
+
           if (item.uploaded_by) {
             if (typeof item.uploaded_by === 'object' && item.uploaded_by.full_name) {
               senderName = item.uploaded_by.full_name;
@@ -66,18 +63,17 @@ export default function FamilyPhotosPage() {
                   senderName = userInfo.full_name;
                   senderPosition = userInfo.position || '';
                 }
-              } catch (e) { 
-                console.log('Error fetching user info:', e);
+                            } catch (e) { 
               }
             }
           }
-          
+
           if (!senderName && item.uploadedBy) {
             const staff = staffList.find(s => String(s._id) === String(item.uploadedBy));
             senderName = staff ? (staff.fullName || staff.name || staff.username || staff.email) : undefined;
             senderPosition = staff ? (staff.position || '') : '';
           }
-          
+
           let imageUrl = item.file_path ? photosAPI.getPhotoUrl(item.file_path) : "";
           const result = {
             ...item,
@@ -93,7 +89,7 @@ export default function FamilyPhotosPage() {
           };
           return result;
         }));
-        
+
         setAllPhotos(mapped);
         if (mapped.length === 0) {
           setError("Chưa có ảnh nào được chia sẻ cho người thân của bạn.");
@@ -101,7 +97,6 @@ export default function FamilyPhotosPage() {
         setLoading(false);
       })
       .catch(err => {
-        console.error('Error fetching photos:', err);
         setError("Không thể tải danh sách ảnh. Có thể bạn không có quyền xem hoặc chưa có ảnh nào được chia sẻ.");
         setLoading(false);
       });
@@ -144,7 +139,7 @@ export default function FamilyPhotosPage() {
       }, {} as Record<string, any[]>),
     [filteredPhotos]
   );
-  
+
   const sortedDates = useMemo(
     () => Object.keys(groupedPhotos).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
     [groupedPhotos]
@@ -154,7 +149,7 @@ export default function FamilyPhotosPage() {
     const idx = filteredPhotos.findIndex((p: any) => p.id === photoId);
     setLightboxIndex(idx);
   };
-  
+
   const closeLightbox = () => setLightboxIndex(null);
   const prevLightbox = () => setLightboxIndex(i => (i !== null && i > 0 ? i - 1 : i));
   const nextLightbox = () => setLightboxIndex(i => (i !== null && i < filteredPhotos.length - 1 ? i + 1 : i));
@@ -189,36 +184,43 @@ export default function FamilyPhotosPage() {
         <div className="flex items-center justify-between gap-10 flex-wrap">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-6">
+              <button
+                onClick={() => router.push('/')}
+                className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                title="Quay lại"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
               <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-lg">
                 <PhotoIcon className="w-8 h-8 text-white" />
-        </div>
+              </div>
               <div className="flex flex-col gap-1">
                 <span className="text-2xl font-bold bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent leading-tight tracking-tight">
-            Nhật ký hình ảnh
-          </span>
+                  Nhật ký hình ảnh
+                </span>
                 <span className="text-lg text-slate-500 font-medium">
-            Khoảnh khắc đáng nhớ của người thân tại viện
-          </span>
-        </div>
-      </div>
-    </div>
+                  Khoảnh khắc đáng nhớ của người thân tại viện
+                </span>
+              </div>
+            </div>
+          </div>
 
           <div className="flex items-center flex-1 justify-end min-w-80">
             <div className="relative min-w-80 max-w-lg w-full">
               <span className="absolute left-6 top-1/2 transform -translate-y-1/2 text-slate-300 text-2xl pointer-events-none z-10">
-          <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </span>
-        <input
-          type="text"
-          placeholder="Tìm kiếm ảnh, chú thích, người gửi..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
+                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Tìm kiếm ảnh, chú thích, người gửi..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="w-full py-4 px-12 rounded-3xl border-2 border-slate-200 text-lg bg-slate-50 text-slate-700 shadow-sm outline-none font-medium tracking-wide transition-all duration-200 focus:border-red-500 focus:shadow-lg focus:shadow-red-100"
-        />
+              />
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
 
       <div className="max-w-7xl mx-auto px-10 pb-2 flex items-start justify-start mb-4">
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-emerald-200 rounded-2xl shadow-sm p-3 flex items-center gap-3 min-w-0 max-w-none w-auto m-0 flex-nowrap">
@@ -255,13 +257,12 @@ export default function FamilyPhotosPage() {
                     key={photo.id || idx}
                     className="relative rounded-2xl overflow-hidden bg-slate-50 shadow-lg group"
                   >
-                    <img 
-                      src={photo.url} 
-                      alt={photo.caption} 
+                    <img
+                      src={photo.url}
+                      alt={photo.caption}
                       onClick={() => router.push(`/family/photos/${photo.id}`)}
                       className="w-full h-56 object-cover block bg-gray-100 rounded-2xl cursor-pointer transition-transform duration-200 group-hover:scale-105"
                       onError={(e) => {
-                        console.error('Image failed to load:', photo.url);
                         e.currentTarget.style.display = 'none';
                         const placeholder = document.createElement('div');
                         placeholder.innerHTML = `
@@ -279,15 +280,15 @@ export default function FamilyPhotosPage() {
                         e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
                       }}
                     />
-                    
-                      <button
+
+                    <button
                       onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
                       className="absolute top-3 right-3 bg-gradient-to-br from-white to-slate-50 border-2 border-red-500 rounded-lg text-red-500 p-2 cursor-pointer text-base font-medium shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-gradient-to-br hover:from-red-500 hover:to-red-600 hover:text-white hover:-translate-y-1 hover:scale-105 hover:shadow-xl"
                       title="Tải ảnh xuống"
                     >
                       <ArrowDownTrayIcon className="w-4 h-4" />
-                      </button>
-                    
+                    </button>
+
                     <button
                       onClick={() => router.push(`/family/photos/${photo.id}`)}
                       title="Xem chi tiết ảnh"
@@ -305,35 +306,35 @@ export default function FamilyPhotosPage() {
 
       {lightboxIndex !== null && filteredPhotos[lightboxIndex] && (
         <div className="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center animate-fadeIn" onClick={closeLightbox}>
-          <button 
+          <button
             onClick={closeLightbox}
             title="Đóng"
             className="absolute top-24 right-16 bg-white/25 text-white border border-white/20 rounded-full text-lg cursor-pointer z-10 p-4 font-light backdrop-blur-sm shadow-lg transition-all duration-300 flex items-center justify-center hover:-translate-y-1 hover:shadow-xl hover:bg-white/35"
           >
             <XMarkIcon className="w-4 h-4" />
           </button>
-          
-          <button 
-            onClick={e => { e.stopPropagation(); prevLightbox(); }} 
+
+          <button
+            onClick={e => { e.stopPropagation(); prevLightbox(); }}
             className="absolute left-10 top-1/2 transform -translate-y-1/2 bg-white/15 text-white border-none rounded-2xl text-4xl cursor-pointer z-10 px-6 font-bold shadow-lg"
           >
             <ChevronLeftIcon className="w-9 h-9" />
           </button>
-          
-          <img 
-            src={filteredPhotos[lightboxIndex].url} 
-            alt={filteredPhotos[lightboxIndex].caption} 
-            className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-white object-contain" 
-            onClick={e => e.stopPropagation()} 
+
+          <img
+            src={filteredPhotos[lightboxIndex].url}
+            alt={filteredPhotos[lightboxIndex].caption}
+            className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-white object-contain"
+            onClick={e => e.stopPropagation()}
           />
-          
-          <button 
-            onClick={e => { e.stopPropagation(); nextLightbox(); }} 
+
+          <button
+            onClick={e => { e.stopPropagation(); nextLightbox(); }}
             className="absolute right-10 top-1/2 transform -translate-y-1/2 bg-white/15 text-white border-none rounded-2xl text-4xl cursor-pointer z-10 px-6 font-bold shadow-lg"
           >
             <ChevronRightIcon className="w-9 h-9" />
-         </button>
-         
+          </button>
+
           <div className="absolute bottom-14 left-0 right-0 text-center flex justify-center pointer-events-none">
             <div className="bg-slate-900/70 rounded-2xl p-6 inline-block text-white min-w-64 font-bold text-shadow-lg text-lg">
               <div className="text-xl font-bold mb-3">{filteredPhotos[lightboxIndex].caption}</div>

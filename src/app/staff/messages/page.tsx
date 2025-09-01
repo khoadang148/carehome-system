@@ -272,7 +272,7 @@ export default function StaffMessagesPage() {
 	if (loading) {
 		return (
 			<div className="h-screen bg-white flex items-center justify-center">
-				        <LoadingSpinner size="lg" text="Đang tải..." />
+				<LoadingSpinner size="lg" text="Đang tải..." />
 			</div>
 		);
 	}
@@ -282,12 +282,12 @@ export default function StaffMessagesPage() {
 			<div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-4 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-6">
 				<div className="flex items-center justify-between gap-10 flex-wrap">
 					<div className="flex items-center gap-6">
-					<button
-							 onClick={() => router.back()}
-							 className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-							 title="Quay lại trang trước"
-						 >
-						 <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+						<button
+							onClick={() => router.back()}
+							className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+							title="Quay lại trang trước"
+						>
+							<ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
 						</button>
 						<div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
 							<ChatBubbleLeftRightIcon className="w-6 h-6 text-white" />
@@ -346,11 +346,10 @@ export default function StaffMessagesPage() {
 									<div
 										key={conversation.key}
 										onClick={() => handleConversationSelect(conversation)}
-										className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-											selectedConversation?.key === conversation.key
+										className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${selectedConversation?.key === conversation.key
 												? 'bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200'
 												: 'bg-white hover:bg-gray-50 border border-transparent hover:border-gray-200'
-										}`}
+											}`}
 									>
 										<div className="flex items-center gap-2">
 											<img
@@ -414,88 +413,86 @@ export default function StaffMessagesPage() {
 									</div>
 								</div>
 
-							<div
-								id="messages-container"
-								className="flex-1 overflow-y-auto min-h-0 p-6 space-y-3"
-							>
-								{messages.length === 0 ? (
-									<div className="flex flex-col items-center justify-center h-full text-gray-500">
-										<ChatBubbleLeftRightIcon className="w-12 h-12 text-gray-300 mb-2" />
-										<p className="text-base font-medium">Chưa có tin nhắn nào</p>
-										<p className="text-sm">Bắt đầu cuộc trò chuyện</p>
-									</div>
-								) : (
-									messages.map((message, index) => {
-										const isOwnMessage =
-											message.sender_id === user?.id ||
-											(typeof message.sender_id === 'object' && message.sender_id._id === user?.id);
+								<div
+									id="messages-container"
+									className="flex-1 overflow-y-auto min-h-0 p-6 space-y-3"
+								>
+									{messages.length === 0 ? (
+										<div className="flex flex-col items-center justify-center h-full text-gray-500">
+											<ChatBubbleLeftRightIcon className="w-12 h-12 text-gray-300 mb-2" />
+											<p className="text-base font-medium">Chưa có tin nhắn nào</p>
+											<p className="text-sm">Bắt đầu cuộc trò chuyện</p>
+										</div>
+									) : (
+										messages.map((message, index) => {
+											const isOwnMessage =
+												message.sender_id === user?.id ||
+												(typeof message.sender_id === 'object' && message.sender_id._id === user?.id);
 
-										return (
-											<div
-												key={`${message._id || message.timestamp || 'msg'}-${index}`}
-												className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-											>
+											return (
 												<div
-													className={`max-w-[64%] md:max-w-[54%] lg:max-w-[50%] px-4 py-2 rounded-2xl ${
-														isOwnMessage
-															? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-															: 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-900'
-												}`}
+													key={`${message._id || message.timestamp || 'msg'}-${index}`}
+													className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
 												>
-													<p className="text-sm break-words">{message.content}</p>
 													<div
-														className={`flex items-center justify-between mt-1 text-xs ${
-															isOwnMessage ? 'text-blue-100' : 'text-gray-500'
-														}`}
+														className={`max-w-[64%] md:max-w-[54%] lg:max-w-[50%] px-4 py-2 rounded-2xl ${isOwnMessage
+																? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
+																: 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-900'
+															}`}
 													>
-														<span>
-															{new Date(message.timestamp).toLocaleTimeString('vi-VN', {
-																hour: '2-digit',
-																minute: '2-digit'
-															})}
-														</span>
-														{isOwnMessage && <CheckSolid className="w-3 h-3" />}
+														<p className="text-sm break-words">{message.content}</p>
+														<div
+															className={`flex items-center justify-between mt-1 text-xs ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+																}`}
+														>
+															<span>
+																{new Date(message.timestamp).toLocaleTimeString('vi-VN', {
+																	hour: '2-digit',
+																	minute: '2-digit'
+																})}
+															</span>
+															{isOwnMessage && <CheckSolid className="w-3 h-3" />}
+														</div>
 													</div>
 												</div>
-											</div>
-										);
-									})
-								)}
-							</div>
+											);
+										})
+									)}
+								</div>
 
-							<div className="flex-shrink-0 p-4 border-t border-gray-200">
-								<div className="flex gap-3 pr-3">
-									<input
-										type="text"
-										value={newMessage}
-										onChange={(e) => setNewMessage(e.target.value)}
-										onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-										placeholder="Nhập tin nhắn..."
-										className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
-										disabled={sending}
-									/>
-									<button
-										onClick={handleSendMessage}
-										disabled={!newMessage.trim() || sending}
-										className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
-									>
-										        {sending ? <LoadingSpinner size="sm" /> : <PaperAirplaneIcon className="w-4 h-4" />}
-									</button>
+								<div className="flex-shrink-0 p-4 border-t border-gray-200">
+									<div className="flex gap-3 pr-3">
+										<input
+											type="text"
+											value={newMessage}
+											onChange={(e) => setNewMessage(e.target.value)}
+											onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+											placeholder="Nhập tin nhắn..."
+											className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+											disabled={sending}
+										/>
+										<button
+											onClick={handleSendMessage}
+											disabled={!newMessage.trim() || sending}
+											className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
+										>
+											{sending ? <LoadingSpinner size="sm" /> : <PaperAirplaneIcon className="w-4 h-4" />}
+										</button>
+									</div>
+								</div>
+							</>
+						) : (
+							<div className="flex-1 flex items-center justify-center text-gray-500">
+								<div className="text-center">
+									<ChatBubbleLeftRightIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+									<p className="text-lg font-medium">Chọn cuộc trò chuyện</p>
+									<p className="text-sm">Để bắt đầu trao đổi</p>
 								</div>
 							</div>
-						</>
-					) : (
-						<div className="flex-1 flex items-center justify-center text-gray-500">
-							<div className="text-center">
-								<ChatBubbleLeftRightIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-								<p className="text-lg font-medium">Chọn cuộc trò chuyện</p>
-								<p className="text-sm">Để bắt đầu trao đổi</p>
-							</div>
-						</div>
-					)}
+						)}
+					</div>
 				</div>
 			</div>
-		</div>
 		</div>
 	);
 }

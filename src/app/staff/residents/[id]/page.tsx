@@ -23,6 +23,7 @@ import { bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { careNotesAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 
@@ -72,7 +73,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           ? assignments.filter(assignment => assignment && assignment._id)
           : [];
         
-        // Filter out expired assignments
+        // Chỉ hiển thị assignments đang hoạt động
         const now = new Date();
         const filteredActiveAssignments = validAssignments.filter((assignment: any) => {
           const notExpired = !assignment?.end_date || new Date(assignment.end_date) >= now;
@@ -445,7 +446,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                               <span>{plan.plan_name || 'Gói dịch vụ'}</span>
                             </div>
                             <div className="text-sm text-gray-700 mb-2">
-                              Giá: {plan.monthly_price !== undefined ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(plan.monthly_price) : '---'}
+                              Giá: {plan.monthly_price !== undefined ? formatDisplayCurrency(plan.monthly_price) : '---'}
                             </div>
                             
                           </div>

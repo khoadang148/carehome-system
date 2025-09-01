@@ -41,6 +41,7 @@ export default function EditStaffPage() {
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [originalData, setOriginalData] = useState<any>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -54,23 +55,15 @@ export default function EditStaffPage() {
     avatar: null as File | null
   });
 
-  // Fetch staff data
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
-    
+
     const fetchStaff = async () => {
       try {
         setLoadingData(true);
         const data = await staffAPI.getById(staffId);
         setStaff(data);
-        console.log('Staff data loaded:', data);
-        console.log('Staff avatar:', data.avatar);
-        console.log('Staff avatar type:', typeof data.avatar);
-        console.log('Staff avatar length:', data.avatar?.length);
-        
-        console.log('Staff data from API:', data);
-        console.log('Original join_date:', data.join_date);
-        
+
         const initialFormData = {
           full_name: data.full_name || '',
           email: data.email || '',
@@ -83,21 +76,18 @@ export default function EditStaffPage() {
             try {
               const date = new Date(data.join_date);
               if (isNaN(date.getTime())) {
-                console.log('Invalid join_date from API:', data.join_date);
                 return '';
               }
               return date.toISOString().split('T')[0];
             } catch (error) {
-              console.log('Error parsing join_date:', data.join_date, error);
               return '';
             }
           })() : '',
           avatar: null
         };
-        
-        console.log('Initial form data:', initialFormData);
-        console.log('Initial join_date:', initialFormData.join_date);
-        
+
+
+
         setFormData(initialFormData);
         setOriginalData(initialFormData);
         setHasChanges(false);
@@ -111,97 +101,163 @@ export default function EditStaffPage() {
     fetchStaff();
   }, [user, staffId]);
 
+  const validateField = (field: string, value: any) => {
+    let errorMessage = '';
+    
+    switch (field) {
+      case 'full_name':
+        if (!value || !value.trim()) {
+          errorMessage = 'Họ và tên không được để trống';
+        } else if (value.trim().length < 2) {
+          errorMessage = 'Họ và tên phải có ít nhất 2 ký tự';
+        }
+        break;
+      case 'email':
+        if (!value || !value.trim()) {
+          errorMessage = 'Email không được để trống';
+        } else {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            errorMessage = 'Email không đúng định dạng';
+          }
+        }
+        break;
+      case 'phone':
+        if (!value || !value.trim()) {
+          errorMessage = 'Số điện thoại không được để trống';
+        } else {
+          const phoneRegex = /^(0|\+84)[0-9]{9,10}$/;
+          if (!phoneRegex.test(value)) {
+            errorMessage = 'Số điện thoại không đúng định dạng Việt Nam';
+          }
+        }
+        break;
+      case 'position':
+        if (!value || !value.trim()) {
+          errorMessage = 'Vị trí công việc không được để trống';
+        }
+        break;
+      case 'qualification':
+        if (!value || !value.trim()) {
+          errorMessage = 'Bằng cấp không được để trống';
+        }
+        break;
+      case 'join_date':
+        if (!value || !value.trim()) {
+          errorMessage = 'Ngày vào làm không được để trống';
+        } else {
+          // Kiểm tra cả định dạng dd/mm/yyyy và ISO format
+          const ddmmRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+          const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+          
+          const isDDMM = ddmmRegex.test(value);
+          const isISO = isoRegex.test(value);
+          
+          if (!isDDMM && !isISO) {
+            errorMessage = 'Ngày vào làm phải theo định dạng dd/mm/yyyy';
+          } else {
+            // Kiểm tra ngày hợp lệ
+            let dateToCheck = value;
+            if (isDDMM) {
+              const isoDate = convertDDMMYYYYToISO(value);
+              if (!isoDate) {
+                errorMessage = 'Ngày không hợp lệ';
+              } else {
+                dateToCheck = isoDate;
+              }
+            }
+            
+            if (dateToCheck) {
+              const date = new Date(dateToCheck);
+              if (isNaN(date.getTime())) {
+                errorMessage = 'Ngày không hợp lệ';
+              }
+            }
+          }
+        }
+        break;
+    }
+    
+    setFieldErrors(prev => ({ ...prev, [field]: errorMessage }));
+    return errorMessage === '';
+  };
+
   const checkForChanges = (newFormData: any) => {
     if (!originalData) return false;
-    
-    // Check all text fields
+
     const textFields = ['full_name', 'email', 'phone', 'position', 'qualification', 'notes'];
     for (const field of textFields) {
       if (newFormData[field] !== originalData[field]) {
         return true;
       }
     }
-    
-    // Check join_date field - normalize for comparison
+
+    // So sánh ngày tháng
     const normalizeDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string' && date.includes('-')) {
-        return date; // Already ISO format
+        // ISO format, chuyển về dd/mm/yyyy để so sánh
+        try {
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) return '';
+          return dateObj.toLocaleDateString('vi-VN');
+        } catch {
+          return '';
+        }
       }
       if (typeof date === 'string' && date.includes('/')) {
-        return convertDDMMYYYYToISO(date) || date;
+        return date; // Giữ nguyên định dạng dd/mm/yyyy
       }
       return date;
     };
-    
+
     const originalDate = normalizeDate(originalData.join_date);
     const newDate = normalizeDate(newFormData.join_date);
-    
+
     if (originalDate !== newDate) {
-      console.log('Date changed:', { original: originalDate, new: newDate });
       return true;
     }
-    
-    // Check status field
+
     if (newFormData.status !== originalData.status) {
       return true;
     }
-    
-    // Check if avatar has been added
+
     if (newFormData.avatar && !originalData.avatar) {
       return true;
     }
-    
+
     return false;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    // Special handling for join_date field
+
+    // Clear error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
+
     if (name === 'join_date') {
-      console.log('Date input name:', name, 'value:', value);
-      
       let newFormData;
-      
-      // Allow empty value or partial input
+
       if (!value || value.trim() === '') {
         newFormData = {
           ...formData,
           [name]: ''
         };
-        console.log('Cleared join date');
       } else {
-        // Always allow input, only validate when complete
         newFormData = {
           ...formData,
-          [name]: value // Keep as string for all input
+          [name]: value
         };
-        console.log('Date input updated:', value);
-        
-        // Only validate if the input looks like a complete date (has 2 slashes and 3 parts)
-        if (value.includes('/') && value.split('/').length === 3) {
-          const isoDate = parseDateFromDisplay(value);
-          console.log('Parsed ISO date:', isoDate);
-          
-          if (isoDate) {
-            newFormData = {
-              ...formData,
-              [name]: isoDate
-            };
-            console.log('Updated form data with ISO date:', newFormData[name]);
-          } else {
-            // Invalid date format - keep the input value but don't show error immediately
-            // Error will be shown during submit if needed
-            console.log('Invalid date format, keeping input value for now');
-          }
-        }
+
+        // Không chuyển đổi ngay lập tức, giữ nguyên định dạng dd/mm/yyyy
+        // Chỉ chuyển đổi khi submit
       }
-      
+
       setFormData(newFormData);
       setHasChanges(checkForChanges(newFormData));
     } else {
-      // Normal handling for other fields
       const newFormData = {
         ...formData,
         [name]: value
@@ -214,18 +270,15 @@ export default function EditStaffPage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast.error('Vui lòng chọn file hình ảnh hợp lệ');
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Kích thước file không được vượt quá 5MB');
         return;
       }
-      
-      // Show confirmation modal instead of directly setting the avatar
+
       setPendingAvatarFile(file);
       setShowAvatarConfirmModal(true);
     }
@@ -248,7 +301,6 @@ export default function EditStaffPage() {
   const cancelAvatarChange = () => {
     setShowAvatarConfirmModal(false);
     setPendingAvatarFile(null);
-    // Reset the file input
     const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
     if (fileInput) {
       fileInput.value = '';
@@ -264,15 +316,12 @@ export default function EditStaffPage() {
     setHasChanges(checkForChanges(newFormData));
   };
 
-  // Date formatting utilities for dd/mm/yyyy
   const formatDateForDisplay = (dateString: string): string => {
     if (!dateString || dateString.trim() === '') return '';
-    
+
     try {
-      console.log('formatDateForDisplay input:', dateString);
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        console.log('Invalid date:', dateString);
         return '';
       }
       const formatted = date.toLocaleDateString('vi-VN', {
@@ -280,49 +329,48 @@ export default function EditStaffPage() {
         month: '2-digit',
         year: 'numeric'
       });
-      console.log('formatted date:', formatted);
       return formatted;
     } catch (error) {
-      console.log('Error formatting date:', dateString, error);
       return '';
     }
   };
 
   const parseDateFromDisplay = (displayDate: string): string => {
     if (!displayDate) return '';
-    console.log('parseDateFromDisplay input:', displayDate);
     const result = convertDDMMYYYYToISO(displayDate);
-    console.log('parseDateFromDisplay result:', result);
     return result;
   };
 
 
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.full_name.trim() || !formData.email.trim()) {
-      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+
+    // Validate tất cả trường bắt buộc
+    const requiredFields = ['full_name', 'email', 'phone', 'position', 'qualification', 'join_date'];
+    let hasValidationError = false;
+
+    for (const field of requiredFields) {
+      const isValid = validateField(field, formData[field as keyof typeof formData]);
+      if (!isValid) {
+        hasValidationError = true;
+      }
+    }
+
+    if (hasValidationError) {
       return;
     }
 
     try {
       setSaving(true);
-      
-      // Prepare data for API - ensure join_date is in ISO format
+
       const apiData = { ...formData };
-      
-      // Convert join_date to ISO format if it's not already
+
       if (apiData.join_date && typeof apiData.join_date === 'string') {
-        console.log('handleSubmit - join_date before conversion:', apiData.join_date);
         if (apiData.join_date.includes('/')) {
-          // Convert dd/mm/yyyy to ISO
           const isoDate = convertDDMMYYYYToISO(apiData.join_date);
-          console.log('handleSubmit - convertDDMMYYYYToISO result:', isoDate);
           if (isoDate) {
             apiData.join_date = isoDate;
-            console.log('handleSubmit - join_date after conversion:', apiData.join_date);
           } else {
             toast.error('Định dạng ngày không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy');
             setSaving(false);
@@ -330,18 +378,12 @@ export default function EditStaffPage() {
           }
         }
       }
-      
-      // Debug: Log form data before sending
-      console.log('Form data to be sent:', apiData);
-      console.log('Join date value:', apiData.join_date);
-      console.log('Join date type:', typeof apiData.join_date);
-      
+
       await staffAPI.update(staffId, apiData);
-      
-      // Update original data and reset changes flag
+
       setOriginalData(formData);
       setHasChanges(false);
-      
+
       setSuccessMessage('Thông tin nhân viên đã được cập nhật thành công!');
       setTimeout(() => {
         router.push('/admin/staff-management');
@@ -353,7 +395,6 @@ export default function EditStaffPage() {
     }
   };
 
-  // Loading state
   if (loading || loadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -365,13 +406,11 @@ export default function EditStaffPage() {
     );
   }
 
-  // Auth check
   if (!user || user.role !== 'admin') {
     router.replace('/');
     return null;
   }
 
-  // Success message
   if (successMessage) {
     return (
       <div style={{
@@ -417,27 +456,25 @@ export default function EditStaffPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Background decorations */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-transparent to-blue-50/50"></div>
-      
+
       <div className="relative z-10 max-w-4xl mx-auto p-6">
-        {/* Header */}
         <div className="mb-8">
           <div className="bg-white rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-8">
             <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => router.back()}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại trang trước"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
+              <button
+                onClick={() => router.back()}
+                className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                title="Quay lại trang trước"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
               <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <UserIcon className="w-8 h-8 text-white" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
-                  Chỉnh sửa nhân viên
+                  Chỉnh sửa thông tin
                 </h1>
                 <p className="text-slate-600 mt-1">
                   Cập nhật thông tin chi tiết của nhân viên
@@ -445,23 +482,20 @@ export default function EditStaffPage() {
               </div>
             </div>
 
-           
+
           </div>
         </div>
 
-        {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information */}
             <div>
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <UserIcon className="w-5 h-5 text-indigo-600" />
                 Thông tin cá nhân
               </h3>
-              
-              
 
-              {/* Avatar Upload */}
+
+
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-700 mb-3">
                   {formData.avatar ? 'Ảnh đại diện mới' : 'Thay đổi ảnh đại diện'}
@@ -469,21 +503,16 @@ export default function EditStaffPage() {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     {(() => {
-                      console.log('Render avatar section:');
-                      console.log('- formData.avatar:', formData.avatar);
-                      console.log('- staff?.avatar:', staff?.avatar);
-                      console.log('- staff?.full_name:', staff?.full_name);
-                      
                       if (formData.avatar) {
-                        console.log('Showing new avatar preview');
                         return (
-                          // Hiển thị avatar mới được chọn
                           <div className="relative">
-                            <img
-                              src={formData.avatar ? URL.createObjectURL(formData.avatar) : ''}
-                              alt="Avatar preview"
-                              className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
-                            />
+                            {formData.avatar && (
+                              <img
+                                src={URL.createObjectURL(formData.avatar)}
+                                alt="Avatar preview"
+                                className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                              />
+                            )}
                             <button
                               type="button"
                               onClick={removeAvatar}
@@ -497,25 +526,17 @@ export default function EditStaffPage() {
                           </div>
                         );
                       } else if (staff?.avatar) {
-                        console.log('Showing current avatar');
                         const avatarSrc = processAvatarUrl(staff.avatar);
-                        console.log('Avatar src:', avatarSrc);
-                        
+
                         return (
-                          // Hiển thị avatar hiện tại
                           <div className="relative">
                             <img
                               src={avatarSrc}
                               alt="Current avatar"
                               className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
                               onError={(e) => {
-                                console.log('Avatar load error, showing default avatar');
-                                // Fallback to default avatar if image fails to load
                                 const target = e.target as HTMLImageElement;
                                 target.src = '/default-avatar.svg';
-                              }}
-                              onLoad={() => {
-                                console.log('Avatar loaded successfully');
                               }}
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-20 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
@@ -524,9 +545,7 @@ export default function EditStaffPage() {
                           </div>
                         );
                       } else {
-                        console.log('Showing placeholder');
                         return (
-                          // Hiển thị avatar mặc định khi không có avatar
                           <div className="w-20 h-20 rounded-full border-2 border-slate-200 flex items-center justify-center">
                             <img
                               src="/default-avatar.svg"
@@ -538,7 +557,7 @@ export default function EditStaffPage() {
                       }
                     })()}
                   </div>
-                  
+
                   <div className="flex-1">
                     <input
                       type="file"
@@ -560,7 +579,7 @@ export default function EditStaffPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -571,10 +590,19 @@ export default function EditStaffPage() {
                     name="full_name"
                     value={formData.full_name}
                     onChange={handleInputChange}
+                    onBlur={() => validateField('full_name', formData.full_name)}
                     required
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white ${
+                      fieldErrors.full_name ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-slate-300'
+                    }`}
                     placeholder="Nhập họ và tên"
                   />
+                  {fieldErrors.full_name && (
+                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {fieldErrors.full_name}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -588,16 +616,25 @@ export default function EditStaffPage() {
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
+                      onBlur={() => validateField('email', formData.email)}
                       required
-                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white ${
+                        fieldErrors.email ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-slate-300'
+                      }`}
                       placeholder="example@email.com"
                     />
                   </div>
+                  {fieldErrors.email && (
+                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Số điện thoại
+                    Số điện thoại <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <PhoneIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -606,58 +643,87 @@ export default function EditStaffPage() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                      onBlur={() => validateField('phone', formData.phone)}
+                      required
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white ${
+                        fieldErrors.phone ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-slate-300'
+                      }`}
                       placeholder="0123456789"
                     />
                   </div>
+                  {fieldErrors.phone && (
+                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {fieldErrors.phone}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Ngày vào làm
+                    Ngày vào làm <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                       type="text"
                       name="join_date"
-                      value={formData.join_date && formData.join_date.includes('-') 
-                        ? formatDateForDisplay(formData.join_date) 
+                      value={formData.join_date && formData.join_date.includes('-')
+                        ? formatDateForDisplay(formData.join_date)
                         : formData.join_date || ''}
                       onChange={handleInputChange}
+                      onBlur={() => validateField('join_date', formData.join_date)}
+                      required
                       placeholder="dd/mm/yyyy"
-                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white ${
+                        fieldErrors.join_date ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-slate-300'
+                      }`}
                     />
                   </div>
+                  {fieldErrors.join_date && (
+                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {fieldErrors.join_date}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Professional Information */}
             <div>
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <BriefcaseIcon className="w-5 h-5 text-indigo-600" />
                 Thông tin chuyên môn
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Vị trí công việc
+                    Vị trí công việc <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     name="position"
                     value={formData.position}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                    onBlur={() => validateField('position', formData.position)}
+                    required
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white ${
+                      fieldErrors.position ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-slate-300'
+                    }`}
                     placeholder="Ví dụ: Y tá, Bác sĩ, Nhân viên chăm sóc..."
                   />
+                  {fieldErrors.position && (
+                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {fieldErrors.position}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Bằng cấp
+                    Bằng cấp <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <AcademicCapIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -666,23 +732,32 @@ export default function EditStaffPage() {
                       name="qualification"
                       value={formData.qualification}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white"
+                      onBlur={() => validateField('qualification', formData.qualification)}
+                      required
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white ${
+                        fieldErrors.qualification ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-slate-300'
+                      }`}
                       placeholder="Ví dụ: Đại học Y, Cao đẳng Điều dưỡng..."
                     />
                   </div>
+                  {fieldErrors.qualification && (
+                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {fieldErrors.qualification}
+                    </p>
+                  )}
                 </div>
 
-                
+
               </div>
             </div>
 
-            {/* Notes */}
             <div>
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
                 Ghi chú
               </h3>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Ghi chú bổ sung
@@ -698,7 +773,6 @@ export default function EditStaffPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center justify-between pt-6 border-t border-slate-200">
               <Link
                 href="/admin/staff-management"
@@ -706,15 +780,14 @@ export default function EditStaffPage() {
               >
                 Hủy bỏ
               </Link>
-              
+
               <button
                 type="submit"
                 disabled={saving || !hasChanges}
-                className={`px-8 py-3 font-medium rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${
-                  hasChanges 
-                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700' 
+                className={`px-8 py-3 font-medium rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${hasChanges
+                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700'
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {saving ? (
                   <>
@@ -733,11 +806,9 @@ export default function EditStaffPage() {
         </div>
       </div>
 
-      {/* Avatar Confirmation Modal */}
       {showAvatarConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-            {/* Header */}
             <div className="bg-gradient-to-r from-indigo-500 to-blue-600 p-6 text-white text-center">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <PhotoIcon className="w-8 h-8" />
@@ -748,20 +819,20 @@ export default function EditStaffPage() {
               </p>
             </div>
 
-            {/* Content */}
             <div className="p-6">
-              {/* Avatar Preview */}
               <div className="mb-6">
                 <h4 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
                   <PhotoIcon className="w-5 h-5 text-indigo-600" />
                   Ảnh đại diện mới
                 </h4>
                 <div className="flex justify-center">
-                  <img
-                    src={pendingAvatarFile ? URL.createObjectURL(pendingAvatarFile) : ''}
-                    alt="New avatar preview"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-indigo-200 shadow-lg"
-                  />
+                  {pendingAvatarFile && (
+                    <img
+                      src={URL.createObjectURL(pendingAvatarFile)}
+                      alt="New avatar preview"
+                      className="w-24 h-24 rounded-full object-cover border-4 border-indigo-200 shadow-lg"
+                    />
+                  )}
                 </div>
                 <div className="mt-3 text-center">
                   <p className="text-sm text-slate-600">
@@ -773,7 +844,6 @@ export default function EditStaffPage() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -792,7 +862,6 @@ export default function EditStaffPage() {
               </div>
             </div>
 
-            {/* Close button */}
             <button
               type="button"
               onClick={cancelAvatarChange}

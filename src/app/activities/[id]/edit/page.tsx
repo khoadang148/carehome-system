@@ -4,9 +4,9 @@ import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
-import { 
-  ArrowLeftIcon, 
-  InformationCircleIcon, 
+import {
+  ArrowLeftIcon,
+  InformationCircleIcon,
   PencilSquareIcon,
   CheckCircleIcon,
   XMarkIcon
@@ -44,12 +44,13 @@ type ActivityFormData = {
   date: string;
 };
 
-const categories = ['Thể chất', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục', 'Y tế', 'Tâm lý', 'Giải trí'];
-const baseLocations = ['Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật'];
+const categories = ['Thể chất', 'Thể dục', 'Sáng tạo', 'Trị liệu', 'Nhận thức', 'Xã hội', 'Giáo dục', 'Y tế', 'Tâm lý', 'Giải trí', 'Khác'];
+const baseLocations = ['Thư viện', 'Vườn hoa', 'Phòng y tế', 'Sân vườn', 'Phòng thiền', 'Phòng giải trí', 'Phòng sinh hoạt chung', 'Nhà bếp', 'Phòng nghệ thuật', 'Khác'];
 
 function mapActivityType(type: string): string {
   const map: Record<string, string> = {
     'Thể thao': 'Thể chất',
+    'Thể dục': 'Thể dục',
     'Học tập': 'Giáo dục',
     'the_thao': 'Thể chất',
     'giai_tri': 'Giải trí',
@@ -65,7 +66,9 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [activityId, setActivityId] = useState<string>('');
-  
+  const [originalData, setOriginalData] = useState<ActivityFormData | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+
   useEffect(() => {
     const getActivityId = async () => {
       const resolvedParams = await params;
@@ -73,33 +76,41 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
     };
     getActivityId();
   }, [params]);
-  
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors }, 
-    reset
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch
   } = useForm<ActivityFormData>();
-  
+
   useEffect(() => {
     if (!activityId) return;
-    
+
     const fetchActivity = async () => {
       try {
         setLoading(true);
         const apiActivity = await activitiesAPI.getById(activityId);
         if (apiActivity) {
           setActivity(apiActivity);
-          reset({
+          const mappedCategory = mapActivityType(apiActivity.activity_type || '');
+          
+          const mappedLocation = apiActivity.location || '';
+          
+          const initialData = {
             name: apiActivity.activity_name || '',
             description: apiActivity.description || '',
-            category: mapActivityType(apiActivity.activity_type || ''),
-            location: apiActivity.location || '',
+            category: mappedCategory,
+            location: mappedLocation,
             scheduledTime: apiActivity.schedule_time ? format(parseISO(apiActivity.schedule_time), 'HH:mm') : '',
             duration: apiActivity.duration || 0,
             capacity: apiActivity.capacity || 0,
             date: apiActivity.schedule_time ? convertToDisplayDate(format(parseISO(apiActivity.schedule_time), 'yyyy-MM-dd')) : '',
-          });
+          };
+          reset(initialData);
+          setOriginalData(initialData);
+          setHasChanges(false);
         } else {
           router.push('/activities');
         }
@@ -111,10 +122,42 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
     };
     fetchActivity();
   }, [activityId, router, reset]);
+
+  // Watch form changes
+  const watchedValues = watch();
   
+  useEffect(() => {
+    if (!originalData) return;
+    
+    const hasFormChanges = Object.keys(watchedValues).some(key => {
+      const currentValue = watchedValues[key as keyof ActivityFormData];
+      const originalValue = originalData[key as keyof ActivityFormData];
+      
+      // Handle number comparison (convert string to number for comparison)
+      if (key === 'duration' || key === 'capacity') {
+        const currentNum = Number(currentValue);
+        const originalNum = Number(originalValue);
+        return currentNum !== originalNum;
+      }
+      
+      // Handle string comparison
+      if (typeof currentValue === 'string' && typeof originalValue === 'string') {
+        return currentValue !== originalValue;
+      }
+      
+      return false;
+    });
+    
+    setHasChanges(hasFormChanges);
+  }, [watchedValues, originalData]);
+
+
+
+
+
   const onSubmit = async (data: ActivityFormData) => {
     if (!activityId) return;
-    
+
     setIsSubmitting(true);
     try {
       const apiDate = convertToApiDate(data.date);
@@ -131,15 +174,19 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
         capacity: Number(data.capacity)
       };
       await activitiesAPI.update(activityId, payload);
-      
+
       setSuccessMessage(`Hoạt động "${data.name}" đã được cập nhật thành công!`);
       setShowSuccessModal(true);
       
+      // Update original data after successful update
+      setOriginalData(data);
+      setHasChanges(false);
+
       setTimeout(() => {
         setShowSuccessModal(false);
         router.push('/activities');
       }, 3000);
-      
+
     } catch (error) {
       console.error('Error updating activity:', error);
       toast.error('Có lỗi xảy ra khi cập nhật hoạt động. Vui lòng thử lại.');
@@ -147,13 +194,13 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
       setIsSubmitting(false);
     }
   };
-  
+
   const currentLocation = activity?.location || '';
   let locations = baseLocations;
   if (currentLocation && !baseLocations.includes(currentLocation)) {
     locations = [currentLocation, ...baseLocations];
   }
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -161,7 +208,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
       </div>
     );
   }
-  
+
   if (!activity) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -169,11 +216,11 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
       <div className="absolute inset-0 bg-gradient-radial from-blue-500/5 via-transparent to-transparent bg-gradient-radial from-green-500/5 via-transparent to-transparent bg-gradient-radial from-yellow-500/3 via-transparent to-transparent pointer-events-none" />
-      
+
       <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-sm">
           <div className="flex justify-between items-center flex-wrap gap-4">
@@ -233,16 +280,13 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
                   <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
                     Loại hoạt động <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <input
                     id="category"
+                    type="text"
+                    placeholder="Nhập loại hoạt động..."
                     className={`block w-full rounded-lg border ${errors.category ? 'border-red-400' : 'border-gray-300'} focus:ring-emerald-600 focus:border-emerald-600 shadow-sm py-2 px-3 text-sm`}
                     {...register('category', { required: 'Loại hoạt động là bắt buộc' })}
-                  >
-                    <option value="">Chọn loại hoạt động</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
+                  />
                   {errors.category && (
                     <p className="mt-1 text-xs text-red-600">{errors.category.message}</p>
                   )}
@@ -251,16 +295,13 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
                   <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
                     Địa điểm <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <input
                     id="location"
+                    type="text"
+                    placeholder="Nhập địa điểm..."
                     className={`block w-full rounded-lg border ${errors.location ? 'border-red-400' : 'border-gray-300'} focus:ring-emerald-600 focus:border-emerald-600 shadow-sm py-2 px-3 text-sm`}
                     {...register('location', { required: 'Địa điểm là bắt buộc' })}
-                  >
-                    <option value="">Chọn địa điểm</option>
-                    {locations.map(location => (
-                      <option key={location} value={location}>{location}</option>
-                    ))}
-                  </select>
+                  />
                   {errors.location && (
                     <p className="mt-1 text-xs text-red-600">{errors.location.message}</p>
                   )}
@@ -314,7 +355,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
                     type="text"
                     placeholder="dd/mm/yyyy"
                     className={`block w-full rounded-lg border ${errors.date ? 'border-red-400' : 'border-gray-300'} focus:ring-emerald-600 focus:border-emerald-600 shadow-sm py-2 px-3 text-sm`}
-                    {...register('date', { 
+                    {...register('date', {
                       required: 'Ngày là bắt buộc',
                       pattern: {
                         value: /^(\d{2})\/(\d{2})\/(\d{4})$/,
@@ -326,9 +367,6 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
                         const date = new Date(year, month - 1, day);
                         if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
                           return 'Ngày không hợp lệ';
-                        }
-                        if (date < new Date()) {
-                          return 'Ngày không thể trong quá khứ';
                         }
                         return true;
                       }
@@ -375,41 +413,47 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
               >
                 Hủy
               </Link>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`inline-flex items-center px-6 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer transition-all duration-200 ${
-                  isSubmitting 
-                    ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-sm' 
-                    : 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-lg hover:from-emerald-600 hover:to-emerald-700 hover:-translate-y-0.5 hover:shadow-xl'
-                }`}
-              >
-                {isSubmitting ? 'Đang cập nhật...' : 'Cập nhật hoạt động'}
-              </button>
+              {hasChanges && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`inline-flex items-center px-6 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer transition-all duration-200 ${isSubmitting
+                      ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-sm'
+                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-lg hover:from-emerald-600 hover:to-emerald-700 hover:-translate-y-0.5 hover:shadow-xl'
+                    }`}
+                >
+                  {isSubmitting ? 'Đang cập nhật...' : 'Cập nhật hoạt động'}
+                </button>
+              )}
+              {!hasChanges && (
+                <div className="inline-flex items-center px-6 py-3 rounded-xl text-sm font-semibold text-gray-500 bg-gray-100 border border-gray-200 cursor-not-allowed">
+                  Không có thay đổi
+                </div>
+              )}
             </div>
           </form>
         </div>
       </div>
-      
+
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-10 max-w-lg w-[90%] text-center shadow-2xl border border-white/20 animate-[modalSlideIn_0.3s_ease-out]">
             <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg animate-[successIconBounce_0.6s_ease-out]">
               <CheckCircleIcon className="w-8 h-8 text-white" />
             </div>
-            
+
             <h2 className="text-2xl font-bold text-emerald-800 mb-4 tracking-tight">
               Cập nhật thành công!
             </h2>
-            
+
             <p className="text-base text-gray-600 mb-8 leading-relaxed">
               {successMessage}
             </p>
-            
+
             <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mb-6">
               <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full animate-[progressBar_3s_linear_forwards]" />
             </div>
-            
+
             <div className="flex gap-4 justify-center">
               <button
                 onClick={() => {
@@ -421,7 +465,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
                 <CheckCircleIcon className="w-4 h-4" />
                 Xem danh sách
               </button>
-              
+
               <button
                 onClick={() => setShowSuccessModal(false)}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-gray-500 bg-white border border-gray-300 cursor-pointer transition-all duration-200 hover:bg-gray-50 hover:border-gray-400"
@@ -433,7 +477,7 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       )}
-      
+
       <style jsx>{`
         @keyframes modalSlideIn {
           from {

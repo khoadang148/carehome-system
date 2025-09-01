@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { staffAssignmentsAPI, careNotesAPI, carePlansAPI, roomsAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
-import { 
-  HeartIcon, 
+import {
+  HeartIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   UserIcon,
@@ -32,11 +32,11 @@ export default function CareNotesPage() {
   const [filteredResidents, setFilteredResidents] = useState<Resident[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [careNotesMap, setCareNotesMap] = useState<Record<string, any[]>>({});
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [residentsPerPage] = useState(5);
 
-  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {};
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => { };
 
   useEffect(() => {
     if (!user || user.role !== 'staff') {
@@ -61,10 +61,10 @@ export default function CareNotesPage() {
       const assignmentsData = await staffAssignmentsAPI.getMyAssignments();
       const assignments = Array.isArray(assignmentsData) ? assignmentsData : [];
       const activeAssignments = assignments.filter((assignment: any) => assignment.status === 'active');
-      
+
       const residentsWithNotes = await Promise.all(activeAssignments.map(async (assignment: any) => {
         const resident = assignment.resident_id;
-        
+
         let age = '';
         if (resident.date_of_birth) {
           const dob = new Date(resident.date_of_birth);
@@ -75,16 +75,16 @@ export default function CareNotesPage() {
             age = (parseInt(age) - 1).toString();
           }
         }
-        
+
         let room_number = '';
         if (resident.room_number) {
           room_number = resident.room_number;
         } else {
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
+            const bedAssignment = Array.isArray(bedAssignments) ?
               bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-            
+
             if (bedAssignment?.bed_id?.room_id) {
               if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
                 room_number = bedAssignment.bed_id.room_id.room_number;
@@ -97,9 +97,9 @@ export default function CareNotesPage() {
               }
             } else {
               const carePlanAssignments = await carePlansAPI.getByResidentId(resident._id);
-              const carePlanAssignment = Array.isArray(carePlanAssignments) ? 
+              const carePlanAssignment = Array.isArray(carePlanAssignments) ?
                 carePlanAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-              
+
               if (carePlanAssignment?.bed_id?.room_id) {
                 const roomData = carePlanAssignment.bed_id.room_id;
                 if (typeof roomData === 'object' && roomData?.room_number) {
@@ -120,9 +120,9 @@ export default function CareNotesPage() {
                 }
               }
             }
-        } catch {}
+          } catch { }
         }
-        
+
         return {
           id: resident._id || resident.id,
           full_name: resident.full_name || resident.name || resident.fullName || '',
@@ -133,10 +133,10 @@ export default function CareNotesPage() {
           avatar: resident.avatar || '',
         };
       }));
-      
+
       setResidents(residentsWithNotes);
-      
-     
+
+
       const notesMap: Record<string, any[]> = {};
       await Promise.all(residentsWithNotes.map(async (resident) => {
         try {
@@ -159,7 +159,7 @@ export default function CareNotesPage() {
     router.push(`/staff/assessments/${residentId}/notes?residentName=${encodeURIComponent(residentName)}`);
   };
 
-  const handleCloseModal = () => {};
+  const handleCloseModal = () => { };
 
   const handleCreateCareNote = (resident: Resident) => {
     router.push(`/staff/assessments/new?residentId=${resident.id}&residentName=${encodeURIComponent(resident.full_name)}`);
@@ -179,8 +179,7 @@ export default function CareNotesPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold m-0 text-slate-800">
-                Nhật ký theo dõi
-              </h1>
+                Ghi chú chăm sóc              </h1>
               <p className="text-base text-slate-600 mt-1">
                 Ghi chú quan sát và chăm sóc hàng ngày cho {residents.length} người cao tuổi đang được phân công
               </p>
@@ -205,7 +204,7 @@ export default function CareNotesPage() {
             const startIndex = (currentPage - 1) * residentsPerPage;
             const endIndex = startIndex + residentsPerPage;
             const currentResidents = filteredResidents.slice(startIndex, endIndex);
-            
+
             return (
               <>
                 {filteredResidents.length > 0 && (
@@ -231,103 +230,105 @@ export default function CareNotesPage() {
 
                 {currentResidents.length > 0 ? (
                   currentResidents.map((resident) => {
-            const notes = careNotesMap[resident.id] || [];
-            const lastNote = notes[0]?.notes || 'Chưa có ghi chú';
-            const notesCount = notes.length;
-            return (
-            <div
-              key={resident.id}
-                      className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 shadow-md border border-white/20 transition-all duration-200 hover:shadow-lg"
-                    >
-                      <div className="flex items-center gap-2 mb-4">
-                
-                        <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
-                  <img
-                    src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : ''}
-                    alt={`Avatar của ${resident.full_name}`}
-                            className="w-full h-full object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const nextElement = target.nextElementSibling as HTMLElement;
-                      if (nextElement) {
-                        nextElement.style.display = 'flex';
-                      }
-                    }}
-                  />
-                  <UserIcon 
-                            className="w-4 h-4 text-gray-400 hidden"
-                  />
-                </div>
-                        <div className="text-sm text-slate-800 flex items-center gap-2 flex-wrap">
-                          <span><span className="text-blue-600 font-medium">Họ và tên:</span> <span className="font-semibold">{resident.full_name}</span></span>
-                          <span className="text-gray-300">|</span>
-                          <span><span className="text-blue-600 font-medium">Phòng:</span> {resident.room_number}</span>
-                  {resident.date_of_birth && (
-                    (() => {
-                      const dob = new Date(resident.date_of_birth);
-                      const now = new Date();
-                      let age = now.getFullYear() - dob.getFullYear();
-                      const m = now.getMonth() - dob.getMonth();
-                      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
-                        age--;
-                      }
-                      const day = dob.getDate().toString().padStart(2, '0');
-                      const month = (dob.getMonth() + 1).toString().padStart(2, '0');
-                      const year = dob.getFullYear();
-                      return (
-                        <>
-                                  <span className="text-gray-300">|</span>
-                          <span>
-                                    <span className="text-blue-600 font-medium">Ngày sinh:</span> {`${day}/${month}/${year}`} ({age} tuổi)
-                          </span>
-                        </>
-                      );
-                    })()
-                  )}
-                </div>
-              </div>
+                    const notes = careNotesMap[resident.id] || [];
+                    const lastNote = notes[0]?.notes || 'Chưa có ghi chú';
+                    const notesCount = notes.length;
+                    return (
+                      <div
+                        key={resident.id}
+                        className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 shadow-md border border-white/20 transition-all duration-200 hover:shadow-lg"
+                      >
+                        <div className="flex items-center gap-2 mb-4">
 
-                      <div className="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                        <DocumentTextIcon className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm text-blue-600 font-medium">Ghi chú gần nhất:</span>
-                        <span className="text-sm text-slate-600">{lastNote}</span>
-                      </div>
+                          <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
+                            {resident.avatar ? (
+                              <img
+                                src={userAPI.getAvatarUrl(resident.avatar)}
+                                alt={`Avatar của ${resident.full_name}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const nextElement = target.nextElementSibling as HTMLElement;
+                                  if (nextElement) {
+                                    nextElement.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <UserIcon
+                              className={`w-4 h-4 text-gray-400 ${resident.avatar ? 'hidden' : 'block'}`}
+                            />
+                          </div>
+                          <div className="text-sm text-slate-800 flex items-center gap-2 flex-wrap">
+                            <span><span className="text-blue-600 font-medium">Họ và tên:</span> <span className="font-semibold">{resident.full_name}</span></span>
+                            <span className="text-gray-300">|</span>
+                            <span><span className="text-blue-600 font-medium">Phòng:</span> {resident.room_number}</span>
+                            {resident.date_of_birth && (
+                              (() => {
+                                const dob = new Date(resident.date_of_birth);
+                                const now = new Date();
+                                let age = now.getFullYear() - dob.getFullYear();
+                                const m = now.getMonth() - dob.getMonth();
+                                if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
+                                  age--;
+                                }
+                                const day = dob.getDate().toString().padStart(2, '0');
+                                const month = (dob.getMonth() + 1).toString().padStart(2, '0');
+                                const year = dob.getFullYear();
+                                return (
+                                  <>
+                                    <span className="text-gray-300">|</span>
+                                    <span>
+                                      <span className="text-blue-600 font-medium">Ngày sinh:</span> {`${day}/${month}/${year}`} ({age} tuổi)
+                                    </span>
+                                  </>
+                                );
+                              })()
+                            )}
+                          </div>
+                        </div>
 
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-sm text-blue-600 font-medium">Tổng ghi chú:</span>
-                        <span className="text-sm text-blue-600 font-bold">{notesCount}</span>
-                      </div>
+                        <div className="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <DocumentTextIcon className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-blue-600 font-medium">Ghi chú gần nhất:</span>
+                          <span className="text-sm text-slate-600">{lastNote}</span>
+                        </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleShowNotes(String(resident.id))}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200 hover:from-blue-700 hover:to-blue-600"
-                        >
-                          <DocumentTextIcon className="w-4 h-4" />
-                          Xem ghi chú
-                        </button>
-                        <button
-                          onClick={() => handleCreateCareNote(resident)}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200 hover:from-blue-600 hover:to-blue-700"
-                        >
-                          <PlusIcon className="w-4 h-4" />
-                          Thêm ghi chú mới
-                        </button>
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-sm text-blue-600 font-medium">Tổng ghi chú:</span>
+                          <span className="text-sm text-blue-600 font-bold">{notesCount}</span>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleShowNotes(String(resident.id))}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200 hover:from-blue-700 hover:to-blue-600"
+                          >
+                            <DocumentTextIcon className="w-4 h-4" />
+                            Xem ghi chú
+                          </button>
+                          <button
+                            onClick={() => handleCreateCareNote(resident)}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200 hover:from-blue-600 hover:to-blue-700"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                            Thêm ghi chú mới
+                          </button>
+                        </div>
                       </div>
-                    </div>
                     );
                   })
                 ) : (
                   <div className="text-center py-12">
                     <div className="text-gray-500 text-lg mb-2">
                       {searchTerm ? 'Không tìm thấy người cao tuổi nào phù hợp' : 'Chưa có người cao tuổi nào được phân công'}
-              </div>
+                    </div>
                     <div className="text-gray-400 text-sm">
                       {searchTerm ? 'Thử tìm kiếm với từ khóa khác' : 'Vui lòng liên hệ quản lý để được phân công'}
-            </div>
-          </div>
-        )}
+                    </div>
+                  </div>
+                )}
 
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-6">
@@ -341,24 +342,23 @@ export default function CareNotesPage() {
                       </svg>
                       Trước
                     </button>
-                    
+
                     <div className="flex gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                         <button
                           key={page}
                           onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            currentPage === page
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
                               ? 'bg-blue-600 text-white'
                               : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {page}
                         </button>
                       ))}
                     </div>
-                    
-                <button
+
+                    <button
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                       disabled={currentPage === totalPages}
                       className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -367,18 +367,14 @@ export default function CareNotesPage() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                </button>
-          </div>
-        )}
+                    </button>
+                  </div>
+                )}
               </>
             );
           })()}
         </div>
-
-        
       </div>
-
-
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: scale(0.95); }

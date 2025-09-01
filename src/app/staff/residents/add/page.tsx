@@ -370,6 +370,12 @@ export default function AddResidentPage() {
           setIsSubmitting(false);
           return;
         }
+        
+        if (!data.emergency_contact?.address?.trim()) {
+          toast.error('Địa chỉ người liên hệ là bắt buộc');
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       if (data.family_account_type === 'existing' && !data.existing_family_id) {
@@ -402,21 +408,29 @@ export default function AddResidentPage() {
         const selectedFamilyAccount = existingFamilyAccounts.find(acc => acc._id === data.existing_family_id);
         if (selectedFamilyAccount) {
           familyMemberId = selectedFamilyAccount._id;
+           // Xử lý relationship: nếu chọn "khác" thì lấy giá trị tùy chỉnh
+           let relationshipValue = data.emergency_contact.relationship || '';
+           if (data.emergency_contact.relationship === 'khác' && data.emergency_contact.relationship_other?.trim()) {
+             relationshipValue = data.emergency_contact.relationship_other.trim();
+           }
           emergencyContactInfo = {
             name: selectedFamilyAccount.full_name || '',
             phone: selectedFamilyAccount.phone || '',
             email: selectedFamilyAccount.email || '',
-            relationship: data.emergency_contact.relationship === 'khác' 
-              ? (data.emergency_contact.relationship_other || '') 
-              : (data.emergency_contact.relationship || '')
+             relationship: relationshipValue
           };
         }
       } else if (data.family_account_type === 'new') {
+         // Xử lý relationship: nếu chọn "khác" thì lấy giá trị tùy chỉnh
+         let relationshipValue = data.emergency_contact.relationship || '';
+         if (data.emergency_contact.relationship === 'khác' && data.emergency_contact.relationship_other?.trim()) {
+           relationshipValue = data.emergency_contact.relationship_other.trim();
+         }
         emergencyContactInfo = {
           name: data.emergency_contact.name || '',
           phone: data.emergency_contact.phone || '',
           email: data.emergency_contact.email || '',
-          relationship: data.emergency_contact.relationship === 'khác' ? (data.emergency_contact.relationship_other || '') : (data.emergency_contact.relationship || '')
+           relationship: relationshipValue
         };
       }
       
@@ -432,6 +446,9 @@ export default function AddResidentPage() {
       let email = '';
       let createdFamilyAccountId = null;
 
+             // Xử lý medical_history
+       let medicalHistoryText = data.medical_history || 'Không có';
+
       const payload: any = {
         full_name: data.full_name,
         date_of_birth: convertedDateOfBirth,
@@ -439,7 +456,7 @@ export default function AddResidentPage() {
         avatar: avatarFile && avatarPreview ? avatarPreview : '/default-avatar.svg',
         relationship: emergencyContactInfo.relationship,
         admission_date: data.admission_date ? convertDDMMYYYYToISO(data.admission_date) : new Date().toISOString().slice(0, 10),
-        medical_history: data.medical_history || 'Không có',
+        medical_history: medicalHistoryText,
         current_medications: medications.filter(med => med.medication_name && med.dosage && med.frequency),
         allergies: allergies.filter(allergy => allergy.trim()),
         emergency_contact: emergencyContactInfo,
@@ -471,9 +488,7 @@ export default function AddResidentPage() {
           accountData.append("created_at", new Date().toISOString());
           accountData.append("updated_at", new Date().toISOString());
           
-          if (data.emergency_contact.address) {
-            accountData.append("address", data.emergency_contact.address);
-          }
+            accountData.append("address", data.emergency_contact.address || '');
           
           const userResponse = await userAPI.create(accountData);
           
@@ -932,14 +947,21 @@ export default function AddResidentPage() {
                   {familyAccountType === 'new' && (
                   <div>
                     <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem'}}>
-                      Địa chỉ người liên hệ
+                      Địa chỉ người liên hệ <span style={{color: '#ef4444'}}>*</span>
                     </label>
                     <input
                       type="text"
-                      style={{width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb', borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: 'white'}}
+                      style={{width: '100%', padding: '0.75rem', border: `2px solid ${errors.emergency_contact?.address ? '#ef4444' : '#e5e7eb'}`, borderRadius: '0.5rem', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s', background: errors.emergency_contact?.address ? '#fef2f2' : 'white'}}
                       placeholder="Nhập địa chỉ của người liên hệ"
-                      {...register('emergency_contact.address')}
+                      {...register('emergency_contact.address', { 
+                        required: 'Địa chỉ người liên hệ là bắt buộc',
+                        minLength: { value: 5, message: 'Địa chỉ phải có ít nhất 5 ký tự' },
+                        maxLength: { value: 200, message: 'Địa chỉ không được quá 200 ký tự' }
+                      })}
                     />
+                    {errors.emergency_contact?.address && (
+                      <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>{errors.emergency_contact.address.message}</p>
+                    )}
                   </div>
                   )}
 
@@ -988,6 +1010,7 @@ export default function AddResidentPage() {
                            }}>
                              Ví dụ: chú, bác, cô, dì, bạn thân, người giám hộ...
                            </p>
+                                                                                    
                          </div>
                          {errors.emergency_contact?.relationship_other && (
                            <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#ef4444', fontWeight: 500}}>

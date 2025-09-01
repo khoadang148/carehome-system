@@ -14,11 +14,11 @@ import {
   ExclamationTriangleIcon,
   HomeIcon,
   ShieldCheckIcon,
-  HeartIcon,
-  ArrowPathIcon
+  HeartIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedsAPI } from '@/lib/api';
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return '/default-avatar.svg';
@@ -53,14 +53,10 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
 
     const interval = setInterval(() => {
       setLastRefresh(new Date());
-    }, 30000); 
+    }, 10000); // Cập nhật mỗi 10 giây thay vì 30 giây
 
     return () => clearInterval(interval);
   }, [autoRefreshEnabled, residentId]);
-
-  const refreshData = () => {
-    setLastRefresh(new Date());
-  };
 
   useEffect(() => {
     if (!user) {
@@ -210,12 +206,7 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
     loadRoomAndBedInfo();
   }, [carePlanAssignments]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -376,7 +367,7 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                 Tổng quan gói dịch vụ
               </h2>
               <p className="text-base text-slate-600 mt-1">
-                Thông tin chi tiết về tất cả gói dịch vụ đang sử dụng
+                Thông tin chi tiết về tất cả gói dịch vụ đang sử dụng 
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -384,15 +375,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                 <div className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                 <span>{autoRefreshEnabled ? 'Tự động cập nhật' : 'Tắt cập nhật'}</span>
               </div>
-              
-              <button
-                onClick={refreshData}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200"
-                title="Làm mới dữ liệu"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                <span className="text-sm font-medium">Làm mới</span>
-              </button>
               
               <button
                 onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
@@ -474,7 +456,7 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                             Giá:
                           </span>
                           <span className="text-xl font-bold text-cyan-800">
-                            {formatCurrency(carePlan.monthly_price || 0)}
+                            {formatDisplayCurrency(carePlan.monthly_price || 0)}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 m-0">

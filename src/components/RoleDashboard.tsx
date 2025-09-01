@@ -37,33 +37,34 @@ interface DashboardCard {
 
 const ROLE_DASHBOARDS = {
   admin: {
-    title: 'Trung tâm Điều hành',
+    title: 'Trung tâm điều hành của Quản trị viên',
     description: 'Hệ thống quản lý toàn diện viện dưỡng lão',
+    
     cards: [
       {
         title: 'Thống kê số liệu',
-        description: 'Thống kê số liệu về người cao tuổi, nhân viên, tài chính',
+        description: 'Thống kê số liệu về người cao tuổi, nhân viên, hóa đơn',
         icon: ChartBarIcon,
         href: '/admin/dashboard',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       },
       {
-        title: 'Quản lý phân công',
+        title: 'Phân công chăm sóc',
         description: 'Thiết lập và quản lý phân công nhân viên chăm sóc cho từng người cao tuổi',
         icon: UserPlusIcon,
         href: '/admin/staff-assignments',
         gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
       },
       {
-        title: 'Quản lý phòng & giường',
-        description: 'Quản lý phân bổ phòng và giường cho người cao tuổi',
+        title: 'Phòng & giường',
+        description: 'Phân bổ phòng và giường cho người cao tuổi',
         icon: BuildingOfficeIcon,
         href: '/admin/room-management',
         gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
       },
       {
         title: 'Chỉ số sức khỏe',
-        description: 'Xem và quản lý tất cả chỉ số sức khỏe của người cao tuổi',
+        description: 'Xem tất cả chỉ số sức khỏe của người cao tuổi',
         icon: HeartIcon,
         href: '/admin/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -72,7 +73,7 @@ const ROLE_DASHBOARDS = {
     ]
   },
   staff: {
-    title: 'Hệ thống quản lý chăm sóc',
+    title: 'Hệ thống quản lý chăm sóc của Nhân viên chăm sóc',
     description: ' Công cụ điều hành cho đội ngũ y tế!',
     cards: [
       {
@@ -91,15 +92,15 @@ const ROLE_DASHBOARDS = {
       },
 
       {
-        title: 'Lịch Thăm Viếng',
-        description: 'Quản lý và theo dõi lịch trình thăm viếng của gia đình',
+        title: 'Lịch Thăm',
+        description: 'Danh sách lịch thăm của gia đình người cao tuổi',
         icon: CalendarDaysIcon,
         href: '/staff/visits',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       },
       {
         title: 'Theo dõi Sức khỏe',
-        description: 'Ghi nhận và theo dõi các chỉ số sinh tồn của người cao tuổi',
+        description: 'Ghi nhận và theo dõi các chỉ số sức khỏe của người cao tuổi',
         icon: HeartIcon,
         href: '/staff/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -107,7 +108,7 @@ const ROLE_DASHBOARDS = {
     ]
   },
   family: {
-    title: 'Cổng thông tin Gia đình',
+    title: 'Cổng thông tin Gia Đình ',
     description: 'Theo dõi và kết nối với người thân',
     cards: [
       {
@@ -401,10 +402,6 @@ export default function RoleDashboard() {
             </div>
           ))}
         </div>
-
-       
-
-
       </div>
     </div>
   );

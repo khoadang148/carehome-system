@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   HeartIcon,
   PlusIcon,
   ArrowLeftIcon,
@@ -14,7 +14,7 @@ import {
   ClockIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
-import { 
+import {
   HeartIcon as HeartIconSolid
 } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
@@ -23,7 +23,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import { formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone, getDateYYYYMMDDWithTimezone, formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
 
-// Helper function to ensure string values
 const ensureString = (value: any): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'object' && value !== null) {
@@ -41,17 +40,16 @@ const ensureString = (value: any): string => {
   return String(value || 'N/A');
 };
 
-const ITEMS_PER_PAGE = 15; // Số chỉ số sức khỏe hiển thị trên mỗi trang
+const ITEMS_PER_PAGE = 15;
 
 export default function AdminVitalSignsPage() {
   const { user } = useAuth();
   const router = useRouter();
-  
-  // State management
+
   const [vitalSigns, setVitalSigns] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
   const [staffAssignments, setStaffAssignments] = useState<any[]>([]);
-  const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
+  const [roomNumbers, setRoomNumbers] = useState<{ [residentId: string]: string }>({});
   const [loading, setLoading] = useState(false);
   const [selectedResident, setSelectedResident] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -61,33 +59,28 @@ export default function AdminVitalSignsPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Check access permissions
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (!user.role || user.role !== 'admin') {
       router.push('/');
       return;
     }
   }, [user, router]);
 
-  // Load all residents and staff assignments
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Load all residents
         const residentsData = await residentAPI.getAll();
         const allResidents = Array.isArray(residentsData) ? residentsData : [];
-        
-        // Load all staff assignments
+
         const assignmentsData = await staffAssignmentsAPI.getAll();
         const allAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
-        
-        // Get room assignments for all residents first
+
         const residentsWithRooms = await Promise.all(
           allResidents.map(async (resident: any) => {
             try {
@@ -95,13 +88,13 @@ export default function AdminVitalSignsPage() {
               const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
               const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
               const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              
+
               let roomNumber = 'Chưa hoàn tất đăng kí';
               if (roomIdString) {
                 const room = await roomsAPI.getById(roomIdString);
                 roomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
               }
-              
+
               return {
                 ...resident,
                 roomNumber,
@@ -116,21 +109,18 @@ export default function AdminVitalSignsPage() {
             }
           })
         );
-        
-        // Filter only residents who have completed registration (have room assigned)
-        // and are still active (not discharged/deleted)
+
         const completedResidents = residentsWithRooms.filter((resident: any) => {
           const status = resident.status || resident.resident_status;
           const isDeleted = Boolean(resident.deleted || resident.isDeleted);
           return resident.hasRoom && status === 'active' && !isDeleted;
         });
-        
-        // Map residents with their assignment status
+
         const mappedResidents = completedResidents.map((resident: any) => {
-          const activeAssignment = allAssignments.find((assignment: any) => 
+          const activeAssignment = allAssignments.find((assignment: any) =>
             assignment.resident_id === resident._id && assignment.status === 'active'
           );
-          
+
           return {
             id: resident._id,
             name: resident.full_name || '',
@@ -141,32 +131,29 @@ export default function AdminVitalSignsPage() {
             roomNumber: resident.roomNumber,
           };
         });
-        
+
         setResidents(mappedResidents);
         setStaffAssignments(allAssignments);
-        
-        // Set room numbers
-        const roomNumbersMap: {[residentId: string]: string} = {};
+
+        const roomNumbersMap: { [residentId: string]: string } = {};
         mappedResidents.forEach((resident: any) => {
           roomNumbersMap[resident.id] = resident.roomNumber;
         });
         setRoomNumbers(roomNumbersMap);
-        
+
       } catch (err) {
-        console.error('Error loading data:', err);
         setResidents([]);
         setStaffAssignments([]);
       } finally {
         setLoading(false);
       }
     };
-    
+
     if (user) {
       fetchData();
     }
   }, [user]);
 
-  // Load vital signs data
   useEffect(() => {
     const fetchVitalSigns = async () => {
       try {
@@ -174,22 +161,20 @@ export default function AdminVitalSignsPage() {
         const vitalSignsData = Array.isArray(data) ? data : [];
         setVitalSigns(vitalSignsData);
       } catch (err) {
-        console.error('Error loading vital signs:', err);
         setVitalSigns([]);
       }
     };
-    
+
     if (user) {
       fetchVitalSigns();
     }
   }, [user]);
 
-  // Transform vital signs data for display
   const transformVitalSignsForDisplay = (vitalSignsData: any[]) => {
     return vitalSignsData.map(vs => {
       const resident = residents.find(r => r.id === vs.resident_id);
       const dateTime = vs.date_time || vs.date;
-      
+
       return {
         id: vs._id,
         residentId: vs.resident_id,
@@ -210,53 +195,46 @@ export default function AdminVitalSignsPage() {
     });
   };
 
-  // Get filtered vital signs
   const getFilteredVitalSigns = (residentId?: string, dateFilter?: string) => {
     let filtered = vitalSigns;
-    
+
     if (residentId) {
       filtered = filtered.filter(vs => vs.resident_id === residentId);
     }
-    
+
     if (dateFilter) {
       filtered = filtered.filter(vs => {
         const dateTime = vs.date_time || vs.date;
         if (!dateTime) return false;
-        
+
         const formattedDate = getDateYYYYMMDDWithTimezone(dateTime);
         return formattedDate === dateFilter;
       });
     }
-    
-    // Keep only records of residents currently active in the list
+
     const activeResidentIds = new Set(residents.map(r => r.id));
     filtered = filtered.filter(vs => activeResidentIds.has(vs.resident_id));
 
-    // Sort by date (newest first)
     filtered.sort((a, b) => {
       const dateA = new Date(a.date_time || a.date);
       const dateB = new Date(b.date_time || b.date);
-      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      return dateB.getTime() - dateA.getTime();
     });
-    
+
     return transformVitalSignsForDisplay(filtered);
   };
 
-  // Get filtered data
   const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, selectedDate || undefined);
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredVitalSigns.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentVitalSigns = filteredVitalSigns.slice(startIndex, endIndex);
 
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedResident, selectedDate]);
 
-  // Helper function to convert dd/mm/yyyy to yyyy-mm-dd
   const convertDateToISO = (dateString: string): string => {
     if (!dateString) return '';
     const parts = dateString.split('/');
@@ -265,7 +243,6 @@ export default function AdminVitalSignsPage() {
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
-  // Helper function to convert yyyy-mm-dd to dd/mm/yyyy
   const convertDateToDisplay = (dateString: string): string => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -273,11 +250,10 @@ export default function AdminVitalSignsPage() {
     return formatDateDDMMYYYY(date);
   };
 
-  // Generate page numbers for pagination
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     const maxVisiblePages = 5;
-    
+
     if (totalPages <= maxVisiblePages) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
@@ -305,11 +281,10 @@ export default function AdminVitalSignsPage() {
         pages.push(totalPages);
       }
     }
-    
+
     return pages;
   };
 
-  // Calculate statistics
   const totalResidents = residents.length;
   const totalVitalSigns = vitalSigns.length;
   const todayVitalSigns = vitalSigns.filter(vs => {
@@ -318,7 +293,6 @@ export default function AdminVitalSignsPage() {
     return vsDate === today;
   }).length;
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
@@ -333,21 +307,20 @@ export default function AdminVitalSignsPage() {
   return (
     <>
       <ToastContainer />
-      
+
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-6">
 
-          {/* Enhanced Header */}
           <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg border border-gray-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
-              <button
-              onClick={() => router.push('/admin')}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
+                <button
+                  onClick={() => router.push('/admin')}
+                  className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                  title="Quay lại"
+                >
+                  <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                </button>
                 <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center shadow-lg">
                   <HeartIconSolid className="w-8 h-8 text-white" />
                 </div>
@@ -360,7 +333,7 @@ export default function AdminVitalSignsPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-4">
                 <div className="bg-red-50 px-6 py-4 rounded-2xl border border-red-200">
                   <div className="text-center">
@@ -368,7 +341,7 @@ export default function AdminVitalSignsPage() {
                       Tổng chỉ số
                     </div>
                     <div className="text-3xl font-bold text-red-700">
-                      {filteredVitalSigns.length} 
+                      {filteredVitalSigns.length}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-1">
                       bản ghi
@@ -386,13 +359,11 @@ export default function AdminVitalSignsPage() {
 
 
 
-          {/* Enhanced Filters */}
           <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-end">
-              {/* Resident Filter */}
               <div>
-                                <label className="block text-sm font-semibold text-red-600 mb-3">
-                   Lọc theo người cao tuổi
+                <label className="block text-sm font-semibold text-red-600 mb-3">
+                  Lọc theo người cao tuổi
                 </label>
                 <div className="relative">
                   <select
@@ -409,18 +380,16 @@ export default function AdminVitalSignsPage() {
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     </svg>
+                    </svg>
                   </div>
                 </div>
               </div>
 
-                                          {/* Date Filter */}
               <div>
                 <label className="block text-sm font-semibold text-red-600 mb-3">
-                   Lọc theo ngày
+                  Lọc theo ngày
                 </label>
                 <div className="relative date-picker-container">
-                  {/* Hidden date input for native picker */}
                   <input
                     type="date"
                     value={selectedDate}
@@ -434,8 +403,7 @@ export default function AdminVitalSignsPage() {
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     style={{ zIndex: 1 }}
                   />
-                  
-                  {/* Visible text input */}
+
                   <input
                     type="text"
                     placeholder="dd/mm/yyyy"
@@ -443,8 +411,7 @@ export default function AdminVitalSignsPage() {
                     onChange={(e) => {
                       const value = e.target.value;
                       setSelectedDateDisplay(value);
-                      
-                      // Validate and convert to ISO format for filtering
+
                       if (value && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
                         setSelectedDate(convertDateToISO(value));
                       } else {
@@ -454,7 +421,7 @@ export default function AdminVitalSignsPage() {
                     className="w-full p-4 border border-gray-300 rounded-xl text-base outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm text-gray-700 pr-12 relative"
                     style={{ zIndex: 0 }}
                   />
-                  
+
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                     <CalendarIcon className="w-5 h-5 text-gray-400" />
                   </div>
@@ -463,7 +430,6 @@ export default function AdminVitalSignsPage() {
             </div>
           </div>
 
-          {/* Enhanced Vital Signs List */}
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
             <div className="p-6 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center justify-between">
@@ -503,13 +469,13 @@ export default function AdminVitalSignsPage() {
                       <tr className="bg-red-600">
                         <th className="px-6 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[200px]">
                           <div className="flex items-center gap-2">
-                            
+
                             Người cao tuổi
                           </div>
                         </th>
                         <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
                           <div className="flex items-center gap-2">
-                            
+
                             Ngày giờ
                           </div>
                         </th>
@@ -538,11 +504,10 @@ export default function AdminVitalSignsPage() {
                     </thead>
                     <tbody>
                       {currentVitalSigns.map((vs, index) => (
-                        <tr 
+                        <tr
                           key={vs.id}
-                          className={`border-b border-gray-100 transition-all duration-200 hover:bg-red-50 ${
-                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                          }`}
+                          className={`border-b border-gray-100 transition-all duration-200 hover:bg-red-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                            }`}
                         >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
@@ -629,16 +594,14 @@ export default function AdminVitalSignsPage() {
                   </table>
                 </div>
 
-                {/* Enhanced Pagination */}
                 {totalPages > 1 && (
                   <div className="px-6 py-6 border-t border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-600">
                         Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredVitalSigns.length)} trong tổng số {filteredVitalSigns.length} bản ghi
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
-                        {/* Previous Button */}
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
@@ -647,27 +610,24 @@ export default function AdminVitalSignsPage() {
                           <ChevronLeftIcon className="w-5 h-5" />
                         </button>
 
-                        {/* Page Numbers */}
                         <div className="flex items-center gap-1">
                           {getPageNumbers().map((page, index) => (
                             <button
                               key={index}
                               onClick={() => typeof page === 'number' && setCurrentPage(page)}
                               disabled={page === '...'}
-                              className={`px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                                page === currentPage
+                              className={`px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${page === currentPage
                                   ? 'bg-red-500 text-white shadow-lg'
                                   : page === '...'
-                                  ? 'text-gray-400 cursor-default'
-                                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300'
-                              }`}
+                                    ? 'text-gray-400 cursor-default'
+                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300'
+                                }`}
                             >
                               {page}
                             </button>
                           ))}
                         </div>
 
-                        {/* Next Button */}
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
@@ -685,63 +645,10 @@ export default function AdminVitalSignsPage() {
         </div>
       </div>
 
-      {/* Enhanced Notification Center Button */}
       <div className="fixed top-6 right-8 z-50">
-        <button
-          onClick={() => setShowNotifications(v => !v)}
-          className="relative bg-white border border-gray-300 rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-        >
-          <BellIcon className="w-7 h-7 text-red-500" />
-          {notifications.length > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs font-bold px-2 py-1 min-w-6 text-center leading-none shadow-lg">
-              {notifications.length}
-            </span>
-          )}
-        </button>
         
-        {/* Enhanced Notification List Popup */}
-        {showNotifications && (
-          <div className="absolute top-16 right-0 w-96 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <span className="font-bold text-lg text-gray-900">Thông báo</span>
-              <button 
-                onClick={() => setShowNotifications(false)} 
-                className="bg-none border-none text-red-500 font-bold cursor-pointer text-2xl hover:text-red-600 transition-colors"
-              >
-                ×
-              </button>
-            </div>
-            {notifications.length === 0 ? (
-              <div className="text-gray-500 text-center py-8">Không có thông báo nào</div>
-            ) : (
-              <ul className="space-y-3">
-                {notifications.map(n => (
-                  <li key={n.id} className={`p-4 rounded-xl border flex items-center gap-3 transition-all duration-200 ${
-                    n.type === 'success' 
-                      ? 'bg-green-50 border-green-300 hover:bg-green-100' 
-                      : 'bg-red-50 border-red-300 hover:bg-red-100'
-                  }`}>
-                    <span className="text-2xl">{n.type === 'success' ? '✅' : '❌'}</span>
-                    <div className="flex-1">
-                      <div className={`font-semibold ${
-                        n.type === 'success' ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {n.message}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">{n.time}</div>
-                    </div>
-                    <button 
-                      onClick={() => setNotifications(prev => prev.filter(x => x.id !== n.id))} 
-                      className="bg-none border-none text-gray-500 text-xl cursor-pointer hover:text-gray-700 transition-colors"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+
+        
       </div>
     </>
   );

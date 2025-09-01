@@ -50,8 +50,18 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
-      const residentsData = await residentAPI.getAll();
+      let residentsData;
       
+      // Only fetch all residents for admin and staff roles
+      if (user?.role === 'admin' || user?.role === 'staff') {
+        residentsData = await residentAPI.getAll();
+      } else if (user?.role === 'family' && user?.id) {
+        // For family role, fetch only their associated residents
+        const familyResidents = await residentAPI.getByFamilyMemberId(user.id);
+        residentsData = Array.isArray(familyResidents) ? familyResidents : (familyResidents ? [familyResidents] : []);
+      } else {
+        residentsData = [];
+      }
       
       const mappedResidentsPromises = residentsData.map(async (resident: any) => {
         const mappedResident = {
@@ -74,27 +84,19 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
           ...resident
         };
 
-        
         try {
           const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id || resident.id);
-          console.log(`Care plan assignments for resident ${resident._id}:`, assignments);
           
           if (Array.isArray(assignments) && assignments.length > 0) {
-            
             const activeAssignment = assignments.find((a: any) => 
               a.status === 'active' || a.status === 'room_assigned' || a.status === 'payment_completed'
             ) || assignments[0]; 
             
-            console.log(`Selected assignment for resident ${resident._id}:`, activeAssignment);
-            
-            
             if (activeAssignment?.bed_id?.room_id) {
               try {
-                
                 if (typeof activeAssignment.bed_id.room_id === 'object' && activeAssignment.bed_id.room_id.room_number) {
                   mappedResident.roomNumber = activeAssignment.bed_id.room_id.room_number;
                 } else {
-                  
                   const roomId = activeAssignment.bed_id.room_id._id || activeAssignment.bed_id.room_id;
                   if (roomId) {
                     const room = await roomsAPI.getById(roomId);
@@ -104,20 +106,17 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
                   }
                 }
               } catch (roomError) {
-                console.error(`Error fetching room for resident ${resident._id}:`, roomError);
                 mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
               }
             } else {
               mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
             }
             
-            
             mappedResident.carePlan = activeAssignment;
           } else {
             mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
           }
         } catch (assignmentError) {
-          console.error(`Error fetching care plan assignments for resident ${resident._id}:`, assignmentError);
           mappedResident.roomNumber = 'Chưa hoàn tất đăng kí';
         }
 
@@ -128,7 +127,6 @@ export function ResidentsProvider({ children }: { children: ReactNode }) {
       setResidents(mappedResidents);
       setInitialized(true);
     } catch (err) {
-      console.error('Error fetching residents:', err);
       setError('Không thể tải danh sách người cao tuổi');
       setResidents([]);
     } finally {

@@ -24,7 +24,9 @@ import {
   AcademicCapIcon,
   SparklesIcon,
   DevicePhoneMobileIcon,
-  KeyIcon
+  KeyIcon,
+  QuestionMarkCircleIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import type { User } from '@/lib/contexts/auth-context';
 import { toast } from 'react-toastify';
@@ -36,15 +38,10 @@ import { authAPI } from '@/lib/api';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
-  const [activeTab, setActiveTab] = useState<'email' | 'phone'>('email');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCountdown, setOtpCountdown] = useState(0);
   const hasRedirected = useRef(false);
   const [sessionDebug, setSessionDebug] = useState({});
   const [shouldRedirect, setShouldRedirect] = useState(false);
@@ -53,25 +50,17 @@ export default function LoginPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [userName, setUserName] = useState<string | undefined>(undefined);
+  
+  // Forgot password states
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [isForgotPasswordLoading, setIsForgotPasswordLoading] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/';
   const { login, user, loading } = useAuth();
   const { startTransition: startPageTransition } = usePageTransition();
-
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (otpCountdown > 0) {
-      interval = setInterval(() => {
-        setOtpCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [otpCountdown]);
 
   useEffect(() => {
     router.prefetch('/family');
@@ -92,6 +81,7 @@ export default function LoginPage() {
       hasRedirected.current = true;
       
       const redirectTo = (url: string) => {
+        startPageTransition(url, user.role);
         router.push(url);
       };
 
@@ -107,18 +97,7 @@ export default function LoginPage() {
         redirectTo('/');
       }
     }
-  }, [user, loading, returnUrl]);
-
-  useEffect(() => {
-    if (email.length > 0 || password.length > 0) {
-      router.prefetch('/family');
-      router.prefetch('/admin');
-      router.prefetch('/staff');
-      if (returnUrl && returnUrl !== '/login') {
-        router.prefetch(returnUrl);
-      }
-    }
-  }, [email, password, router, returnUrl]);
+  }, [user, loading, returnUrl, startPageTransition]);
 
   useEffect(() => {
     const savedError = clientStorage.getItem('login_error');
@@ -181,9 +160,8 @@ export default function LoginPage() {
       
       const redirectTo = (url: string) => {
         router.prefetch(url);
-        startTransition(() => {
-          router.push(url);
-        });
+        startPageTransition(url, user.role);
+        router.push(url);
       };
 
       if (user.role === 'family') {
@@ -248,7 +226,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 4000);
+      setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Vui lòng thử lại.')), 2000);
     });
 
     try {
@@ -272,7 +250,10 @@ export default function LoginPage() {
       clientStorage.removeItem('login_error');
       setUserName(typedUser.name);
       
+      setSuccess(`${typedUser.name || 'bạn'}!`);
       clientStorage.setItem('login_success', `${typedUser.name || 'bạn'}!`);
+      
+      setShouldRedirect(true);
     } catch (err: any) {
       setIsLoading(false);
       setShouldRedirect(false);
@@ -297,112 +278,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!phone.trim()) {
-      setErrorWithModal('Vui lòng nhập số điện thoại');
-      return;
-    }
-
-    const phoneRegex = /^(\+84|84|0)[3|5|7|8|9][0-9]{8}$/;
-    if (!phoneRegex.test(phone)) {
-      setErrorWithModal('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      let formattedPhone = phone;
-      if (phone.startsWith('0')) {
-        formattedPhone = '+84' + phone.substring(1);
-      } else if (phone.startsWith('84')) {
-        formattedPhone = '+' + phone;
-      } else if (!phone.startsWith('+84')) {
-        formattedPhone = '+84' + phone;
-      }
-
-      await authAPI.sendOtp(formattedPhone);
-      
-      setOtpSent(true);
-      setOtpCountdown(60); 
-      setSuccess('OTP đã được gửi đến số điện thoại của bạn');
-      setErrorMessage('');
-      setShowErrorModal(false);
-    } catch (err: any) {
-      setErrorWithModal(err.message || 'Có lỗi xảy ra khi gửi OTP');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!otp.trim() || otp.length !== 6) {
-      setErrorWithModal('Vui lòng nhập mã OTP 6 chữ số');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      
-      let formattedPhone = phone;
-      if (phone.startsWith('0')) {
-        formattedPhone = '+84' + phone.substring(1);
-      } else if (phone.startsWith('84')) {
-        formattedPhone = '+' + phone;
-      } else if (!phone.startsWith('+84')) {
-        formattedPhone = '+84' + phone;
-      }
-
-      const result = await authAPI.verifyOtp(formattedPhone, otp);
-      
-      if (result.success) {
-        setUserName(result.user?.full_name || result.user?.username);
-        setSuccessWithStorage(`${result.user?.full_name || result.user?.username || 'bạn'}!`);
-        clientStorage.removeItem('login_error');
-        setErrorMessage('');
-        setShowErrorModal(false);
-        setLoginAttempts(0);
-        clientStorage.removeItem('login_attempts');
-      }
-    } catch (err: any) {
-      setErrorWithModal(err.message || 'Có lỗi xảy ra khi xác thực OTP');
-      setOtp('');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (otpCountdown > 0) return;
-    
-    setIsLoading(true);
-    
-    try {
-      let formattedPhone = phone;
-      if (phone.startsWith('0')) {
-        formattedPhone = '+84' + phone.substring(1);
-      } else if (phone.startsWith('84')) {
-        formattedPhone = '+' + phone;
-      } else if (!phone.startsWith('+84')) {
-        formattedPhone = '+84' + phone;
-      }
-
-      await authAPI.sendOtp(formattedPhone);
-      
-      setOtpCountdown(60);
-      setSuccess('OTP mới đã được gửi đến số điện thoại của bạn');
-    } catch (err: any) {
-      setErrorWithModal(err.message || 'Có lỗi xảy ra khi gửi lại OTP');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
   };
@@ -411,30 +286,47 @@ export default function LoginPage() {
     setPassword(e.target.value);
   };
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(e.target.value);
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!forgotPasswordEmail.trim()) {
+      setErrorWithModal('Vui lòng nhập email của bạn');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(forgotPasswordEmail)) {
+      setErrorWithModal('Email không hợp lệ. Vui lòng kiểm tra lại.');
+      return;
+    }
+
+    setIsForgotPasswordLoading(true);
+
+    try {
+      const result = await authAPI.forgotPassword(forgotPasswordEmail);
+      
+      if (result.success) {
+        setSuccess('Mật khẩu mới đã được gửi về email của bạn. Vui lòng kiểm tra hộp thư.');
+        setShowForgotPasswordModal(false);
+        setForgotPasswordEmail('');
+        setErrorMessage('');
+        setShowErrorModal(false);
+      } else {
+        setErrorWithModal(result.message || 'Có lỗi xảy ra khi đặt lại mật khẩu');
+      }
+    } catch (err: any) {
+      setErrorWithModal(err.message || 'Có lỗi xảy ra khi đặt lại mật khẩu');
+    } finally {
+      setIsForgotPasswordLoading(false);
+    }
   };
 
-  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(value);
-  };
-
-  const handleTabChange = (tab: 'email' | 'phone') => {
-    setActiveTab(tab);
-    setOtpSent(false);
-    setOtp('');
-    setOtpCountdown(0);
-    setSuccess('');
-    setErrorMessage('');
-    setShowErrorModal(false);
-    clientStorage.removeItem('login_error');
-    clientStorage.removeItem('login_success');
+  const handleForgotPasswordEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForgotPasswordEmail(e.target.value);
   };
 
   useEffect(() => {
     const handleUnload = () => {
-      console.log('🔄 Page unload detected');
     };
 
     window.addEventListener('unload', handleUnload);
@@ -548,37 +440,12 @@ export default function LoginPage() {
                     Đăng nhập
                   </h2>
                   <p className="text-sm text-gray-500 leading-relaxed">
-                    Chọn phương thức đăng nhập phù hợp
+                    Vui lòng nhập thông tin đăng nhập của bạn
                   </p>
                 </div>
               </div>
               
               <div className="p-10">
-                <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
-                  <button
-                    onClick={() => handleTabChange('email')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      activeTab === 'email'
-                        ? 'bg-white text-emerald-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    <EnvelopeIcon className="w-4 h-4" />
-                    Email
-                  </button>
-                  <button
-                    onClick={() => handleTabChange('phone')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      activeTab === 'phone'
-                        ? 'bg-white text-emerald-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    <DevicePhoneMobileIcon className="w-4 h-4" />
-                    Số điện thoại
-                  </button>
-                </div>
-
                 {loginAttempts >= 3 && (
                   <div className="flex items-center gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg mb-4 text-sm border border-amber-200 font-medium">
                     <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0" />
@@ -587,16 +454,15 @@ export default function LoginPage() {
                 )}
                 
                 {success && (
-                  <div className="flex items-center gap-3 p-4 bg-green-50 text-green-800 rounded-lg mb-6 text-sm border border-green-200 font-medium">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+                  <div className="flex items-center gap-3 p-3 bg-green-50 text-green-800 rounded-lg mb-4 text-sm border border-green-200 font-medium animate-in slide-in-from-top-2 duration-300">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-green-600">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                       <polyline points="22,4 12,14.01 9,11.01"></polyline>
                     </svg>
-                    <span className="font-medium">{success}</span>
+                    <span className="font-medium">Chào mừng {success}</span>
                   </div>
                 )}
 
-                {activeTab === 'email' && (
                   <form onSubmit={handleEmailSubmit} className="flex flex-col gap-6" noValidate>
                     <div>
                       <label 
@@ -652,6 +518,15 @@ export default function LoginPage() {
                           }
                         </button>
                       </div>
+                    <div className="flex justify-end mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPasswordModal(true)}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+                      >
+                        Quên mật khẩu?
+                      </button>
+                    </div>
                     </div>
                     
                     <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
@@ -674,8 +549,8 @@ export default function LoginPage() {
                       className="w-full py-4 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer mt-2 shadow-lg disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
                     >
                       {isLoading ? (
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                           Đang xác thực...
                         </div>
                       ) : (
@@ -686,163 +561,112 @@ export default function LoginPage() {
                       )}
                     </button>
                   </form>
-                )}
-
-                {activeTab === 'phone' && (
-                  <div className="flex flex-col gap-6">
-                    {!otpSent ? (
-                      <form onSubmit={handleSendOtp} className="flex flex-col gap-6" noValidate>
-                        <div>
-                          <label 
-                            htmlFor="phone" 
-                            className="block text-sm font-semibold text-gray-700 mb-2"
-                          >
-                            Số điện thoại
-                          </label>
-                          <div className="relative">
-                            <div className="absolute top-1/2 left-4 transform -translate-y-1/2 pointer-events-none z-10">
-                              <DevicePhoneMobileIcon className="w-5 h-5 text-gray-400" />
-                            </div>
-                            <input
-                              id="phone"
-                              name="phone"
-                              type="tel"
-                              placeholder="0123456789"
-                              value={phone}
-                              onChange={handlePhoneChange}
-                              className="w-full px-4 py-3.5 pl-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
-                            />
                           </div>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Nhập số điện thoại đã đăng ký trong hệ thống
-                          </p>
-                        </div>
-                        
-                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <KeyIcon className="w-4 h-4 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-xs text-blue-800 font-semibold mb-1">
-                              Xác thực bằng OTP
                             </div>
-                            <div className="text-xs text-blue-700 leading-relaxed">
-                              Mã OTP sẽ được gửi qua SMS đến số điện thoại của bạn
                             </div>
                           </div>
                         </div>
                         
+      <LoginSpinner isLoading={isLoading} />
+      
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+                  <QuestionMarkCircleIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Quên mật khẩu</h3>
+                  <p className="text-sm text-gray-500">Nhập email để đặt lại mật khẩu</p>
+                </div>
+              </div>
                         <button
-                          type="submit"
-                          disabled={isLoading}
-                          className="w-full py-4 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer mt-2 shadow-lg disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
-                        >
-                          {isLoading ? (
-                            <div className="flex items-center justify-center gap-3">
-                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Đang gửi OTP...
+                onClick={() => {
+                  setShowForgotPasswordModal(false);
+                  setForgotPasswordEmail('');
+                }}
+                className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-500" />
+              </button>
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-center gap-2">
-                              <DevicePhoneMobileIcon className="w-5 h-5" />
-                              Gửi mã OTP
-                            </div>
-                          )}
-                        </button>
-                      </form>
-                    ) : (
-                      <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6" noValidate>
+            
+            <form onSubmit={handleForgotPassword} className="space-y-4">
                         <div>
                           <label 
-                            htmlFor="otp" 
+                  htmlFor="forgot-email" 
                             className="block text-sm font-semibold text-gray-700 mb-2"
                           >
-                            Mã OTP
+                  Địa chỉ email
                           </label>
                           <div className="relative">
                             <div className="absolute top-1/2 left-4 transform -translate-y-1/2 pointer-events-none z-10">
-                              <KeyIcon className="w-5 h-5 text-gray-400" />
+                    <EnvelopeIcon className="w-5 h-5 text-gray-400" />
                             </div>
                             <input
-                              id="otp"
-                              name="otp"
-                              type="text"
-                              placeholder="123456"
-                              value={otp}
-                              onChange={handleOtpChange}
-                              maxLength={6}
-                              className="w-full px-4 py-3.5 pl-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200 text-center tracking-widest"
+                    id="forgot-email"
+                    name="forgot-email"
+                    type="email"
+                    placeholder="example@email.com"
+                    value={forgotPasswordEmail}
+                    onChange={handleForgotPasswordEmailChange}
+                    className="w-full px-4 py-3 pl-11 text-sm text-gray-800 bg-white rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
+                    required
                             />
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <p className="text-xs text-gray-500">
-                              Mã 6 chữ số đã được gửi đến {phone}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={handleResendOtp}
-                              disabled={otpCountdown > 0}
-                              className="text-xs text-emerald-600 hover:text-emerald-700 disabled:text-gray-400 disabled:cursor-not-allowed font-medium"
-                            >
-                              {otpCountdown > 0 ? `Gửi lại (${otpCountdown}s)` : 'Gửi lại'}
-                            </button>
                           </div>
                         </div>
                         
-                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <ClockIcon className="w-4 h-4 text-white" />
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
                           </div>
                           <div>
                             <div className="text-xs text-amber-800 font-semibold mb-1">
-                              Mã có hiệu lực trong 5 phút
+                      Lưu ý quan trọng
                             </div>
                             <div className="text-xs text-amber-700 leading-relaxed">
-                              Vui lòng nhập mã OTP để hoàn tất đăng nhập
+                      Mật khẩu mới sẽ được gửi về email của bạn. Vui lòng kiểm tra hộp thư và thư mục spam.
+                    </div>
                             </div>
                           </div>
                         </div>
                         
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPasswordModal(false);
+                    setForgotPasswordEmail('');
+                  }}
+                  className="flex-1 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-xl border-none cursor-pointer transition-all duration-200"
+                >
+                  Hủy
+                </button>
                         <button
                           type="submit"
-                          disabled={isLoading}
-                          className="w-full py-4 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer mt-2 shadow-lg disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
+                  disabled={isForgotPasswordLoading}
+                  className="flex-1 py-3 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 rounded-xl border-none cursor-pointer disabled:cursor-not-allowed transition-all duration-200"
                         >
-                          {isLoading ? (
-                            <div className="flex items-center justify-center gap-3">
-                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Đang xác thực...
+                  {isForgotPasswordLoading ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Đang xử lý...
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center gap-2">
-                              <KeyIcon className="w-5 h-5" />
-                              Xác thực OTP
-                            </div>
+                    'Gửi yêu cầu'
                           )}
                         </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOtpSent(false);
-                            setOtp('');
-                            setOtpCountdown(0);
-                          }}
-                          className="w-full py-3 text-sm font-medium text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-xl border-none cursor-pointer transition-all duration-200"
-                        >
-                          Quay lại nhập số điện thoại
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                )}
               </div>
-            </div>
+            </form>
           </div>
         </div>
-      </div>
-      
-      <LoginSpinner isLoading={isLoading} />
+      )}
     </>
   );
 } 

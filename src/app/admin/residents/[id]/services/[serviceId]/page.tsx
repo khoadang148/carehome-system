@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
+import {
   ArrowLeftIcon,
   XMarkIcon,
   CheckCircleIcon,
@@ -19,14 +19,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, userAPI, roomsAPI, bedsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 
-// Helper function to get full avatar URL
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return '/default-avatar.svg';
-  
+
   if (avatarPath.startsWith('http')) return avatarPath;
   if (avatarPath.startsWith('data:')) return avatarPath;
-  
+
   const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
   return userAPI.getAvatarUrl(cleanPath);
 };
@@ -35,7 +35,7 @@ export default function ResidentServiceDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
-  
+
   const [resident, setResident] = useState<any>(null);
   const [carePlanAssignment, setCarePlanAssignment] = useState<any>(null);
   const [carePlanDetails, setCarePlanDetails] = useState<any[]>([]);
@@ -46,25 +46,23 @@ export default function ResidentServiceDetailPage() {
   const [bedLoading, setBedLoading] = useState(false);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
   const [roomCost, setRoomCost] = useState<number>(0);
+  const [isExpired, setIsExpired] = useState<boolean>(false);
 
-  // Get IDs from URL params
   const residentId = params.id as string;
   const serviceId = params.serviceId as string;
 
-  // Check access permissions - admin only
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (user?.role !== 'admin') {
       router.push('/');
       return;
     }
   }, [user, router]);
 
-  // Load resident data
   useEffect(() => {
     const loadResident = async () => {
       try {
@@ -89,7 +87,6 @@ export default function ResidentServiceDetailPage() {
         };
         setResident(mapped);
       } catch (error) {
-        console.error('Error loading resident:', error);
         router.push('/admin/residents');
       } finally {
         setLoading(false);
@@ -101,32 +98,31 @@ export default function ResidentServiceDetailPage() {
     }
   }, [residentId, router]);
 
-  // Load care plan assignment
   useEffect(() => {
     const loadCarePlanAssignment = async () => {
       if (!residentId) return;
 
       try {
         const assignments = await carePlansAPI.getByResidentId(residentId);
-        console.log('🔍 All care plan assignments for resident:', assignments);
-        
+
         const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a._id === serviceId) : null;
-        console.log('🔍 Found assignment:', assignment);
-        
+
         if (assignment) {
           setCarePlanAssignment(assignment);
           
-          // Load care plan details
+          // Kiểm tra trạng thái hết hạn
+          const now = new Date();
+          const assignmentEndDate = assignment.end_date ? new Date(assignment.end_date) : null;
+          const expired = assignmentEndDate ? assignmentEndDate < now : false;
+          setIsExpired(expired);
+
           if (assignment.care_plan_ids && assignment.care_plan_ids.length > 0) {
             const carePlanPromises = assignment.care_plan_ids.map(async (plan: any) => {
               const planId = plan._id || plan;
               try {
                 const planData = await carePlansAPI.getById(planId);
-                console.log('✅ Loaded care plan:', planData);
                 return planData;
               } catch (err) {
-                console.error('❌ Error fetching care plan with ID', planId, ':', err);
-                // Return a fallback object with basic info
                 return {
                   plan_name: plan.plan_name || 'Gói dịch vụ không xác định',
                   description: plan.description || 'Không có mô tả',
@@ -137,19 +133,15 @@ export default function ResidentServiceDetailPage() {
                 };
               }
             });
-            
+
             const carePlanData = await Promise.all(carePlanPromises);
-            console.log('📋 Final care plan details:', carePlanData);
             setCarePlanDetails(carePlanData);
           } else {
-            console.log('⚠️ No care plan IDs found in assignment');
             setCarePlanDetails([]);
           }
         } else {
-          console.log('❌ No assignment found for serviceId:', serviceId);
         }
       } catch (error) {
-        console.error('❌ Error loading care plan assignment:', error);
         setCarePlanDetails([]);
       }
     };
@@ -157,7 +149,6 @@ export default function ResidentServiceDetailPage() {
     loadCarePlanAssignment();
   }, [residentId, serviceId]);
 
-  // Load room and bed information
   useEffect(() => {
     const loadRoomAndBedInfo = async () => {
       if (!residentId) return;
@@ -166,40 +157,25 @@ export default function ResidentServiceDetailPage() {
       setBedLoading(true);
 
       try {
-        console.log('🏠 Loading room and bed info for resident:', residentId);
-        
-        // Ưu tiên sử dụng bedAssignmentsAPI để lấy thông tin phòng và giường
         try {
           const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-          console.log('🛏️ Bed assignments found:', bedAssignments);
-          
-          const bedAssignment = Array.isArray(bedAssignments) ? 
+
+          const bedAssignment = Array.isArray(bedAssignments) ?
             bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-          
-          console.log('🛏️ Active bed assignment:', bedAssignment);
-          
+
           if (bedAssignment?.bed_id?.room_id) {
-            // Nếu room_id đã có thông tin room_number, sử dụng trực tiếp
             if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-              console.log('🏠 Room number from bed assignment:', bedAssignment.bed_id.room_id.room_number);
               setRoomNumber(bedAssignment.bed_id.room_id.room_number);
-              // Set room cost if available
               if (bedAssignment.bed_id.room_id.monthly_price) {
                 setRoomCost(bedAssignment.bed_id.room_id.monthly_price);
-                console.log('💰 Room cost from bed assignment:', bedAssignment.bed_id.room_id.monthly_price);
               }
             } else {
-              // Nếu chỉ có _id, fetch thêm thông tin
               const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-              console.log('🏠 Fetching room info for ID:', roomId);
               if (roomId) {
                 const room = await roomsAPI.getById(roomId);
-                console.log('🏠 Room data:', room);
                 setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-                // Set room cost from fetched room data
                 if (room?.monthly_price) {
                   setRoomCost(room.monthly_price);
-                  console.log('💰 Room cost from fetched room:', room.monthly_price);
                 }
               } else {
                 throw new Error('No room ID found');
@@ -210,17 +186,12 @@ export default function ResidentServiceDetailPage() {
           }
 
           if (bedAssignment?.bed_id) {
-            // Nếu bed_id đã có thông tin bed_number, sử dụng trực tiếp
             if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
-              console.log('🛏️ Bed number from bed assignment:', bedAssignment.bed_id.bed_number);
               setBedNumber(bedAssignment.bed_id.bed_number);
             } else {
-              // Nếu chỉ có _id, fetch thêm thông tin
               const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
-              console.log('🛏️ Fetching bed info for ID:', bedId);
               if (bedId) {
                 const bed = await bedsAPI.getById(bedId);
-                console.log('🛏️ Bed data:', bed);
                 setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
               } else {
                 throw new Error('No bed ID found');
@@ -230,52 +201,35 @@ export default function ResidentServiceDetailPage() {
             throw new Error('No bed assignment found');
           }
         } catch (bedError) {
-          console.warn(`⚠️ Failed to get bed assignment for resident ${residentId}:`, bedError);
-          
-          // Fallback về carePlansAPI nếu bedAssignmentsAPI không có kết quả
           if (carePlanAssignment) {
-            console.log('🔄 Falling back to care plan assignment for room/bed info');
-            
-            // Load room information from care plan assignment
             const assignedRoomId = carePlanAssignment.bed_id?.room_id || carePlanAssignment.assigned_room_id;
-            console.log('🏠 Room ID from care plan:', assignedRoomId);
-            
+
             const roomIdString = typeof assignedRoomId === 'object' && assignedRoomId?._id ? assignedRoomId._id : assignedRoomId;
             if (roomIdString) {
               const room = await roomsAPI.getById(roomIdString);
-              console.log('🏠 Room data from care plan:', room);
               setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-              // Set room cost from care plan fallback
               if (room?.monthly_price) {
                 setRoomCost(room.monthly_price);
-                console.log('💰 Room cost from care plan fallback:', room.monthly_price);
               }
             } else {
-              console.log('❌ No room ID found in care plan assignment');
               setRoomNumber('Chưa hoàn tất đăng kí');
             }
 
-            // Load bed information from care plan assignment
             const assignedBedId = carePlanAssignment.assigned_bed_id;
-            console.log('🛏️ Bed ID from care plan:', assignedBedId);
-            
+
             const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
             if (bedIdString) {
               const bed = await bedsAPI.getById(bedIdString);
-              console.log('🛏️ Bed data from care plan:', bed);
               setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
             } else {
-              console.log('❌ No bed ID found in care plan assignment');
               setBedNumber('Chưa hoàn tất đăng kí');
             }
           } else {
-            console.log('❌ No care plan assignment available for fallback');
             setRoomNumber('Chưa hoàn tất đăng kí');
             setBedNumber('Chưa hoàn tất đăng kí');
           }
         }
       } catch (error) {
-        console.error('❌ Error loading room/bed info:', error);
         setRoomNumber('Chưa hoàn tất đăng kí');
         setBedNumber('Chưa hoàn tất đăng kí');
       } finally {
@@ -288,10 +242,7 @@ export default function ResidentServiceDetailPage() {
   }, [residentId, carePlanAssignment]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
+    return formatDisplayCurrency(amount);
   };
 
   const formatDate = (dateString: string) => {
@@ -413,7 +364,6 @@ export default function ResidentServiceDetailPage() {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -445,14 +395,13 @@ export default function ResidentServiceDetailPage() {
             >
               <ArrowLeftIcon style={{ width: '1.25rem', height: '1.25rem' }} />
             </Link>
-            
+
             <div style={{ flex: 1 }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '1.5rem'
               }}>
-                {/* Avatar */}
                 <div style={{
                   width: '80px',
                   height: '80px',
@@ -496,8 +445,7 @@ export default function ResidentServiceDetailPage() {
                     />
                   )}
                 </div>
-                
-                {/* Thông tin cơ bản */}
+
                 <div style={{ flex: 1 }}>
                   <div style={{ marginBottom: '0.5rem' }}>
                     <span style={{
@@ -525,7 +473,6 @@ export default function ResidentServiceDetailPage() {
                     marginTop: '0.5rem',
                     flexWrap: 'wrap'
                   }}>
-                    {/* Tuổi */}
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -541,7 +488,6 @@ export default function ResidentServiceDetailPage() {
                       <span>Tuổi:</span>
                       <span>{resident.age} tuổi</span>
                     </span>
-                    {/* Phòng */}
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -557,7 +503,6 @@ export default function ResidentServiceDetailPage() {
                       <span>Phòng:</span>
                       <span>{roomLoading ? 'Đang tải...' : roomNumber}</span>
                     </span>
-                    {/* Giường */}
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -578,8 +523,7 @@ export default function ResidentServiceDetailPage() {
               </div>
             </div>
           </div>
-          
-          {/* Page Title */}
+
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -617,8 +561,9 @@ export default function ResidentServiceDetailPage() {
             </div>
           </div>
         </div>
-        
-        {/* Content */}
+
+       
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -627,10 +572,7 @@ export default function ResidentServiceDetailPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)'
         }}>
           <div style={{ display: 'grid', gap: '2rem' }}>
-            
-           
 
-            {/* Service Packages */}
             <div style={{
               background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
               borderRadius: '1rem',
@@ -671,7 +613,7 @@ export default function ResidentServiceDetailPage() {
                     Chi tiết các dịch vụ đang sử dụng
                   </p>
                 </div>
-                <div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <span style={{
                     background: 'rgba(14, 165, 233, 0.1)',
                     color: '#0c4a6e',
@@ -683,20 +625,37 @@ export default function ResidentServiceDetailPage() {
                   }}>
                     Tổng: {carePlanDetails.length} gói dịch vụ
                   </span>
+                  {isExpired && (
+                    <span style={{
+                      background: 'rgba(220, 38, 38, 0.1)',
+                      color: '#dc2626',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      padding: '0.5rem 1rem',
+                      borderRadius: '9999px',
+                      border: '1px solid rgba(220, 38, 38, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}>
+                      <ExclamationTriangleIcon style={{ width: '1rem', height: '1rem' }} />
+                      HẾT HẠN
+                    </span>
+                  )}
                 </div>
               </div>
-              
+
               <div style={{ display: 'grid', gap: '1.5rem' }}>
                 {carePlanDetails.map((carePlan: any, index: number) => (
                   <div key={index} style={{
                     background: 'rgba(255, 255, 255, 0.9)',
                     borderRadius: '1rem',
                     padding: '1.5rem',
-                    border: '1px solid #bae6fd',
+                    border: isExpired ? '1px solid #fecaca' : '1px solid #bae6fd',
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    opacity: isExpired ? 0.8 : 1
                   }}>
-                    {/* Header with name and price */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'flex-start',
@@ -704,14 +663,33 @@ export default function ResidentServiceDetailPage() {
                       marginBottom: '1.5rem'
                     }}>
                       <div style={{ flex: 1 }}>
-                        <h4 style={{
-                          fontSize: '1.25rem',
-                          fontWeight: 700,
-                          color: '#1e293b',
-                          margin: '0 0 0.5rem 0'
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          marginBottom: '0.5rem'
                         }}>
-                          {carePlan.plan_name}
-                        </h4>
+                          <h4 style={{
+                            fontSize: '1.25rem',
+                            fontWeight: 700,
+                            color: isExpired ? '#dc2626' : '#1e293b',
+                            margin: 0
+                          }}>
+                            {carePlan.plan_name}
+                          </h4>
+                          {isExpired && (
+                            <span style={{
+                              background: '#dc2626',
+                              color: 'white',
+                              fontSize: '0.75rem',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.25rem',
+                              fontWeight: 600
+                            }}>
+                              HẾT HẠN
+                            </span>
+                          )}
+                        </div>
                         <p style={{
                           fontSize: '0.875rem',
                           color: '#64748b',
@@ -751,15 +729,16 @@ export default function ResidentServiceDetailPage() {
                         </p>
                       </div>
                     </div>
-                    
-                    {/* Time Information */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      marginBottom: '1.5rem',
-                      border: '1px solid #bbf7d0'
-                    }}>
+
+                                            <div style={{
+                          background: isExpired 
+                            ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
+                            : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                          borderRadius: '0.75rem',
+                          padding: '1rem',
+                          marginBottom: '1.5rem',
+                          border: isExpired ? '1px solid #fecaca' : '1px solid #bbf7d0'
+                        }}>
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -773,11 +752,11 @@ export default function ResidentServiceDetailPage() {
                             gap: '0.5rem',
                             marginBottom: '0.5rem'
                           }}>
-                            <ClockIcon style={{ width: '1rem', height: '1rem', color: '#16a34a' }} />
+                            <ClockIcon style={{ width: '1rem', height: '1rem', color: isExpired ? '#dc2626' : '#16a34a' }} />
                             <span style={{
                               fontSize: '0.75rem',
                               fontWeight: 600,
-                              color: '#15803d'
+                              color: isExpired ? '#dc2626' : '#15803d'
                             }}>
                               Ngày bắt đầu
                             </span>
@@ -788,8 +767,8 @@ export default function ResidentServiceDetailPage() {
                             color: '#1e293b',
                             margin: 0
                           }}>
-                            {carePlan.start_date ? formatDate(carePlan.start_date) : 
-                             carePlanAssignment.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
+                            {carePlan.start_date ? formatDate(carePlan.start_date) :
+                              carePlanAssignment.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
                           </p>
                         </div>
                         <div style={{ textAlign: 'center' }}>
@@ -800,11 +779,11 @@ export default function ResidentServiceDetailPage() {
                             gap: '0.5rem',
                             marginBottom: '0.5rem'
                           }}>
-                            <CalendarIcon style={{ width: '1rem', height: '1rem', color: '#7c3aed' }} />
+                            <CalendarIcon style={{ width: '1rem', height: '1rem', color: isExpired ? '#dc2626' : '#7c3aed' }} />
                             <span style={{
                               fontSize: '0.75rem',
                               fontWeight: 600,
-                              color: '#6d28d9'
+                              color: isExpired ? '#dc2626' : '#6d28d9'
                             }}>
                               Ngày kết thúc
                             </span>
@@ -812,17 +791,16 @@ export default function ResidentServiceDetailPage() {
                           <p style={{
                             fontSize: '0.875rem',
                             fontWeight: 600,
-                            color: '#1e293b',
+                            color: isExpired ? '#dc2626' : '#1e293b',
                             margin: 0
                           }}>
-                            {carePlan.end_date ? formatDate(carePlan.end_date) : 
-                             carePlanAssignment.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
+                            {carePlan.end_date ? formatDate(carePlan.end_date) :
+                              carePlanAssignment.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
                           </p>
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Services Included */}
+
                     <div style={{
                       borderTop: '1px solid #e2e8f0',
                       paddingTop: '1.5rem'
@@ -905,7 +883,7 @@ export default function ResidentServiceDetailPage() {
                     </div>
                   </div>
                 ))}
-                
+
                 {carePlanDetails.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <DocumentTextIcon style={{
@@ -934,7 +912,6 @@ export default function ResidentServiceDetailPage() {
               </div>
             </div>
 
-            {/* Room & Bed Information */}
             <div style={{
               background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
               borderRadius: '1rem',
@@ -976,7 +953,7 @@ export default function ResidentServiceDetailPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',

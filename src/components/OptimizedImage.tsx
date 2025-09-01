@@ -1,6 +1,7 @@
-import React, { useState, useCallback, memo } from 'react';
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { useIntersectionObserver } from '@/hooks/usePerformance';
 
 interface OptimizedImageProps {
   src: string;
@@ -9,122 +10,89 @@ interface OptimizedImageProps {
   height?: number;
   className?: string;
   priority?: boolean;
-  quality?: number;
-  placeholder?: 'blur' | 'empty';
-  blurDataURL?: string;
-  sizes?: string;
-  fill?: boolean;
+  fallbackSrc?: string;
   onLoad?: () => void;
   onError?: () => void;
 }
 
-const OptimizedImage: React.FC<OptimizedImageProps> = memo(({
+export default function OptimizedImage({
   src,
   alt,
-  width,
-  height,
+  width = 400,
+  height = 300,
   className = '',
   priority = false,
-  quality = 75,
-  placeholder = 'empty',
-  blurDataURL,
-  sizes,
-  fill = false,
+  fallbackSrc = '/default-avatar.svg',
   onLoad,
-  onError
-}) => {
-  const [isLoaded, setIsLoaded] = useState(false);
+  onError,
+}: OptimizedImageProps) {
+  const [imageSrc, setImageSrc] = useState(src);
+  const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [isInView, setIsInView] = useState(priority);
+  const imgRef = useRef<HTMLImageElement>(null);
 
-  const handleIntersection = useCallback((entries: IntersectionObserverEntry[]) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        setIsInView(true);
-      }
-    });
-  }, []);
+  useEffect(() => {
+    setImageSrc(src);
+    setIsLoading(true);
+    setHasError(false);
+  }, [src]);
 
-  const { observe, unobserve } = useIntersectionObserver(handleIntersection, {
-    rootMargin: '50px',
-    threshold: 0.1
-  });
-
-  const imageRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) {
-      if (priority) {
-        setIsInView(true);
-      } else {
-        observe(node);
-      }
-    }
-    return () => {
-      if (node && !priority) {
-        unobserve(node);
-      }
-    };
-  }, [priority, observe, unobserve]);
-
-  const handleLoad = useCallback(() => {
-    setIsLoaded(true);
+  const handleLoad = () => {
+    setIsLoading(false);
     onLoad?.();
-  }, [onLoad]);
+  };
 
-  const handleError = useCallback(() => {
-    setHasError(true);
+  const handleError = () => {
+    if (imageSrc !== fallbackSrc) {
+      setImageSrc(fallbackSrc);
+      setHasError(true);
+    } else {
+      setIsLoading(false);
+      setHasError(true);
+    }
     onError?.();
-  }, [onError]);
+  };
 
-  if (hasError) {
+  if (!src) {
     return (
-      <div 
+      <div
         className={`bg-gray-200 flex items-center justify-center ${className}`}
         style={{ width, height }}
       >
-        <span className="text-gray-500 text-sm">Image not available</span>
+        <span className="text-gray-400 text-sm">No image</span>
       </div>
     );
   }
 
-  if (!isInView) {
-    return (
-      <div 
-        ref={imageRef}
-        className={`bg-gray-200 animate-pulse ${className}`}
-        style={{ width, height }}
-      />
-    );
-  }
-
   return (
-    <div ref={imageRef} className={`relative ${className}`}>
+    <div className={`relative overflow-hidden ${className}`} style={{ width, height }}>
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+      )}
+
       <Image
-        src={src}
+        ref={imgRef}
+        src={imageSrc}
         alt={alt}
-        width={fill ? undefined : width}
-        height={fill ? undefined : height}
-        className={`transition-opacity duration-300 ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
-        }`}
+        width={width}
+        height={height}
+        className={`transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'
+          }`}
         priority={priority}
-        quality={quality}
-        placeholder={placeholder}
-        blurDataURL={blurDataURL}
-        sizes={sizes}
-        fill={fill}
+        loading={priority ? 'eager' : 'lazy'}
         onLoad={handleLoad}
         onError={handleError}
-        style={{
-          objectFit: 'cover',
-        }}
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        quality={85}
       />
-      {!isLoaded && (
-        <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+
+      {hasError && imageSrc === fallbackSrc && (
+        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+          <span className="text-gray-400 text-xs">Image unavailable</span>
+        </div>
       )}
     </div>
   );
-});
-
-OptimizedImage.displayName = 'OptimizedImage';
-
-export default OptimizedImage;
+}

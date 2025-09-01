@@ -41,16 +41,13 @@ export default function StaffManagementPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Thêm state cho modal chi tiết
   const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // State cho việc chuyển hướng đến trang chỉnh sửa
   const [redirectingToEdit, setRedirectingToEdit] = useState<string | null>(null);
 
 
 
-  // Lấy danh sách nhân viên
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     setLoadingData(true);
@@ -60,7 +57,6 @@ export default function StaffManagementPage() {
       .finally(() => setLoadingData(false));
   }, [user]);
 
-  // Lọc danh sách
   const filteredStaff = staffList
     .filter((staff) => staff.role === 'staff')
     .filter((staff) => {
@@ -72,39 +68,33 @@ export default function StaffManagementPage() {
       return matchesSearch && matchesStatus;
     });
 
-  // Tách nhân viên theo trạng thái
   const activeStaff = filteredStaff.filter(staff => staff.status === 'active');
   const inactiveStaff = filteredStaff.filter(staff => staff.status === 'inactive');
 
-  // Xử lý xóa nhân viên
   const handleDelete = (id: string) => {
     setDeleteId(id);
     setShowDeleteModal(true);
   };
   const confirmDelete = async () => {
     if (!deleteId) return;
-    
-    // Tìm thông tin nhân viên trước khi xóa để hiển thị trong thông báo
+
     const staffToDelete = staffList.find(s => s._id === deleteId);
     const staffName = staffToDelete?.full_name || 'Nhân viên';
-    
+
     try {
       await staffAPI.delete(deleteId);
       setStaffList((prev) => prev.filter((s) => s._id !== deleteId));
       setShowDeleteModal(false);
       setDeleteId(null);
-      // Thông báo thành công chi tiết
-      setError(''); // Xóa lỗi cũ nếu có
+      setError('');
       setSuccessMessage(`Đã xóa thành công nhân viên: ${staffName}`);
       setShowSuccessModal(true);
-      // Tự động chuyển hướng sau 2 giây
       setTimeout(() => {
         setShowSuccessModal(false);
       }, 2000);
     } catch (error: any) {
-      console.error('Error deleting staff:', error);
       setError(`❌ Không thể xóa nhân viên ${staffName}: ${error.message || 'Lỗi không xác định'}`);
-      setSuccessMessage(''); // Xóa thông báo thành công nếu có
+      setSuccessMessage('');
     }
   };
   const cancelDelete = () => {
@@ -112,20 +102,17 @@ export default function StaffManagementPage() {
     setDeleteId(null);
   };
 
-  // Xử lý chuyển hướng đến trang chỉnh sửa
   const handleEdit = (staffId: string) => {
     setRedirectingToEdit(staffId);
     router.push(`/admin/staff-management/edit/${staffId}`);
   };
 
-  // Handle redirect for non-admin users
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
       router.replace('/');
     }
   }, [user, loading, router]);
 
-  // Show loading state
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #e0e7ff 0%, #f1f5f9 100%)' }}>
@@ -135,12 +122,10 @@ export default function StaffManagementPage() {
     );
   }
 
-  // Show nothing while redirecting or if not admin
   if (!user || user.role !== 'admin') {
     return null;
   }
 
-  // Get staff to delete for modal
   const staffToDelete = staffList.find(s => s._id === deleteId);
   const staffName = staffToDelete?.full_name || 'Nhân viên';
   const staffEmail = staffToDelete?.email || '';
@@ -151,7 +136,6 @@ export default function StaffManagementPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background decorations */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -172,7 +156,6 @@ export default function StaffManagementPage() {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Header Section */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -182,7 +165,6 @@ export default function StaffManagementPage() {
           border: '1px solid rgba(255, 255, 255, 0.2)',
           backdropFilter: 'blur(10px)'
         }}>
-          {/* Error Messages */}
           {error && (
             <div style={{
               marginBottom: '1rem',
@@ -219,7 +201,7 @@ export default function StaffManagementPage() {
               </div>
             </div>
           )}
-          
+
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -250,7 +232,7 @@ export default function StaffManagementPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Quản lý nhân viên
+                  Danh sách nhân viên
                 </h1>
                 <p style={{
                   fontSize: '1rem',
@@ -270,7 +252,7 @@ export default function StaffManagementPage() {
                 </p>
               </div>
             </div>
-            
+
             <Link
               href="/admin/staff-management/add"
               style={{
@@ -301,11 +283,10 @@ export default function StaffManagementPage() {
               <PlusCircleIcon style={{ width: '1.25rem', height: '1.25rem' }} />
               Thêm nhân viên
             </Link>
-            
-            
+
+
           </div>
         </div>
-        {/* Search and Filter Section */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -320,7 +301,6 @@ export default function StaffManagementPage() {
             gap: '1rem',
             alignItems: 'end'
           }}>
-            {/* Search Input */}
             <div>
               <label style={{
                 display: 'block',
@@ -357,7 +337,6 @@ export default function StaffManagementPage() {
                 }} />
               </div>
             </div>
-            {/* Status Filter */}
             <div>
               <label style={{
                 display: 'block',
@@ -385,7 +364,6 @@ export default function StaffManagementPage() {
                 <option value="inactive">Nghỉ việc</option>
               </select>
             </div>
-            {/* Results Count */}
             <div style={{
               background: 'rgba(99, 102, 241, 0.1)',
               padding: '0.75rem 1rem',
@@ -404,7 +382,6 @@ export default function StaffManagementPage() {
           </div>
         </div>
 
-        {/* Tab Navigation */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -438,7 +415,7 @@ export default function StaffManagementPage() {
                 boxShadow: activeTab === 'active' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
               }}
             >
-              <CheckCircleIcon style={{width: '1.125rem', height: '1.125rem'}} />
+              <CheckCircleIcon style={{ width: '1.125rem', height: '1.125rem' }} />
               Đang làm việc ({activeStaff.length} người)
             </button>
             <button
@@ -459,13 +436,12 @@ export default function StaffManagementPage() {
                 boxShadow: activeTab === 'inactive' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : 'none'
               }}
             >
-              <XMarkIcon style={{width: '1.125rem', height: '1.125rem'}} />
+              <XMarkIcon style={{ width: '1.125rem', height: '1.125rem' }} />
               Đã nghỉ việc ({inactiveStaff.length} người)
             </button>
           </div>
         </div>
 
-        {/* Staff Table */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -525,9 +501,9 @@ export default function StaffManagementPage() {
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}>
-                          <img 
-                            src={staff.avatar ? processAvatarUrl(staff.avatar) : '/default-avatar.svg'} 
-                            alt={staff.full_name} 
+                          <img
+                            src={staff.avatar ? processAvatarUrl(staff.avatar) : '/default-avatar.svg'}
+                            alt={staff.full_name}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             onError={(e) => {
                               e.currentTarget.src = '/default-avatar.svg';
@@ -536,7 +512,7 @@ export default function StaffManagementPage() {
                         </div>
                         <div>
                           <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>{staff.full_name}</p>
-                          
+
                         </div>
                       </div>
                     </td>
@@ -594,7 +570,7 @@ export default function StaffManagementPage() {
                         >
                           <PencilIcon style={{ width: '1rem', height: '1rem' }} />
                         </button>
-                        
+
                       </div>
                     </td>
                   </tr>
@@ -603,71 +579,70 @@ export default function StaffManagementPage() {
             </table>
           </div>
         </div>
-        {/* Modal xác nhận xóa */}
         {showDeleteModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(10px)'
+          }}>
             <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              backdropFilter: 'blur(10px)'
+              background: 'white',
+              borderRadius: '1rem',
+              padding: '2rem',
+              maxWidth: '450px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
             }}>
-              <div style={{
-                background: 'white',
-                borderRadius: '1rem',
-                padding: '2rem',
-                maxWidth: '450px',
-                width: '90%',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{
-                    width: '3rem',
-                    height: '3rem',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <TrashIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#111827' }}>
-                    Xác nhận xóa nhân viên
-                  </h3>
-                </div>
-                
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                 <div style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '0.75rem',
-                  padding: '1rem',
-                  marginBottom: '1.5rem'
+                  width: '3rem',
+                  height: '3rem',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}>
-                  <p style={{ margin: '0 0 0.5rem 0', color: '#dc2626', fontWeight: 600 }}>
-                    Bạn sắp xóa nhân viên:
-                  </p>
-                  <p style={{ margin: '0 0 0.25rem 0', color: '#374151', fontWeight: 500 }}>
-                    <strong>Tên:</strong> {staffName}
-                  </p>
-                  {staffEmail && (
-                    <p style={{ margin: 0, color: '#6b7280' }}>
-                      <strong>Email:</strong> {staffEmail}
-                    </p>
-                  )}
+                  <TrashIcon style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} />
                 </div>
-                
-                                <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
-                  ⚠️ <strong>Lưu ý:</strong> Hành động này sẽ xóa vĩnh viễn tài khoản và tất cả dữ liệu liên quan. Không thể hoàn tác!
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#111827' }}>
+                  Xác nhận xóa nhân viên
+                </h3>
+              </div>
+
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#dc2626', fontWeight: 600 }}>
+                  Bạn sắp xóa nhân viên:
                 </p>
-                
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <p style={{ margin: '0 0 0.25rem 0', color: '#374151', fontWeight: 500 }}>
+                  <strong>Tên:</strong> {staffName}
+                </p>
+                {staffEmail && (
+                  <p style={{ margin: 0, color: '#6b7280' }}>
+                    <strong>Email:</strong> {staffEmail}
+                  </p>
+                )}
+              </div>
+
+              <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                ⚠️ <strong>Lưu ý:</strong> Hành động này sẽ xóa vĩnh viễn tài khoản và tất cả dữ liệu liên quan. Không thể hoàn tác!
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                 <button
                   onClick={cancelDelete}
                   style={{
@@ -682,13 +657,12 @@ export default function StaffManagementPage() {
                 >
                   Hủy bỏ
                 </button>
-                
+
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal xem chi tiết nhân viên */}
         {showDetailModal && selectedStaff && selectedStaff.role === 'staff' && (
           <div style={{
             position: 'fixed',
@@ -719,7 +693,6 @@ export default function StaffManagementPage() {
               marginTop: '90px',
               marginLeft: '100px'
             }}>
-              {/* Button đóng */}
               <button
                 title="Đóng"
                 onClick={() => setShowDetailModal(false)}
@@ -739,12 +712,12 @@ export default function StaffManagementPage() {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
-                
-                onMouseOver={e => { 
+
+                onMouseOver={e => {
                   e.currentTarget.style.background = 'linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%)';
                   e.currentTarget.style.transform = 'scale(1.05)';
                 }}
-                onMouseOut={e => { 
+                onMouseOut={e => {
                   e.currentTarget.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%)';
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
@@ -752,52 +725,51 @@ export default function StaffManagementPage() {
                 <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
               </button>
 
-              {/* Header với avatar và thông tin cơ bản */}
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
                 marginBottom: '1.5rem',
                 textAlign: 'center'
               }}>
-                                  <div style={{
-                    position: 'relative',
-                    width: '80px',
-                    height: '80px',
-                    marginBottom: '1rem',
+                <div style={{
+                  position: 'relative',
+                  width: '80px',
+                  height: '80px',
+                  marginBottom: '1rem',
+                }}>
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 12px 32px rgba(99,102,241,0.25), 0 0 0 3px rgba(255,255,255,0.8)',
+                    border: '2px solid rgba(255,255,255,0.9)',
                   }}>
-                    <div style={{
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: '50%',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 12px 32px rgba(99,102,241,0.25), 0 0 0 3px rgba(255,255,255,0.8)',
-                      border: '2px solid rgba(255,255,255,0.9)',
-                    }}>
-                      <img 
-                        src={selectedStaff.avatar ? processAvatarUrl(selectedStaff.avatar) : '/default-avatar.svg'} 
-                        alt={selectedStaff.full_name} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.currentTarget.src = '/default-avatar.svg';
-                        }}
-                      />
-                    </div>
+                    <img
+                      src={selectedStaff.avatar ? processAvatarUrl(selectedStaff.avatar) : '/default-avatar.svg'}
+                      alt={selectedStaff.full_name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.currentTarget.src = '/default-avatar.svg';
+                      }}
+                    />
                   </div>
-                
-                <h2 style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: 700, 
-                  margin: '0 0 0.5rem 0', 
-                  color: '#0f172a', 
+                </div>
+
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  margin: '0 0 0.5rem 0',
+                  color: '#0f172a',
                   letterSpacing: '-0.02em'
                 }}>
                   {selectedStaff.full_name}
                 </h2>
-                
+
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -809,11 +781,10 @@ export default function StaffManagementPage() {
                   boxShadow: '0 2px 8px rgba(15,23,42,0.08)'
                 }}>
                   <IdentificationIcon style={{ width: '1rem', height: '1rem', color: '#6366f1' }} />
-                  
+
                 </div>
               </div>
 
-              {/* Thông tin chi tiết trong card */}
               <div style={{
                 background: 'rgba(255,255,255,0.7)',
                 borderRadius: '1rem',
@@ -833,42 +804,42 @@ export default function StaffManagementPage() {
                   <UsersIcon style={{ width: '1.25rem', height: '1.25rem', color: '#6366f1' }} />
                   Thông tin nhân viên
                 </h3>
-                
+
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                   gap: '1rem'
                 }}>
-                  <DetailRow 
-                    icon={<AtSymbolIcon style={{ width: '1rem', height: '1rem', color: '#6366f1' }} />} 
-                    label="Email" 
-                    value={selectedStaff.email} 
+                  <DetailRow
+                    icon={<AtSymbolIcon style={{ width: '1rem', height: '1rem', color: '#6366f1' }} />}
+                    label="Email"
+                    value={selectedStaff.email}
                   />
-                  <DetailRow 
-                    icon={<PhoneIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />} 
-                    label="Số điện thoại" 
-                    value={selectedStaff.phone} 
+                  <DetailRow
+                    icon={<PhoneIcon style={{ width: '1rem', height: '1rem', color: '#10b981' }} />}
+                    label="Số điện thoại"
+                    value={selectedStaff.phone}
                   />
-                  <DetailRow 
-                    icon={<BriefcaseIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />} 
-                    label="Vị trí" 
-                    value={selectedStaff.position} 
+                  <DetailRow
+                    icon={<BriefcaseIcon style={{ width: '1rem', height: '1rem', color: '#f59e0b' }} />}
+                    label="Vị trí"
+                    value={selectedStaff.position}
                   />
-                  <DetailRow 
-                    icon={<AcademicCapIcon style={{ width: '1rem', height: '1rem', color: '#0ea5e9' }} />} 
-                    label="Bằng cấp" 
-                    value={selectedStaff.qualification} 
+                  <DetailRow
+                    icon={<AcademicCapIcon style={{ width: '1rem', height: '1rem', color: '#0ea5e9' }} />}
+                    label="Bằng cấp"
+                    value={selectedStaff.qualification}
                   />
-                  <DetailRow 
-                    icon={<CheckCircleIcon style={{ width: '1rem', height: '1rem', color: selectedStaff.status === 'active' ? '#10b981' : '#6b7280' }} />} 
-                    label="Trạng thái" 
-                    value={selectedStaff.status === 'active' ? 'Đang làm việc' : 'Nghỉ việc'} 
-                    badge={selectedStaff.status} 
+                  <DetailRow
+                    icon={<CheckCircleIcon style={{ width: '1rem', height: '1rem', color: selectedStaff.status === 'active' ? '#10b981' : '#6b7280' }} />}
+                    label="Trạng thái"
+                    value={selectedStaff.status === 'active' ? 'Đang làm việc' : 'Nghỉ việc'}
+                    badge={selectedStaff.status}
                   />
-                  <DetailRow 
-                    icon={<CalendarIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />} 
-                    label="Ngày vào làm" 
-                    value={selectedStaff.join_date ? new Date(selectedStaff.join_date).toLocaleDateString('vi-VN') : ''} 
+                  <DetailRow
+                    icon={<CalendarIcon style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} />}
+                    label="Ngày vào làm"
+                    value={selectedStaff.join_date ? new Date(selectedStaff.join_date).toLocaleDateString('vi-VN') : ''}
                   />
                   <div style={{
                     gridColumn: '1 / -1',
@@ -906,7 +877,6 @@ export default function StaffManagementPage() {
                 </div>
               </div>
 
-              {/* Footer với action buttons */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'center',
@@ -915,13 +885,12 @@ export default function StaffManagementPage() {
                 paddingTop: '1rem',
                 borderTop: '1px solid rgba(226,232,240,0.6)'
               }}>
-                
+
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal */}
         {showSuccessModal && (
           <div style={{
             position: 'fixed',
@@ -973,11 +942,10 @@ export default function StaffManagementPage() {
   );
 }
 
-// Component DetailRow được cải thiện
 function DetailRow({ label, value, badge, icon }: { label: string, value: string, badge?: string, icon?: React.ReactNode }) {
   return (
-    <div style={{ 
-      display: 'flex', 
+    <div style={{
+      display: 'flex',
       flexDirection: 'column',
       gap: '0.25rem',
       padding: '0.75rem',
@@ -987,27 +955,27 @@ function DetailRow({ label, value, badge, icon }: { label: string, value: string
       boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
       transition: 'all 0.2s ease'
     }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '0.5rem' 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem'
       }}>
         {icon}
-        <span style={{ 
-          color: '#334155', 
-          fontWeight: 600, 
+        <span style={{
+          color: '#334155',
+          fontWeight: 600,
           fontSize: '0.75rem',
           letterSpacing: '0.025em'
         }}>
           {label}
         </span>
       </div>
-      
+
       {badge ? (
         <span style={{
           alignSelf: 'flex-start',
-          background: badge === 'active' 
-            ? 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.1) 100%)' 
+          background: badge === 'active'
+            ? 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.1) 100%)'
             : 'linear-gradient(135deg, rgba(156,163,175,0.15) 0%, rgba(107,114,128,0.1) 100%)',
           color: badge === 'active' ? '#059669' : '#6b7280',
           padding: '0.25rem 0.75rem',
@@ -1020,8 +988,8 @@ function DetailRow({ label, value, badge, icon }: { label: string, value: string
           {value}
         </span>
       ) : (
-        <span style={{ 
-          color: '#0f172a', 
+        <span style={{
+          color: '#0f172a',
           fontSize: '0.875rem',
           fontWeight: 500,
           lineHeight: '1.5'

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { 
+import {
   ArrowLeftIcon,
   XMarkIcon,
   CheckCircleIcon,
@@ -16,13 +16,14 @@ import {
   HomeIcon
 } from '@heroicons/react/24/outline';
 import { carePlansAPI, carePlanAssignmentsAPI, residentAPI, userAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return '/default-avatar.svg';
-  
+
   if (avatarPath.startsWith('http')) return avatarPath;
   if (avatarPath.startsWith('data:')) return avatarPath;
-  
+
   const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
   return userAPI.getAvatarUrl(cleanPath);
 };
@@ -31,7 +32,7 @@ export default function ServiceDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
-  
+
   const [relatives, setRelatives] = useState<any[]>([]);
   const [selectedRelative, setSelectedRelative] = useState<any>(null);
   const [residentCarePlans, setResidentCarePlans] = useState<any[]>([]);
@@ -40,7 +41,7 @@ export default function ServiceDetailsPage() {
   const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
   const [loadingCarePlanDetail, setLoadingCarePlanDetail] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
   const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [bedNumber, setBedNumber] = useState<string>('Chưa phân giường');
   const [roomLoading, setRoomLoading] = useState(false);
@@ -54,7 +55,7 @@ export default function ServiceDetailsPage() {
       router.push('/login');
       return;
     }
-    
+
     if (user?.role !== 'family') {
       router.push('/');
       return;
@@ -68,7 +69,7 @@ export default function ServiceDetailsPage() {
         const response = await residentAPI.getByFamilyMemberId(user?.id || '');
         const relativesData = Array.isArray(response) ? response : [];
         setRelatives(relativesData);
-        
+
         const selected = relativesData.find((r: any) => r._id === residentId);
         if (selected) {
           setSelectedRelative(selected);
@@ -76,7 +77,6 @@ export default function ServiceDetailsPage() {
           setSelectedRelative(relativesData[0]);
         }
       } catch (error) {
-        console.error('Error loading relatives:', error);
       } finally {
         setLoading(false);
       }
@@ -95,7 +95,6 @@ export default function ServiceDetailsPage() {
         const response = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
         setResidentCarePlans(Array.isArray(response) ? response : []);
       } catch (error) {
-        console.error('Error loading care plans:', error);
       }
     };
 
@@ -108,13 +107,33 @@ export default function ServiceDetailsPage() {
 
       try {
         setLoadingCarePlanDetail(true);
-        
+
         const allAssignments = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
-        setCarePlanAssignments(Array.isArray(allAssignments) ? allAssignments : []);
         
+        // Lọc ra chỉ những assignment đang active (không hết hạn, không bị hủy, không hoàn thành)
+        const activeAssignments = allAssignments.filter((assignment: any) => {
+          // Kiểm tra status
+          if (assignment.status === 'cancelled' || assignment.status === 'completed') {
+            return false;
+          }
+          
+          // Kiểm tra end_date nếu có
+          if (assignment.end_date) {
+            const endDate = new Date(assignment.end_date);
+            const today = new Date();
+            if (endDate < today) {
+              return false; // Đã hết hạn
+            }
+          }
+          
+          return true; // Còn active
+        });
+        
+        setCarePlanAssignments(activeAssignments);
+
         const allCarePlanIds: any[] = [];
-        if (Array.isArray(allAssignments)) {
-          allAssignments.forEach((assignment: any) => {
+        if (Array.isArray(activeAssignments)) {
+          activeAssignments.forEach((assignment: any) => {
             if (Array.isArray(assignment.care_plan_ids)) {
               assignment.care_plan_ids.forEach((plan: any) => {
                 const planId = plan._id || plan;
@@ -125,7 +144,7 @@ export default function ServiceDetailsPage() {
             }
           });
         }
-        
+
         if (allCarePlanIds.length > 0) {
           const carePlanPromises = allCarePlanIds.map(async (plan: any) => {
             const planId = plan._id || plan;
@@ -133,20 +152,21 @@ export default function ServiceDetailsPage() {
               const planData = await carePlansAPI.getById(planId);
               return planData;
             } catch (err) {
-              return plan; 
+              return plan;
             }
           });
-          
+
           const carePlanData = await Promise.all(carePlanPromises);
           setCarePlanDetails(carePlanData);
         } else {
           setCarePlanDetails([]);
         }
-        
-        if (allAssignments.length > 0) {
-          setResidentCarePlanDetail(allAssignments[0]);
-          
-          const assignmentWithRoomCost = allAssignments.find((assignment: any) => 
+
+        if (activeAssignments.length > 0) {
+          setResidentCarePlanDetail(activeAssignments[0]);
+
+          // Ưu tiên sử dụng room_monthly_cost từ care plan assignment
+          const assignmentWithRoomCost = activeAssignments.find((assignment: any) =>
             assignment.room_monthly_cost && assignment.room_monthly_cost > 0
           );
           if (assignmentWithRoomCost) {
@@ -154,7 +174,6 @@ export default function ServiceDetailsPage() {
           }
         }
       } catch (error) {
-        console.error('Error loading care plan detail:', error);
       } finally {
         setLoadingCarePlanDetail(false);
       }
@@ -170,116 +189,121 @@ export default function ServiceDetailsPage() {
       setRoomPrice(0);
       return;
     }
+    
     setRoomLoading(true);
+    
+    // Hàm để cập nhật thông tin phòng và lấy giá từ room_types
+    const updateRoomInfo = async (roomData: any, bedInfo: any) => {
+      setRoomNumber(roomData?.room_number || 'Chưa hoàn tất đăng kí');
+      
+      if (bedInfo) {
+        if (typeof bedInfo === 'object' && bedInfo.bed_number) {
+          setBedNumber(bedInfo.bed_number);
+        } else {
+          const bedId = typeof bedInfo === 'object' && bedInfo?._id ? bedInfo._id : bedInfo;
+          setBedNumber(bedId || 'Chưa phân giường');
+        }
+      } else {
+        setBedNumber('Chưa phân giường');
+      }
+
+      // Lấy giá phòng từ room_types dựa trên room_type của phòng
+      if (roomData?.room_type) {
+        try {
+          // Import roomTypesAPI để lấy giá phòng
+          const { roomTypesAPI } = await import('@/lib/api');
+          const roomTypes = await roomTypesAPI.getAll();
+          const roomType = roomTypes.find((type: any) => type.room_type === roomData.room_type);
+          
+          if (roomType && roomType.monthly_price) {
+            setRoomPrice(roomType.monthly_price);
+          } else {
+            setRoomPrice(0);
+          }
+        } catch (error) {
+          console.error('Error fetching room type price:', error);
+          setRoomPrice(0);
+        }
+      } else {
+        setRoomPrice(0);
+      }
+    };
+
+    // Thử lấy thông tin từ bed assignments trước
     bedAssignmentsAPI.getByResidentId(selectedRelative._id)
       .then((assignments: any[]) => {
         const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
+        
         if (assignment?.bed_id?.room_id) {
-          if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
-            setRoomNumber(assignment.bed_id.room_id.room_number);
-            if (assignment.bed_id.room_id.monthly_price) {
-              setRoomPrice(assignment.bed_id.room_id.monthly_price);
-            }
+          const roomData = assignment.bed_id.room_id;
+          
+          if (typeof roomData === 'object' && roomData.room_number) {
+            // Có thông tin phòng đầy đủ
+            updateRoomInfo(roomData, assignment.bed_id);
           } else {
-            const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
+            // Cần fetch thông tin phòng
+            const roomId = roomData._id || roomData;
             if (roomId) {
               return roomsAPI.getById(roomId)
                 .then((room: any) => {
-                  setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-                  setRoomPrice(room?.monthly_price || 0);
+                  updateRoomInfo(room, assignment.bed_id);
                 })
                 .catch(() => {
-                  setRoomNumber('Chưa hoàn tất đăng kí');
-                  setRoomPrice(0);
+                  updateRoomInfo(null, null);
                 });
             } else {
-              setRoomNumber('Chưa hoàn tất đăng kí');
-              setRoomPrice(0);
+              updateRoomInfo(null, null);
             }
-          }
-          
-          if (assignment.bed_id) {
-            if (typeof assignment.bed_id === 'object' && assignment.bed_id.bed_number) {
-              setBedNumber(assignment.bed_id.bed_number);
-            } else {
-              const bedId = typeof assignment.bed_id === 'object' && assignment.bed_id?._id ? 
-                assignment.bed_id._id : assignment.bed_id;
-              setBedNumber(bedId || 'Chưa phân giường');
-            }
-          } else {
-            setBedNumber('Chưa phân giường');
           }
         } else {
+          // Không có bed assignment, thử từ care plan assignments
           return carePlanAssignmentsAPI.getByResidentId(selectedRelative._id)
             .then((careAssignments: any[]) => {
-              const careAssignment = Array.isArray(careAssignments) ? careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+              const careAssignment = Array.isArray(careAssignments) ? 
+                careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
+              
               const roomId = careAssignment?.bed_id?.room_id || careAssignment?.assigned_room_id;
               const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+              
               if (roomIdString) {
                 return roomsAPI.getById(roomIdString)
                   .then((room: any) => {
-                    setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-                    setRoomPrice(room?.monthly_price || 0);
+                    updateRoomInfo(room, careAssignment?.bed_id);
                   })
                   .catch(() => {
-                    setRoomNumber('Chưa hoàn tất đăng kí');
-                    setRoomPrice(0);
+                    updateRoomInfo(null, null);
                   });
               } else {
-                setRoomNumber('Chưa hoàn tất đăng kí');
-                setRoomPrice(0);
-              }
-              
-              if (careAssignment?.bed_id) {
-                if (typeof careAssignment.bed_id === 'object' && careAssignment.bed_id.bed_number) {
-                  setBedNumber(careAssignment.bed_id.bed_number);
-                } else {
-                  const bedId = typeof careAssignment.bed_id === 'object' && careAssignment.bed_id?._id ? 
-                    careAssignment.bed_id._id : careAssignment.bed_id;
-                  setBedNumber(bedId || 'Chưa phân giường');
-                }
-              } else {
-                setBedNumber('Chưa phân giường');
+                updateRoomInfo(null, null);
               }
             })
             .catch(() => {
-              setRoomNumber('Chưa hoàn tất đăng kí');
-              setBedNumber('Chưa phân giường');
-              setRoomPrice(0);
+              updateRoomInfo(null, null);
             });
         }
       })
       .catch(() => {
-        setRoomNumber('Chưa hoàn tất đăng kí');
-        setBedNumber('Chưa phân giường');
-        setRoomPrice(0);
+        updateRoomInfo(null, null);
       })
       .finally(() => setRoomLoading(false));
   }, [selectedRelative?._id]);
 
+  // Debug logging để kiểm tra roomPrice
   useEffect(() => {
-    if (carePlanAssignments.length > 0 && roomPrice === 0) {
-      const assignmentWithRoomCost = carePlanAssignments.find((assignment: any) => 
-        assignment.room_monthly_cost && assignment.room_monthly_cost > 0
-      );
-      if (assignmentWithRoomCost) {
-        setRoomPrice(assignmentWithRoomCost.room_monthly_cost);
-      }
+    if (roomPrice > 0) {
+      console.log('Room price updated:', roomPrice);
     }
-  }, [carePlanAssignments, roomPrice]);
+  }, [roomPrice]);
 
+  // Debug logging để kiểm tra carePlanDetails
   useEffect(() => {
-    if (carePlanAssignments.length === 0) {
-      setRoomPrice(0);
+    if (carePlanDetails.length > 0) {
+      console.log('Care plan details updated:', carePlanDetails.map(cp => ({
+        name: cp.plan_name,
+        price: cp.monthly_price
+      })));
     }
-  }, [selectedRelative?._id, carePlanAssignments.length]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+  }, [carePlanDetails]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
@@ -304,7 +328,7 @@ export default function ServiceDetailsPage() {
     }
   };
 
-  
+
 
   const toggleServiceExpansion = (index: number) => {
     setExpandedServices(prev => ({
@@ -315,7 +339,7 @@ export default function ServiceDetailsPage() {
 
   const getAssignmentForCarePlan = (carePlanId: string) => {
     if (!Array.isArray(carePlanAssignments)) return null;
-    
+
     return carePlanAssignments.find((assignment: any) => {
       if (Array.isArray(assignment.care_plan_ids)) {
         return assignment.care_plan_ids.some((plan: any) => {
@@ -329,21 +353,15 @@ export default function ServiceDetailsPage() {
 
   const calculateTotalServiceCost = () => {
     if (!Array.isArray(carePlanDetails)) return 0;
-    
+
     return carePlanDetails.reduce((total, carePlan) => {
       return total + (carePlan.monthly_price || 0);
     }, 0);
   };
 
   const getDisplayRoomPrice = () => {
-    if (roomPrice > 0) return roomPrice;
-    
-    const totalServiceCost = calculateTotalServiceCost();
-    if (totalServiceCost > 0) {
-      return Math.round(totalServiceCost * 0.7);
-    }
-    
-    return 0;
+    // Sử dụng roomPrice đã được lấy từ room_types
+    return roomPrice;
   };
 
   if (loading) {
@@ -380,14 +398,14 @@ export default function ServiceDetailsPage() {
       <div className="sticky top-0 z-10 bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-3xl p-6 mb-8 w-full max-w-7xl mx-auto shadow-lg backdrop-blur-sm mt-8">
         <div className="flex items-center justify-between gap-10 flex-wrap">
           <div className="flex items-center gap-8">
-          <button
+            <button
               onClick={() => router.push('/family/services')}
               className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
               title="Quay lại"
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
-            
+
             <div className="flex items-center gap-6">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                 <DocumentTextIcon className="w-8 h-8 text-white" />
@@ -440,7 +458,7 @@ export default function ServiceDetailsPage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-xl border-2 border-blue-100 p-6">
               <div className="text-center mb-6">
-                
+
                 <div className="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden border-4 border-blue-300 shadow-lg">
                   <img
                     src={getAvatarUrl(selectedRelative.avatar)}
@@ -453,38 +471,38 @@ export default function ServiceDetailsPage() {
                   {selectedRelative.full_name || selectedRelative.name || 'Không có tên'}
                 </h2>
               </div>
-               
-                              <div className="space-y-4">
-                 <div>
-                   <p className="text-gray-700 font-medium text-sm mb-2">Ngày sinh:</p>
-                   <div className="flex items-center space-x-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
-                     <CalendarIcon className="w-5 h-5 text-blue-600" />
-                     <span className="text-gray-900 font-medium">
-                       {selectedRelative.date_of_birth || selectedRelative.dateOfBirth ? (
-                         (() => {
-                           const birthDate = new Date(selectedRelative.date_of_birth || selectedRelative.dateOfBirth);
-                           const age = new Date().getFullYear() - birthDate.getFullYear();
-                           const formattedDate = birthDate.toLocaleDateString('vi-VN', {
-                             day: '2-digit',
-                             month: '2-digit',
-                             year: 'numeric'
-                           });
-                           return `${formattedDate} (${age} tuổi)`;
-                         })()
-                       ) : 'N/A'}
-                     </span>
-                   </div>
-                 </div>
-                 <div>
-                   <p className="text-gray-700 font-medium text-sm mb-2">Số phòng:</p>
-                   <div className="flex items-center space-x-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
-                     <HomeIcon className="w-5 h-5 text-green-600" />
-                     <span className="text-gray-900 font-medium">
-                       {roomLoading ? 'Đang tải...' : roomNumber}
-                     </span>
-                   </div>
-                 </div>
-               </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-gray-700 font-medium text-sm mb-2">Ngày sinh:</p>
+                  <div className="flex items-center space-x-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <CalendarIcon className="w-5 h-5 text-blue-600" />
+                    <span className="text-gray-900 font-medium">
+                      {selectedRelative.date_of_birth || selectedRelative.dateOfBirth ? (
+                        (() => {
+                          const birthDate = new Date(selectedRelative.date_of_birth || selectedRelative.dateOfBirth);
+                          const age = new Date().getFullYear() - birthDate.getFullYear();
+                          const formattedDate = birthDate.toLocaleDateString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          });
+                          return `${formattedDate} (${age} tuổi)`;
+                        })()
+                      ) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-700 font-medium text-sm mb-2">Số phòng:</p>
+                  <div className="flex items-center space-x-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <HomeIcon className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-900 font-medium">
+                      {roomLoading ? 'Đang tải...' : roomNumber}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -510,112 +528,121 @@ export default function ServiceDetailsPage() {
                   </div>
                 ) : residentCarePlanDetail ? (
                   <div className="space-y-6">
-                   
 
-                     <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300">
-                       <div className="flex items-center space-x-3 mb-4">
-                         <div className="bg-blue-100 p-2 rounded-lg">
-                           <CurrencyDollarIcon className="w-6 h-6 text-blue-600" />
-                         </div>
-                         <div>
-                           <h4 className="font-bold text-gray-900 text-lg">Tổng chi phí dịch vụ</h4>
-                           <p className="text-gray-600 text-sm">Chi phí hàng tháng bao gồm phòng và dịch vụ</p>
-                         </div>
-                       </div>
-                       <div className="text-center">
-                         <p className="text-3xl font-bold text-blue-600 mb-1">
-                           {formatCurrency(getDisplayRoomPrice() + calculateTotalServiceCost())}
-                         </p>
-                         <p className="text-gray-600 text-sm mb-4">Mỗi tháng</p>
-                         <div className="bg-white rounded-lg p-4 border border-blue-100">
-                           <div className="grid grid-cols-2 gap-4">
-                             <div className="text-center">
-                               <p className="text-gray-600 text-sm">Tiền phòng</p>
-                               <p className="text-lg font-bold text-gray-900">
-                                 {formatCurrency(getDisplayRoomPrice())}
-                               </p>
-                             </div>
-                             <div className="text-center">
-                               <p className="text-gray-600 text-sm">Tiền dịch vụ</p>
-                               <p className="text-lg font-bold text-gray-900">
-                                 {formatCurrency(calculateTotalServiceCost())}
-                               </p>
-                             </div>
-                           </div>
-                         </div>
-                       </div>
-                     </div>
 
-                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300">
-                       <div className="flex items-center space-x-3 mb-4">
-                         <div className="bg-blue-100 p-2 rounded-lg">
-                           <DocumentTextIcon className="w-6 h-6 text-blue-600" />
-                         </div>
-                         <div>
-                           <h4 className="font-bold text-gray-900 text-lg">Gói dịch vụ đã đăng ký</h4>
-                           <p className="text-gray-600 text-sm">Chi tiết các dịch vụ đang sử dụng</p>
-                         </div>
-                         <div className="ml-4">
-                           <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                             Tổng: {carePlanDetails.length} gói dịch vụ
-                           </span>
-                         </div>
-                       </div>
-                       
-                       <div className="space-y-4">
-                         {carePlanDetails.map((carePlan: any, index: number) => {
-                           const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
-                           return (
-                           <div key={index} className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 transform hover:-translate-y-1">
-                             <div className="flex items-start justify-between mb-4">
-                               <div className="flex-1">
-                                 <h5 className="font-bold text-gray-900 text-lg mb-1">{carePlan.plan_name}</h5>
-                                 <p className="text-gray-600 text-sm leading-relaxed">{carePlan.description}</p>
-                               </div>
-                               <div className="text-right ml-4">
-                                 <div className="flex items-center space-x-1 mb-1">
-                                   <span className="text-gray-500 text-xs">Giá:</span>
-                                   <span className="text-lg font-bold text-blue-600">
-                                     {formatCurrency(carePlan.monthly_price || 0)}
-                                   </span>
-                                 </div>
-                                 <p className="text-gray-500 text-xs">mỗi tháng</p>
-                               </div>
-                             </div>
-                             
-                             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 mb-3 border border-green-100">
-                               <div className="grid grid-cols-2 gap-4">
-                                 <div className="text-center">
-                                   <div className="flex items-center justify-center space-x-1 mb-1">
-                                     <ClockIcon className="w-4 h-4 text-green-600" />
-                                     <span className="text-green-700 text-xs font-medium">Ngày bắt đầu</span>
-                                   </div>
-                                   <p className="text-sm font-semibold text-gray-900">
-                                     {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
-                                   </p>
-                                 </div>
-                                 <div className="text-center">
-                                   <div className="flex items-center justify-center space-x-1 mb-1">
-                                     <CalendarIcon className="w-4 h-4 text-purple-600" />
-                                     <span className="text-purple-700 text-xs font-medium">Ngày kết thúc</span>
-                                   </div>
-                                   <p className="text-sm font-semibold text-gray-900">
-                                     {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
-                                   </p>
-                                 </div>
-                               </div>
-                             </div>
-                             
-                             
-                             <div className="border-t border-gray-100 pt-3">
-                               <p className="text-gray-700 text-sm font-medium mb-2">Dịch vụ bao gồm:</p>
-                               <div className="flex flex-wrap gap-2">
-                                 {carePlan.services_included?.slice(0, expandedServices[index] ? undefined : 4).map((service: string, serviceIndex: number) => (
-                                   <span key={serviceIndex} className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-xs px-3 py-1.5 rounded-full border border-blue-200 font-medium">
-                                     {service}
-                                   </span>
-                                 ))}
-                                                                   {carePlan.services_included?.length > 4 && !expandedServices[index] && (
+                    <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                          <CurrencyDollarIcon className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-lg">Tổng chi phí dịch vụ</h4>
+                          <p className="text-gray-600 text-sm">Chi phí hàng tháng bao gồm phòng và dịch vụ</p>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-blue-600 mb-1">
+                          {formatDisplayCurrency(getDisplayRoomPrice() + calculateTotalServiceCost())}
+                        </p>
+                        <p className="text-gray-600 text-sm mb-4">Mỗi tháng</p>
+                        <div className="bg-white rounded-lg p-4 border border-blue-100">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="text-center">
+                              <p className="text-gray-600 text-sm">Tiền phòng</p>
+                              <p className="text-lg font-bold text-gray-900">
+                                {formatDisplayCurrency(getDisplayRoomPrice())}
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-gray-600 text-sm">Tiền dịch vụ</p>
+                              <p className="text-lg font-bold text-gray-900">
+                                {formatDisplayCurrency(calculateTotalServiceCost())}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                          <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-lg">Gói dịch vụ đã đăng ký</h4>
+                          <p className="text-gray-600 text-sm">Chi tiết các dịch vụ đang sử dụng</p>
+                        </div>
+                        <div className="ml-4">
+                          <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                            Tổng: {carePlanDetails.length} gói dịch vụ
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {carePlanDetails.length > 0 ? (
+                          carePlanDetails.map((carePlan: any, index: number) => {
+                          const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
+                            
+                            // Kiểm tra xem gói dịch vụ có còn active không
+                            if (!carePlanAssignment || 
+                                carePlanAssignment.status === 'cancelled' || 
+                                carePlanAssignment.status === 'completed' ||
+                                (carePlanAssignment.end_date && new Date(carePlanAssignment.end_date) < new Date())) {
+                              return null; // Không hiển thị gói đã hết hạn
+                            }
+                            
+                          return (
+                            <div key={index} className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 transform hover:-translate-y-1">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                  <h5 className="font-bold text-gray-900 text-lg mb-1">{carePlan.plan_name}</h5>
+                                  <p className="text-gray-600 text-sm leading-relaxed">{carePlan.description}</p>
+                                </div>
+                                <div className="text-right ml-4">
+                                  <div className="flex items-center space-x-1 mb-1">
+                                    <span className="text-gray-500 text-xs">Giá:</span>
+                                    <span className="text-lg font-bold text-blue-600">
+                                        {formatDisplayCurrency(carePlan.monthly_price || 0)}
+                                    </span>
+                                  </div>
+                                  <p className="text-gray-500 text-xs">mỗi tháng</p>
+                                </div>
+                              </div>
+
+                              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 mb-3 border border-green-100">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="text-center">
+                                    <div className="flex items-center justify-center space-x-1 mb-1">
+                                      <ClockIcon className="w-4 h-4 text-green-600" />
+                                      <span className="text-green-700 text-xs font-medium">Ngày bắt đầu</span>
+                                    </div>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      {carePlanAssignment?.start_date ? formatDate(carePlanAssignment.start_date) : 'N/A'}
+                                    </p>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="flex items-center justify-center space-x-1 mb-1">
+                                      <CalendarIcon className="w-4 h-4 text-purple-600" />
+                                      <span className="text-purple-700 text-xs font-medium">Ngày kết thúc</span>
+                                    </div>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="border-t border-gray-100 pt-3">
+                                <p className="text-gray-700 text-sm font-medium mb-2">Dịch vụ bao gồm:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {carePlan.services_included?.slice(0, expandedServices[index] ? undefined : 4).map((service: string, serviceIndex: number) => (
+                                    <span key={serviceIndex} className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-xs px-3 py-1.5 rounded-full border border-blue-200 font-medium">
+                                      {service}
+                                    </span>
+                                  ))}
+                                  {carePlan.services_included?.length > 4 && !expandedServices[index] && (
                                     <button
                                       onClick={() => toggleServiceExpansion(index)}
                                       className="bg-blue-100 text-blue-700 text-xs px-3 py-1.5 rounded-full border border-blue-200 font-medium hover:bg-blue-200 transition-colors cursor-pointer flex items-center space-x-1"
@@ -627,7 +654,7 @@ export default function ServiceDetailsPage() {
                                       </svg>
                                     </button>
                                   )}
-                                                                   {carePlan.services_included?.length > 4 && expandedServices[index] && (
+                                  {carePlan.services_included?.length > 4 && expandedServices[index] && (
                                     <button
                                       onClick={() => toggleServiceExpansion(index)}
                                       className="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-full border border-gray-200 font-medium hover:bg-gray-200 transition-colors cursor-pointer flex items-center space-x-1"
@@ -639,63 +666,63 @@ export default function ServiceDetailsPage() {
                                       </svg>
                                     </button>
                                   )}
-                               </div>
-                             </div>
-                           </div>
-                         );
-                       })}
-                         {carePlanDetails.length === 0 && (
-                           <div className="text-center py-8">
-                             <DocumentTextIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                             <p className="text-gray-500 font-medium">Chưa có gói dịch vụ nào</p>
-                             <p className="text-gray-400 text-sm mt-1">Hãy đăng ký dịch vụ để bắt đầu</p>
-                           </div>
-                         )}
-                       </div>
-                     </div>
-
-
-
-                       <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-6 border border-green-200 shadow-sm hover:shadow-md transition-all duration-300">
-                         <div className="flex items-center space-x-3 mb-4">
-                           <div className="bg-green-100 p-2 rounded-lg">
-                             <HomeIcon className="w-6 h-6 text-green-600" />
-                           </div>
-                           <div>
-                             <h4 className="font-bold text-gray-900 text-lg">Phòng & Giường</h4>
-                             <p className="text-gray-600 text-sm">Vị trí lưu trú hiện tại</p>
-                           </div>
-                         </div>
-                                                   <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center">
-                              <div className="bg-white rounded-lg p-3 border border-green-100">
-                                <p className="text-gray-600 text-sm mb-1">Phòng</p>
-                                                                 <p className="text-xl font-bold text-green-600">
-                                   {roomLoading ? 'Đang tải...' : roomNumber}
-                                 </p>
-                               </div>
-                             </div>
-                             <div className="text-center">
-                               <div className="bg-white rounded-lg p-3 border border-green-100">
-                                 <p className="text-gray-600 text-sm mb-1">Giường</p>
-                                 <p className="text-xl font-bold text-green-600">
-                                   {roomLoading ? 'Đang tải...' : bedNumber}
-                                 </p>
+                                </div>
                               </div>
                             </div>
+                          );
+                          }).filter(Boolean) // Lọc bỏ các item null
+                        ) : (
+                          <div className="text-center py-8">
+                            <DocumentTextIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <p className="text-gray-500 font-medium">Không có gói dịch vụ đang hoạt động</p>
+                            <p className="text-gray-400 text-sm mt-1">Tất cả gói dịch vụ đã hết hạn hoặc bị hủy</p>
                           </div>
-                       </div>
+                        )}
+                      </div>
+                    </div>
 
-                    
 
-                   </div>
-                 ) : (
+
+                    <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-6 border border-green-200 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="bg-green-100 p-2 rounded-lg">
+                          <HomeIcon className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-lg">Phòng & Giường</h4>
+                          <p className="text-gray-600 text-sm">Vị trí lưu trú hiện tại</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <div className="bg-white rounded-lg p-3 border border-green-100">
+                            <p className="text-gray-600 text-sm mb-1">Phòng</p>
+                            <p className="text-xl font-bold text-green-600">
+                              {roomLoading ? 'Đang tải...' : roomNumber}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="bg-white rounded-lg p-3 border border-green-100">
+                            <p className="text-gray-600 text-sm mb-1">Giường</p>
+                            <p className="text-xl font-bold text-green-600">
+                              {roomLoading ? 'Đang tải...' : bedNumber}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+
+
+                  </div>
+                ) : (
                   <div className="text-center py-8">
                     <DocumentTextIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Chưa có gói dịch vụ</h3>
-                                         <p className="text-gray-600 mb-4">
-                       {selectedRelative.full_name || selectedRelative.name || 'Người thân'} chưa đăng ký gói dịch vụ nào
-                     </p>
+                    <p className="text-gray-600 mb-4">
+                      {selectedRelative.full_name || selectedRelative.name || 'Người thân'} chưa đăng ký gói dịch vụ nào
+                    </p>
                     <button
                       onClick={() => router.push('/family/services')}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"

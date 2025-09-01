@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { residentAPI, userAPI, paymentAPI } from '@/lib/api';
 import EmptyState from './EmptyState';
+import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 
 interface StatisticsData {
   hospitalizedResidents: number;
@@ -96,11 +97,7 @@ export default function AdminStatistics() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      minimumFractionDigits: 0
-    }).format(amount);
+    return formatDisplayCurrency(amount);
   };
 
   const StatCard = ({ 

@@ -1,15 +1,22 @@
-"use client";
+'use client';
 
-import { useAuth } from "@/lib/contexts/auth-context";
-import { usePathname } from "next/navigation";
-import Sidebar from "./Sidebar";
-import Header from "./Header";
-import { ReactNode, useEffect, useState, useMemo, memo } from "react";
-import { useSessionTimeout } from "@/hooks/useSessionTimeout";
-import SessionTimeoutModal from "@/components/SessionTimeoutModal";
+import React, { Suspense, lazy, useEffect, useState, useMemo, memo } from 'react';
+import dynamic from 'next/dynamic';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { usePathname } from 'next/navigation';
+import LoadingSpinner from '../LoadingSpinner';
+import Sidebar from './Sidebar';
+import Header from './Header';
+import { useSessionTimeout } from '@/hooks/useSessionTimeout';
+import SessionTimeoutModal from '@/components/SessionTimeoutModal';
+import TransitionLoading from '@/components/TransitionLoading';
+
+const PerformanceMonitor = lazy(() => import('@/components/PerformanceMonitor'));
+const ToastProvider = dynamic(() => import('@/components/ToastProvider').then(m => m.ToastProvider), { ssr: false });
+const ChatFloatingButton = dynamic(() => import('@/components/ChatFloatingButton'), { ssr: false });
 
 interface ClientLayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 const BackgroundPattern = memo(() => (
@@ -90,12 +97,22 @@ function ClientLayout({ children }: ClientLayoutProps) {
           : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         {children}
+        <Suspense fallback={null}>
+          <ToastProvider />
+        </Suspense>
+        <Suspense fallback={null}>
+          <ChatFloatingButton />
+        </Suspense>
+        <Suspense fallback={null}>
+          <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
+        </Suspense>
       </div>
     );
   }
     
   return (
     <>
+      <TransitionLoading />
       <div style={{ 
         display: 'flex', 
         height: '100vh', 
@@ -130,6 +147,16 @@ function ClientLayout({ children }: ClientLayoutProps) {
         onLogout={handleLogout}
         remainingTime={remainingTime}
       />
+      
+      <Suspense fallback={null}>
+        <ToastProvider />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ChatFloatingButton />
+      </Suspense>
+      <Suspense fallback={null}>
+        <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
+      </Suspense>
     </>
   );
 }

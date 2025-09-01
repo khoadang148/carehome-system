@@ -1,51 +1,66 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+'use client';
+
+import { useEffect, useMemo } from 'react';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { residentAPI, activitiesAPI } from '@/lib/api';
 
-interface PreloadDataProps {
-  enabled?: boolean;
-}
+export default function PreloadData() {
+  const { user } = useAuth();
 
-export default function PreloadData({ enabled = true }: PreloadDataProps) {
-  const router = useRouter();
+  const userRole = user?.role;
+  const userId = user?.id;
 
-  useEffect(() => {
-    if (!enabled) return;
+  const shouldPrefetchData = useMemo(() => {
+    return user && userRole && userId;
+  }, [user, userRole, userId]);
 
-    const preloadCriticalData = async () => {
-      try {
-        await residentAPI.getAll();
-        
-        // Preload activities data
-        await activitiesAPI.getAll();
-        
-        console.log('Critical data preloaded successfully');
-      } catch (error) {
-        console.warn('Preload failed:', error);
-      }
-    };
-
-    const timer = setTimeout(preloadCriticalData, 1000);
+  const prefetchRoutes = useMemo(() => {
+    if (!userRole) return [];
     
-    return () => clearTimeout(timer);
-  }, [enabled]);
+    const baseRoutes = ['/profile', '/settings'];
+    
+    switch (userRole) {
+      case 'admin':
+        return [...baseRoutes, '/admin', '/admin/residents', '/admin/staff-management', '/admin/financial-reports', '/admin/ai-recommendations'];
+      case 'staff':
+        return [...baseRoutes, '/staff', '/staff/residents', '/staff/assessments', '/staff/photos', '/staff/activities'];
+      case 'family':
+        return [...baseRoutes, '/family', '/family/photos', '/family/services', '/family/finance', '/family/messages', '/family/schedule-visit/history'];
+      default:
+        return baseRoutes;
+    }
+  }, [userRole]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!shouldPrefetchData) return;
 
-    const preloadRouteData = () => {
-      const routes = ['/family', '/admin', '/staff'];
+    const prefetchTimer = setTimeout(() => {
+      if (userRole === 'family' && userId) {
+        residentAPI.getByFamilyMemberId(userId).catch(() => {});
+      } else if (userRole === 'admin' || userRole === 'staff') {
+        residentAPI.getAll().catch(() => {});
+      }
       
-      routes.forEach(route => {
+      activitiesAPI.getAll().catch(() => {});
+    }, 100);
+
+    return () => clearTimeout(prefetchTimer);
+  }, [shouldPrefetchData, userRole, userId]);
+
+  useEffect(() => {
+    if (!shouldPrefetchData) return;
+
+    const routePrefetchTimer = setTimeout(() => {
+      prefetchRoutes.forEach(route => {
         const link = document.createElement('link');
         link.rel = 'prefetch';
         link.href = route;
         document.head.appendChild(link);
       });
-    };
+    }, 200);
 
-    preloadRouteData();
-  }, [enabled]);
+    return () => clearTimeout(routePrefetchTimer);
+  }, [shouldPrefetchData, prefetchRoutes]);
 
   return null;
 }

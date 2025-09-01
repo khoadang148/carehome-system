@@ -317,7 +317,7 @@ export default function ResidentStaffList() {
               color: 'white',
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
             }}>
-              Quản lý cư dân & nhân viên
+              Quản lý người cao tuổi & nhân viên
             </h2>
             <p style={{
               fontSize: '1.125rem',

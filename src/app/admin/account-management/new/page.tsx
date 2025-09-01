@@ -1,14 +1,13 @@
 "use client";
 import { useState, useEffect } from "react"
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { residentAPI } from "@/lib/api";
 import { userAPI } from "@/lib/api";
 import { UserFriendlyErrorHandler } from '@/lib/utils/user-friendly-errors';
 
-// Format ngày sinh dạng dd/mm/yyyy
 function formatDate(dateStr: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -32,11 +31,9 @@ export default function NewAccountPage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
-  
-  // State cho modal thông báo thành công
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -50,7 +47,6 @@ export default function NewAccountPage() {
 
   const handleChange = (field: string, value: string | File | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear validation error when user starts typing
     if (validationErrors[field]) {
       setValidationErrors(prev => ({ ...prev, [field]: "" }));
     }
@@ -76,10 +72,9 @@ export default function NewAccountPage() {
     setSaving(true);
     setError("");
     setValidationErrors({});
-    
-    // Validate form
-    const errors: {[key: string]: string} = {};
-    
+
+    const errors: { [key: string]: string } = {};
+
     if (!formData.username.trim()) {
       errors.username = "Tên đăng nhập không được để trống";
     } else if (formData.username.length < 3) {
@@ -87,28 +82,27 @@ export default function NewAccountPage() {
     } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
       errors.username = "Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới";
     }
-    
+
     if (!formData.password.trim()) {
       errors.password = "Mật khẩu không được để trống";
     } else if (formData.password.length < 6) {
       errors.password = "Mật khẩu phải có ít nhất 6 ký tự";
     }
-    
+
     if (!formData.email.trim()) {
       errors.email = "Email không được để trống";
     } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       errors.email = "Email không đúng định dạng";
     }
-    
+
     if (!formData.role) {
       errors.role = "Vui lòng chọn vai trò";
     }
-    
-    // Nếu là gia đình thì phải chọn người cao tuổi
+
     if (formData.role === "family" && !selectedResidentId) {
       errors.resident = "Vui lòng chọn người cao tuổi thuộc tài khoản gia đình này";
     }
-    
+
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       setSaving(false);
@@ -121,36 +115,30 @@ export default function NewAccountPage() {
       data.append("email", formData.email);
       data.append("role", formData.role);
       if (formData.avatar) data.append("avatar", formData.avatar);
-      // Thêm các trường backend yêu cầu (ẩn khỏi form)
       data.append("full_name", formData.username);
       data.append("phone", "0123456789");
       data.append("status", "active");
       data.append("created_at", new Date().toISOString());
       data.append("updated_at", new Date().toISOString());
-      // Thêm các trường mới cho family accounts
       if (formData.role === "family") {
         if (formData.address) data.append("address", formData.address);
         if (formData.notes) data.append("notes", formData.notes);
       }
-              const res = await userAPI.create(data);
-        if (res.status === 201) {
-          const user = res.data;
-          // Nếu là gia đình, cập nhật resident
-          if (formData.role === "family" && selectedResidentId) {
-            await residentAPI.update(selectedResidentId, { family_member_id: user._id });
-          }
-          setSuccessMessage("Tài khoản đã được tạo thành công!");
-          setShowSuccessModal(true);
-        } else {
+      const res = await userAPI.create(data);
+      if (res.status === 201) {
+        const user = res.data;
+        if (formData.role === "family" && selectedResidentId) {
+          await residentAPI.update(selectedResidentId, { family_member_id: user._id });
+        }
+        setSuccessMessage("Tài khoản đã được tạo thành công!");
+        setShowSuccessModal(true);
+      } else {
         const errData = res.data;
         setError(errData.detail || errData.message || "Tạo tài khoản thất bại!");
       }
     } catch (err: any) {
-      console.error('Error creating account:', err);
-      
       const errorResult = UserFriendlyErrorHandler.handleError(err);
-      
-      // Handle field-specific errors
+
       if (errorResult.fieldErrors && Object.keys(errorResult.fieldErrors).length > 0) {
         setValidationErrors(errorResult.fieldErrors);
       } else {
@@ -177,7 +165,6 @@ export default function NewAccountPage() {
         alignItems: 'center',
         gap: 0
       }}>
-        {/* Nút quay lại */}
         <Link href="/admin/account-management" style={{
           position: 'absolute',
           top: 24,
@@ -198,7 +185,6 @@ export default function NewAccountPage() {
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#6366f1" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
           Quay lại
         </Link>
-        {/* Header với avatar lớn và tiêu đề */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
           <div style={{ position: 'relative', width: 104, height: 104, marginBottom: 12 }}>
             <div style={{ width: 104, height: 104, borderRadius: '50%', overflow: 'hidden', background: '#f3f4f6', border: '3px solid #a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, fontWeight: 700, color: '#6366f1', boxShadow: '0 4px 16px rgba(99,102,241,0.10)' }}>
@@ -207,7 +193,6 @@ export default function NewAccountPage() {
               ) : (
                 <span>?</span>
               )}
-              {/* Overlay icon camera */}
               <label htmlFor="avatar-upload" style={{
                 position: 'absolute',
                 bottom: 0,
@@ -231,7 +216,6 @@ export default function NewAccountPage() {
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'transparent', background: 'linear-gradient(135deg, #6366f1 0%, #2563eb 100%)', WebkitBackgroundClip: 'text', margin: 0, letterSpacing: '-0.01em', textAlign: 'center' }}>Thêm tài khoản mới</h2>
           <p style={{ color: '#64748b', marginBottom: 24, marginTop: 8, textAlign: 'center', fontSize: 15 }}>Điền thông tin để tạo tài khoản mới cho hệ thống</p>
         </div>
-        {/* Form fields */}
         <div style={{ display: 'grid', gap: 18, width: '100%' }}>
           <div>
             <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 15, marginBottom: 4, display: 'block' }}>Tên đăng nhập *</label>
@@ -240,16 +224,16 @@ export default function NewAccountPage() {
               value={formData.username}
               onChange={e => handleChange('username', e.target.value)}
               required
-              style={{ 
-                width: '100%', 
-                padding: 14, 
-                borderRadius: 10, 
-                border: validationErrors.username ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
-                fontSize: 15, 
-                marginTop: 2, 
-                outline: 'none', 
-                transition: 'border-color 0.2s', 
-                background: validationErrors.username ? '#fef2f2' : '#f8fafc' 
+              style={{
+                width: '100%',
+                padding: 14,
+                borderRadius: 10,
+                border: validationErrors.username ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb',
+                fontSize: 15,
+                marginTop: 2,
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                background: validationErrors.username ? '#fef2f2' : '#f8fafc'
               }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
               onBlur={e => e.currentTarget.style.borderColor = validationErrors.username ? '#ef4444' : '#e5e7eb'}
@@ -270,16 +254,16 @@ export default function NewAccountPage() {
               value={formData.password}
               onChange={e => handleChange('password', e.target.value)}
               required
-              style={{ 
-                width: '100%', 
-                padding: 14, 
-                borderRadius: 10, 
-                border: validationErrors.password ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
-                fontSize: 15, 
-                marginTop: 2, 
-                outline: 'none', 
-                transition: 'border-color 0.2s', 
-                background: validationErrors.password ? '#fef2f2' : '#f8fafc' 
+              style={{
+                width: '100%',
+                padding: 14,
+                borderRadius: 10,
+                border: validationErrors.password ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb',
+                fontSize: 15,
+                marginTop: 2,
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                background: validationErrors.password ? '#fef2f2' : '#f8fafc'
               }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
               onBlur={e => e.currentTarget.style.borderColor = validationErrors.password ? '#ef4444' : '#e5e7eb'}
@@ -300,16 +284,16 @@ export default function NewAccountPage() {
               value={formData.email}
               onChange={e => handleChange('email', e.target.value)}
               required
-              style={{ 
-                width: '100%', 
-                padding: 14, 
-                borderRadius: 10, 
-                border: validationErrors.email ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
-                fontSize: 15, 
-                marginTop: 2, 
-                outline: 'none', 
-                transition: 'border-color 0.2s', 
-                background: validationErrors.email ? '#fef2f2' : '#f8fafc' 
+              style={{
+                width: '100%',
+                padding: 14,
+                borderRadius: 10,
+                border: validationErrors.email ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb',
+                fontSize: 15,
+                marginTop: 2,
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                background: validationErrors.email ? '#fef2f2' : '#f8fafc'
               }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
               onBlur={e => e.currentTarget.style.borderColor = validationErrors.email ? '#ef4444' : '#e5e7eb'}
@@ -329,16 +313,16 @@ export default function NewAccountPage() {
               value={formData.role}
               onChange={e => handleChange('role', e.target.value)}
               required
-              style={{ 
-                width: '100%', 
-                padding: 14, 
-                borderRadius: 10, 
-                border: validationErrors.role ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
-                fontSize: 15, 
-                marginTop: 2, 
-                background: validationErrors.role ? '#fef2f2' : '#f8fafc', 
-                outline: 'none', 
-                transition: 'border-color 0.2s' 
+              style={{
+                width: '100%',
+                padding: 14,
+                borderRadius: 10,
+                border: validationErrors.role ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb',
+                fontSize: 15,
+                marginTop: 2,
+                background: validationErrors.role ? '#fef2f2' : '#f8fafc',
+                outline: 'none',
+                transition: 'border-color 0.2s'
               }}
               onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
               onBlur={e => e.currentTarget.style.borderColor = validationErrors.role ? '#ef4444' : '#e5e7eb'}
@@ -356,7 +340,6 @@ export default function NewAccountPage() {
               </div>
             )}
           </div>
-          {/* Nếu là gia đình thì chọn người cao tuổi */}
           {formData.role === "family" && (
             <>
               <div>
@@ -370,16 +353,16 @@ export default function NewAccountPage() {
                     }
                   }}
                   required
-                  style={{ 
-                    width: '100%', 
-                    padding: 14, 
-                    borderRadius: 10, 
-                    border: validationErrors.resident ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb', 
-                    fontSize: 15, 
-                    marginTop: 2, 
-                    background: validationErrors.resident ? '#fef2f2' : '#f8fafc', 
-                    outline: 'none', 
-                    transition: 'border-color 0.2s' 
+                  style={{
+                    width: '100%',
+                    padding: 14,
+                    borderRadius: 10,
+                    border: validationErrors.resident ? '1.5px solid #ef4444' : '1.5px solid #e5e7eb',
+                    fontSize: 15,
+                    marginTop: 2,
+                    background: validationErrors.resident ? '#fef2f2' : '#f8fafc',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
                   }}
                 >
                   <option value="">-- Chọn người cao tuổi --</option>
@@ -404,16 +387,16 @@ export default function NewAccountPage() {
                   value={formData.address}
                   onChange={e => handleChange('address', e.target.value)}
                   placeholder="Nhập địa chỉ của người giám hộ"
-                  style={{ 
-                    width: '100%', 
-                    padding: 14, 
-                    borderRadius: 10, 
-                    border: '1.5px solid #e5e7eb', 
-                    fontSize: 15, 
-                    marginTop: 2, 
-                    outline: 'none', 
-                    transition: 'border-color 0.2s', 
-                    background: '#f8fafc' 
+                  style={{
+                    width: '100%',
+                    padding: 14,
+                    borderRadius: 10,
+                    border: '1.5px solid #e5e7eb',
+                    fontSize: 15,
+                    marginTop: 2,
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    background: '#f8fafc'
                   }}
                   onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
                   onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
@@ -427,15 +410,15 @@ export default function NewAccountPage() {
                   onChange={e => handleChange('notes', e.target.value)}
                   placeholder="Nhập ghi chú về tài khoản (tùy chọn)"
                   rows={3}
-                  style={{ 
-                    width: '100%', 
-                    padding: 14, 
-                    borderRadius: 10, 
-                    border: '1.5px solid #e5e7eb', 
-                    fontSize: 15, 
-                    marginTop: 2, 
-                    outline: 'none', 
-                    transition: 'border-color 0.2s', 
+                  style={{
+                    width: '100%',
+                    padding: 14,
+                    borderRadius: 10,
+                    border: '1.5px solid #e5e7eb',
+                    fontSize: 15,
+                    marginTop: 2,
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
                     background: '#f8fafc',
                     resize: 'vertical',
                     fontFamily: 'inherit'
@@ -474,11 +457,10 @@ export default function NewAccountPage() {
             display: 'flex',
             alignItems: 'center',
             gap: 8
-          }}>{saving ? 'Đang lưu...' : (<><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{marginRight: 4}}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Tạo tài khoản</>)}          </button>
+          }}>{saving ? 'Đang lưu...' : (<><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{ marginRight: 4 }}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Tạo tài khoản</>)}</button>
         </div>
       </form>
 
-      {/* Modal thông báo thành công */}
       {showSuccessModal && (
         <div style={{
           position: 'fixed',
@@ -504,7 +486,6 @@ export default function NewAccountPage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
             border: '1px solid rgba(255,255,255,0.2)'
           }}>
-            {/* Icon thành công */}
             <div style={{
               width: '4rem',
               height: '4rem',
@@ -521,7 +502,6 @@ export default function NewAccountPage() {
               </svg>
             </div>
 
-            {/* Tiêu đề */}
             <h3 style={{
               fontSize: '1.5rem',
               fontWeight: 700,
@@ -532,7 +512,6 @@ export default function NewAccountPage() {
               Thành công!
             </h3>
 
-            {/* Nội dung */}
             <p style={{
               fontSize: '1rem',
               color: '#64748b',
@@ -542,7 +521,6 @@ export default function NewAccountPage() {
               {successMessage}
             </p>
 
-            {/* Nút đóng */}
             <button
               onClick={() => {
                 setShowSuccessModal(false);

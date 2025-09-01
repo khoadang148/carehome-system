@@ -1,66 +1,51 @@
-import React from 'react';
+'use client';
+
+import { memo, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import LoadingSpinner from './LoadingSpinner';
 
-interface TransitionLoadingProps {
-  userName?: string;
-  destination?: string;
-}
+const TransitionLoading = memo(() => {
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingKey, setLoadingKey] = useState(0);
 
-export const TransitionLoading: React.FC<TransitionLoadingProps> = ({ 
-  userName, 
-  destination 
-}) => {
-  const getDestinationText = (dest?: string) => {
-    switch (dest) {
-      case '/family':
-        return 'Cổng thông tin Gia đình';
-      case '/admin':
-        return 'Trung tâm Điều hành';
-      case '/staff':
-        return 'Hệ thống Quản lý Chăm sóc';
-      default:
-        return 'Trang chính';
-    }
-  };
+  useEffect(() => {
+    setIsLoading(true);
+    setLoadingKey(prev => prev + 1);
+    
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [pathname]);
+
+  if (!isLoading) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
-      <div className="text-center max-w-md mx-auto px-6">
-        <LoadingSpinner size="lg" />
-        
-        <div className="mt-8 space-y-4">
-          
-          
-          {userName && (
-            <p className="text-lg text-gray-600">
-              Xin chào, <span className="font-semibold text-purple-600">{userName}</span>
-            </p>
-          )}
-          
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-gray-600">
-                Đang chuyển đến
-              </span>
-            </div>
-            
-            <p className="text-lg font-semibold text-purple-600">
-              {getDestinationText(destination)}
-            </p>
-            
-            <p className="text-sm text-gray-500 mt-2">
-              Vui lòng chờ trong giây lát...
-            </p>
-          </div>
+    <div
+      key={loadingKey}
+      className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center"
+      style={{
+        animation: 'fadeIn 0.1s ease-out'
+      }}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center shadow-lg">
+          <LoadingSpinner size="md" />
         </div>
+        <p className="text-sm font-medium text-gray-700">Đang tải...</p>
       </div>
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
-};
+});
+
+TransitionLoading.displayName = 'TransitionLoading';
 
 export default TransitionLoading; 

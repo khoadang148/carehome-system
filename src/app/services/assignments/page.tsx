@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
-import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
+import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { residentAPI, carePlansAPI, carePlanAssignmentsAPI, userAPI } from '@/lib/api';
@@ -21,8 +21,7 @@ export default function ServiceAssignmentsPage() {
   const [showPackageSelectModal, setShowPackageSelectModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'expired'>('all');
-  
-  // Pagination state
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -41,25 +40,22 @@ export default function ServiceAssignmentsPage() {
     setError(null);
     try {
       const resList = await residentAPI.getAll();
-      // Lọc chỉ lấy residents có status 'active' (chưa xuất viện)
       const activeResidents = Array.isArray(resList) ? resList.filter((r: any) => r.status === 'active') : [];
       setResidents(activeResidents);
-      
-      // Lấy assignment cho từng resident và gộp các gói dịch vụ
+
       const allAssignments = await Promise.all(
         activeResidents.map(async (r: any) => {
           try {
-            const residentId = typeof r._id === 'object' && (r._id as any)?._id 
-              ? (r._id as any)._id 
+            const residentId = typeof r._id === 'object' && (r._id as any)?._id
+              ? (r._id as any)._id
               : r._id;
             const data = await carePlansAPI.getByResidentId(residentId);
             const assignments = Array.isArray(data) ? data : [];
-            
+
             if (assignments.length === 0) {
               return [];
             }
-            
-            // Chỉ hiển thị gói dịch vụ hiện tại (không trộn lịch sử)
+
             const now = new Date();
             const sortedByStart = [...assignments].sort((a: any, b: any) => {
               const da = new Date(a?.start_date || a?.createdAt || 0).getTime();
@@ -83,7 +79,6 @@ export default function ServiceAssignmentsPage() {
               notes: currentAssignment?.notes,
               consultation_notes: currentAssignment?.consultation_notes,
               family_preferences: currentAssignment?.family_preferences,
-              // Tổng chi phí vẫn lấy theo tất cả đăng ký (nếu muốn chỉ hiện hiện tại thì đổi sang currentAssignment)
               care_plans_monthly_cost: assignments.reduce((total: number, a: any) => total + (a.care_plans_monthly_cost || 0), 0),
               total_monthly_cost: assignments.reduce((total: number, a: any) => total + (a.total_monthly_cost || 0), 0),
               room_monthly_cost: currentAssignment?.room_monthly_cost || 0,
@@ -91,10 +86,9 @@ export default function ServiceAssignmentsPage() {
               assigned_room_id: currentAssignment?.assigned_room_id,
               assigned_bed_id: currentAssignment?.assigned_bed_id,
               additional_medications: currentAssignment?.additional_medications,
-              // Chỉ hiển thị các gói hiện tại thay vì toàn bộ lịch sử
               care_plan_ids: Array.isArray(currentAssignment?.care_plan_ids) ? currentAssignment.care_plan_ids : []
             };
-            
+
             return [mergedAssignment];
           } catch {
             return [];
@@ -110,7 +104,6 @@ export default function ServiceAssignmentsPage() {
     }
   };
 
-  // Filter theo search term và tab
   const filteredAssignments = assignments.filter(a => {
     const residentName = a.resident?.full_name || a.resident?.name || '';
     const planNames = Array.isArray(a.care_plan_ids) ? a.care_plan_ids.map((cp: any) => cp.description || cp.plan_name || cp.name || '').join(', ') : '';
@@ -121,65 +114,54 @@ export default function ServiceAssignmentsPage() {
 
     if (!matchesSearch) return false;
 
-    // Filter theo tab
     const isExpired = a.end_date && new Date(a.end_date) < new Date();
-    
+
     switch (activeTab) {
       case 'active':
         return !isExpired;
       case 'expired':
         return isExpired;
       default:
-        return true; // 'all' tab
+        return true;
     }
   });
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredAssignments.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedAssignments = filteredAssignments.slice(startIndex, endIndex);
 
-  // Reset to first page when search or tab changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, activeTab]);
 
-  // Handle view details
   const handleViewDetails = (assignmentId: string) => {
     router.push(`/services/assignments/${assignmentId}`);
   };
 
-  // Handle edit
   const handleEdit = (assignmentId: string) => {
     router.push(`/services/assignments/${assignmentId}/edit`);
   };
 
-  // Handle delete
   const handleDelete = (assignment: any) => {
-    // Chỉ admin mới được xóa
     if (user?.role !== 'admin') {
       toast.error('Bạn không có quyền thực hiện thao tác này.');
       return;
     }
 
     const carePlanCount = Array.isArray(assignment.care_plan_ids) ? assignment.care_plan_ids.length : 0;
-    
+
     if (carePlanCount > 1) {
-      // Nếu có nhiều gói, hiện modal chọn gói
       setSelectedAssignment(assignment);
       setShowPackageSelectModal(true);
     } else {
-      // Nếu chỉ có 1 gói, hiện modal xác nhận xóa toàn bộ
       setDeleteConfirmId(assignment._id);
     }
   };
 
-  // Handle delete confirmation
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmId) return;
 
-    // Chỉ admin mới được xóa
     if (user?.role !== 'admin') {
       toast.error('Bạn không có quyền thực hiện thao tác này.');
       setDeleteConfirmId(null);
@@ -187,22 +169,18 @@ export default function ServiceAssignmentsPage() {
     }
 
     try {
-      // Sử dụng API removePackage thay vì delete
       await carePlanAssignmentsAPI.removePackage(deleteConfirmId);
       setDeleteConfirmId(null);
       setShowSuccessModal(true);
-      // Refresh data
       loadData();
     } catch (error: any) {
       toast.error('Không thể xóa đăng ký dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
     }
   };
 
-  // Handle delete specific package
   const handleDeletePackage = async (packageId: string) => {
     if (!selectedAssignment) return;
 
-    // Chỉ admin mới được xóa
     if (user?.role !== 'admin') {
       toast.error('Bạn không có quyền thực hiện thao tác này.');
       setShowPackageSelectModal(false);
@@ -211,27 +189,22 @@ export default function ServiceAssignmentsPage() {
     }
 
     try {
-      // Sử dụng API để xóa gói riêng lẻ - gửi packageId trong body
       await carePlanAssignmentsAPI.update(selectedAssignment._id, { packageId });
 
       setShowPackageSelectModal(false);
       setSelectedAssignment(null);
       setShowSuccessModal(true);
-      // Refresh data
       loadData();
     } catch (error: any) {
-      console.error('Error deleting package:', error);
       toast.error('Không thể xóa gói dịch vụ: ' + (error.message || 'Có lỗi xảy ra'));
     }
   };
 
-  // Get status text and color based on assignment end date
   const getStatusInfo = (status: string, endDate?: string, carePlanIds?: any[]) => {
-    // Kiểm tra nếu có ngày kết thúc và đã hết hạn
     if (endDate && new Date(endDate) < new Date()) {
       return { text: 'Đã hết hạn', color: '#ef4444' };
     }
-    
+
     const statusMap: { [key: string]: { text: string; color: string } } = {
       'consulting': { text: 'Đang tư vấn', color: '#f59e0b' },
       'packages_selected': { text: 'Đã chọn gói', color: '#3b82f6' },
@@ -252,7 +225,6 @@ export default function ServiceAssignmentsPage() {
       background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       position: 'relative'
     }}>
-      {/* Background decorations giống residents */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -273,9 +245,8 @@ export default function ServiceAssignmentsPage() {
         position: 'relative',
         zIndex: 1
       }}>
-        
 
-        {/* Header Section */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1.5rem',
@@ -293,7 +264,7 @@ export default function ServiceAssignmentsPage() {
             >
               <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
             </button>
-            
+
             <div style={{
               width: '3rem',
               height: '3rem',
@@ -328,8 +299,7 @@ export default function ServiceAssignmentsPage() {
             Tổng số đăng ký: {filteredAssignments.length} | Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length} | Chỉ hiển thị người cao tuổi chưa xuất viện
           </p>
         </div>
-        
-        {/* Tab Navigation */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -356,8 +326,7 @@ export default function ServiceAssignmentsPage() {
             <span style={{ color: '#667eea', fontWeight: 600 }}>
               Hiển thị: {paginatedAssignments.length} / {filteredAssignments.length} đăng ký
             </span>
-            
-            {/* Page Size Selector */}
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Hiển thị:</span>
               <select
@@ -382,8 +351,7 @@ export default function ServiceAssignmentsPage() {
               <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>mục/trang</span>
             </div>
           </div>
-          
-          {/* Tab Buttons */}
+
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
               onClick={() => setActiveTab('all')}
@@ -395,8 +363,8 @@ export default function ServiceAssignmentsPage() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                background: activeTab === 'all' 
-                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                background: activeTab === 'all'
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
                   : '#f3f4f6',
                 color: activeTab === 'all' ? 'white' : '#6b7280'
               }}
@@ -413,8 +381,8 @@ export default function ServiceAssignmentsPage() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                background: activeTab === 'active' 
-                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' 
+                background: activeTab === 'active'
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
                   : '#f3f4f6',
                 color: activeTab === 'active' ? 'white' : '#6b7280'
               }}
@@ -431,8 +399,8 @@ export default function ServiceAssignmentsPage() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                background: activeTab === 'expired' 
-                  ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                background: activeTab === 'expired'
+                  ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
                   : '#f3f4f6',
                 color: activeTab === 'expired' ? 'white' : '#6b7280'
               }}
@@ -441,8 +409,7 @@ export default function ServiceAssignmentsPage() {
             </button>
           </div>
         </div>
-        
-        {/* Table Section */}
+
         <div style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '1rem',
@@ -499,15 +466,15 @@ export default function ServiceAssignmentsPage() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                               {a.care_plan_ids.map((cp: any, index: number) => (
                                 <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                                  <span style={{ 
-                                    color: activeTab === 'expired' ? '#ef4444' : '#059669', 
-                                    fontSize: '0.75rem', 
+                                  <span style={{
+                                    color: activeTab === 'expired' ? '#ef4444' : '#059669',
+                                    fontSize: '0.75rem',
                                     marginTop: '0.125rem',
                                     fontWeight: 'bold'
                                   }}>•</span>
-                                  <span style={{ 
-                                    fontSize: '0.875rem', 
-                                    color: '#374151', 
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#374151',
                                     lineHeight: '1.4'
                                   }}>
                                     {cp.description || cp.plan_name || cp.name || 'N/A'}
@@ -560,8 +527,8 @@ export default function ServiceAssignmentsPage() {
                               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
                               </svg>
                             </button>
                             <button
@@ -585,11 +552,11 @@ export default function ServiceAssignmentsPage() {
                               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                               </svg>
                             </button>
-                            
+
                           </div>
                         </td>
                       </tr>
@@ -601,7 +568,6 @@ export default function ServiceAssignmentsPage() {
           </div>
         </div>
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <div style={{
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -619,7 +585,7 @@ export default function ServiceAssignmentsPage() {
             <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
               Hiển thị {startIndex + 1} - {Math.min(endIndex, filteredAssignments.length)} trong tổng số {filteredAssignments.length} đăng ký
             </div>
-            
+
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -639,8 +605,7 @@ export default function ServiceAssignmentsPage() {
                 <ChevronLeftIcon style={{ width: '1rem', height: '1rem' }} />
                 Trước
               </button>
-              
-              {/* Page Numbers */}
+
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -653,7 +618,7 @@ export default function ServiceAssignmentsPage() {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-                  
+
                   return (
                     <button
                       key={pageNum}
@@ -674,7 +639,7 @@ export default function ServiceAssignmentsPage() {
                   );
                 })}
               </div>
-              
+
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
@@ -698,7 +663,6 @@ export default function ServiceAssignmentsPage() {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirmId && user?.role === 'admin' && (
         <div style={{
           position: 'fixed',
@@ -762,7 +726,6 @@ export default function ServiceAssignmentsPage() {
         </div>
       )}
 
-      {/* Success Modal */}
       {showSuccessModal && user?.role === 'admin' && (
         <div style={{
           position: 'fixed',
@@ -828,7 +791,6 @@ export default function ServiceAssignmentsPage() {
         </div>
       )}
 
-      {/* Package Selection Modal */}
       {showPackageSelectModal && selectedAssignment && user?.role === 'admin' && (
         <div style={{
           position: 'fixed',
@@ -864,9 +826,9 @@ export default function ServiceAssignmentsPage() {
                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
               }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'white' }}>
-                  <path d="M3 6h18"/>
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                 </svg>
               </div>
               <div>
@@ -883,7 +845,7 @@ export default function ServiceAssignmentsPage() {
               <p style={{ color: '#6b7280', margin: '0 0 1rem 0', lineHeight: '1.5' }}>
                 Vui lòng chọn gói dịch vụ bạn muốn xóa khỏi đăng ký này:
               </p>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {Array.isArray(selectedAssignment.care_plan_ids) && selectedAssignment.care_plan_ids.map((cp: any, index: number) => (
                   <div key={cp._id} style={{
@@ -894,9 +856,9 @@ export default function ServiceAssignmentsPage() {
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.borderColor = '#ef4444'}
-                  onMouseOut={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-                  onClick={() => handleDeletePackage(cp._id)}
+                    onMouseOver={(e) => e.currentTarget.style.borderColor = '#ef4444'}
+                    onMouseOut={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                    onClick={() => handleDeletePackage(cp._id)}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div style={{
@@ -910,9 +872,9 @@ export default function ServiceAssignmentsPage() {
                         background: '#fef2f2'
                       }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#ef4444' }}>
-                          <path d="M3 6h18"/>
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          <path d="M3 6h18" />
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                         </svg>
                       </div>
                       <div style={{ flex: 1 }}>

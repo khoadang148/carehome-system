@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { careNotesAPI, userAPI } from '@/lib/api';
-import { 
+import {
   ArrowLeftIcon,
   DocumentTextIcon,
   PlusIcon,
@@ -32,7 +32,7 @@ export default function ResidentNotesPage() {
   const params = useParams();
   const { user } = useAuth();
   const residentId = params.residentId as string;
-  
+
   const [residentName, setResidentName] = useState<string>('');
   const [careNotes, setCareNotes] = useState<CareNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,15 +67,15 @@ export default function ResidentNotesPage() {
       setLoading(true);
       const notes = await careNotesAPI.getAll({ resident_id: residentId });
       const notesArray = Array.isArray(notes) ? notes : [];
-      
+
       const sortedNotes = notesArray.sort((a, b) => {
         const dateA = new Date(a.date || 0);
         const dateB = new Date(b.date || 0);
         return dateB.getTime() - dateA.getTime();
       });
-      
+
       setCareNotes(sortedNotes);
-      
+
       const urlParams = new URLSearchParams(window.location.search);
       const nameFromUrl = urlParams.get('residentName');
       if (nameFromUrl) {
@@ -94,10 +94,10 @@ export default function ResidentNotesPage() {
     const content = (note.notes || '').toLowerCase();
     const assessmentType = (note.assessment_type || '').toLowerCase();
     const recommendations = (note.recommendations || '').toLowerCase();
-    
-    return content.includes(searchLower) || 
-           assessmentType.includes(searchLower) || 
-           recommendations.includes(searchLower);
+
+    return content.includes(searchLower) ||
+      assessmentType.includes(searchLower) ||
+      recommendations.includes(searchLower);
   });
 
   const totalPages = Math.ceil(filteredNotes.length / notesPerPage);
@@ -114,7 +114,7 @@ export default function ResidentNotesPage() {
       showNotification('Nội dung không được để trống!', 'error');
       return;
     }
-    
+
     try {
       const updateData = {
         assessment_type: note.assessment_type || 'Đánh giá tổng quát',
@@ -124,7 +124,7 @@ export default function ResidentNotesPage() {
         conducted_by: typeof note.conducted_by === 'object' ? (note.conducted_by._id || note.conducted_by.full_name) : note.conducted_by,
       };
       await careNotesAPI.update(note._id, updateData);
-      
+
       await loadResidentNotes();
       setEditNote(null);
       setEditContent('');
@@ -159,24 +159,24 @@ export default function ResidentNotesPage() {
     if (typeof staffId === 'object' && staffId.full_name) {
       return staffId.full_name;
     }
-    
+
     if (typeof staffId === 'string') {
       if (staffNames[staffId]) return staffNames[staffId];
-      
+
       userAPI.getById(staffId)
         .then(data => {
-          setStaffNames(prev => ({ 
-            ...prev, 
-            [staffId]: data.full_name || data.username || data.email || staffId 
+          setStaffNames(prev => ({
+            ...prev,
+            [staffId]: data.full_name || data.username || data.email || staffId
           }));
         })
         .catch(() => {
           setStaffNames(prev => ({ ...prev, [staffId]: staffId }));
         });
-      
+
       return 'Đang tải...';
     }
-    
+
     return '---';
   };
 
@@ -195,11 +195,11 @@ export default function ResidentNotesPage() {
             >
               <ArrowLeftIcon className="w-5 h-5" />
             </button>
-            
+
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
               <DocumentTextIcon className="w-6 h-6 text-white" />
             </div>
-            
+
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold m-0 text-slate-800">
                 Ghi chú chăm sóc
@@ -224,7 +224,7 @@ export default function ResidentNotesPage() {
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm hover:shadow-md"
               />
             </div>
-            
+
             <button
               onClick={handleCreateNote}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-none rounded-xl text-sm font-semibold cursor-pointer transition-all duration-300 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg hover:scale-105 active:scale-95 shadow-md"
@@ -260,8 +260,8 @@ export default function ResidentNotesPage() {
             {currentNotes.length > 0 ? (
               <div className="space-y-4">
                 {currentNotes.map((note, index) => (
-                  <div 
-                    key={note._id} 
+                  <div
+                    key={note._id}
                     className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group"
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
@@ -270,12 +270,12 @@ export default function ResidentNotesPage() {
                         <div className="flex items-center gap-3 mb-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                               {note.date ? formatDateDDMMYYYYWithTimezone(note.date) : '---'}
+                              {note.date ? formatDateDDMMYYYYWithTimezone(note.date) : '---'}
                             </span>
-                            
+
                           </div>
                         </div>
-                        
+
                         <div className="mb-4 bg-slate-50 rounded-xl p-4">
                           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -283,7 +283,7 @@ export default function ResidentNotesPage() {
                           </h3>
                           <p className="text-gray-800 whitespace-pre-line leading-relaxed">{note.notes || 'Không có nội dung'}</p>
                         </div>
-                        
+
                         {note.recommendations && (
                           <div className="mb-4 bg-amber-50 rounded-xl p-4 border-l-4 border-amber-400">
                             <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -293,12 +293,12 @@ export default function ResidentNotesPage() {
                             <p className="text-gray-800">{note.recommendations}</p>
                           </div>
                         )}
-                        
+
                         <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg inline-block">
                           Nhân viên ghi chú: <span className="font-medium">{getStaffName(note.conducted_by)}</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button
                           onClick={() => {
@@ -329,7 +329,7 @@ export default function ResidentNotesPage() {
               <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
                 <DocumentTextIcon className="w-20 h-20 text-gray-300 mx-auto mb-6" />
                 <div className="text-gray-500 text-xl mb-3 font-medium">
-                                     {searchTerm ? 'Không tìm thấy ghi chú nào phù hợp' : 'Chưa có ghi chú nào'}
+                  {searchTerm ? 'Không tìm thấy ghi chú nào phù hợp' : 'Chưa có ghi chú nào'}
                 </div>
                 <div className="text-gray-400 text-base mb-6">
                   {searchTerm ? 'Thử tìm kiếm với từ khóa khác' : 'Bắt đầu thêm ghi chú đầu tiên cho người cao tuổi này'}
@@ -356,23 +356,22 @@ export default function ResidentNotesPage() {
                   <ChevronLeftIcon className="w-4 h-4" />
                   Trước
                 </button>
-                
+
                 <div className="flex gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        currentPage === page
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${currentPage === page
                           ? 'bg-blue-600 text-white shadow-md'
                           : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:shadow-sm'
-                      }`}
+                        }`}
                     >
                       {page}
                     </button>
                   ))}
                 </div>
-                
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
@@ -389,7 +388,7 @@ export default function ResidentNotesPage() {
         {editNote && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
             <div className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl relative animate-slideUp">
-              <button 
+              <button
                 title="Đóng"
                 onClick={() => {
                   setEditNote(null);
@@ -397,7 +396,7 @@ export default function ResidentNotesPage() {
                   setEditRecommendations('');
                   setOriginalContent('');
                   setOriginalRecommendations('');
-                }} 
+                }}
                 className="absolute top-4 right-4 w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-blue-600 transition-colors duration-200 text-2xl"
                 aria-label="Đóng"
               >
@@ -407,7 +406,7 @@ export default function ResidentNotesPage() {
                 <PencilIcon className="w-6 h-6" />
                 Sửa ghi chú
               </h3>
-              
+
               <div className="space-y-5">
                 <div>
                   <label className="font-semibold block mb-2 text-gray-700">
@@ -423,7 +422,7 @@ export default function ResidentNotesPage() {
                   />
                   <div className="text-xs text-gray-400 mt-1 text-right">{editContent.length}/1000</div>
                 </div>
-                
+
                 <div>
                   <label className="font-semibold block mb-2 text-gray-700">Khuyến nghị:</label>
                   <textarea
@@ -435,7 +434,7 @@ export default function ResidentNotesPage() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
                 <button
                   onClick={() => {
@@ -499,12 +498,10 @@ export default function ResidentNotesPage() {
 
         {notification && (
           <div className="fixed inset-0 bg-black/15 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-fadeIn">
-            <div className={`${
-              notification.type === 'success' ? 'bg-green-50 text-green-600 border-green-500' : 'bg-red-50 text-red-600 border-red-500'
-            } border-2 rounded-2xl min-w-64 max-w-80 p-6 shadow-2xl text-center text-lg font-semibold relative animate-slideUp`}>
-                             <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                 notification.type === 'success' ? 'bg-green-100' : 'bg-red-100'
-               }`}>
+            <div className={`${notification.type === 'success' ? 'bg-green-50 text-green-600 border-green-500' : 'bg-red-50 text-red-600 border-red-500'
+              } border-2 rounded-2xl min-w-64 max-w-80 p-6 shadow-2xl text-center text-lg font-semibold relative animate-slideUp`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${notification.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                }`}>
                 {notification.type === 'success' ? (
                   <CheckCircleIcon className="w-6 h-6 text-green-600" />
                 ) : (

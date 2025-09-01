@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { 
+import {
   EyeIcon,
   EyeSlashIcon,
   ExclamationTriangleIcon,
@@ -27,7 +27,7 @@ interface PasswordStrength {
 
 export default function SettingsPage() {
   const router = useRouter();
-  
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -137,7 +137,7 @@ export default function SettingsPage() {
     const error = validateNewPassword(value);
     setErrors(prev => ({ ...prev, newPassword: error }));
     setPasswordStrength(calculatePasswordStrength(value));
-    
+
     if (confirmPassword) {
       const confirmError = validateConfirmPassword(confirmPassword);
       setErrors(prev => ({ ...prev, confirmPassword: confirmError }));
@@ -169,16 +169,13 @@ export default function SettingsPage() {
 
     setIsSubmitting(true);
 
-    const originalConsoleError = console.error;
-    console.error = () => {};
-
     try {
       await userAPI.changePassword({
         currentPassword,
         newPassword,
         confirmPassword
       });
-      
+
       setModalType('success');
       setModalTitle('Thành công');
       setModalMessage('Đổi mật khẩu thành công!');
@@ -190,8 +187,8 @@ export default function SettingsPage() {
       setPasswordStrength({ score: 0, feedback: '', color: '#d1d5db' });
     } catch (error: any) {
       const errorMessage = error?.message || 'Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại.';
-      if (errorMessage.includes('Mật khẩu hiện tại không đúng') || 
-          errorMessage.includes('Thông tin không hợp lệ')) {
+      if (errorMessage.includes('Mật khẩu hiện tại không đúng') ||
+        errorMessage.includes('Thông tin không hợp lệ')) {
         setModalType('info');
         setModalTitle('Thông báo');
         setModalMessage(errorMessage);
@@ -217,7 +214,6 @@ export default function SettingsPage() {
         setErrors({ currentPassword: errorMessage });
       }
     } finally {
-      console.error = originalConsoleError;
       setIsSubmitting(false);
     }
   };
@@ -226,16 +222,16 @@ export default function SettingsPage() {
     <>
       <div className="min-h-screen bg-gray-50 px-4 pb-6">
         <div className="max-w-2xl mx-auto">
-          
+
           <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 mb-8 shadow-lg border border-white/20 backdrop-blur-sm">
             <div className="flex items-center gap-4 mb-3">
-            <button
-              onClick={() => router.back()}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại trang trước"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
+              <button
+                onClick={() => router.back()}
+                className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                title="Quay lại trang trước"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
                 <CogIcon className="w-8 h-8 text-white" />
               </div>
@@ -250,14 +246,14 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          
+
           <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 mb-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Đổi mật khẩu
             </h3>
-            
+
             <div className="space-y-4">
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mật khẩu hiện tại
@@ -268,9 +264,8 @@ export default function SettingsPage() {
                     value={currentPassword}
                     onChange={(e) => handleCurrentPasswordChange(e.target.value)}
                     placeholder="Nhập mật khẩu hiện tại"
-                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${
-                      errors.currentPassword ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${errors.currentPassword ? 'border-red-500' : 'border-gray-300'
+                      }`}
                   />
                   <button
                     type="button"
@@ -278,7 +273,7 @@ export default function SettingsPage() {
                     title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-none border-none cursor-pointer"
                   >
-                    {showCurrentPassword ? 
+                    {showCurrentPassword ?
                       <EyeSlashIcon className="w-4 h-4 text-gray-500" /> :
                       <EyeIcon className="w-4 h-4 text-gray-500" />
                     }
@@ -292,7 +287,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mật khẩu mới
@@ -303,9 +298,8 @@ export default function SettingsPage() {
                     value={newPassword}
                     onChange={(e) => handleNewPasswordChange(e.target.value)}
                     placeholder="Nhập mật khẩu mới"
-                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${
-                      errors.newPassword ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${errors.newPassword ? 'border-red-500' : 'border-gray-300'
+                      }`}
                   />
                   <button
                     type="button"
@@ -313,19 +307,19 @@ export default function SettingsPage() {
                     title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-none border-none cursor-pointer"
                   >
-                    {showNewPassword ? 
+                    {showNewPassword ?
                       <EyeSlashIcon className="w-4 h-4 text-gray-500" /> :
                       <EyeIcon className="w-4 h-4 text-gray-500" />
                     }
                   </button>
                 </div>
-                
-                
+
+
                 {newPassword && (
                   <div className="mt-2">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-gray-500">Độ mạnh mật khẩu:</span>
-                      <span 
+                      <span
                         className="text-xs font-medium"
                         style={{ color: passwordStrength.color }}
                       >
@@ -333,7 +327,7 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full transition-all duration-300"
                         style={{
                           width: `${(passwordStrength.score / 5) * 100}%`,
@@ -343,7 +337,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {errors.newPassword && (
                   <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
                     <ExclamationTriangleIcon className="w-3.5 h-3.5" />
@@ -352,7 +346,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Xác nhận mật khẩu mới
@@ -363,9 +357,8 @@ export default function SettingsPage() {
                     value={confirmPassword}
                     onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                     placeholder="Nhập lại mật khẩu mới"
-                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${
-                      errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-3 pr-10 rounded-md border text-sm outline-none box-border bg-white ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                      }`}
                   />
                   <button
                     type="button"
@@ -373,7 +366,7 @@ export default function SettingsPage() {
                     title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-none border-none cursor-pointer"
                   >
-                    {showConfirmPassword ? 
+                    {showConfirmPassword ?
                       <EyeSlashIcon className="w-4 h-4 text-gray-500" /> :
                       <EyeIcon className="w-4 h-4 text-gray-500" />
                     }
@@ -387,7 +380,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              
+
               <div className="border-t border-gray-100 pt-4 flex justify-end gap-4 items-center">
                 {passwordSuccess && (
                   <div className="text-green-700 text-sm flex items-center gap-2">
@@ -395,15 +388,14 @@ export default function SettingsPage() {
                     Đổi mật khẩu thành công!
                   </div>
                 )}
-                
+
                 <button
                   onClick={handleChangePassword}
                   disabled={isSubmitting || !currentPassword || !newPassword || !confirmPassword}
-                  className={`px-6 py-3 rounded-lg border-none text-white text-sm font-semibold flex items-center gap-2 transition-colors ${
-                    isSubmitting || !currentPassword || !newPassword || !confirmPassword
+                  className={`px-6 py-3 rounded-lg border-none text-white text-sm font-semibold flex items-center gap-2 transition-colors ${isSubmitting || !currentPassword || !newPassword || !confirmPassword
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
+                    }`}
                 >
                   {isSubmitting ? (
                     <>
@@ -422,7 +414,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-      
+
       <NotificationModal
         open={modalOpen}
         title={modalTitle}

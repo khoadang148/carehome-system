@@ -5,10 +5,10 @@ import { toast } from 'react-toastify'
 import { getUserFriendlyError } from '@/lib/utils/error-translations';;;
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  MagnifyingGlassIcon, 
-  FunnelIcon, 
-  EyeIcon, 
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  EyeIcon,
   CalendarIcon,
   SparklesIcon,
   CalendarDaysIcon,
@@ -95,39 +95,39 @@ export default function StaffActivitiesPage() {
   const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [evaluationResidents, setEvaluationResidents] = useState<any[]>([]);
-  
+
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activityParticipantCounts, setActivityParticipantCounts] = useState<{[id: string]: number}>({});
-  
+  const [activityParticipantCounts, setActivityParticipantCounts] = useState<{ [id: string]: number }>({});
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    
+
     if (!user.role || user.role !== 'staff') {
       router.push('/');
       return;
     }
   }, [user, router]);
-  
+
   useEffect(() => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         if (!user?.id) {
           setError('Không tìm thấy thông tin người dùng');
           return;
         }
-        
+
         const participations = await activityParticipationsAPI.getByStaffId(user.id);
-        
+
         const activityIds = [...new Set(participations.map((p: any) => p.activity_id?._id || p.activity_id))].filter(Boolean);
-        
+
         const activityPromises = activityIds.map(async (activityId: any) => {
           try {
             if (!activityId) {
@@ -139,15 +139,15 @@ export default function StaffActivitiesPage() {
             return null;
           }
         });
-        
+
         const activityResults = await Promise.all(activityPromises);
         const validActivities = activityResults.filter(Boolean);
-        
+
         validActivities.sort((a, b) => {
           if (!a || !b) return 0;
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
-        
+
         setActivities(validActivities);
       } catch (err: any) {
         setError('Không thể tải danh sách hoạt động. Vui lòng thử lại sau.');
@@ -160,20 +160,20 @@ export default function StaffActivitiesPage() {
       fetchActivities();
     }
   }, [user?.id]);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [filterLocation, setFilterLocation] = useState('Tất cả');
   const [filterCategory, setFilterCategory] = useState('Tất cả');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedWeek, setSelectedWeek] = useState(0);
-  
+
   const getWeekDates = (weekOffset: number = 0): Date[] => {
     const today = new Date();
     const currentDay = today.getDay();
     const mondayDate = new Date(today);
     mondayDate.setDate(today.getDate() - currentDay + 1 + (weekOffset * 7));
-    
+
     const weekDates: Date[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(mondayDate);
@@ -184,7 +184,7 @@ export default function StaffActivitiesPage() {
   };
 
   const weekDates = getWeekDates(selectedWeek);
-  
+
   const filteredActivities = activities.filter((activity) => {
     const name = activity.name || '';
     const description = activity.description || '';
@@ -203,9 +203,9 @@ export default function StaffActivitiesPage() {
 
   const weekActivities = filteredActivities.filter(activity => {
     if (viewMode === 'list') return true;
-    
+
     const activityDate = new Date(activity.date);
-    return weekDates.some(date => 
+    return weekDates.some(date =>
       date.toDateString() === activityDate.toDateString()
     );
   });
@@ -270,36 +270,36 @@ export default function StaffActivitiesPage() {
         activity_id: activity.id,
         date: activity.date
       });
-      
+
       const filteredParticipations = participations.filter((p: any) => {
         if (!p.date) return false;
         const participationDate = new Date(p.date).toLocaleDateString('en-CA');
         return participationDate === activity.date;
       });
-      
+
       const uniqueParticipations = filteredParticipations.reduce((acc: any[], current: any) => {
         const residentId = current.resident_id?._id || current.resident_id;
-        const existingIndex = acc.findIndex(item => 
+        const existingIndex = acc.findIndex(item =>
           (item.resident_id?._id || item.resident_id) === residentId
         );
-        
+
         if (existingIndex === -1) {
           acc.push(current);
         } else {
           const existing = acc[existingIndex];
           const existingTime = new Date(existing.updated_at || existing.created_at || 0);
           const currentTime = new Date(current.updated_at || current.created_at || 0);
-          
+
           if (currentTime > existingTime) {
             acc[existingIndex] = current;
           }
         }
         return acc;
       }, []);
-      
+
       const residentIds = uniqueParticipations.map((p: any) => p.resident_id?._id || p.resident_id);
       const filteredResidents = residents.filter((r: any) => residentIds.includes(r.id));
-      
+
       setSelectedActivity(activity);
       setEvaluationResidents(filteredResidents);
       setEvaluationModalOpen(true);
@@ -310,40 +310,40 @@ export default function StaffActivitiesPage() {
 
   useEffect(() => {
     const fetchCounts = async () => {
-      const counts: {[id: string]: number} = {};
+      const counts: { [id: string]: number } = {};
       await Promise.all(activities.map(async (activity) => {
         if (!activity.id || !activity.date) return;
         try {
           const participations = await activityParticipationsAPI.getAll({
             activity_id: activity.id
           });
-          
+
           const filtered = participations.filter((p: any) => {
             const participationActivityId = p.activity_id?._id || p.activity_id;
             const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
             return participationActivityId === activity.id && participationDate === activity.date;
           });
-          
+
           const joined = filtered.reduce((acc: any[], current: any) => {
             const residentId = current.resident_id?._id || current.resident_id;
-            const existingIndex = acc.findIndex(item => 
+            const existingIndex = acc.findIndex(item =>
               (item.resident_id?._id || item.resident_id) === residentId
             );
-            
+
             if (existingIndex === -1) {
               acc.push(current);
             } else {
               const existing = acc[existingIndex];
               const existingTime = new Date(existing.updated_at || existing.created_at || 0);
               const currentTime = new Date(current.updated_at || current.created_at || 0);
-              
+
               if (currentTime > existingTime) {
                 acc[existingIndex] = current;
               }
             }
             return acc;
           }, []);
-          
+
           counts[activity.id] = joined.length;
         } catch (error) {
           counts[activity.id] = 0;
@@ -442,7 +442,7 @@ export default function StaffActivitiesPage() {
                 )}
               </div>
             </div>
-            
+
             <div className="flex gap-3 flex-wrap">
               <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
                 <button
@@ -457,7 +457,7 @@ export default function StaffActivitiesPage() {
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg border-0 text-sm font-semibold transition ${viewMode === 'calendar' ? 'bg-blue-500 text-white' : 'bg-transparent text-slate-500'}`}
                 >
                   <CalendarDaysIcon className="w-4 h-4" />
-            Lịch hoạt động
+                  Lịch hoạt động
                 </button>
               </div>
             </div>
@@ -472,8 +472,8 @@ export default function StaffActivitiesPage() {
               </label>
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
+                <input
+                  type="text"
                   placeholder="Tìm kiếm chương trình..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -483,33 +483,33 @@ export default function StaffActivitiesPage() {
             </div>
 
             <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Ngày
-                </label>
-                <DatePicker
-  selected={selectedDate}
-  onChange={date => setSelectedDate(date as Date)}
-  dateFormat="dd/MM/yyyy"
-  className="datepicker-input"
-  placeholderText="dd/mm/yyyy"
-  wrapperClassName="w-full"
-  customInput={
-    <input
-      type="text"
-      className="w-full p-3 rounded-lg border border-gray-300 text-sm"
-    />
-  }
-/>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Ngày
+              </label>
+              <DatePicker
+                selected={selectedDate}
+                onChange={date => setSelectedDate(date as Date)}
+                dateFormat="dd/MM/yyyy"
+                className="datepicker-input"
+                placeholderText="dd/mm/yyyy"
+                wrapperClassName="w-full"
+                customInput={
+                  <input
+                    type="text"
+                    className="w-full p-3 rounded-lg border border-gray-300 text-sm"
+                  />
+                }
+              />
             </div>
 
             <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Loại hoạt động
-                </label>
-                <select
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Loại hoạt động
+              </label>
+              <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                  className="w-full p-3 rounded-lg border border-gray-300 text-sm"
+                className="w-full p-3 rounded-lg border border-gray-300 text-sm"
               >
                 {categories.map((category) => (
                   <option key={category} value={category}>
@@ -520,13 +520,13 @@ export default function StaffActivitiesPage() {
             </div>
 
             <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Địa điểm
-                </label>
-                <select
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Địa điểm
+              </label>
+              <select
                 value={filterLocation}
                 onChange={(e) => setFilterLocation(e.target.value)}
-                  className="w-full p-3 rounded-lg border border-gray-300 text-sm"
+                className="w-full p-3 rounded-lg border border-gray-300 text-sm"
               >
                 {locations.map((location) => (
                   <option key={location} value={location}>
@@ -537,7 +537,7 @@ export default function StaffActivitiesPage() {
             </div>
           </div>
 
-          
+
         </div>
 
         {viewMode === 'calendar' && (
@@ -628,7 +628,7 @@ export default function StaffActivitiesPage() {
             .map((activity, index) => {
               const statusColor = getStatusColor(activity.status);
               const categoryColor = getCategoryColor(activity.activity_type);
-              
+
               return (
                 <div
                   key={activity.id || `activity-${index}`}
@@ -689,7 +689,7 @@ export default function StaffActivitiesPage() {
                         <div className="text-[0.75rem] text-gray-500">({activity.duration} phút)</div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3 p-3 bg-amber-100 rounded-lg border border-amber-200">
                       <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
                         <CalendarIcon className="w-4 h-4 text-white" />
@@ -701,7 +701,7 @@ export default function StaffActivitiesPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
                       <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
                         <MapPinIcon className="w-4 h-4 text-white" />
@@ -713,7 +713,7 @@ export default function StaffActivitiesPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3 p-3 bg-amber-100 rounded-lg border border-amber-200">
                       <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
                         <UserGroupIcon className="w-4 h-4 text-white" />
@@ -737,7 +737,7 @@ export default function StaffActivitiesPage() {
                       Xem chi tiết
                     </button>
                   </div>
-                  </div>
+                </div>
               );
             })}
         </div>
@@ -765,20 +765,20 @@ export default function StaffActivitiesPage() {
             setSelectedActivity(null);
             setEvaluationResidents([]);
             const fetchCounts = async () => {
-              const counts: {[id: string]: number} = {};
+              const counts: { [id: string]: number } = {};
               await Promise.all(activities.map(async (activity) => {
                 if (!activity.id || !activity.date) return;
                 try {
                   const participations = await activityParticipationsAPI.getAll({
                     activity_id: activity.id
                   });
-                  
+
                   const joined = participations.filter((p: any) => {
                     const participationActivityId = p.activity_id?._id || p.activity_id;
                     const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
                     return participationActivityId === activity.id && participationDate === activity.date;
                   });
-                  
+
                   counts[activity.id] = joined.length;
                 } catch (error) {
                   counts[activity.id] = 0;

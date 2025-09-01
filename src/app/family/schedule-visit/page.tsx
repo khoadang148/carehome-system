@@ -11,8 +11,8 @@ import VisitErrorModal from '@/components/VisitErrorModal';
 export default function ScheduleVisitPage() {
   const router = useRouter();
   const { user } = useAuth();
-  
-  
+
+
   const [residents, setResidents] = useState<any[]>([]);
   const [visitHistory, setVisitHistory] = useState<any[]>([]);
   const [visitDate, setVisitDate] = useState('');
@@ -76,7 +76,7 @@ export default function ScheduleVisitPage() {
       .then((data) => {
         const arr = Array.isArray(data) ? data : [];
         setVisitHistory(arr);
-        
+
       })
       .catch(() => setVisitHistory([]))
       .finally(() => setLoadingVisits(false));
@@ -118,30 +118,30 @@ export default function ScheduleVisitPage() {
       setShowErrorModal(true);
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const visitDateTime = new Date(`${visitDate}T${visitTime}:00`);
       const now = new Date();
       const timeDiff = visitDateTime.getTime() - now.getTime();
-      const minTimeDiff = 24 * 60 * 60 * 1000; 
-      const maxTimeDiff = 30 * 24 * 60 * 60 * 1000; 
-      
+      const minTimeDiff = 24 * 60 * 60 * 1000;
+      const maxTimeDiff = 30 * 24 * 60 * 60 * 1000;
+
       if (timeDiff < minTimeDiff) {
         setError('Bạn chỉ được đặt lịch trước ít nhất 24 giờ so với thời điểm hiện tại.');
         setShowErrorModal(true);
         setLoading(false);
         return;
       }
-      
+
       if (timeDiff > maxTimeDiff) {
         setError('Bạn chỉ được đặt lịch trước tối đa 30 ngày so với thời điểm hiện tại.');
         setShowErrorModal(true);
         setLoading(false);
         return;
       }
-      
+
       if (visitHistory.length > 0) {
         const duplicatedNames = residents.filter(resident =>
           visitHistory.some((item) =>
@@ -150,7 +150,7 @@ export default function ScheduleVisitPage() {
             (item.visit_time === visitTime)
           )
         ).map(r => r.fullName || r.name || 'Người thân');
-        
+
         if (duplicatedNames.length > 0) {
           setError(`Người thân sau đã có lịch thăm vào khung giờ này: ${duplicatedNames.join(', ')}. Vui lòng chọn thời gian khác.`);
           setShowErrorModal(true);
@@ -158,7 +158,7 @@ export default function ScheduleVisitPage() {
           return;
         }
       }
-      
+
       const residentIds = residents.filter(resident => resident._id).map(r => String(r._id));
       const payload = {
         resident_ids: residentIds,
@@ -177,13 +177,13 @@ export default function ScheduleVisitPage() {
         setLoading(false);
         return;
       }
-      
+
       const successfulResidents = residents.map(r => r.full_name || r.fullName || r.name || 'Người thân');
       setScheduledResidents(successfulResidents);
       setShowSuccessModal(true);
-      
+
       setTimeout(() => fetchVisits(), 100);
-      
+
     } catch (err) {
       setError(String((err && (err as any).message) || err || 'Có lỗi xảy ra khi đặt lịch.'));
       setShowErrorModal(true);
@@ -195,7 +195,7 @@ export default function ScheduleVisitPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center p-8">
       <div className="flex gap-7 bg-white rounded-3xl shadow-xl p-10 max-w-4xl w-full items-start relative">
-        
+
         <div className="flex-2 min-w-80">
           <div className="flex items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
@@ -208,7 +208,7 @@ export default function ScheduleVisitPage() {
               </div>
             </div>
 
-            
+
             <button
               onClick={() => router.push('/family/schedule-visit/history')}
               className="px-4 py-2 rounded-full border-2 border-emerald-500 bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-600 font-bold text-base cursor-pointer shadow-lg transition-all duration-200 flex items-center gap-2 ml-4 hover:from-emerald-100 hover:to-emerald-200"
@@ -238,7 +238,7 @@ export default function ScheduleVisitPage() {
                         const value = e.target.value;
                         const cleanValue = value.replace(/[^0-9/]/g, '');
                         setDisplayDate(cleanValue);
-                        
+
                         const parts = cleanValue.split('/');
                         if (parts.length === 3 && parts[0] && parts[1] && parts[2] && parts[2].length === 4) {
                           const day = parts[0].padStart(2, '0');
@@ -252,7 +252,7 @@ export default function ScheduleVisitPage() {
                       }}
                       placeholder="dd/mm/yyyy"
                       className="w-full px-4 py-3.5 pr-12 rounded-xl border-2 border-gray-200 text-base transition-all duration-200 shadow-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 focus:outline-none"
-                      onBlur={e => { 
+                      onBlur={e => {
                         const value = displayDate;
                         if (value && !value.includes('/')) {
                           let formattedValue = value;
@@ -344,7 +344,7 @@ export default function ScheduleVisitPage() {
                     <option value="Tham gia hoạt động">Tham gia hoạt động</option>
                     <option value="Khác">Khác</option>
                   </select>
-                  
+
                   {visitPurpose === 'Khác' && (
                     <div className="mt-4">
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
@@ -360,9 +360,9 @@ export default function ScheduleVisitPage() {
                       />
                     </div>
                   )}
-                  
+
                   <div className="text-sm text-gray-500 mt-1">
-                    {visitPurpose === 'Khác' 
+                    {visitPurpose === 'Khác'
                       ? 'Vui lòng mô tả chi tiết lý do thăm để nhân viên chuẩn bị phù hợp.'
                       : 'Chọn đúng mục đích để nhân viên chuẩn bị tốt nhất cho chuyến thăm.'
                     }
@@ -379,27 +379,26 @@ export default function ScheduleVisitPage() {
                 >
                   Hủy bỏ
                 </button>
-                                 <button
-                   onClick={submitVisitSchedule}
-                   disabled={!visitDate || !visitTime || !visitPurpose || (visitPurpose === 'Khác' && !customPurpose.trim()) || loading}
-                   className={`px-7 py-3.5 rounded-xl border-none text-white font-bold text-base flex items-center gap-2 transition-all duration-200 ${
-                     loading 
-                       ? 'bg-gradient-to-r from-gray-300 to-gray-400 cursor-not-allowed shadow-none' 
-                       : 'bg-gradient-to-r from-emerald-500 to-emerald-600 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                   }`}
-                 >
-                   {loading ? (
-                     <>
-                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                       Đang xử lý...
-                     </>
-                   ) : (
-                     <>
-                       <CheckIcon className="w-4 h-4" />
-                       Đặt lịch
-                     </>
-                   )}
-                 </button>
+                <button
+                  onClick={submitVisitSchedule}
+                  disabled={!visitDate || !visitTime || !visitPurpose || (visitPurpose === 'Khác' && !customPurpose.trim()) || loading}
+                  className={`px-7 py-3.5 rounded-xl border-none text-white font-bold text-base flex items-center gap-2 transition-all duration-200 ${loading
+                    ? 'bg-gradient-to-r from-gray-300 to-gray-400 cursor-not-allowed shadow-none'
+                    : 'bg-gradient-to-r from-emerald-500 to-emerald-600 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                    }`}
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <CheckIcon className="w-4 h-4" />
+                      Đặt lịch
+                    </>
+                  )}
+                </button>
               </div>
             </>
           ) : (
@@ -421,27 +420,27 @@ export default function ScheduleVisitPage() {
           )}
         </div>
       </div>
-      
-      
-      <VisitSuccessModal 
-        open={showSuccessModal} 
+
+
+      <VisitSuccessModal
+        open={showSuccessModal}
         onClose={() => {
           setShowSuccessModal(false);
-          
+
           setVisitDate('');
           setVisitTime('');
           setVisitPurpose('');
           setCustomPurpose('');
           setDisplayDate('');
-        }} 
+        }}
         scheduledResidents={scheduledResidents}
       />
-      <VisitErrorModal 
-        open={showErrorModal} 
+      <VisitErrorModal
+        open={showErrorModal}
         onClose={() => {
           setShowErrorModal(false);
           setError(null);
-        }} 
+        }}
         title="Không thể đặt lịch!"
         message={error || 'Có lỗi xảy ra khi đặt lịch.'}
         type="error"

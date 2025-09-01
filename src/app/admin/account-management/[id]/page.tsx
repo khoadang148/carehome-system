@@ -2,6 +2,20 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { userAPI, residentAPI } from '@/lib/api';
+import {
+  ArrowLeftIcon,
+  UserIcon,
+  EnvelopeIcon,
+  PhoneIcon,
+  IdentificationIcon,
+  CalendarIcon,
+  MapPinIcon,
+  DocumentTextIcon,
+  UserGroupIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  PencilIcon
+} from '@heroicons/react/24/outline';
 
 interface User {
   _id: string;
@@ -65,8 +79,34 @@ export default function AccountDetailsPage() {
     return () => { mounted = false; };
   }, [id]);
 
-  if (loading) return <div style={{padding: 40, textAlign: 'center'}}>Đang tải dữ liệu...</div>;
-  if (error) return <div style={{padding: 40, color: 'red', textAlign: 'center'}}>{error}</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <ExclamationTriangleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/admin/account-management')}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+          >
+            Quay lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!account) return null;
 
   const isStaff = account.role === 'staff' || account.role === 'admin';
@@ -88,174 +128,285 @@ export default function AccountDetailsPage() {
     return userAPI.getAvatarUrlById(account._id);
   };
 
-  return (
-    <div style={{ padding: '2rem' }}>
-      <button
-        onClick={() => router.push('/admin/account-management')}
-        style={{
-          padding: '0.5rem 1rem',
-          borderRadius: 8,
-          border: '1px solid #e5e7eb',
-          background: '#f8fafc',
-          color: '#374151',
-          cursor: 'pointer',
-          marginBottom: '1rem',
-          fontWeight: 600
-        }}
-      >
-        ← Quay lại
-      </button>
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'inactive':
+        return 'bg-gray-100 text-gray-800';
+      case 'suspended':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-      <div style={{
-        background: 'white',
-        borderRadius: '1rem',
-        border: '1px solid #e5e7eb',
-        overflow: 'hidden',
-        boxShadow: '0 10px 20px rgba(0,0,0,0.06)'
-      }}>
-        <div style={{
-          background: isStaff ? 'linear-gradient(135deg, #6366f1 0%, #60a5fa 100%)' : 'linear-gradient(135deg, #f59e42 0%, #fbbf24 100%)',
-          padding: '2rem 2.5rem',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.5rem'
-        }}>
-          <div style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            background: account.avatar ? 'transparent' : 'rgba(255,255,255,0.18)',
-            overflow: 'hidden',
-            border: isStaff ? '2px solid #e0e7ff' : '2px solid #fde68a',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 32,
-            fontWeight: 700
-          }}>
-            <img
-              src={getAccountAvatarUrl()}
-              alt={account.full_name}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/default-avatar.svg'; }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: '0.25rem' }}>
-                Họ và tên
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Hoạt động';
+      case 'inactive':
+        return 'Không hoạt động';
+      case 'suspended':
+        return 'Tạm khóa';
+      default:
+        return 'Không xác định';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-200 to-indigo-200 rounded-2xl p-6 mb-8 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/admin/account-management')}
+                className="group p-3 rounded-full bg-white/80 hover:bg-white text-gray-700 hover:text-blue-700 hover:shadow-lg transition-all duration-300"
+                title="Quay lại"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">
+                  Chi tiết tài khoản
+                </h1>
+                <p className="text-gray-600 mt-1">Thông tin chi tiết về tài khoản người dùng</p>
               </div>
-              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{account.full_name}</h1>
             </div>
-            <div style={{ opacity: 0.9, marginTop: 4 }}>{roleDisplay}</div>
-          </div>
-          <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>
-              Trạng thái:
-            </div>
-            <span style={{
-              display: 'inline-block',
-              padding: '0.25rem 0.75rem',
-              borderRadius: 999,
-              background: account.status === 'active' ? '#dcfce7' : account.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
-              color: account.status === 'active' ? '#16a34a' : account.status === 'inactive' ? '#64748b' : '#b45309',
-              fontWeight: 700
-            }}>
-              {account.status === 'active' ? 'Hoạt động' : account.status === 'inactive' ? 'Không hoạt động' : 'Tạm khóa'}
-            </span>
+            
+            <button
+              onClick={() => router.push(`/admin/account-management/edit/${id}`)}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl"
+            >
+              <PencilIcon className="w-5 h-5" />
+              Chỉnh sửa
+            </button>
           </div>
         </div>
 
-        <div style={{ padding: '1.5rem 2rem', background: '#fafafa' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-            <div>
-              <div style={{ color: '#64748b' }}>Họ và tên</div>
-              <div style={{ fontWeight: 600 }}>{account.full_name}</div>
-            </div>
-            <div>
-              <div style={{ color: '#64748b' }}>Username</div>
-              <div style={{ fontWeight: 600 }}>{account.username}</div>
-            </div>
-            <div>
-              <div style={{ color: '#64748b' }}>Email</div>
-              <div style={{ fontWeight: 600 }}>{account.email}</div>
-            </div>
-            <div>
-              <div style={{ color: '#64748b' }}>Số điện thoại</div>
-              <div style={{ fontWeight: 600 }}>{account.phone}</div>
+        {/* Main Content */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          {/* Profile Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 border-b border-gray-200">
+            <div className="flex items-center gap-6">
+              {/* Avatar */}
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border-4 border-white shadow-lg flex items-center justify-center">
+                  <img
+                    src={getAccountAvatarUrl()}
+                    alt={account.full_name}
+                    className="w-full h-full rounded-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/default-avatar.svg'; }}
+                  />
+                </div>
+                <div className={`absolute -bottom-2 -right-2 w-6 h-6 rounded-full border-2 border-white ${
+                  account.status === 'active' ? 'bg-green-500' : 
+                  account.status === 'inactive' ? 'bg-gray-500' : 'bg-yellow-500'
+                }`}></div>
+              </div>
+
+              {/* User Info */}
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  {account.full_name}
+                </h2>
+                <div className="flex items-center gap-4 text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <UserGroupIcon className="w-4 h-4" />
+                    <span className="text-sm font-medium">Vai trò:</span>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                      {roleDisplay}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircleIcon className="w-4 h-4" />
+                    <span className="text-sm font-medium">Trạng thái:</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      account.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {getStatusText(account.status)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {isStaff && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <div style={{ color: '#64748b' }}>Chức vụ</div>
-                <div style={{ fontWeight: 600 }}>{account.position || account.role}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b' }}>Bằng cấp</div>
-                <div style={{ fontWeight: 600 }}>{account.qualification || '—'}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b' }}>Ngày vào làm</div>
-                <div style={{ fontWeight: 600 }}>{account.join_date ? new Date(account.join_date).toLocaleDateString('vi-VN') : '—'}</div>
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ color: '#64748b' }}>Ghi chú</div>
-                <div style={{ fontWeight: 600, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{account.notes || '—'}</div>
-              </div>
-            </div>
-          )}
+          {/* Account Information */}
+          <div className="p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Basic Information */}
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3 pb-3 border-b-2 border-blue-100">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <IdentificationIcon className="w-5 h-5 text-blue-600" />
+                  </div>
+                  Thông tin cơ bản
+                </h3>
 
-          {isFamily && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <div style={{ color: '#64748b' }}>Địa chỉ</div>
-                <div style={{ fontWeight: 600 }}>{account.address || '—'}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b' }}>Ghi chú</div>
-                <div style={{ fontWeight: 600 }}>{account.notes || '—'}</div>
-              </div>
-            </div>
-          )}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <UserIcon className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Họ và tên</p>
+                      <p className="font-semibold text-gray-900">{account.full_name}</p>
+                    </div>
+                  </div>
 
-          {isFamily && (
-            <div style={{ marginTop: '1rem' }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Người cao tuổi được liên kết</div>
-              {loadingLinkedResidents ? (
-                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 8 }}>Đang tải thông tin...</div>
-              ) : linkedResidents.length > 0 ? (
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {linkedResidents.map((resident: any, index: number) => (
-                    <div key={resident._id || index} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      <div>
-                        <div style={{ color: '#64748b' }}>Họ và tên</div>
-                        <div style={{ fontWeight: 600 }}>{resident.full_name}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#64748b' }}>Mối quan hệ</div>
-                        <div style={{ fontWeight: 600 }}>{resident.relationship}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#64748b' }}>Ngày sinh</div>
-                        <div style={{ fontWeight: 600 }}>{resident.date_of_birth ? new Date(resident.date_of_birth).toLocaleDateString('vi-VN') : '—'}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#64748b' }}>Trạng thái</div>
-                        <div style={{ fontWeight: 700, color: resident.status === 'active' ? '#16a34a' : '#64748b' }}>
-                          {resident.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <EnvelopeIcon className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Email</p>
+                      <p className="font-semibold text-gray-900">{account.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <PhoneIcon className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Số điện thoại</p>
+                      <p className="font-semibold text-gray-900">{account.phone || '—'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <IdentificationIcon className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Tên đăng nhập</p>
+                      <p className="font-semibold text-gray-900">{account.username}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3 pb-3 border-b-2 border-green-100">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <DocumentTextIcon className="w-5 h-5 text-green-600" />
+                  </div>
+                  Thông tin bổ sung
+                </h3>
+
+                <div className="space-y-4">
+                  {isStaff && (
+                    <>
+                      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                        <UserIcon className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Chức vụ</p>
+                          <p className="font-semibold text-gray-900">{account.position || roleDisplay}</p>
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                        <DocumentTextIcon className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Bằng cấp</p>
+                          <p className="font-semibold text-gray-900">{account.qualification || '—'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                        <CalendarIcon className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Ngày vào làm</p>
+                          <p className="font-semibold text-gray-900">
+                            {account.join_date ? new Date(account.join_date).toLocaleDateString('vi-VN') : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {isFamily && (
+                    <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                      <MapPinIcon className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-500">Địa chỉ</p>
+                        <p className="font-semibold text-gray-900">{account.address || '—'}</p>
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  <div className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                    <DocumentTextIcon className="w-5 h-5 text-gray-400 mt-1" />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500">Ghi chú</p>
+                      <p className="font-semibold text-gray-900 whitespace-pre-wrap">
+                        {account.notes || '—'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8 }}>Chưa có người cao tuổi nào được liên kết</div>
-              )}
+              </div>
             </div>
-          )}
+
+            {/* Linked Residents for Family Members */}
+            {isFamily && (
+              <div className="mt-8 bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3 pb-3 border-b-2 border-purple-100">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <UserGroupIcon className="w-5 h-5 text-purple-600" />
+                  </div>
+                  Người cao tuổi được liên kết
+                </h3>
+
+                {loadingLinkedResidents ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Đang tải thông tin...</p>
+                  </div>
+                ) : linkedResidents.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {linkedResidents.map((resident: any, index: number) => (
+                      <div key={resident._id || index} className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                            <UserIcon className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{resident.full_name}</h4>
+                            <p className="text-sm text-gray-500">{resident.relationship}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-gray-500">Ngày sinh</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {resident.date_of_birth ? new Date(resident.date_of_birth).toLocaleDateString('vi-VN') : '—'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Trạng thái</p>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${resident.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                              <span className={`text-sm font-medium ${resident.status === 'active' ? 'text-green-600' : 'text-gray-600'}`}>
+                                {resident.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <ExclamationTriangleIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">Chưa có liên kết</h4>
+                    <p className="text-gray-600">Chưa có người cao tuổi nào được liên kết với tài khoản này</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
