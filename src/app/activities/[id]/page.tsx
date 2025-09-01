@@ -632,7 +632,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       setNotificationModal({
         open: true,
         title: 'Không thể thay đổi',
-        message: 'Hoạt động đã qua ngày, không thể xóa nhân viên.',
+        message: 'Hoạt động đã qua, không thể xóa nhân viên.',
         type: 'warning'
       });
       return;
@@ -769,7 +769,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       setNotificationModal({
         open: true,
         title: 'Không thể thay đổi',
-        message: 'Hoạt động đã qua ngày, không thể phân công nhân viên.',
+        message: 'Hoạt động đã qua, không thể phân công nhân viên.',
         type: 'warning'
       });
       return;
@@ -1616,7 +1616,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           fontWeight: 600
                         }}>
                           <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                          Hoạt động đã qua ngày - Không thể phân công
+                          Hoạt động đã qua - Không thể phân công
                         </div>
                       )}
                     </div>
@@ -1692,7 +1692,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                               border: '1px solid #d1d5db',
                               fontSize: '0.75rem',
                               fontWeight: 600
-                            }} title="Hoạt động đã qua ngày - Không thể xóa nhân viên">
+                            }} title="Hoạt động đã qua - Không thể xóa nhân viên">
                               ×
                             </div>
                           )}

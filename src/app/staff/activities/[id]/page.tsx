@@ -1385,7 +1385,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                         fontWeight: 600
                       }}>
                         <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                        Hoạt động đã qua ngày - Không thể thêm người tham gia
+                        Hoạt động đã qua - Không thể thêm người tham gia
                       </div>
                     )}
                   </div>
@@ -1509,7 +1509,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     fontWeight: 600
                   }}>
                     <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                    {isActivityDatePassed() ? 'Hoạt động đã qua ngày - Không thể chỉnh sửa' : 'Hoạt động trong tương lai - Không thể chỉnh sửa'}
+                    {isActivityDatePassed() ? 'Hoạt động đã qua - Không thể chỉnh sửa' : 'Hoạt động trong tương lai - Không thể chỉnh sửa'}
                   </div>
                 )}
               </div>

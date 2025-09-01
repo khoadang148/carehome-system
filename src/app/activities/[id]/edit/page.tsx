@@ -158,6 +158,12 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   const onSubmit = async (data: ActivityFormData) => {
     if (!activityId) return;
 
+    // Kiểm tra staff_id trước khi submit
+    if (!activity?.staff_id && !activity?.staff?._id) {
+      toast.error('Không tìm thấy thông tin nhân viên phụ trách. Vui lòng cập nhật thông tin nhân viên phụ trách.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const apiDate = convertToApiDate(data.date);
@@ -171,8 +177,14 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
         location: data.location,
         schedule_time,
         duration: Number(data.duration),
-        capacity: Number(data.capacity)
+        capacity: Number(data.capacity),
+        staff_id: activity?.staff_id || activity?.staff?._id || '' // Thêm staff_id từ activity hiện tại
       };
+      
+      // Log payload để debug
+      console.log('Updating activity with payload:', payload);
+      console.log('Activity ID:', activityId);
+      
       await activitiesAPI.update(activityId, payload);
 
       setSuccessMessage(`Hoạt động "${data.name}" đã được cập nhật thành công!`);
@@ -187,9 +199,23 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
         router.push('/activities');
       }, 3000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating activity:', error);
-      toast.error('Có lỗi xảy ra khi cập nhật hoạt động. Vui lòng thử lại.');
+      
+      // Hiển thị thông tin lỗi chi tiết hơn
+      let errorMessage = 'Có lỗi xảy ra khi cập nhật hoạt động. Vui lòng thử lại.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Lỗi server nội bộ. Vui lòng liên hệ admin hoặc thử lại sau.';
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Không tìm thấy hoạt động. Vui lòng tải lại trang.';
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
