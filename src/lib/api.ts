@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { clientStorage } from './utils/clientStorage';
 import { isTokenValid } from './utils/tokenUtils';
+import { buildCacheKey, getCached, setCached } from './utils/apiCache';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com';
 
@@ -17,6 +18,18 @@ const apiClient = axios.create({
   withCredentials: true,
   timeout: 10000, 
 });
+
+// Transparent GET cache helper for list-like endpoints
+async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 30_000): Promise<T> {
+  const key = buildCacheKey(API_BASE_URL, url, params);
+  const cached = typeof window !== 'undefined' ? getCached<T>(key) : null;
+  if (cached) return cached.data;
+  const res = await apiClient.get<T>(url, { params });
+  if (typeof window !== 'undefined') {
+    setCached<T>(key, { data: res.data as any, status: res.status, statusText: res.statusText }, ttlMs);
+  }
+  return res.data as any;
+}
 
 const logoutClient = axios.create({
   baseURL: API_BASE_URL,
@@ -270,8 +283,8 @@ export const authAPI = {
 export const userAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get('/users', { params });
-      return response.data;
+      const data = await getWithCache<any[]>('/users', params, 30_000);
+      return data as any[];
     } catch (error) {
       return [];
     }
@@ -436,8 +449,8 @@ export const userAPI = {
 export const residentAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.residents, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.residents, params, 30_000);
+      return data as any[];
     } catch (error) {
       return [];
     }
@@ -537,19 +550,15 @@ export const staffAPI = {
         }
         return [];
       }
-      
       const user = JSON.parse(clientStorage.getItem('user') || '{}');
       if (user.role === 'family') {
-        const response = await apiClient.get('/users', { params });
-        const allUsers = response.data;
+        const data = await getWithCache<any[]>('/users', params, 30_000);
+        const allUsers = data;
         const staffUsers = allUsers.filter((user: any) => user.role === 'staff');
         return staffUsers;
       }
-      
-      const response = await apiClient.get('/users/by-role', { 
-        params: { role: 'staff', ...params } 
-      });
-      return response.data;
+      const data = await getWithCache<any[]>('/users/by-role', { role: 'staff', ...params }, 30_000);
+      return data as any[];
     } catch (error) {
       return [];
     }
@@ -723,8 +732,8 @@ export const staffAssignmentsAPI = {
 export const activitiesAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.activities, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.activities, params, 20_000);
+      return data as any[];
     } catch (error) {
       return [];
     }
@@ -937,8 +946,8 @@ export const activityParticipationsAPI = {
 export const medicationAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.medications, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.medications, params, 30_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -984,8 +993,8 @@ export const medicationAPI = {
 export const careNotesAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.careNotes, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.careNotes, params, 20_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1019,8 +1028,8 @@ export const careNotesAPI = {
 export const appointmentsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.appointments, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.appointments, params, 20_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1110,8 +1119,8 @@ export const familyMembersAPI = {
 export const roomsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.rooms, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.rooms, params, 60_000);
+      return data as any[];
     } catch (error) {
       return [];
     }
@@ -1119,8 +1128,8 @@ export const roomsAPI = {
 
   getById: async (id: string) => {
     try {
-      const response = await apiClient.get(`${endpoints.rooms}/${id}`);
-      return response.data;
+      const data = await getWithCache<any>(`${endpoints.rooms}/${id}`, undefined, 60_000);
+      return data;
     } catch (error: any) {
       if (error.response?.status === 400 || error.response?.status === 404) {
         return null;
@@ -1160,8 +1169,8 @@ export const roomsAPI = {
 export const transactionsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.transactions, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.transactions, params, 20_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1207,8 +1216,8 @@ export const transactionsAPI = {
 export const reportsAPI = {
   getFinancialReport: async (params?: any) => {
     try {
-      const response = await apiClient.get(`${endpoints.reports}/financial`, { params });
-      return response.data;
+      const data = await getWithCache<any>(`${endpoints.reports}/financial`, params, 20_000);
+      return data;
     } catch (error) {
       throw error;
     }
@@ -1216,8 +1225,8 @@ export const reportsAPI = {
 
   getOccupancyReport: async (params?: any) => {
     try {
-      const response = await apiClient.get(`${endpoints.reports}/occupancy`, { params });
-      return response.data;
+      const data = await getWithCache<any>(`${endpoints.reports}/occupancy`, params, 20_000);
+      return data;
     } catch (error) {
       throw error;
     }
@@ -1245,8 +1254,8 @@ export const reportsAPI = {
 export const notificationsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.notifications, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.notifications, params, 15_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1292,8 +1301,8 @@ export const notificationsAPI = {
 export const permissionsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.permissions, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.permissions, params, 60_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1339,8 +1348,8 @@ export const permissionsAPI = {
 export const servicesAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.services, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.services, params, 60_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1386,8 +1395,8 @@ export const servicesAPI = {
 export const inventoryAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.inventory, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.inventory, params, 60_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1433,8 +1442,8 @@ export const inventoryAPI = {
 export const vitalSignsAPI = {
   getAll: async (params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.vitalSigns, { params });
-      return response.data;
+      const data = await getWithCache<any[]>(endpoints.vitalSigns, params, 15_000);
+      return data as any[];
     } catch (error) {
       throw error;
     }
@@ -1495,38 +1504,29 @@ export const photosAPI = {
         }
         return [];
       }
-      
       const user = JSON.parse(clientStorage.getItem('user') || '{}');
-      
       if (params?.family_member_id && user.role === 'family') {
-        const response = await apiClient.get('/resident-photos', { 
-          params: { family_member_id: params.family_member_id } 
-        });
-        return response.data;
+        const data = await getWithCache<any[]>('/resident-photos', { family_member_id: params.family_member_id }, 30_000);
+        return data as any[];
       }
-      
       if (params?.family_member_id) {
         try {
           const residents = await residentAPI.getByFamilyMemberId(params.family_member_id);
           const residentIds = Array.isArray(residents) ? residents.map(r => r._id) : [residents._id];
-          
           const allPhotos: any[] = [];
           for (const residentId of residentIds) {
             try {
-              const response = await apiClient.get(`/resident-photos/by-resident/${residentId}`);
-              if (response.data && Array.isArray(response.data)) {
-                allPhotos.push(...response.data);
+              const data = await getWithCache<any[]>(`/resident-photos/by-resident/${residentId}`, undefined, 30_000);
+              if (data && Array.isArray(data)) {
+                allPhotos.push(...data);
               }
-            } catch (residentError) {
-            }
+            } catch {}
           }
           return allPhotos;
-        } catch (residentError) {
-        }
+        } catch {}
       }
-
-      const response = await apiClient.get('/resident-photos', { params });
-      return response.data;
+      const data = await getWithCache<any[]>('/resident-photos', params, 30_000);
+      return data as any[];
     } catch (error) {
       return [];
     }

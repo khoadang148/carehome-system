@@ -1583,6 +1583,12 @@ export default function SelectPackagesPage() {
                     const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
                     const residentGender = selectedResident?.gender;
 
+                    if (loadingRooms) {
+                      return (
+                        <div className="text-sm text-indigo-600 m-0 font-medium">Đang tải danh sách phòng...</div>
+                      );
+                    }
+
                     const availableRooms = rooms.filter(r => {
                       if (r.room_type !== roomType || r.status !== 'available') {
                         return false;
@@ -1762,6 +1768,14 @@ export default function SelectPackagesPage() {
                   const availableBedsInRoom = getBedsForRoom(r._id, residentGender);
                   return availableBedsInRoom.length > 0;
                 });
+
+                if (loadingRooms) {
+                  return (
+                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+                      <p className="text-sm text-indigo-600 m-0 font-medium">Đang tải danh sách phòng...</p>
+                    </div>
+                  );
+                }
 
                 if (availableRooms.length === 0) {
                   const genderText = residentGender === 'male' ? 'nam' : residentGender === 'female' ? 'nữ' : '';
