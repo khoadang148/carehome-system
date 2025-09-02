@@ -20,34 +20,14 @@ import {
 import { parseAIRecommendation, ParsedAIRecommendation } from '@/lib/ai-recommendations';
 import { activitiesAPI } from '@/lib/api';
 import NotificationModal from '@/components/NotificationModal';
-import { residentAPI, carePlansAPI, roomsAPI, staffAssignmentsAPI, bedAssignmentsAPI } from '@/lib/api';
+import { residentAPI, staffAssignmentsAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
 import { filterOfficialResidents } from '@/lib/utils/resident-status';
+import { clientStorage } from '@/lib/utils/clientStorage';
 import { validateActivitySchedule, checkScheduleConflict, ActivityParticipation } from '@/lib/utils/validation';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { clientStorage } from '@/lib/utils/clientStorage';
 
-// Simple concurrency limiter
-const withConcurrency = async <T, R>(items: T[], limit: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> => {
-  const results: R[] = new Array(items.length) as R[];
-  let idx = 0;
-  const workers: Promise<void>[] = [];
-  const run = async () => {
-    while (idx < items.length) {
-      const current = idx++;
-      try {
-        results[current] = await worker(items[current], current);
-      } catch (e) {
-        // @ts-ignore
-        results[current] = null;
-      }
-    }
-  };
-  for (let i = 0; i < Math.max(1, limit); i++) workers.push(run());
-  await Promise.all(workers);
-  return results;
-};
 
 export default function AIRecommendationsPage() {
   const router = useRouter();
@@ -67,7 +47,6 @@ export default function AIRecommendationsPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [showResidentDropdown, setShowResidentDropdown] = useState(false);
   const [residentSearchTerm, setResidentSearchTerm] = useState('');
-  const [loadingRoomInfo, setLoadingRoomInfo] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -103,87 +82,35 @@ export default function AIRecommendationsPage() {
   const fetchResidents = async () => {
     try {
       setResidentsLoading(true);
-      // 1) Try cached list for instant display
+      
+      // Tải danh sách residents cơ bản trước (nhanh)
+      // Show cached basic list immediately if available
       try {
-        const cachedRaw = clientStorage.getItem('aiResidentsCache');
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          if (Array.isArray(cached?.data) && cached.data.length > 0) {
-            setResidents(cached.data);
-            setResidentsError(null);
+        const cachedBasicRaw = clientStorage.getItem('aiResidentsBasicCache');
+        if (cachedBasicRaw) {
+          const cachedBasic = JSON.parse(cachedBasicRaw);
+          if (Array.isArray(cachedBasic?.data) && cachedBasic.data.length > 0) {
+            setResidents(cachedBasic.data);
           }
         }
       } catch {}
 
-      // 2) Fetch fresh basic list (residentAPI.getAll has its own short TTL cache)
       const apiData = await residentAPI.getAll();
 
+      // Lọc residents chính thức ngay lập tức
       const basicResidents = apiData.map((r: any) => ({
         id: r._id,
         name: r.full_name || '',
         room: '',
         status: r.status || 'active'
       }));
-
+      
       const officialResidents = await filterOfficialResidents(basicResidents);
-
+      
+      // Hiển thị danh sách cơ bản ngay lập tức
       setResidents(officialResidents);
+      try { clientStorage.setItem('aiResidentsBasicCache', JSON.stringify({ ts: Date.now(), data: officialResidents })); } catch {}
       setResidentsError(null);
-
-      // 3) Background room info with concurrency limit and cache final
-      if (officialResidents.length > 0) {
-        setTimeout(async () => {
-          try {
-            setLoadingRoomInfo(true);
-            const residentsWithRooms = await withConcurrency<typeof officialResidents[number], any>(officialResidents, 6, async (resident) => {
-              let roomNumber = '';
-              try {
-                const residentId = resident.id;
-                try {
-                  const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-                  const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-                  if (bedAssignment?.bed_id?.room_id) {
-                    if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                      roomNumber = bedAssignment.bed_id.room_id.room_number;
-                    } else {
-                      const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                      if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
-                        const roomData = await roomsAPI.getById(roomId);
-                        roomNumber = roomData?.room_number || '';
-                      }
-                    }
-                  } else {
-                    throw new Error('No bed assignment found');
-                  }
-                } catch (bedError) {
-                  const assignments = await carePlansAPI.getByResidentId(residentId);
-                  const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-                  if (assignment?.bed_id?.room_id || assignment?.assigned_room_id) {
-                    const roomId = assignment.bed_id?.room_id || assignment?.assigned_room_id;
-                    const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-                    if (roomIdString && roomIdString !== '[object Object]' && roomIdString !== 'undefined' && roomIdString !== 'null') {
-                      const roomData = await roomsAPI.getById(roomIdString);
-                      roomNumber = roomData?.room_number || '';
-                    }
-                  }
-                }
-              } catch (error) {
-                roomNumber = '';
-              }
-              return { ...resident, room: roomNumber };
-            });
-
-            setResidents(residentsWithRooms);
-            try {
-              clientStorage.setItem('aiResidentsCache', JSON.stringify({ ts: Date.now(), data: residentsWithRooms }));
-            } catch {}
-          } catch (error) {
-            console.log('Không thể tải thông tin phòng:', error);
-          } finally {
-            setLoadingRoomInfo(false);
-          }
-        }, 50);
-      }
       
     } catch (error) {
       setResidentsError('Không thể tải danh sách người cao tuổi. Vui lòng thử lại.');
@@ -298,10 +225,7 @@ export default function AIRecommendationsPage() {
   const filteredResidents = useMemo(() => {
     if (!residentSearchTerm) return residents;
     const searchLower = residentSearchTerm.toLowerCase();
-    return residents.filter(resident => 
-      resident.name.toLowerCase().includes(searchLower) ||
-      (resident.room && resident.room.toLowerCase().includes(searchLower))
-    );
+    return residents.filter(resident => resident.name.toLowerCase().includes(searchLower));
   }, [residents, residentSearchTerm]);
 
   const selectedResidentData = useMemo(() => 
@@ -750,14 +674,9 @@ export default function AIRecommendationsPage() {
                 >
                   <span style={{ color: selectedResident ? '#374151' : '#9ca3af' }}>
                     {selectedResidentData 
-                      ? `${selectedResidentData.name}${selectedResidentData.room && selectedResidentData.room !== '' && selectedResidentData.room !== 'Chưa phân phòng' ? ` - Phòng ${selectedResidentData.room}` : ''}`
+                      ? `${selectedResidentData.name}`
                       : residentsLoading ? 'Đang tải danh sách...' : 'Chọn người cao tuổi...'
                     }
-                    {loadingRoomInfo && !residentsLoading && (
-                      <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: '0.5rem' }}>
-                        (Đang tải thông tin phòng...)
-                      </span>
-                    )}
                   </span>
                   <svg 
                     style={{ 
@@ -797,7 +716,7 @@ export default function AIRecommendationsPage() {
                     }}>
                       <input
                         type="text"
-                        placeholder="Tìm kiếm theo tên hoặc phòng..."
+                        placeholder="Tìm kiếm theo tên..."
                         value={residentSearchTerm}
                         onChange={(e) => setResidentSearchTerm(e.target.value)}
                         style={{
@@ -863,11 +782,6 @@ export default function AIRecommendationsPage() {
                               <div style={{ fontWeight: 500, color: '#374151' }}>
                                 {resident.name}
                               </div>
-                              {resident.room && resident.room !== '' && resident.room !== 'Chưa phân phòng' && (
-                                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                  Phòng {resident.room}
-                                </div>
-                              )}
                             </div>
                             {selectedResident === resident.id && (
                               <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

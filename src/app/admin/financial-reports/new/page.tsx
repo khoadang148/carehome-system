@@ -203,8 +203,6 @@ export default function NewBillPage() {
     const searchTerm = residentSearchTerm.toLowerCase();
     const filtered = residents.filter(r =>
       r?.full_name?.toLowerCase().includes(searchTerm) ||
-      r?.room_number?.toString().includes(searchTerm) ||
-      r?.room?.room_number?.toString().includes(searchTerm) ||
       r?.phone?.includes(searchTerm)
     );
     setFilteredResidents(filtered);
@@ -580,7 +578,7 @@ export default function NewBillPage() {
                     <div className="relative mb-2">
                       <input
                         type="text"
-                        placeholder="Tìm kiếm người cao tuổi theo tên hoặc số phòng..."
+                        placeholder="Tìm kiếm người cao tuổi theo tên..."
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                         value={residentSearchTerm}
                         onChange={(e) => {
@@ -612,11 +610,10 @@ export default function NewBillPage() {
                           <option value="" disabled>Không có người cao tuổi nào</option>
                         )}
                         {(filteredResidents.length > 0 ? filteredResidents : residents).map(r => {
-                          const roomInfo = r?.room_number || r?.room?.room_number || 'Chưa phân phòng';
                           const isNewResident = r?.isNewResident;
                           return (
                             <option key={r?._id} value={r?._id}>
-                              {r?.full_name} - Phòng {roomInfo} {isNewResident ? '(MỚI)' : ''}
+                              {r?.full_name} {isNewResident ? '(MỚI)' : ''}
                             </option>
                           );
                         })}
