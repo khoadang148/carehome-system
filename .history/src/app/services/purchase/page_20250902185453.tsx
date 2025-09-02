@@ -204,19 +204,15 @@ export default function SelectPackagesPage() {
       return shouldShow;
     });
 
-    // Sort the filtered results (stable, cheap comparator)
+    // Sort the filtered results
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          const an = (a.full_name || a.name || '').toLowerCase();
-          const bn = (b.full_name || b.name || '').toLowerCase();
-          if (an < bn) return -1; if (an > bn) return 1; return 0;
+          return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
         case 'age':
           return (b.age || 0) - (a.age || 0);
         case 'gender':
-          const ag = (a.gender || '').toLowerCase();
-          const bg = (b.gender || '').toLowerCase();
-          if (ag < bg) return -1; if (ag > bg) return 1; return 0;
+          return (a.gender || '').localeCompare(b.gender || '');
         default:
           return 0;
       }
@@ -796,8 +792,6 @@ export default function SelectPackagesPage() {
                                       src={r.avatar.startsWith('data:') ? r.avatar : r.avatar}
                                       alt={r.full_name || r.name || 'Avatar'}
                                       className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-md"
-                                      loading="lazy"
-                                      decoding="async"
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';

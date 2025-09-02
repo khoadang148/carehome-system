@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useDeferredValue } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, carePlanAssignmentsAPI, userAPI, apiClient, bedAssignmentsAPI } from '@/lib/api';
@@ -24,6 +24,7 @@ export default function SelectPackagesPage() {
   const [selectedResidentId, setSelectedResidentId] = useState<string>('');
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
@@ -71,9 +72,8 @@ export default function SelectPackagesPage() {
   const [loadingExistingInfo, setLoadingExistingInfo] = useState(false);
 
   const isInitialLoading = useMemo(() => {
-    // Render immediately once core lists are available; fetch assignment status in background
-    return !residents.length || !carePlans.length;
-  }, [residents, carePlans]);
+    return !residents.length || !carePlans.length || loadingAssignmentStatus;
+  }, [residents, carePlans, loadingAssignmentStatus]);
 
   useEffect(() => {
     if (startDate && registrationPeriod) {
@@ -88,6 +88,15 @@ export default function SelectPackagesPage() {
 
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
+
+  // Defer heavy resident list updates for smoother typing
+  const deferredResidents = useDeferredValue(residents);
+
+  // Debounce search input to avoid frequent recomputations
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(id);
+  }, [searchTerm]);
 
   // Function to fetch existing room and bed information
   const fetchExistingRoomBedInfo = async (residentId: string) => {
@@ -174,14 +183,14 @@ export default function SelectPackagesPage() {
 
   const filteredAndSortedResidents = useMemo(() => {
     // Always filter by active status first for immediate display
-    let filtered = residents.filter(resident => {
+    let filtered = deferredResidents.filter(resident => {
       // Chỉ hiển thị resident có status active
       if (resident.status !== 'active') {
           return false;
         }
 
         const name = (resident.full_name || resident.name || '').toLowerCase();
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = debouncedSearchTerm.toLowerCase();
         const matchesSearch = name.includes(searchLower);
 
       if (!matchesSearch) {
@@ -204,26 +213,22 @@ export default function SelectPackagesPage() {
       return shouldShow;
     });
 
-    // Sort the filtered results (stable, cheap comparator)
+    // Sort the filtered results
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          const an = (a.full_name || a.name || '').toLowerCase();
-          const bn = (b.full_name || b.name || '').toLowerCase();
-          if (an < bn) return -1; if (an > bn) return 1; return 0;
+          return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
         case 'age':
           return (b.age || 0) - (a.age || 0);
         case 'gender':
-          const ag = (a.gender || '').toLowerCase();
-          const bg = (b.gender || '').toLowerCase();
-          if (ag < bg) return -1; if (ag > bg) return 1; return 0;
+          return (a.gender || '').localeCompare(b.gender || '');
         default:
           return 0;
       }
     });
 
     return filtered;
-  }, [residents, searchTerm, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
+  }, [deferredResidents, debouncedSearchTerm, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
 
   const totalPages = Math.ceil(filteredAndSortedResidents.length / itemsPerPage);
   const paginatedResidents = filteredAndSortedResidents.slice(
@@ -286,8 +291,7 @@ export default function SelectPackagesPage() {
     // Use cached data first for instant display
     if (residentsData && Array.isArray(residentsData) && residentsData.length > 0) {
       setResidents(residentsData);
-    } else if (!residents.length) {
-      // Kick off fetch, but avoid state thrash; fall back to empty quickly
+        } else {
       fetchResidents()
         .then((data) => {
           const next = Array.isArray(data) ? data : [];
@@ -295,7 +299,7 @@ export default function SelectPackagesPage() {
         })
         .catch(() => setResidents([]));
     }
-  }, [user, residentId, residentsData, residents.length]);
+  }, [user, residentId, residentsData, residents.length]); // Remove fetchResidents dependency
 
   // Optimized room types loading - prioritize cached data
   const { data: roomTypesData, refetch: fetchRoomTypes } = useOptimizedRoomTypes();
@@ -796,8 +800,6 @@ export default function SelectPackagesPage() {
                                       src={r.avatar.startsWith('data:') ? r.avatar : r.avatar}
                                       alt={r.full_name || r.name || 'Avatar'}
                                       className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-md"
-                                      loading="lazy"
-                                      decoding="async"
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';

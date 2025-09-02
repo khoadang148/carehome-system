@@ -179,7 +179,7 @@ export default function AddResidentPage() {
       allergies: [],
       family_account_type: 'new'
     },
-    mode: 'onChange'
+    mode: 'onBlur'
   });
 
   const familyAccountType = watch('family_account_type');
@@ -697,22 +697,21 @@ export default function AddResidentPage() {
                       required: 'Ngày sinh là bắt buộc',
                       validate: (value) => {
                         if (!value) return 'Ngày sinh là bắt buộc';
-                        const displayVal = formatDateToDisplay(value);
-                        const base = validateDate(displayVal, 'Ngày sinh');
-                        if (base !== true) return base;
-                        const isoVal = value.includes('/') ? formatDateToISO(value) : value;
-                        return validateAge(isoVal);
+                        const formattedValue = formatDateToDisplay(value);
+                        return validateDate(formattedValue, 'Ngày sinh');
                       },
                       onChange: (e) => {
                         const formattedDate = formatDateToISO(e.target.value);
-                        setValue('date_of_birth', formattedDate, { shouldValidate: true });
+                        setValue('date_of_birth', formattedDate);
                       },
                       onBlur: (e) => {
+                       
                         const dateValidation = validateDate(e.target.value, 'Ngày sinh');
                         if (dateValidation !== true) {
                           setValue('date_of_birth', '', { shouldValidate: true });
                           return;
                         }
+                        
                         const formattedDate = formatDateToISO(e.target.value);
                         if (formattedDate) {
                           setValue('date_of_birth', formattedDate, { shouldValidate: true });
