@@ -1129,7 +1129,7 @@ export default function NewStaffAssignmentPage() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-semibold text-green-900">{resident.full_name}</p>
-                                   
+    
                                   </div>
                                 </div>
                                 <button

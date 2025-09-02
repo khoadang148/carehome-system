@@ -106,7 +106,6 @@ export default function ActivitiesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activityParticipantCounts, setActivityParticipantCounts] = useState<{[id: string]: number}>({});
-  const [loadingCounts, setLoadingCounts] = useState(false);
   
   // Fetch activities from API
   useEffect(() => {
@@ -321,67 +320,60 @@ export default function ActivitiesPage() {
   // Fetch participant counts for each activity
   useEffect(() => {
     const fetchCounts = async () => {
-      if (activities.length === 0) return;
-      
-      setLoadingCounts(true);
       const counts: {[id: string]: number} = {};
-      
-      try {
-        await Promise.all(activities.map(async (activity) => {
-          if (!activity.id || !activity.date) return;
+      await Promise.all(activities.map(async (activity) => {
+        if (!activity.id || !activity.date) return;
+        try {
+          const participations = await activityParticipationsAPI.getAll({
+            activity_id: activity.id
+          });
           
-          try {
-            const participations = await activityParticipationsAPI.getAll({
-              activity_id: activity.id
-            });
+          // Lọc participations cho hoạt động này và đúng ngày
+          const filtered = participations.filter((p: any) => {
+            const participationActivityId = p.activity_id?._id || p.activity_id;
+            const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
+            return participationActivityId === activity.id && participationDate === activity.date;
+          });
+          
+          // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
+          const joined = filtered.reduce((acc: any[], current: any) => {
+            const residentId = current.resident_id?._id || current.resident_id;
+            const existingIndex = acc.findIndex(item => 
+              (item.resident_id?._id || item.resident_id) === residentId
+            );
             
-            // Lọc participations cho hoạt động này và đúng ngày
-            const filtered = participations.filter((p: any) => {
-              const participationActivityId = p.activity_id?._id || p.activity_id;
-              const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
-              return participationActivityId === activity.id && participationDate === activity.date;
-            });
-            
-            // Loại bỏ trùng lặp - chỉ lấy bản ghi mới nhất cho mỗi resident
-            const joined = filtered.reduce((acc: any[], current: any) => {
-              const residentId = current.resident_id?._id || current.resident_id;
-              const existingIndex = acc.findIndex(item => 
-                (item.resident_id?._id || item.resident_id) === residentId
-              );
+            if (existingIndex === -1) {
+              // Chưa có, thêm vào
+              acc.push(current);
+            } else {
+              // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
+              const existing = acc[existingIndex];
+              const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+              const currentTime = new Date(current.updated_at || current.created_at || 0);
               
-              if (existingIndex === -1) {
-                // Chưa có, thêm vào
-                acc.push(current);
-              } else {
-                // Đã có, so sánh thời gian cập nhật và lấy bản mới nhất
-                const existing = acc[existingIndex];
-                const existingTime = new Date(existing.updated_at || existing.created_at || 0);
-                const currentTime = new Date(current.updated_at || current.created_at || 0);
-                
-                if (currentTime > existingTime) {
-                  acc[existingIndex] = current;
-                }
+              if (currentTime > existingTime) {
+                acc[existingIndex] = current;
               }
-              return acc;
-            }, []);
-            
-            counts[activity.id] = joined.length;
-          } catch (error) {
-            console.error(`Error fetching participations for activity ${activity.id}:`, error);
-            counts[activity.id] = 0;
-          }
-        }));
-        
-        setActivityParticipantCounts(counts);
-      } catch (error) {
-        console.error('Error fetching participant counts:', error);
-      } finally {
-        setLoadingCounts(false);
-      }
+            }
+            return acc;
+          }, []);
+          
+          console.log(`Activity ${activity.name} (${activity.id}):`, {
+            totalParticipations: participations.length,
+            filteredParticipations: joined.length,
+            activityDate: activity.date
+          });
+          
+          counts[activity.id] = joined.length;
+        } catch (error) {
+          console.error(`Error fetching participations for activity ${activity.id}:`, error);
+          counts[activity.id] = 0;
+        }
+      }));
+      setActivityParticipantCounts(counts);
     };
-    
-    fetchCounts();
-  }, [activities]);
+    if (activities.length > 0) fetchCounts();
+  }, [activities.length]); // Chỉ dependency vào length thay vì toàn bộ array
 
   // Loading state
   if (loading) {
@@ -1242,34 +1234,7 @@ export default function ActivitiesPage() {
                       </div>
                     </div>
                     
-                    {/* Participants */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.75rem',
-                      background: '#fef3c7',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #fde68a'
-                    }}>
-                      <div style={{
-                        width: '2rem',
-                        height: '2rem',
-                        borderRadius: '50%',
-                        background: '#f59e0b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <UserGroupIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Số lượng người cao tuổi tham gia:</div>
-                        <div style={{ color: '#111827', fontWeight: 600, fontSize: '0.875rem' }}>
-                          {loadingCounts ? '...' : (activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
-                        </div>
-                      </div>
-                    </div>
+                  
                   </div>
 
                   {/* Actions */}
