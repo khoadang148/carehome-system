@@ -393,13 +393,7 @@ export default function PhotoGalleryPage() {
                 onClick={() => handlePhotoClick(photo)}
                 className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 cursor-pointer transition transform hover:-translate-y-1 hover:shadow-xl"
               >
-                <img 
-                  src={getPhotoUrl(photo)} 
-                  alt={photo.caption} 
-                  key={`${photo._id}-${photo.updated_at || photo.created_at}`}
-                  className="h-[200px] w-full object-cover block" 
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }} 
-                />
+                <img src={getPhotoUrl(photo)} alt={photo.caption} className="h-[200px] w-full object-cover block" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }} />
 
                 <div className="p-4">
                   <div className="grid [grid-template-columns:max-content_1fr] gap-x-4 gap-y-1 items-center mb-3 border-b border-slate-100 pb-2">
@@ -465,7 +459,6 @@ export default function PhotoGalleryPage() {
                 <img
                   src={getPhotoUrl(selectedPhoto)}
                   alt={selectedPhoto.caption}
-                  key={`${selectedPhoto._id}-${selectedPhoto.updated_at || selectedPhoto.created_at}`}
                   className="w-full h-[400px] object-cover block"
                   onError={e => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }}
                 />

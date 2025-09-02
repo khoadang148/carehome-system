@@ -1740,7 +1740,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                                   <ClockIcon style={{ width: '1rem', height: '1rem' }} />
                                   {!isActivityTimeReached() && isActivityToday() ? 'Chưa đến giờ đánh giá' :
                                    evaluation.status === 'attended' ? 'Đã tham gia' :
-                                    evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
+                                   evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
                                 </div>
                               )}
                             </div>

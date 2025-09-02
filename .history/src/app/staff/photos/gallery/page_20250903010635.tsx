@@ -465,7 +465,6 @@ export default function PhotoGalleryPage() {
                 <img
                   src={getPhotoUrl(selectedPhoto)}
                   alt={selectedPhoto.caption}
-                  key={`${selectedPhoto._id}-${selectedPhoto.updated_at || selectedPhoto.created_at}`}
                   className="w-full h-[400px] object-cover block"
                   onError={e => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }}
                 />

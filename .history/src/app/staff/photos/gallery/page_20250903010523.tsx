@@ -55,6 +55,7 @@ export default function PhotoGalleryPage() {
   const [activityTypes, setActivityTypes] = useState<string[]>([]);
   const [staffs, setStaffs] = useState<Array<any>>([]);
   const [roomNumbers, setRoomNumbers] = useState<{ [residentId: string]: string }>({});
+  const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
 
   // Load photos from API
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function PhotoGalleryPage() {
       }
     };
     fetchPhotos();
-  }, [filterResident, filterActivityType, filterDateRange]);
+  }, [filterResident, filterActivityType, filterDateRange, photoRefreshKey]);
 
   // Load residents from API cho dropdown filter - chỉ lấy những resident đã hoàn tất đăng ký
   useEffect(() => {
@@ -267,10 +268,13 @@ export default function PhotoGalleryPage() {
   const getPhotoUrl = (photo: any) => {
     if (!photo || !photo.file_path) return '/window.svg';
     if (photo.file_path.startsWith('http')) return photo.file_path;
-    
-    // Thêm version từ photo data để tránh cache
-    const version = photo.updated_at || photo.created_at || Date.now();
-    return `${photosAPI.getPhotoUrl(photo.file_path)}?v=${version}`;
+    // Thêm cache busting để đảm bảo ảnh được cập nhật
+    const baseUrl = photosAPI.getPhotoUrl(photo.file_path);
+    return baseUrl;
+  };
+
+  const refreshPhotos = () => {
+    setPhotoRefreshKey(prev => prev + 1);
   };
 
   const getResidentNameByResidentId = (residentId: string | { _id: string, full_name: string, date_of_birth: string, gender: string } | null) => {
@@ -354,14 +358,23 @@ export default function PhotoGalleryPage() {
 
             <div className="flex items-center justify-between text-gray-500 text-sm">
               <span>Hiển thị {sortedPhotos.length} / {photos.length} ảnh</span>
-              {user?.role !== 'family' && (
+              <div className="flex gap-2">
                 <button
-                  onClick={() => router.push('/staff/photos')}
-                  className="px-4 py-2 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-md text-sm font-semibold"
+                  onClick={refreshPhotos}
+                  className="px-3 py-2 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-md text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all"
+                  title="Làm mới ảnh"
                 >
-                  + Đăng ảnh mới
+                  🔄 Làm mới
                 </button>
-              )}
+                {user?.role !== 'family' && (
+                  <button
+                    onClick={() => router.push('/staff/photos')}
+                    className="px-4 py-2 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-md text-sm font-semibold"
+                  >
+                    + Đăng ảnh mới
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -396,9 +409,9 @@ export default function PhotoGalleryPage() {
                 <img 
                   src={getPhotoUrl(photo)} 
                   alt={photo.caption} 
-                  key={`${photo._id}-${photo.updated_at || photo.created_at}`}
                   className="h-[200px] w-full object-cover block" 
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }} 
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }}
+                  key={`${photo._id}-${photoRefreshKey}`}
                 />
 
                 <div className="p-4">
@@ -465,7 +478,6 @@ export default function PhotoGalleryPage() {
                 <img
                   src={getPhotoUrl(selectedPhoto)}
                   alt={selectedPhoto.caption}
-                  key={`${selectedPhoto._id}-${selectedPhoto.updated_at || selectedPhoto.created_at}`}
                   className="w-full h-[400px] object-cover block"
                   onError={e => { (e.currentTarget as HTMLImageElement).src = '/window.svg'; }}
                 />
