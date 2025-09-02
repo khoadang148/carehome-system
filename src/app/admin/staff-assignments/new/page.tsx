@@ -876,9 +876,7 @@ export default function NewStaffAssignmentPage() {
                                         <p className={`font-semibold text-lg ${isSelected ? 'text-green-900' : 'text-gray-900'}`}>
                                           {resident.full_name}
                                         </p>
-                                        <p className={`text-sm ${isSelected ? 'text-green-700' : 'text-gray-500'}`}>
-                                          Đã hoàn tất đăng kí dịch vụ
-                                        </p>
+                                        
                                         {formData.staff_id && getAssignmentStatus(resident._id) === 'active' && (
                                           <p className="text-xs text-red-600 font-medium mt-1">
                                             ⚠️ Đã được phân công cho nhân viên này

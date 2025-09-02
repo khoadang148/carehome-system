@@ -794,7 +794,19 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     setUpdatingData(true);
     try {
       const staffAssignments = await staffAssignmentsAPI.getByStaff(selectedStaffId);
-      const assignedResidentIds = staffAssignments.map((assignment: any) => assignment.resident_id?._id || assignment.resident_id);
+      // Chỉ lấy resident có assignment còn hiệu lực (không hết hạn)
+      const validAssignments = staffAssignments.filter((assignment: any) => {
+        // Kiểm tra assignment còn hiệu lực
+        if (assignment.status === 'expired') return false;
+        if (assignment.end_date) {
+          const endDate = new Date(assignment.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (endDate < today) return false;
+        }
+        return true;
+      });
+      const assignedResidentIds = validAssignments.map((assignment: any) => assignment.resident_id?._id || assignment.resident_id);
 
       const currentActivityParticipations = participations.filter(p => {
         const participationActivityId = p.activity_id?._id || p.activity_id;
