@@ -95,7 +95,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     const fetchStaffList = async () => {
       try {
         const users = await staffAPI.getAll();
-        const staff = users.filter((u: any) => u.role === 'staff' && typeof u._id === 'string' && u._id.length === 24);
+        const staff = users.filter((u: any) => 
+          u.role === 'staff' && 
+          u.status === 'active' && 
+          typeof u._id === 'string' && 
+          u._id.length === 24
+        );
         const uniqueStaff = Array.from(
           new Map(staff.map((u: any) => [u._id, u])).values()
         );

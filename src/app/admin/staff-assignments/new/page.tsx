@@ -1129,7 +1129,7 @@ export default function NewStaffAssignmentPage() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-semibold text-green-900">{resident.full_name}</p>
-                                    <p className="text-xs text-green-700">Đã hoàn tất đăng kí dịch vụ</p>
+                                   
                                   </div>
                                 </div>
                                 <button
