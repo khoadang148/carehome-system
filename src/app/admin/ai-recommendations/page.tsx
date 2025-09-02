@@ -22,7 +22,6 @@ import { activitiesAPI } from '@/lib/api';
 import NotificationModal from '@/components/NotificationModal';
 import { residentAPI, staffAssignmentsAPI } from '@/lib/api';
 import { activityParticipationsAPI } from '@/lib/api';
-import { filterOfficialResidents } from '@/lib/utils/resident-status';
 import { clientStorage } from '@/lib/utils/clientStorage';
 import { validateActivitySchedule, checkScheduleConflict, ActivityParticipation } from '@/lib/utils/validation';
 import DatePicker from 'react-datepicker';
@@ -97,7 +96,7 @@ export default function AIRecommendationsPage() {
 
       const apiData = await residentAPI.getAll();
 
-      // Lọc residents chính thức ngay lập tức
+      // Rút gọn dữ liệu và lọc nhanh theo trạng thái active
       const basicResidents = apiData.map((r: any) => ({
         id: r._id,
         name: r.full_name || '',
@@ -105,11 +104,11 @@ export default function AIRecommendationsPage() {
         status: r.status || 'active'
       }));
       
-      const officialResidents = await filterOfficialResidents(basicResidents);
+      const activeResidents = basicResidents.filter((r: any) => String(r.status || '').toLowerCase() === 'active');
       
       // Hiển thị danh sách cơ bản ngay lập tức
-      setResidents(officialResidents);
-      try { clientStorage.setItem('aiResidentsBasicCache', JSON.stringify({ ts: Date.now(), data: officialResidents })); } catch {}
+      setResidents(activeResidents);
+      try { clientStorage.setItem('aiResidentsBasicCache', JSON.stringify({ ts: Date.now(), data: activeResidents })); } catch {}
       setResidentsError(null);
       
     } catch (error) {
