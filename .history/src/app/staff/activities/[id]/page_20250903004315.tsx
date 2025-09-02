@@ -1945,16 +1945,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           <div className="fixed inset-0 bg-black opacity-30" />
           <Dialog.Panel className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
             <Dialog.Title className="text-lg font-bold mb-4">Chọn người cao tuổi để thêm vào hoạt động</Dialog.Title>
-            {isActivityDatePassed() && (
-              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm">
-                ⚠️ Hoạt động đã qua ngày, không thể thay đổi danh sách tham gia.
-              </div>
-            )}
             <select
               value={selectedResidentId || ''}
               onChange={e => setSelectedResidentId(e.target.value)}
               className="w-full border rounded px-3 py-2 mb-4"
-              disabled={isActivityDatePassed()}
             >
               <option value="">-- Chọn người cao tuổi --</option>
               {residentsNotJoined.map((r: any) => (

@@ -1954,7 +1954,6 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               value={selectedResidentId || ''}
               onChange={e => setSelectedResidentId(e.target.value)}
               className="w-full border rounded px-3 py-2 mb-4"
-              disabled={isActivityDatePassed()}
             >
               <option value="">-- Chọn người cao tuổi --</option>
               {residentsNotJoined.map((r: any) => (
