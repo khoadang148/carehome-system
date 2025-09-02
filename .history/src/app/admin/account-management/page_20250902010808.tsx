@@ -345,7 +345,7 @@ export default function AccountManagementPage() {
         >
           {user.avatar ? (
             <img
-              src={user.avatar.startsWith('http') ? user.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com'}/${user.avatar}`}
+              src={user.avatar.startsWith('http') ? user.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${user.avatar}`}
               alt={user.full_name}
               style={{
                 width: '100%',
@@ -477,7 +477,7 @@ export default function AccountManagementPage() {
         >
           {account.avatar ? (
             <img
-              src={account.avatar.startsWith('http') ? account.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com'}/${account.avatar}`}
+              src={account.avatar.startsWith('http') ? account.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${account.avatar}`}
               alt={account.full_name}
               style={{
                 width: '100%',
@@ -2079,7 +2079,7 @@ export default function AccountManagementPage() {
             }}>
               {selectedAccount.avatar ? (
                 <img
-                  src={selectedAccount.avatar.startsWith('http') ? selectedAccount.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com'}/${selectedAccount.avatar}`}
+                  src={selectedAccount.avatar.startsWith('http') ? selectedAccount.avatar : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/${selectedAccount.avatar}`}
                   alt={selectedAccount.full_name}
                   style={{
                     width: '100%',

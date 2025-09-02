@@ -108,7 +108,7 @@ interface ChatProviderProps {
   children: ReactNode;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export function ChatProvider({ children }: ChatProviderProps) {
   const { user } = useAuth();

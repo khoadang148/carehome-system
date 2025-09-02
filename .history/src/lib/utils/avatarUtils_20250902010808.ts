@@ -4,7 +4,7 @@
 // 2. Mobile app paths: "file:///var/mobile/Containers/..."
 // 3. Full URLs: "http://example.com/image.jpg"
 
-const API_BASE_URL = 'https://sep490-be-xniz.onrender.com';
+const API_BASE_URL = 'http://localhost:8000';
 
 export const processAvatarUrl = (avatarPath: string): string => {
   if (!avatarPath) return '/default-avatar.svg';
