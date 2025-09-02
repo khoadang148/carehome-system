@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, carePlanAssignmentsAPI, userAPI, apiClient, bedAssignmentsAPI } from '@/lib/api';
-import { clientStorage } from '@/lib/utils/clientStorage';
 import { useOptimizedCarePlansAll, useOptimizedResidentsByRole, useOptimizedRooms, useOptimizedBeds, useOptimizedRoomTypes, useResidentsAssignmentStatus } from '@/hooks/useOptimizedData';
 import { ArrowLeftIcon, CheckCircleIcon, UserIcon, MagnifyingGlassIcon, FunnelIcon, CalendarIcon, PhoneIcon, MapPinIcon, GiftIcon, PlusIcon } from '@heroicons/react/24/outline';
 import DatePicker from 'react-datepicker';
@@ -72,6 +71,7 @@ export default function SelectPackagesPage() {
   const [loadingExistingInfo, setLoadingExistingInfo] = useState(false);
 
   const isInitialLoading = useMemo(() => {
+    // Render immediately once core lists are available; fetch assignment status in background
     return !residents.length || !carePlans.length;
   }, [residents, carePlans]);
 
@@ -85,49 +85,6 @@ export default function SelectPackagesPage() {
   }, [startDate, registrationPeriod]);
 
   const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
-
-  // Load cached assignment status immediately for instant display (with TTL)
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('assignmentStatusCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        const now = Date.now();
-        const ttlMs = 5 * 60 * 1000; // 5 minutes
-        if (cached && typeof cached === 'object') {
-          if (cached.ts && cached.data && (now - cached.ts) < ttlMs) {
-            setResidentsWithAssignmentStatus(cached.data);
-          }
-        }
-      }
-    } catch {}
-  }, []);
-
-  // Server-side cached fetch as a fast path (keeps logic unchanged)
-  useEffect(() => {
-    const run = async () => {
-      const ids = (residents || []).map(r => r._id || r.id).filter(Boolean);
-      if (!ids.length) return;
-      try {
-        const res = await fetch('/api/assignment-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ residentIds: ids }),
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        const map = json?.data || {};
-        if (map && Object.keys(map).length > 0) {
-          setResidentsWithAssignmentStatus((prev) => ({ ...prev, ...map }));
-          try {
-            clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: { ...map } }));
-          } catch {}
-        }
-      } catch {}
-    };
-    run();
-  }, [residents]);
 
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
@@ -212,9 +169,6 @@ export default function SelectPackagesPage() {
     if (assignmentMap && Object.keys(assignmentMap).length > 0) {
       // Immediately update the residents list to hide those with active assignments
       setResidentsWithAssignmentStatus(assignmentMap);
-      try {
-        clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: assignmentMap }));
-      } catch {}
     }
   }, [assignmentMap]);
 
@@ -250,15 +204,19 @@ export default function SelectPackagesPage() {
       return shouldShow;
     });
 
-    // Sort the filtered results
+    // Sort the filtered results (stable, cheap comparator)
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
+          const an = (a.full_name || a.name || '').toLowerCase();
+          const bn = (b.full_name || b.name || '').toLowerCase();
+          if (an < bn) return -1; if (an > bn) return 1; return 0;
         case 'age':
           return (b.age || 0) - (a.age || 0);
         case 'gender':
-          return (a.gender || '').localeCompare(b.gender || '');
+          const ag = (a.gender || '').toLowerCase();
+          const bg = (b.gender || '').toLowerCase();
+          if (ag < bg) return -1; if (ag > bg) return 1; return 0;
         default:
           return 0;
       }
@@ -296,7 +254,7 @@ export default function SelectPackagesPage() {
   }, [user, router]);
 
   // Optimized care plans loading - prioritize cached data
-  const { data: carePlansData, refetch: fetchCarePlans } = useOptimizedCarePlansAll();
+  const { data: carePlansData, refetch: fetchCarePlans } = useOptimizedCarePlansAll({ enabled: true });
   useEffect(() => {
     // Use cached data first for instant display
     if (carePlansData && Array.isArray(carePlansData) && carePlansData.length > 0) {
@@ -316,7 +274,7 @@ export default function SelectPackagesPage() {
   }, [carePlansData, carePlans.length]); // Remove fetchCarePlans dependency
 
   // Optimized residents loading - prioritize cached data
-  const { data: residentsData, refetch: fetchResidents } = useOptimizedResidentsByRole(user?.role, user?.id);
+  const { data: residentsData, refetch: fetchResidents } = useOptimizedResidentsByRole(user?.role, user?.id, { enabled: true });
   useEffect(() => {
     if (!user) return;
     if (residentId) {
@@ -328,7 +286,8 @@ export default function SelectPackagesPage() {
     // Use cached data first for instant display
     if (residentsData && Array.isArray(residentsData) && residentsData.length > 0) {
       setResidents(residentsData);
-        } else {
+    } else if (!residents.length) {
+      // Kick off fetch, but avoid state thrash; fall back to empty quickly
       fetchResidents()
         .then((data) => {
           const next = Array.isArray(data) ? data : [];
@@ -336,10 +295,10 @@ export default function SelectPackagesPage() {
         })
         .catch(() => setResidents([]));
     }
-  }, [user, residentId, residentsData, residents.length]); // Remove fetchResidents dependency
+  }, [user, residentId, residentsData, residents.length]);
 
   // Optimized room types loading - prioritize cached data
-  const { data: roomTypesData, refetch: fetchRoomTypes } = useOptimizedRoomTypes();
+  const { data: roomTypesData, refetch: fetchRoomTypes } = useOptimizedRoomTypes({ enabled: step >= 3 });
   useEffect(() => {
     // Use cached data first for instant display
     if (roomTypesData && Array.isArray(roomTypesData) && roomTypesData.length > 0) {
@@ -358,7 +317,7 @@ export default function SelectPackagesPage() {
   }, [roomTypesData, roomTypes.length]); // Remove fetchRoomTypes dependency
 
   // Optimized rooms loading - prioritize cached data
-  const { data: roomsData, refetch: fetchRooms } = useOptimizedRooms();
+  const { data: roomsData, refetch: fetchRooms } = useOptimizedRooms({ enabled: step >= 4 || (step >= 3 && !!roomType) });
   useEffect(() => {
     // Use cached data first for instant display
     if (roomsData && Array.isArray(roomsData) && roomsData.length > 0) {
@@ -377,7 +336,7 @@ export default function SelectPackagesPage() {
   }, [roomsData, rooms.length]); // Remove fetchRooms dependency
 
   // Optimized beds loading - prioritize cached data
-  const { data: bedsData, refetch: fetchBeds } = useOptimizedBeds();
+  const { data: bedsData, refetch: fetchBeds } = useOptimizedBeds({ enabled: step >= 5 && !!selectedRoomId });
   useEffect(() => {
     // Use cached data first for instant display
     if (bedsData && Array.isArray(bedsData) && bedsData.length > 0) {
@@ -837,6 +796,8 @@ export default function SelectPackagesPage() {
                                       src={r.avatar.startsWith('data:') ? r.avatar : r.avatar}
                                       alt={r.full_name || r.name || 'Avatar'}
                                       className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-md"
+                                      loading="lazy"
+                                      decoding="async"
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';

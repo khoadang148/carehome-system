@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, carePlanAssignmentsAPI, userAPI, apiClient, bedAssignmentsAPI } from '@/lib/api';
-import { clientStorage } from '@/lib/utils/clientStorage';
 import { useOptimizedCarePlansAll, useOptimizedResidentsByRole, useOptimizedRooms, useOptimizedBeds, useOptimizedRoomTypes, useResidentsAssignmentStatus } from '@/hooks/useOptimizedData';
 import { ArrowLeftIcon, CheckCircleIcon, UserIcon, MagnifyingGlassIcon, FunnelIcon, CalendarIcon, PhoneIcon, MapPinIcon, GiftIcon, PlusIcon } from '@heroicons/react/24/outline';
 import DatePicker from 'react-datepicker';
@@ -72,8 +71,8 @@ export default function SelectPackagesPage() {
   const [loadingExistingInfo, setLoadingExistingInfo] = useState(false);
 
   const isInitialLoading = useMemo(() => {
-    return !residents.length || !carePlans.length;
-  }, [residents, carePlans]);
+    return !residents.length || !carePlans.length || loadingAssignmentStatus;
+  }, [residents, carePlans, loadingAssignmentStatus]);
 
   useEffect(() => {
     if (startDate && registrationPeriod) {
@@ -84,50 +83,33 @@ export default function SelectPackagesPage() {
     }
   }, [startDate, registrationPeriod]);
 
-  const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
+  // Fetch assignment status only for the current page to reduce load and speed up initial render
+  const baseFilteredResidents = useMemo(() => {
+    return residents.filter(resident => {
+      if (resident.status !== 'active') return false;
+      const name = (resident.full_name || resident.name || '').toLowerCase();
+      const searchLower = searchTerm.toLowerCase();
+      return name.includes(searchLower);
+    });
+  }, [residents, searchTerm]);
 
-  // Load cached assignment status immediately for instant display (with TTL)
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('assignmentStatusCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        const now = Date.now();
-        const ttlMs = 5 * 60 * 1000; // 5 minutes
-        if (cached && typeof cached === 'object') {
-          if (cached.ts && cached.data && (now - cached.ts) < ttlMs) {
-            setResidentsWithAssignmentStatus(cached.data);
-          }
-        }
+  const pageSliceResidents = useMemo(() => {
+    const sorted = [...baseFilteredResidents].sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
+        case 'age':
+          return (b.age || 0) - (a.age || 0);
+        case 'gender':
+          return (a.gender || '').localeCompare(b.gender || '');
+        default:
+          return 0;
       }
-    } catch {}
-  }, []);
+    });
+    return sorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [baseFilteredResidents, sortBy, currentPage, itemsPerPage]);
 
-  // Server-side cached fetch as a fast path (keeps logic unchanged)
-  useEffect(() => {
-    const run = async () => {
-      const ids = (residents || []).map(r => r._id || r.id).filter(Boolean);
-      if (!ids.length) return;
-      try {
-        const res = await fetch('/api/assignment-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ residentIds: ids }),
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        const map = json?.data || {};
-        if (map && Object.keys(map).length > 0) {
-          setResidentsWithAssignmentStatus((prev) => ({ ...prev, ...map }));
-          try {
-            clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: { ...map } }));
-          } catch {}
-        }
-      } catch {}
-    };
-    run();
-  }, [residents]);
+  const { data: assignmentMap, loading: assignmentsLoading } = useResidentsAssignmentStatus(pageSliceResidents);
 
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
@@ -209,49 +191,31 @@ export default function SelectPackagesPage() {
 
   // Effect to immediately update display when assignment status changes
   useEffect(() => {
+    setLoadingAssignmentStatus(Boolean(assignmentsLoading));
+  }, [assignmentsLoading]);
+
+  useEffect(() => {
     if (assignmentMap && Object.keys(assignmentMap).length > 0) {
-      // Immediately update the residents list to hide those with active assignments
-      setResidentsWithAssignmentStatus(assignmentMap);
-      try {
-        clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: assignmentMap }));
-      } catch {}
+      setResidentsWithAssignmentStatus(prev => ({ ...prev, ...assignmentMap }));
     }
   }, [assignmentMap]);
 
   const filteredAndSortedResidents = useMemo(() => {
-    // Always filter by active status first for immediate display
-    let filtered = residents.filter(resident => {
-      // Chỉ hiển thị resident có status active
-      if (resident.status !== 'active') {
-          return false;
-        }
+    // Start from base filtered list for immediate responsiveness
+    let filtered = baseFilteredResidents;
 
-        const name = (resident.full_name || resident.name || '').toLowerCase();
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch = name.includes(searchLower);
-
-      if (!matchesSearch) {
-        return false;
-      }
-
-      // If assignment status is still loading, show all active residents
-      // They will be filtered further when status is available
-      if (loadingAssignmentStatus) {
-        return true;
-      }
-
-      // Apply assignment status filtering when available
-      const residentId = resident._id || resident.id;
-      const assignmentStatus = residentsWithAssignmentStatus[residentId];
-      
-      // Show residents who either don't have assignments or have expired ones
-      const shouldShow = !assignmentStatus?.hasAssignment || assignmentStatus?.isExpired;
-      
-      return shouldShow;
-    });
+    // If we already have some assignment statuses, apply them incrementally
+    if (!loadingAssignmentStatus && Object.keys(residentsWithAssignmentStatus).length > 0) {
+      filtered = filtered.filter(resident => {
+        const residentId = resident._id || resident.id;
+        const assignmentStatus = residentsWithAssignmentStatus[residentId];
+        if (!assignmentStatus) return true; // not yet loaded, keep for now
+        return !assignmentStatus.hasAssignment || assignmentStatus.isExpired;
+      });
+    }
 
     // Sort the filtered results
-    filtered.sort((a, b) => {
+    filtered = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'name':
           return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
@@ -265,7 +229,7 @@ export default function SelectPackagesPage() {
     });
 
     return filtered;
-  }, [residents, searchTerm, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
+  }, [baseFilteredResidents, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
 
   const totalPages = Math.ceil(filteredAndSortedResidents.length / itemsPerPage);
   const paginatedResidents = filteredAndSortedResidents.slice(

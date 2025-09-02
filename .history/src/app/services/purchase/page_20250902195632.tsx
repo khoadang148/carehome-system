@@ -86,48 +86,19 @@ export default function SelectPackagesPage() {
 
   const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
 
-  // Load cached assignment status immediately for instant display (with TTL)
+  // Load cached assignment status immediately for instant display
   useEffect(() => {
     try {
       const raw = clientStorage.getItem('assignmentStatusCache');
       if (raw) {
         const cached = JSON.parse(raw);
-        const now = Date.now();
-        const ttlMs = 5 * 60 * 1000; // 5 minutes
         if (cached && typeof cached === 'object') {
-          if (cached.ts && cached.data && (now - cached.ts) < ttlMs) {
-            setResidentsWithAssignmentStatus(cached.data);
-          }
+          setResidentsWithAssignmentStatus(cached);
+          setLoadingAssignmentStatus(false);
         }
       }
     } catch {}
   }, []);
-
-  // Server-side cached fetch as a fast path (keeps logic unchanged)
-  useEffect(() => {
-    const run = async () => {
-      const ids = (residents || []).map(r => r._id || r.id).filter(Boolean);
-      if (!ids.length) return;
-      try {
-        const res = await fetch('/api/assignment-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ residentIds: ids }),
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        const map = json?.data || {};
-        if (map && Object.keys(map).length > 0) {
-          setResidentsWithAssignmentStatus((prev) => ({ ...prev, ...map }));
-          try {
-            clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: { ...map } }));
-          } catch {}
-        }
-      } catch {}
-    };
-    run();
-  }, [residents]);
 
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
@@ -213,59 +184,62 @@ export default function SelectPackagesPage() {
       // Immediately update the residents list to hide those with active assignments
       setResidentsWithAssignmentStatus(assignmentMap);
       try {
-        clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: assignmentMap }));
+        clientStorage.setItem('assignmentStatusCache', JSON.stringify(assignmentMap));
       } catch {}
     }
   }, [assignmentMap]);
 
+  // Precompute lowercased search and resident index for faster filtering
+  const searchLower = useMemo(() => (searchTerm || '').toLowerCase(), [searchTerm]);
+  const residentIndex = useMemo(() => {
+    return residents.map(r => ({
+      ref: r,
+      id: r._id || r.id,
+      isActive: r.status === 'active',
+      nameLower: ((r.full_name || r.name || '') + '').toLowerCase(),
+      genderLower: ((r.gender || '') + '').toLowerCase(),
+    }));
+  }, [residents]);
+
+  // Build a Set of IDs that pass the assignment rule for O(1) membership checks
+  const eligibleByAssignmentIdSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const [id, st] of Object.entries(residentsWithAssignmentStatus || {})) {
+      if (!st || !st.hasAssignment || st.isExpired) set.add(id);
+    }
+    return set;
+  }, [residentsWithAssignmentStatus]);
+
   const filteredAndSortedResidents = useMemo(() => {
-    // Always filter by active status first for immediate display
-    let filtered = residents.filter(resident => {
-      // Chỉ hiển thị resident có status active
-      if (resident.status !== 'active') {
-          return false;
-        }
+    const output: any[] = [];
+    for (const item of residentIndex) {
+      if (!item.isActive) continue;
+      if (searchLower && !item.nameLower.includes(searchLower)) continue;
+      if (loadingAssignmentStatus) { output.push(item.ref); continue; }
+      if (eligibleByAssignmentIdSet.has(item.id)) output.push(item.ref);
+    }
 
-        const name = (resident.full_name || resident.name || '').toLowerCase();
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch = name.includes(searchLower);
-
-      if (!matchesSearch) {
-        return false;
-      }
-
-      // If assignment status is still loading, show all active residents
-      // They will be filtered further when status is available
-      if (loadingAssignmentStatus) {
-        return true;
-      }
-
-      // Apply assignment status filtering when available
-      const residentId = resident._id || resident.id;
-      const assignmentStatus = residentsWithAssignmentStatus[residentId];
-      
-      // Show residents who either don't have assignments or have expired ones
-      const shouldShow = !assignmentStatus?.hasAssignment || assignmentStatus?.isExpired;
-      
-      return shouldShow;
-    });
-
-    // Sort the filtered results
-    filtered.sort((a, b) => {
+    output.sort((a, b) => {
       switch (sortBy) {
-        case 'name':
-          return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
+        case 'name': {
+          const an = ((a.full_name || a.name || '') + '').toLowerCase();
+          const bn = ((b.full_name || b.name || '') + '').toLowerCase();
+          if (an < bn) return -1; if (an > bn) return 1; return 0;
+        }
         case 'age':
           return (b.age || 0) - (a.age || 0);
-        case 'gender':
-          return (a.gender || '').localeCompare(b.gender || '');
+        case 'gender': {
+          const ag = ((a.gender || '') + '').toLowerCase();
+          const bg = ((b.gender || '') + '').toLowerCase();
+          if (ag < bg) return -1; if (ag > bg) return 1; return 0;
+        }
         default:
           return 0;
       }
     });
 
-    return filtered;
-  }, [residents, searchTerm, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
+    return output;
+  }, [residentIndex, searchLower, sortBy, eligibleByAssignmentIdSet, loadingAssignmentStatus]);
 
   const totalPages = Math.ceil(filteredAndSortedResidents.length / itemsPerPage);
   const paginatedResidents = filteredAndSortedResidents.slice(

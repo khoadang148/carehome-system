@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, carePlanAssignmentsAPI, userAPI, apiClient, bedAssignmentsAPI } from '@/lib/api';
-import { clientStorage } from '@/lib/utils/clientStorage';
 import { useOptimizedCarePlansAll, useOptimizedResidentsByRole, useOptimizedRooms, useOptimizedBeds, useOptimizedRoomTypes, useResidentsAssignmentStatus } from '@/hooks/useOptimizedData';
 import { ArrowLeftIcon, CheckCircleIcon, UserIcon, MagnifyingGlassIcon, FunnelIcon, CalendarIcon, PhoneIcon, MapPinIcon, GiftIcon, PlusIcon } from '@heroicons/react/24/outline';
 import DatePicker from 'react-datepicker';
@@ -64,6 +63,23 @@ export default function SelectPackagesPage() {
 
   const [residentsWithAssignmentStatus, setResidentsWithAssignmentStatus] = useState<{ [key: string]: { hasAssignment: boolean; isExpired: boolean; endDate?: string } }>({});
   const [loadingAssignmentStatus, setLoadingAssignmentStatus] = useState(false);
+  // Cache keys for instant assignment status display
+  const ASSIGNMENT_CACHE_KEY = 'residentsAssignmentStatus:v1';
+  const ASSIGNMENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+  // Hydrate assignment status immediately from cache (if fresh)
+  useEffect(() => {
+    try {
+      const cached = typeof window !== 'undefined' ? localStorage.getItem(ASSIGNMENT_CACHE_KEY) : null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.timestamp && parsed.data && (Date.now() - parsed.timestamp) < ASSIGNMENT_CACHE_TTL_MS) {
+          setResidentsWithAssignmentStatus(parsed.data);
+          setLoadingAssignmentStatus(false);
+        }
+      }
+    } catch {}
+  }, []);
 
   // New state for re-registration
   const [keepExistingRoomBed, setKeepExistingRoomBed] = useState(false);
@@ -72,8 +88,8 @@ export default function SelectPackagesPage() {
   const [loadingExistingInfo, setLoadingExistingInfo] = useState(false);
 
   const isInitialLoading = useMemo(() => {
-    return !residents.length || !carePlans.length;
-  }, [residents, carePlans]);
+    return !residents.length || !carePlans.length || loadingAssignmentStatus;
+  }, [residents, carePlans, loadingAssignmentStatus]);
 
   useEffect(() => {
     if (startDate && registrationPeriod) {
@@ -85,49 +101,6 @@ export default function SelectPackagesPage() {
   }, [startDate, registrationPeriod]);
 
   const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
-
-  // Load cached assignment status immediately for instant display (with TTL)
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('assignmentStatusCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        const now = Date.now();
-        const ttlMs = 5 * 60 * 1000; // 5 minutes
-        if (cached && typeof cached === 'object') {
-          if (cached.ts && cached.data && (now - cached.ts) < ttlMs) {
-            setResidentsWithAssignmentStatus(cached.data);
-          }
-        }
-      }
-    } catch {}
-  }, []);
-
-  // Server-side cached fetch as a fast path (keeps logic unchanged)
-  useEffect(() => {
-    const run = async () => {
-      const ids = (residents || []).map(r => r._id || r.id).filter(Boolean);
-      if (!ids.length) return;
-      try {
-        const res = await fetch('/api/assignment-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ residentIds: ids }),
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        const map = json?.data || {};
-        if (map && Object.keys(map).length > 0) {
-          setResidentsWithAssignmentStatus((prev) => ({ ...prev, ...map }));
-          try {
-            clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: { ...map } }));
-          } catch {}
-        }
-      } catch {}
-    };
-    run();
-  }, [residents]);
 
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
@@ -212,8 +185,9 @@ export default function SelectPackagesPage() {
     if (assignmentMap && Object.keys(assignmentMap).length > 0) {
       // Immediately update the residents list to hide those with active assignments
       setResidentsWithAssignmentStatus(assignmentMap);
+      // Persist to cache for instant load on next navigation
       try {
-        clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: assignmentMap }));
+        localStorage.setItem(ASSIGNMENT_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data: assignmentMap }));
       } catch {}
     }
   }, [assignmentMap]);

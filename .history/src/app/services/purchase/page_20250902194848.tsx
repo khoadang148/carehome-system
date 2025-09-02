@@ -86,47 +86,25 @@ export default function SelectPackagesPage() {
 
   const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
 
-  // Load cached assignment status immediately for instant display (with TTL)
+  // Load cached assignment status immediately for instant display
   useEffect(() => {
     try {
       const raw = clientStorage.getItem('assignmentStatusCache');
       if (raw) {
         const cached = JSON.parse(raw);
-        const now = Date.now();
-        const ttlMs = 5 * 60 * 1000; // 5 minutes
         if (cached && typeof cached === 'object') {
-          if (cached.ts && cached.data && (now - cached.ts) < ttlMs) {
-            setResidentsWithAssignmentStatus(cached.data);
-          }
+          setResidentsWithAssignmentStatus(cached);
+          setLoadingAssignmentStatus(false);
         }
       }
     } catch {}
   }, []);
 
-  // Server-side cached fetch as a fast path (keeps logic unchanged)
+  // When residents list changes, indicate status is loading until fresh map arrives
   useEffect(() => {
-    const run = async () => {
-      const ids = (residents || []).map(r => r._id || r.id).filter(Boolean);
-      if (!ids.length) return;
-      try {
-        const res = await fetch('/api/assignment-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ residentIds: ids }),
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        const map = json?.data || {};
-        if (map && Object.keys(map).length > 0) {
-          setResidentsWithAssignmentStatus((prev) => ({ ...prev, ...map }));
-          try {
-            clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: { ...map } }));
-          } catch {}
-        }
-      } catch {}
-    };
-    run();
+    if (residents && residents.length > 0) {
+      setLoadingAssignmentStatus(true);
+    }
   }, [residents]);
 
   const residentsRef = useRef<string>('');
@@ -213,8 +191,9 @@ export default function SelectPackagesPage() {
       // Immediately update the residents list to hide those with active assignments
       setResidentsWithAssignmentStatus(assignmentMap);
       try {
-        clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: assignmentMap }));
+        clientStorage.setItem('assignmentStatusCache', JSON.stringify(assignmentMap));
       } catch {}
+      setLoadingAssignmentStatus(false);
     }
   }, [assignmentMap]);
 
