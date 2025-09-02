@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './auth-context';
-import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 import { 
   billsAPI, 
   careNotesAPI, 
@@ -188,17 +187,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                          // Check for unpaid bills
              const unpaidBills = userBills.filter((bill: any) => bill.status === 'pending');
              if (unpaidBills.length > 0) {
+               // Tính tổng số tiền cần thanh toán
                const totalUnpaidAmount = unpaidBills.reduce((sum: number, bill: any) => 
                  sum + (bill.amount || 0), 0
                );
                
+               // Nhân với 10000 để hiển thị đúng giá tiền
+               const displayUnpaidAmount = totalUnpaidAmount * 10000;
+               
                newNotifications.push(createNotification(
                  'warning',
                  'Hóa đơn cần thanh toán',
-                 `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán với tổng số tiền ${formatDisplayCurrency(totalUnpaidAmount)}. Vui lòng kiểm tra và thanh toán sớm.`,
+                 `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán với tổng số tiền ${displayUnpaidAmount.toLocaleString('vi-VN')} VNĐ. Vui lòng kiểm tra và thanh toán sớm.`,
                  'hóa đơn',
                  '/family/finance',
-                 { bills: unpaidBills, totalAmount: totalUnpaidAmount, familyId: user.id }
+                 { bills: unpaidBills, totalUnpaidAmount, displayUnpaidAmount, familyId: user.id }
                ));
              }
             
@@ -214,13 +217,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                  sum + (bill.amount || 0), 0
                );
                
+               // Nhân với 10000 để hiển thị đúng giá tiền
+               const displayAmount = totalAmount * 10000;
+               
                newNotifications.push(createNotification(
                  'success',
                  'Thanh toán thành công',
-                 `Bạn đã thanh toán thành công ${recentlyPaidBills.length} hóa đơn với tổng số tiền ${formatDisplayCurrency(totalAmount)}.`,
+                 `Bạn đã thanh toán thành công ${recentlyPaidBills.length} hóa đơn với tổng số tiền ${displayAmount.toLocaleString('vi-VN')} VNĐ.`,
                  'hóa đơn',
                  '/family/finance',
-                 { bills: recentlyPaidBills, totalAmount, familyId: user.id }
+                 { bills: recentlyPaidBills, totalAmount, displayAmount, familyId: user.id }
                ));
              }
           } catch (error) {

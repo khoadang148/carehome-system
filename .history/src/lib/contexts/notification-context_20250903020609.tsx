@@ -185,22 +185,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               return billFamilyId === user.id;
             });
             
-                         // Check for unpaid bills
-             const unpaidBills = userBills.filter((bill: any) => bill.status === 'pending');
-             if (unpaidBills.length > 0) {
-               const totalUnpaidAmount = unpaidBills.reduce((sum: number, bill: any) => 
-                 sum + (bill.amount || 0), 0
-               );
-               
-               newNotifications.push(createNotification(
-                 'warning',
-                 'Hóa đơn cần thanh toán',
-                 `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán với tổng số tiền ${formatDisplayCurrency(totalUnpaidAmount)}. Vui lòng kiểm tra và thanh toán sớm.`,
-                 'hóa đơn',
-                 '/family/finance',
-                 { bills: unpaidBills, totalAmount: totalUnpaidAmount, familyId: user.id }
-               ));
-             }
+            // Check for unpaid bills
+            const unpaidBills = userBills.filter((bill: any) => bill.status === 'pending');
+            if (unpaidBills.length > 0) {
+              newNotifications.push(createNotification(
+                'warning',
+                'Hóa đơn cần thanh toán',
+                `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán. Vui lòng kiểm tra và thanh toán sớm.`,
+                'hóa đơn',
+                '/family/finance',
+                { bills: unpaidBills, familyId: user.id }
+              ));
+            }
             
             // Check for recently paid bills (within last 24 hours)
             const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
