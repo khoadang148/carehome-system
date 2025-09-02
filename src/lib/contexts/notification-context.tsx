@@ -130,8 +130,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const clearAll = useCallback(() => {
-    setNotifications([]);
-  }, []);
+    if (user?.role === 'family') {
+      // For family members, only clear notifications related to their family
+      setNotifications(prev => 
+        prev.filter(n => !n.metadata?.familyId || n.metadata.familyId !== user.id)
+      );
+    } else if (user?.role === 'staff') {
+      // For staff, only clear notifications related to them
+      setNotifications(prev => 
+        prev.filter(n => !n.metadata?.staffId || n.metadata.staffId !== user.id)
+      );
+    } else if (user?.role === 'admin') {
+      // For admin, only clear notifications related to them
+      setNotifications(prev => 
+        prev.filter(n => !n.metadata?.adminId || n.metadata.adminId !== user.id)
+      );
+    } else {
+      // Fallback: clear all
+      setNotifications([]);
+    }
+  }, [user]);
 
   // Generate notifications based on real API data
   const generateRoleBasedNotifications = useCallback(async () => {
@@ -149,13 +167,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           try {
             const residents = await residentAPI.getByFamilyMemberId?.(user.id);
             if (Array.isArray(residents)) {
-              residentIds = residents.map((r: any) => r.id || r.resident_id).filter(Boolean);
+              residentIds = residents.map((r: any) => r.id || r.resident_id || r._id).filter(Boolean);
             }
           } catch (error) {
             if (!isForbidden(error)) console.error('Error fetching residentIds for family:', error);
           }
 
-          // Bills for this family member
+          // Bills for this family member - ensure proper filtering
           try {
             const bills = await billsAPI.getAll({ family_member_id: user.id });
             
@@ -168,7 +186,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán. Vui lòng kiểm tra và thanh toán sớm.`,
                 'hóa đơn',
                 '/family/finance',
-                { bills: unpaidBills }
+                { bills: unpaidBills, familyId: user.id }
               ));
             }
             
@@ -190,19 +208,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Bạn đã thanh toán thành công ${recentlyPaidBills.length} hóa đơn với tổng số tiền ${totalAmount.toLocaleString('vi-VN')} VNĐ.`,
                 'hóa đơn',
                 '/family/finance',
-                { bills: recentlyPaidBills, totalAmount }
+                { bills: recentlyPaidBills, totalAmount, familyId: user.id }
               ));
             }
           } catch (error) {
             if (!isForbidden(error)) console.error('Error fetching bills:', error);
           }
 
-          // Care notes for linked residents (fallback: skip on 403)
+          // Care notes for linked residents - ensure proper filtering by resident IDs
           try {
-            if (residentIds.length > 0 && careNotesAPI.getAll) {
+            if (residentIds.length > 0) {
+              // Use getAll with resident_ids filter instead of non-existent getByResidentId
               const careNotes = await careNotesAPI.getAll({ resident_ids: residentIds.join(',') });
+              
               const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-              const recentCareNotes = careNotes.filter((note: any) => new Date(note.created_at || note.date) > oneDayAgo);
+              const recentCareNotes = careNotes.filter((note: any) => 
+                new Date(note.created_at || note.date) > oneDayAgo
+              );
+              
               if (recentCareNotes.length > 0) {
                 newNotifications.push(createNotification(
                   'info',
@@ -210,7 +233,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   `Có ${recentCareNotes.length} ghi chú chăm sóc mới cho người thân của bạn.`,
                   'care',
                   '/family',
-                  { careNotes: recentCareNotes }
+                  { careNotes: recentCareNotes, familyId: user.id, residentIds }
                 ));
               }
             }
@@ -218,7 +241,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             if (!isForbidden(error)) console.error('Error fetching care notes:', error);
           }
 
-          // Vital signs per resident (avoid global getAll to prevent 403)
+          // Vital signs per resident - ensure proper filtering by resident IDs
           try {
             if (residentIds.length > 0) {
               const results = await Promise.allSettled(
@@ -237,7 +260,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   `Có ${recentVitalSigns.length} chỉ số sức khỏe mới được cập nhật.`,
                   'health',
                   '/family',
-                  { vitalSigns: recentVitalSigns }
+                  { vitalSigns: recentVitalSigns, familyId: user.id, residentIds }
                 ));
               }
             }
@@ -245,7 +268,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             if (!isForbidden(error)) console.error('Error fetching vital signs:', error);
           }
 
-          // Visits upcoming for this family member
+          // Visits upcoming for this family member - ensure proper filtering
           try {
             const visits = await visitsAPI.getAll({ family_member_id: user.id });
             const now = new Date();
@@ -261,7 +284,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Bạn có ${upcomingVisits.length} lịch thăm trong tuần tới.`,
                 'visit',
                 '/family/schedule-visit/history',
-                { visits: upcomingVisits }
+                { visits: upcomingVisits, familyId: user.id }
               ));
             }
           } catch (error) {
@@ -270,9 +293,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           break;
 
         case 'staff':
-          // Check for new assignments
+          // Check for new assignments - filter by staff_id
           try {
-            const assignments = await staffAssignmentsAPI.getAll();
+            const assignments = await staffAssignmentsAPI.getAll({ staff_id: user.id });
             const newAssignments = assignments.filter((assignment: any) => {
               const assignmentDate = new Date(assignment.created_at);
               const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -286,7 +309,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Bạn được phân công chăm sóc ${newAssignments.length} người cao tuổi mới.`,
                 'assignment',
                 '/staff/residents',
-                { assignments: newAssignments }
+                { assignments: newAssignments, staffId: user.id, role: 'staff' }
               ));
             }
           } catch (error) {
@@ -307,7 +330,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Có ${staffPendingNotes.length} ghi chú chăm sóc cần được xử lý.`,
                 'care',
                 '/staff/assessments',
-                { careNotes: staffPendingNotes }
+                { careNotes: staffPendingNotes, staffId: user.id, role: 'staff' }
               ));
             }
           } catch (error) {
@@ -329,7 +352,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Có ${todayActivities.length} hoạt động cần tham gia hôm nay.`,
                 'activity',
                 '/staff/activities',
-                { activities: todayActivities }
+                { activities: todayActivities, staffId: user.id, role: 'staff' }
               ));
             }
           } catch (error) {
@@ -350,7 +373,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Có ${pendingBills.length} hóa đơn đang chờ xử lý.`,
                 'hóa đơn',
                 '/admin/financial-reports',
-                { bills: pendingBills }
+                { bills: pendingBills, adminId: user.id, role: 'admin' }
               ));
             }
           } catch (error) {
@@ -373,7 +396,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Có ${newResidents.length} người cao tuổi mới được nhận vào viện.`,
                 'system',
                 '/admin/residents',
-                { residents: newResidents }
+                { residents: newResidents, adminId: user.id, role: 'admin' }
               ));
             }
           } catch (error) {
@@ -394,7 +417,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 `Có ${pendingAssignments.length} yêu cầu phân công giường cần xử lý.`,
                 'assignment',
                 '/admin/residents',
-                { assignments: pendingAssignments }
+                { assignments: pendingAssignments, adminId: user.id, role: 'admin' }
               ));
             }
           } catch (error) {
@@ -421,7 +444,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   `Tỷ lệ sử dụng giường đã đạt ${occupancyRate.toFixed(1)}%. Cần kiểm tra và mở rộng.`,
                   'system',
                   '/admin/residents',
-                  { occupancyRate, totalResidents, occupiedBeds }
+                  { occupancyRate, totalResidents, occupiedBeds, adminId: user.id, role: 'admin' }
                 ));
               }
             }
@@ -435,11 +458,29 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setNotifications(prev => {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         
+        // Filter existing notifications to only show those for current user
+        const userSpecificNotifications = prev.filter(existing => {
+          // If notification has familyId metadata, only show if it matches current user (for family members)
+          if (existing.metadata?.familyId) {
+            return existing.metadata.familyId === user.id;
+          }
+          // If notification has staffId metadata, only show if it matches current user (for staff)
+          if (existing.metadata?.staffId) {
+            return existing.metadata.staffId === user.id;
+          }
+          // If notification has adminId metadata, only show if it matches current user (for admin)
+          if (existing.metadata?.adminId) {
+            return existing.metadata.adminId === user.id;
+          }
+          // If no specific ID metadata, only show for admin/staff (global notifications)
+          return user.role === 'admin' || user.role === 'staff';
+        });
+        
         const uniqueNewNotifications = newNotifications.filter(newNotif => {
           // Check if this notification already exists (by content and recent time)
           const newNotifKey = createNotificationKey(newNotif.title, newNotif.message, newNotif.category);
           
-          const isDuplicate = prev.some(existing => {
+          const isDuplicate = userSpecificNotifications.some(existing => {
             const existingKey = createNotificationKey(existing.title, existing.message, existing.category);
             return existingKey === newNotifKey && existing.timestamp > oneHourAgo;
           });
@@ -447,7 +488,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           return !isDuplicate;
         });
         
-        return [...uniqueNewNotifications, ...prev];
+        return [...uniqueNewNotifications, ...userSpecificNotifications];
       });
 
     } catch (error) {

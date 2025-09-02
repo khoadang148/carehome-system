@@ -149,15 +149,15 @@ export default function FinancialReportsPage() {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(rid);
             if (Array.isArray(bedAssignments) && bedAssignments.length > 0) {
               const bedAssignment = bedAssignments[0];
-              const rn = bedAssignment?.bed_id?.room_id?.room_number || 'Chưa hoàn tất đăng kí';
+              const rn = bedAssignment?.bed_id?.room_id?.room_number || 'Đã xuất viện';
               results[rid] = rn;
               setRoomCache(rid, rn);
             } else {
-              results[rid] = 'Chưa hoàn tất đăng kí';
-              setRoomCache(rid, 'Chưa hoàn tất đăng kí');
+              results[rid] = 'Đã xuất viện';
+              setRoomCache(rid, 'Đã xuất viện');
             }
           } catch {
-            results[rid] = 'Chưa hoàn tất đăng kí';
+            results[rid] = 'Đã xuất viện';
           }
         }
       };

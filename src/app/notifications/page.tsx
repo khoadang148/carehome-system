@@ -15,6 +15,7 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { useNotifications, Notification } from '@/lib/contexts/notification-context';
+import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 const NotificationCard = memo(({ 
   notification, 

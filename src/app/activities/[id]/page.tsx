@@ -58,6 +58,25 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     return activityDate < today;
   };
 
+  const isActivityTimePassed = () => {
+    if (!activity?.date || !activity?.scheduledTime) return false;
+    
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    // Nếu không phải hôm nay, kiểm tra ngày
+    if (activity.date !== today) {
+      return isActivityDatePassed();
+    }
+    
+    // Nếu là hôm nay, kiểm tra thời gian
+    const [hours, minutes] = activity.scheduledTime.split(':');
+    const activityTime = new Date();
+    activityTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    
+    return now > activityTime;
+  };
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -633,11 +652,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    if (isActivityDatePassed()) {
+    if (isActivityTimePassed()) {
       setNotificationModal({
         open: true,
         title: 'Không thể thay đổi',
-        message: 'Hoạt động đã qua, không thể xóa nhân viên.',
+        message: 'Hoạt động đã qua thời gian, không thể xóa nhân viên hoặc thay đổi danh sách resident.',
         type: 'warning'
       });
       return;
@@ -770,11 +789,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    if (isActivityDatePassed()) {
+    if (isActivityTimePassed()) {
       setNotificationModal({
         open: true,
         title: 'Không thể thay đổi',
-        message: 'Hoạt động đã qua, không thể phân công nhân viên.',
+        message: 'Hoạt động đã qua thời gian, không thể phân công nhân viên hoặc thay đổi danh sách resident.',
         type: 'warning'
       });
       return;
@@ -1597,7 +1616,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                       <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>
                         Nhân viên hướng dẫn:
                       </div>
-                      {user?.role === 'admin' && assignedStaffList.length === 0 && !isActivityDatePassed() && (
+                      {user?.role === 'admin' && assignedStaffList.length === 0 && !isActivityTimePassed() && (
                         <button
                           onClick={() => setAssignStaffModalOpen(true)}
                           style={{
@@ -1619,7 +1638,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           Phân công
                         </button>
                       )}
-                      {user?.role === 'admin' && assignedStaffList.length === 0 && isActivityDatePassed() && (
+                      {user?.role === 'admin' && assignedStaffList.length === 0 && isActivityTimePassed() && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1633,7 +1652,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           fontWeight: 600
                         }}>
                           <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                          Hoạt động đã qua - Không thể phân công
+                          Hoạt động đã qua thời gian - Không thể phân công hoặc thay đổi danh sách resident
                         </div>
                       )}
                     </div>
@@ -1673,7 +1692,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                               </div>
                             </div>
                           </div>
-                          {user?.role === 'admin' && !isActivityDatePassed() && (
+                          {user?.role === 'admin' && !isActivityTimePassed() && (
                             <button
                               onClick={() => handleRemoveStaff(assignedStaffList[0].id)}
                               style={{
@@ -1696,7 +1715,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                               ×
                             </button>
                           )}
-                          {user?.role === 'admin' && isActivityDatePassed() && (
+                          {user?.role === 'admin' && isActivityTimePassed() && (
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1709,7 +1728,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                               border: '1px solid #d1d5db',
                               fontSize: '0.75rem',
                               fontWeight: 600
-                            }} title="Hoạt động đã qua - Không thể xóa nhân viên">
+                            }} title="Hoạt động đã qua thời gian - Không thể xóa nhân viên hoặc thay đổi danh sách resident">
                               ×
                             </div>
                           )}
@@ -2195,11 +2214,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           <div className="fixed inset-0 bg-black opacity-30" />
           <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-auto p-6 z-15">
             <h2 className="text-lg font-bold mb-4">Phân công nhân viên hướng dẫn</h2>
-            {isActivityDatePassed() && (
+            {isActivityTimePassed() && (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-center gap-2 text-amber-800">
                   <ClockIcon className="w-4 h-4" />
-                  <span className="text-sm font-medium">Hoạt động đã qua ngày - Không thể phân công nhân viên</span>
+                  <span className="text-sm font-medium">Hoạt động đã qua thời gian - Không thể phân công nhân viên hoặc thay đổi danh sách resident</span>
                 </div>
               </div>
             )}
@@ -2207,7 +2226,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               value={selectedStaffId || ''}
               onChange={e => setSelectedStaffId(e.target.value)}
               className="w-full border rounded px-3 py-2 mb-4"
-              disabled={isActivityDatePassed()}
+              disabled={isActivityTimePassed()}
             >
               <option value="">-- Chọn nhân viên --</option>
               {staffList.map((staff) => (
@@ -2225,7 +2244,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
               <button
                 onClick={handleAssignStaff}
                 className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold"
-                disabled={assigningStaff || !selectedStaffId || isActivityDatePassed()}
+                disabled={assigningStaff || !selectedStaffId || isActivityTimePassed()}
               >
                 {assigningStaff ? 'Đang phân công...' : 'Phân công'}
               </button>

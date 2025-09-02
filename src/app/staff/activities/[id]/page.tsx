@@ -76,8 +76,27 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     return activityDate.getTime() === today.getTime();
   };
 
+  const isActivityTimeReached = () => {
+    if (!activity?.date || !activity?.scheduledTime) return false;
+    
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    // Nếu không phải hôm nay, chưa đến giờ
+    if (activity.date !== today) {
+      return false;
+    }
+    
+    // Nếu là hôm nay, kiểm tra thời gian
+    const [hours, minutes] = activity.scheduledTime.split(':');
+    const activityTime = new Date();
+    activityTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    
+    return now >= activityTime;
+  };
+
   const canEditOrEvaluate = () => {
-    return isActivityToday();
+    return isActivityToday() && isActivityTimeReached();
   };
 
   const canAddParticipants = () => {
@@ -1509,7 +1528,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     fontWeight: 600
                   }}>
                     <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                    {isActivityDatePassed() ? 'Hoạt động đã qua - Không thể chỉnh sửa' : 'Hoạt động trong tương lai - Không thể chỉnh sửa'}
+                    {isActivityDatePassed() ? 'Hoạt động đã qua - Không thể chỉnh sửa' : 
+                     isActivityToday() ? 'Chưa đến giờ hoạt động - Không thể đánh giá' : 
+                     'Hoạt động trong tương lai - Không thể chỉnh sửa'}
                   </div>
                 )}
               </div>
@@ -1707,12 +1728,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                                   fontWeight: 600
                                 }}>
                                   <ClockIcon style={{ width: '1rem', height: '1rem' }} />
-                                  {evaluation.status === 'attended' ? 'Đã tham gia' :
-                                    evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
+                                  {!isActivityTimeReached() && isActivityToday() ? 'Chưa đến giờ đánh giá' :
+                                   evaluation.status === 'attended' ? 'Đã tham gia' :
+                                   evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
                                 </div>
                               )}
                             </div>
-                            {evaluation.status === 'absent' && canEditOrEvaluate() && (
+                            {evaluation.status === 'absent' && canEditOrEvaluate() && isActivityTimeReached() && (
                               <div style={{ marginTop: '0.5rem' }}>
                                 <input
                                   type="text"
@@ -1786,7 +1808,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     >
                       Hủy
                     </button>
-                    {canEditOrEvaluate() && (
+                    {canEditOrEvaluate() && isActivityTimeReached() && (
                       <button
                         onClick={handleSaveEvaluations}
                         disabled={saving}
