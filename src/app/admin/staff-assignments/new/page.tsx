@@ -15,8 +15,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { staffAssignmentsAPI, staffAPI, residentAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
-import { filterOfficialResidents } from '@/lib/utils/resident-status';
 import { getAvatarUrlWithFallback } from '@/lib/utils/avatarUtils';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 export default function NewStaffAssignmentPage() {
   const { user, loading } = useAuth();
@@ -74,6 +74,26 @@ export default function NewStaffAssignmentPage() {
     const loadData = async () => {
       setLoadingData(true);
       try {
+        // Try to load cached data first for instant display
+        try {
+          const cachedStaff = clientStorage.getItem('staffAssignmentsStaffCache');
+          const cachedResidents = clientStorage.getItem('staffAssignmentsResidentsCache');
+          const cachedAssignments = clientStorage.getItem('staffAssignmentsAssignmentsCache');
+          
+          if (cachedStaff) {
+            const parsed = JSON.parse(cachedStaff);
+            if (Array.isArray(parsed?.data)) setStaffList(parsed.data);
+          }
+          if (cachedResidents) {
+            const parsed = JSON.parse(cachedResidents);
+            if (Array.isArray(parsed?.data)) setResidents(parsed.data);
+          }
+          if (cachedAssignments) {
+            const parsed = JSON.parse(cachedAssignments);
+            if (Array.isArray(parsed?.data)) setAssignments(parsed.data);
+          }
+        } catch {}
+
         const [staffData, residentsData, assignmentsData] = await Promise.all([
           staffAPI.getAll(),
           residentAPI.getAll(),
@@ -83,15 +103,19 @@ export default function NewStaffAssignmentPage() {
         const staffOnly = Array.isArray(staffData) ? staffData.filter((staff: any) => staff.role === 'staff') : [];
         const activeStaffOnly = staffOnly.filter((staff: any) => staff.status === 'active');
         setStaffList(activeStaffOnly);
+        try { clientStorage.setItem('staffAssignmentsStaffCache', JSON.stringify({ ts: Date.now(), data: activeStaffOnly })); } catch {}
 
         const residentsArray = Array.isArray(residentsData) ? residentsData : [];
-        const officialResidents = await filterOfficialResidents(residentsArray);
-        const activeOfficialResidents = officialResidents.filter((resident: any) => resident.status === 'active');
+        const activeOfficialResidents = residentsArray.filter((resident: any) => resident.status === 'active');
         setResidents(activeOfficialResidents);
+        try { clientStorage.setItem('staffAssignmentsResidentsCache', JSON.stringify({ ts: Date.now(), data: activeOfficialResidents })); } catch {}
 
         setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
+        try { clientStorage.setItem('staffAssignmentsAssignmentsCache', JSON.stringify({ ts: Date.now(), data: assignmentsData })); } catch {}
 
-        officialResidents.forEach(async (resident: any) => {
+        // Load room info in background without blocking UI
+        setTimeout(() => {
+          activeOfficialResidents.forEach(async (resident: any) => {
           try {
             const residentId = typeof resident._id === 'object' && (resident._id as any)?._id
               ? (resident._id as any)._id
@@ -132,6 +156,7 @@ export default function NewStaffAssignmentPage() {
             setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa hoàn tất đăng kí' }));
           }
         });
+        }, 100); // Small delay to let UI render first
 
         setError('');
       } catch (err) {
