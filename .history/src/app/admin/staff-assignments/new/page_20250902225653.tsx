@@ -463,7 +463,8 @@ export default function NewStaffAssignmentPage() {
     if (!searchTerm) return availableResidents;
 
     return availableResidents.filter(resident =>
-      resident.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      resident.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (roomNumbers[resident._id] && roomNumbers[resident._id].toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
 

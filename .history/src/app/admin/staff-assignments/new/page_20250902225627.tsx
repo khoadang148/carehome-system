@@ -463,7 +463,8 @@ export default function NewStaffAssignmentPage() {
     if (!searchTerm) return availableResidents;
 
     return availableResidents.filter(resident =>
-      resident.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      resident.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (roomNumbers[resident._id] && roomNumbers[resident._id].toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
 
@@ -797,7 +798,7 @@ export default function NewStaffAssignmentPage() {
                           <div className="relative">
                             <input
                               type="text"
-                              placeholder="Tìm kiếm người cao tuổi theo tên..."
+                              placeholder="Tìm kiếm người cao tuổi theo tên hoặc số phòng..."
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
                               className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 focus:outline-none transition-all duration-200 text-lg"
@@ -1129,7 +1130,7 @@ export default function NewStaffAssignmentPage() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-semibold text-green-900">{resident.full_name}</p>
-                                    <p className="text-xs text-green-700">Đã hoàn tất đăng kí dịch vụ</p>
+                                    <p className="text-xs text-green-700">Phòng {roomNumbers[resident._id] || 'Chưa hoàn tất đăng kí'}</p>
                                   </div>
                                 </div>
                                 <button
