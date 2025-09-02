@@ -774,7 +774,12 @@ export default function NewBillPage() {
                                 </p>
                                 <p className="flex items-center gap-2 font-semibold">
                                   <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-                                  Tổng: {formatDisplayCurrency(billingDetails.totalAmount)}
+                                  Tổng: {formatDisplayCurrency(
+                                      // Hóa đơn tháng hiện tại
+                                      ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0) +
+                                      // + Tiền cọc tháng tiếp theo
+                                      ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))
+                                    )}
                                 </p>
                               </div>
                             </div>
