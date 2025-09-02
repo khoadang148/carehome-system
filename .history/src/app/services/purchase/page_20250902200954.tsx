@@ -64,7 +64,6 @@ export default function SelectPackagesPage() {
 
   const [residentsWithAssignmentStatus, setResidentsWithAssignmentStatus] = useState<{ [key: string]: { hasAssignment: boolean; isExpired: boolean; endDate?: string } }>({});
   const [loadingAssignmentStatus, setLoadingAssignmentStatus] = useState(false);
-  const [displayedResidentIds, setDisplayedResidentIds] = useState<string[]>([]);
 
   // New state for re-registration
   const [keepExistingRoomBed, setKeepExistingRoomBed] = useState(false);
@@ -87,26 +86,48 @@ export default function SelectPackagesPage() {
 
   const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
 
-  // Mark status as loading whenever residents list changes
-  useEffect(() => {
-    if (residents && residents.length > 0) {
-      setLoadingAssignmentStatus(true);
-    }
-  }, [residents]);
-
-  // Load cached assignment status immediately for instant display
+  // Load cached assignment status immediately for instant display (with TTL)
   useEffect(() => {
     try {
       const raw = clientStorage.getItem('assignmentStatusCache');
       if (raw) {
         const cached = JSON.parse(raw);
+        const now = Date.now();
+        const ttlMs = 5 * 60 * 1000; // 5 minutes
         if (cached && typeof cached === 'object') {
-          setResidentsWithAssignmentStatus(cached);
-          setLoadingAssignmentStatus(false);
+          if (cached.ts && cached.data && (now - cached.ts) < ttlMs) {
+            setResidentsWithAssignmentStatus(cached.data);
+          }
         }
       }
     } catch {}
   }, []);
+
+  // Server-side cached fetch as a fast path (keeps logic unchanged)
+  useEffect(() => {
+    const run = async () => {
+      const ids = (residents || []).map(r => r._id || r.id).filter(Boolean);
+      if (!ids.length) return;
+      try {
+        const res = await fetch('/api/assignment-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ residentIds: ids }),
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const map = json?.data || {};
+        if (map && Object.keys(map).length > 0) {
+          setResidentsWithAssignmentStatus((prev) => ({ ...prev, ...map }));
+          try {
+            clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: { ...map } }));
+          } catch {}
+        }
+      } catch {}
+    };
+    run();
+  }, [residents]);
 
   const residentsRef = useRef<string>('');
   const currentResidentsKey = residents.map(r => r._id || r.id).join('_');
@@ -192,51 +213,59 @@ export default function SelectPackagesPage() {
       // Immediately update the residents list to hide those with active assignments
       setResidentsWithAssignmentStatus(assignmentMap);
       try {
-        clientStorage.setItem('assignmentStatusCache', JSON.stringify(assignmentMap));
+        clientStorage.setItem('assignmentStatusCache', JSON.stringify({ ts: Date.now(), data: assignmentMap }));
       } catch {}
-      setLoadingAssignmentStatus(false);
     }
   }, [assignmentMap]);
 
-  // Compute active+search ids and freeze UI until we know their status
-  const activeAndSearchedIds = useMemo(() => {
-    const searchLower = (searchTerm || '').toLowerCase();
-    return residents
-      .filter(r => r.status === 'active')
-      .filter(r => ((r.full_name || r.name || '').toLowerCase().includes(searchLower)))
-      .map(r => r._id || r.id)
-      .filter(Boolean);
-  }, [residents, searchTerm]);
-
-  const hasCompleteStatusForView = useMemo(() => {
-    if (!activeAndSearchedIds.length) return true;
-    return activeAndSearchedIds.every(id => Boolean(residentsWithAssignmentStatus[id]));
-  }, [activeAndSearchedIds, residentsWithAssignmentStatus]);
-
-  useEffect(() => {
-    if (!hasCompleteStatusForView) return;
-    const searchLower = (searchTerm || '').toLowerCase();
-    const filtered = residents
-      .filter(r => r.status === 'active')
-      .filter(r => ((r.full_name || r.name || '').toLowerCase().includes(searchLower)))
-      .filter(r => {
-        const id = r._id || r.id;
-        const st = residentsWithAssignmentStatus[id];
-        if (!st) return false;
-        return !st.hasAssignment || st.isExpired;
-      })
-      .map(r => r._id || r.id);
-    setDisplayedResidentIds(filtered);
-    setLoadingAssignmentStatus(false);
-  }, [hasCompleteStatusForView, residents, residentsWithAssignmentStatus, searchTerm]);
-
   const filteredAndSortedResidents = useMemo(() => {
-    if (!displayedResidentIds.length) return [];
-    const idSet = new Set(displayedResidentIds);
-    const arr = residents.filter(r => idSet.has(r._id || r.id));
-    arr.sort((a, b) => (a.full_name || a.name || '').localeCompare(b.full_name || b.name || ''));
-    return arr;
-  }, [displayedResidentIds, residents]);
+    // Always filter by active status first for immediate display
+    let filtered = residents.filter(resident => {
+      // Chỉ hiển thị resident có status active
+      if (resident.status !== 'active') {
+          return false;
+        }
+
+        const name = (resident.full_name || resident.name || '').toLowerCase();
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = name.includes(searchLower);
+
+      if (!matchesSearch) {
+        return false;
+      }
+
+      // If assignment status is still loading, show all active residents
+      // They will be filtered further when status is available
+      if (loadingAssignmentStatus) {
+        return true;
+      }
+
+      // Apply assignment status filtering when available
+      const residentId = resident._id || resident.id;
+      const assignmentStatus = residentsWithAssignmentStatus[residentId];
+      
+      // Show residents who either don't have assignments or have expired ones
+      const shouldShow = !assignmentStatus?.hasAssignment || assignmentStatus?.isExpired;
+      
+      return shouldShow;
+    });
+
+    // Sort the filtered results
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.full_name || a.name || '').localeCompare(b.full_name || b.name || '');
+        case 'age':
+          return (b.age || 0) - (a.age || 0);
+        case 'gender':
+          return (a.gender || '').localeCompare(b.gender || '');
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [residents, searchTerm, sortBy, residentsWithAssignmentStatus, loadingAssignmentStatus]);
 
   const totalPages = Math.ceil(filteredAndSortedResidents.length / itemsPerPage);
   const paginatedResidents = filteredAndSortedResidents.slice(
@@ -330,34 +359,17 @@ export default function SelectPackagesPage() {
 
   // Optimized rooms loading - prioritize cached data
   const { data: roomsData, refetch: fetchRooms } = useOptimizedRooms();
-
-  // Load rooms from cache immediately if available
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('roomsCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Array.isArray(cached) && cached.length > 0 && rooms.length === 0) {
-          setRooms(cached);
-          setLoadingRooms(false);
-        }
-      }
-    } catch {}
-  }, []);
-
   useEffect(() => {
     // Use cached data first for instant display
     if (roomsData && Array.isArray(roomsData) && roomsData.length > 0) {
       setRooms(roomsData);
       setLoadingRooms(false);
-      try { clientStorage.setItem('roomsCache', JSON.stringify(roomsData)); } catch {}
     } else if (!rooms.length) { // Only fetch if we don't have data
     setLoadingRooms(true);
     fetchRooms()
       .then((data) => {
           const next = Array.isArray(data) ? data : [];
         setRooms(next);
-        try { clientStorage.setItem('roomsCache', JSON.stringify(next)); } catch {}
       })
       .catch(() => setRooms([]))
       .finally(() => setLoadingRooms(false));
@@ -366,63 +378,22 @@ export default function SelectPackagesPage() {
 
   // Optimized beds loading - prioritize cached data
   const { data: bedsData, refetch: fetchBeds } = useOptimizedBeds();
-
-  // Load beds from cache immediately if available
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('bedsCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Array.isArray(cached) && cached.length > 0 && beds.length === 0) {
-          setBeds(cached);
-          setLoadingBeds(false);
-        }
-      }
-    } catch {}
-  }, []);
-
   useEffect(() => {
     // Use cached data first for instant display
     if (bedsData && Array.isArray(bedsData) && bedsData.length > 0) {
       setBeds(bedsData);
       setLoadingBeds(false);
-      try { clientStorage.setItem('bedsCache', JSON.stringify(bedsData)); } catch {}
     } else if (!beds.length) { // Only fetch if we don't have data
     setLoadingBeds(true);
     fetchBeds()
       .then((data) => {
           const next = Array.isArray(data) ? data : [];
         setBeds(next);
-        try { clientStorage.setItem('bedsCache', JSON.stringify(next)); } catch {}
       })
       .catch(() => setBeds([]))
       .finally(() => setLoadingBeds(false));
     }
   }, [bedsData, beds.length]); // Remove fetchBeds dependency
-
-  // Pre-index beds by room for O(1) lookup
-  const bedsByRoomId = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const b of beds) {
-      if (!b) continue;
-      const key = b.room_id || b.roomId || '';
-      if (!key) continue;
-      if (!map[key]) map[key] = [];
-      map[key].push(b);
-    }
-    return map;
-  }, [beds]);
-
-  const bedsByRoomNumber = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const b of beds) {
-      const rn = b.room_number || b.roomNumber;
-      if (!rn) continue;
-      if (!map[rn]) map[rn] = [];
-      map[rn].push(b);
-    }
-    return map;
-  }, [beds]);
 
   const mainPlans = useMemo(() => carePlans.filter((p) => p?.category === 'main' && p?.is_active !== false), [carePlans]);
   const supplementaryPlans = useMemo(() => carePlans.filter((p) => p?.category !== 'main' && p?.is_active !== false), [carePlans]);
@@ -497,11 +468,10 @@ export default function SelectPackagesPage() {
   const getBedsForRoom = (roomId: string, residentGender?: string) => {
     const selectedRoom = rooms.find(r => r._id === roomId);
 
-    // Fast path: direct map lookup
-    let apiBeds = bedsByRoomId[roomId] ? [...bedsByRoomId[roomId]] : [];
+    let apiBeds = beds.filter(b => b.room_id === roomId);
 
     if (apiBeds.length === 0 && selectedRoom?.room_number) {
-      apiBeds = bedsByRoomNumber[selectedRoom.room_number] ? [...bedsByRoomNumber[selectedRoom.room_number]] : [];
+      apiBeds = beds.filter(b => b.room_number === selectedRoom.room_number);
     }
 
     if (apiBeds.length === 0 && selectedRoom?.bed_info) {

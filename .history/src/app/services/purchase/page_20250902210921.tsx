@@ -330,34 +330,17 @@ export default function SelectPackagesPage() {
 
   // Optimized rooms loading - prioritize cached data
   const { data: roomsData, refetch: fetchRooms } = useOptimizedRooms();
-
-  // Load rooms from cache immediately if available
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('roomsCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Array.isArray(cached) && cached.length > 0 && rooms.length === 0) {
-          setRooms(cached);
-          setLoadingRooms(false);
-        }
-      }
-    } catch {}
-  }, []);
-
   useEffect(() => {
     // Use cached data first for instant display
     if (roomsData && Array.isArray(roomsData) && roomsData.length > 0) {
       setRooms(roomsData);
       setLoadingRooms(false);
-      try { clientStorage.setItem('roomsCache', JSON.stringify(roomsData)); } catch {}
     } else if (!rooms.length) { // Only fetch if we don't have data
     setLoadingRooms(true);
     fetchRooms()
       .then((data) => {
           const next = Array.isArray(data) ? data : [];
         setRooms(next);
-        try { clientStorage.setItem('roomsCache', JSON.stringify(next)); } catch {}
       })
       .catch(() => setRooms([]))
       .finally(() => setLoadingRooms(false));
@@ -366,63 +349,22 @@ export default function SelectPackagesPage() {
 
   // Optimized beds loading - prioritize cached data
   const { data: bedsData, refetch: fetchBeds } = useOptimizedBeds();
-
-  // Load beds from cache immediately if available
-  useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('bedsCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Array.isArray(cached) && cached.length > 0 && beds.length === 0) {
-          setBeds(cached);
-          setLoadingBeds(false);
-        }
-      }
-    } catch {}
-  }, []);
-
   useEffect(() => {
     // Use cached data first for instant display
     if (bedsData && Array.isArray(bedsData) && bedsData.length > 0) {
       setBeds(bedsData);
       setLoadingBeds(false);
-      try { clientStorage.setItem('bedsCache', JSON.stringify(bedsData)); } catch {}
     } else if (!beds.length) { // Only fetch if we don't have data
     setLoadingBeds(true);
     fetchBeds()
       .then((data) => {
           const next = Array.isArray(data) ? data : [];
         setBeds(next);
-        try { clientStorage.setItem('bedsCache', JSON.stringify(next)); } catch {}
       })
       .catch(() => setBeds([]))
       .finally(() => setLoadingBeds(false));
     }
   }, [bedsData, beds.length]); // Remove fetchBeds dependency
-
-  // Pre-index beds by room for O(1) lookup
-  const bedsByRoomId = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const b of beds) {
-      if (!b) continue;
-      const key = b.room_id || b.roomId || '';
-      if (!key) continue;
-      if (!map[key]) map[key] = [];
-      map[key].push(b);
-    }
-    return map;
-  }, [beds]);
-
-  const bedsByRoomNumber = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const b of beds) {
-      const rn = b.room_number || b.roomNumber;
-      if (!rn) continue;
-      if (!map[rn]) map[rn] = [];
-      map[rn].push(b);
-    }
-    return map;
-  }, [beds]);
 
   const mainPlans = useMemo(() => carePlans.filter((p) => p?.category === 'main' && p?.is_active !== false), [carePlans]);
   const supplementaryPlans = useMemo(() => carePlans.filter((p) => p?.category !== 'main' && p?.is_active !== false), [carePlans]);
@@ -497,11 +439,10 @@ export default function SelectPackagesPage() {
   const getBedsForRoom = (roomId: string, residentGender?: string) => {
     const selectedRoom = rooms.find(r => r._id === roomId);
 
-    // Fast path: direct map lookup
-    let apiBeds = bedsByRoomId[roomId] ? [...bedsByRoomId[roomId]] : [];
+    let apiBeds = beds.filter(b => b.room_id === roomId);
 
     if (apiBeds.length === 0 && selectedRoom?.room_number) {
-      apiBeds = bedsByRoomNumber[selectedRoom.room_number] ? [...bedsByRoomNumber[selectedRoom.room_number]] : [];
+      apiBeds = beds.filter(b => b.room_number === selectedRoom.room_number);
     }
 
     if (apiBeds.length === 0 && selectedRoom?.bed_info) {
