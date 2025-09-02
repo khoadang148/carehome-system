@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { billsAPI, bedAssignmentsAPI } from '../../../lib/api';
 import { Dialog } from '@headlessui/react';
 import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
 interface FinancialRecord {
   _id: string;
@@ -89,6 +90,25 @@ export default function FinancialReportsPage() {
   const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set());
   const [showTooltip, setShowTooltip] = useState<{ id: string; x: number; y: number } | null>(null);
 
+  const ROOM_CACHE_TTL_MS = 60 * 1000; // 60s
+  const roomCacheKey = (residentId: string) => `residentRoom:${residentId}`;
+
+  const getRoomFromCache = (residentId: string): string | null => {
+    try {
+      const raw = clientStorage.getItem(roomCacheKey(residentId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { expiresAt: number; value: string };
+      if (!parsed || parsed.expiresAt < Date.now()) return null;
+      return parsed.value || null;
+    } catch { return null; }
+  };
+
+  const setRoomCache = (residentId: string, value: string) => {
+    try {
+      clientStorage.setItem(roomCacheKey(residentId), JSON.stringify({ expiresAt: Date.now() + ROOM_CACHE_TTL_MS, value }));
+    } catch {}
+  };
+
   const formatDateToDDMMYYYY = (dateString: string) => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
@@ -103,23 +123,46 @@ export default function FinancialReportsPage() {
       const data = await billsAPI.getAll();
       setRecords(data);
 
+      // Progressive: fill rooms from cache immediately
       const roomMap: Record<string, string> = {};
+      const residentIds = new Set<string>();
       for (const record of data) {
-        if (record.resident_id) {
-          const residentId = typeof record.resident_id === 'object' ? record.resident_id._id : record.resident_id;
+        if (!record.resident_id) continue;
+        const rid = typeof record.resident_id === 'object' ? record.resident_id._id : record.resident_id;
+        if (!rid) continue;
+        const cached = getRoomFromCache(rid);
+        if (cached) roomMap[rid] = cached;
+        residentIds.add(rid);
+      }
+      if (Object.keys(roomMap).length) setResidentRooms(prev => ({ ...roomMap, ...prev }));
+
+      // Fetch missing rooms with concurrency limit
+      const idsToFetch = Array.from(residentIds).filter(id => !roomMap[id]);
+      const limit = 5;
+      let idx = 0;
+      const results: Record<string, string> = {};
+      const worker = async () => {
+        while (idx < idsToFetch.length) {
+          const i = idx++;
+          const rid = idsToFetch[i];
           try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(rid);
             if (Array.isArray(bedAssignments) && bedAssignments.length > 0) {
               const bedAssignment = bedAssignments[0];
-              if (bedAssignment?.bed_id?.room_id?.room_number) {
-                roomMap[residentId] = bedAssignment.bed_id.room_id.room_number;
-              }
+              const rn = bedAssignment?.bed_id?.room_id?.room_number || 'Chưa hoàn tất đăng kí';
+              results[rid] = rn;
+              setRoomCache(rid, rn);
+            } else {
+              results[rid] = 'Chưa hoàn tất đăng kí';
+              setRoomCache(rid, 'Chưa hoàn tất đăng kí');
             }
-          } catch (error) {
+          } catch {
+            results[rid] = 'Chưa hoàn tất đăng kí';
           }
         }
-      }
-      setResidentRooms(roomMap);
+      };
+      await Promise.all(Array.from({ length: Math.min(limit, idsToFetch.length) }, () => worker()));
+      if (Object.keys(results).length) setResidentRooms(prev => ({ ...prev, ...results }));
     } catch (err) {
     } finally {
       setLoading(false);

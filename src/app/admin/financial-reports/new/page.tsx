@@ -6,6 +6,7 @@ import { residentAPI, staffAPI, billsAPI, carePlansAPI, roomsAPI, bedAssignments
 import { useAuth } from '@/lib/contexts/auth-context';
 import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 import { getCompletedResidents } from '@/lib/utils/resident-status';
+import { clientStorage } from '@/lib/utils/clientStorage';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import {
@@ -59,54 +60,93 @@ export default function NewBillPage() {
   const [loadingBills, setLoadingBills] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
+  // Quick helper: concurrency limiter
+  const withConcurrency = async <T, R>(items: T[], limit: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> => {
+    const results: R[] = new Array(items.length) as R[];
+    let idx = 0;
+    const workers: Promise<void>[] = [];
+    const run = async () => {
+      while (idx < items.length) {
+        const current = idx++;
+        try {
+          results[current] = await worker(items[current], current);
+        } catch (e) {
+          // @ts-ignore
+          results[current] = null;
+        }
+      }
+    };
+    for (let i = 0; i < Math.max(1, limit); i++) workers.push(run());
+    await Promise.all(workers);
+    return results;
+  };
+
   const fetchResidentsWithRooms = async () => {
     try {
-      const completedResidents = await getCompletedResidents();
-      const billsData = await billsAPI.getAll();
+      // 1) Show cached list immediately (if any)
+      try {
+        const cachedRaw = clientStorage.getItem('billingValidResidentsCache');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (Array.isArray(cached?.data) && cached?.data.length > 0) {
+            setResidents(cached.data);
+            setFilteredResidents(cached.data);
+          }
+        }
+      } catch {}
+
+      // 2) Recompute in background: fetch core lists in parallel
+      const [allResidents, billsData] = await Promise.all([
+        // residentAPI.getAll is already cached in lib/api.ts
+        residentAPI.getAll().catch(() => []),
+        billsAPI.getAll().catch(() => []),
+      ]);
       setExistingBills(billsData);
 
-      const residentsWithValidServices = await Promise.all(
-        completedResidents.map(async (resident: any) => {
-          try {
-            const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id);
-            const now = new Date();
+      // Pre-filter by active status to reduce work
+      const activeResidents = (allResidents || []).filter((r: any) => String(r?.status || '').toLowerCase() === 'active');
 
-            const hasValidAssignment = Array.isArray(assignments) && assignments.some((a: any) => {
-              const notExpired = !a?.end_date || new Date(a.end_date) >= now;
-              const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
-              const isActive = a?.status === 'active' || !a?.status;
+      // 3) Validate active service for each resident with limited concurrency
+      const evaluated = await withConcurrency<any, any>(activeResidents, 6, async (resident) => {
+        try {
+          const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id);
+          const now = new Date();
+          const hasValidAssignment = Array.isArray(assignments) && assignments.some((a: any) => {
+            const notExpired = !a?.end_date || new Date(a.end_date) >= now;
+            const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
+            const isActive = a?.status === 'active' || !a?.status;
+            return notExpired && notCancelled && isActive;
+          });
+          if (!hasValidAssignment) return null;
 
-              return notExpired && notCancelled && isActive;
-            });
+          const hasExistingBills = billsData.some((bill: any) => bill.resident_id === resident._id || bill.resident_id?._id === resident._id);
+          return {
+            ...resident,
+            room_number: resident.roomNumber || 'Chưa hoàn tất đăng ký',
+            hasExistingBills,
+            isNewResident: !hasExistingBills,
+          };
+        } catch {
+          return null;
+        }
+      });
 
-            if (!hasValidAssignment) {
-              return null;
-            }
-
-            const hasExistingBills = billsData.some((bill: any) =>
-              bill.resident_id === resident._id || bill.resident_id?._id === resident._id
-            );
-
-            return {
-              ...resident,
-              room_number: resident.roomNumber || 'Chưa hoàn tất đăng ký',
-              hasExistingBills,
-              isNewResident: !hasExistingBills
-            };
-          } catch (error) {
-            return null;
-          }
-        })
-      );
-
-      const validResidents = residentsWithValidServices.filter(r => r !== null);
-
+      const validResidents = evaluated.filter(Boolean);
       setResidents(validResidents);
       setFilteredResidents(validResidents);
+
+      // 4) Cache for instant open next time (TTL ~ 60s)
+      try {
+        clientStorage.setItem('billingValidResidentsCache', JSON.stringify({ ts: Date.now(), data: validResidents }));
+      } catch {}
+
       setLastUpdate(new Date());
     } catch (error) {
-      setResidents([]);
-      setFilteredResidents([]);
+      // Keep any cached state if present
+      if (!residents.length) {
+        setResidents([]);
+        setFilteredResidents([]);
+      }
     } finally {
       setLoadingResidents(false);
       setLoadingBills(false);
@@ -117,6 +157,7 @@ export default function NewBillPage() {
     setLoadingResidents(true);
     setLoadingBills(true);
 
+    // Kick off fetch; cached data (if any) will render instantly
     fetchResidentsWithRooms();
     staffAPI.getAll().then(setStaffs);
 

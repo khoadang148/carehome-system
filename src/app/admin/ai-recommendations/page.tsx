@@ -26,7 +26,28 @@ import { filterOfficialResidents } from '@/lib/utils/resident-status';
 import { validateActivitySchedule, checkScheduleConflict, ActivityParticipation } from '@/lib/utils/validation';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { clientStorage } from '@/lib/utils/clientStorage';
 
+// Simple concurrency limiter
+const withConcurrency = async <T, R>(items: T[], limit: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> => {
+  const results: R[] = new Array(items.length) as R[];
+  let idx = 0;
+  const workers: Promise<void>[] = [];
+  const run = async () => {
+    while (idx < items.length) {
+      const current = idx++;
+      try {
+        results[current] = await worker(items[current], current);
+      } catch (e) {
+        // @ts-ignore
+        results[current] = null;
+      }
+    }
+  };
+  for (let i = 0; i < Math.max(1, limit); i++) workers.push(run());
+  await Promise.all(workers);
+  return results;
+};
 
 export default function AIRecommendationsPage() {
   const router = useRouter();
@@ -82,88 +103,86 @@ export default function AIRecommendationsPage() {
   const fetchResidents = async () => {
     try {
       setResidentsLoading(true);
-      
-      // Tải danh sách residents cơ bản trước (nhanh)
+      // 1) Try cached list for instant display
+      try {
+        const cachedRaw = clientStorage.getItem('aiResidentsCache');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (Array.isArray(cached?.data) && cached.data.length > 0) {
+            setResidents(cached.data);
+            setResidentsError(null);
+          }
+        }
+      } catch {}
+
+      // 2) Fetch fresh basic list (residentAPI.getAll has its own short TTL cache)
       const apiData = await residentAPI.getAll();
 
-      // Lọc residents chính thức ngay lập tức
       const basicResidents = apiData.map((r: any) => ({
         id: r._id,
         name: r.full_name || '',
-        room: '', // Sẽ tải sau
+        room: '',
         status: r.status || 'active'
       }));
-      
+
       const officialResidents = await filterOfficialResidents(basicResidents);
-      
-      // Hiển thị danh sách cơ bản ngay lập tức
+
       setResidents(officialResidents);
       setResidentsError(null);
-      
-      // Tải thông tin phòng trong background (nếu cần)
+
+      // 3) Background room info with concurrency limit and cache final
       if (officialResidents.length > 0) {
         setTimeout(async () => {
           try {
             setLoadingRoomInfo(true);
-            const residentsWithRooms = await Promise.all(
-              officialResidents.map(async (resident) => {
-        let roomNumber = '';
-        try {
-                  const residentId = resident.id;
-
-                  // Thử lấy từ bed assignments trước
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-            const bedAssignment = Array.isArray(bedAssignments) ?
-              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-
-            if (bedAssignment?.bed_id?.room_id) {
-              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                roomNumber = bedAssignment.bed_id.room_id.room_number;
-              } else {
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
-                  const roomData = await roomsAPI.getById(roomId);
-                  roomNumber = roomData?.room_number || '';
+            const residentsWithRooms = await withConcurrency<typeof officialResidents[number], any>(officialResidents, 6, async (resident) => {
+              let roomNumber = '';
+              try {
+                const residentId = resident.id;
+                try {
+                  const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+                  const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+                  if (bedAssignment?.bed_id?.room_id) {
+                    if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                      roomNumber = bedAssignment.bed_id.room_id.room_number;
+                    } else {
+                      const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                      if (roomId && roomId !== '[object Object]' && roomId !== 'undefined' && roomId !== 'null') {
+                        const roomData = await roomsAPI.getById(roomId);
+                        roomNumber = roomData?.room_number || '';
+                      }
+                    }
+                  } else {
+                    throw new Error('No bed assignment found');
+                  }
+                } catch (bedError) {
+                  const assignments = await carePlansAPI.getByResidentId(residentId);
+                  const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+                  if (assignment?.bed_id?.room_id || assignment?.assigned_room_id) {
+                    const roomId = assignment.bed_id?.room_id || assignment?.assigned_room_id;
+                    const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                    if (roomIdString && roomIdString !== '[object Object]' && roomIdString !== 'undefined' && roomIdString !== 'null') {
+                      const roomData = await roomsAPI.getById(roomIdString);
+                      roomNumber = roomData?.room_number || '';
+                    }
+                  }
                 }
+              } catch (error) {
+                roomNumber = '';
               }
-            } else {
-              throw new Error('No bed assignment found');
-            }
-          } catch (bedError) {
-                    // Fallback: thử từ care plans
-            const assignments = await carePlansAPI.getByResidentId(residentId);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+              return { ...resident, room: roomNumber };
+            });
 
-            if (assignment?.bed_id?.room_id || assignment?.assigned_room_id) {
-              const roomId = assignment.bed_id?.room_id || assignment?.assigned_room_id;
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-
-              if (roomIdString && roomIdString !== '[object Object]' && roomIdString !== 'undefined' && roomIdString !== 'null') {
-                const roomData = await roomsAPI.getById(roomIdString);
-                roomNumber = roomData?.room_number || '';
-              }
-            }
-          }
-        } catch (error) {
-          roomNumber = '';
-        }
-
-        return {
-                  ...resident,
-          room: roomNumber,
-        };
-              })
-            );
-            
             setResidents(residentsWithRooms);
+            try {
+              clientStorage.setItem('aiResidentsCache', JSON.stringify({ ts: Date.now(), data: residentsWithRooms }));
+            } catch {}
           } catch (error) {
-            // Không hiển thị lỗi nếu chỉ là việc tải room info
             console.log('Không thể tải thông tin phòng:', error);
           } finally {
             setLoadingRoomInfo(false);
           }
-        }, 100); // Delay 100ms để UI render trước
+        }, 50);
       }
       
     } catch (error) {
