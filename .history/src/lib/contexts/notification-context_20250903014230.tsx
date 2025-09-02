@@ -147,7 +147,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       );
     } else {
       // Fallback: clear all
-    setNotifications([]);
+      setNotifications([]);
     }
   }, [user]);
 
@@ -371,8 +371,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             if (assignedResidentIds.length > 0) {
               // Lấy tất cả hoạt động trong ngày hôm nay
-            const activities = await activityParticipationsAPI.getAll();
-            const today = new Date().toISOString().split('T')[0];
+              const activities = await activityParticipationsAPI.getAll();
+              const today = new Date().toISOString().split('T')[0];
               
               // Đếm số hoạt động duy nhất trong ngày (không trùng lặp theo activity_id)
               const uniqueTodayActivities = new Set();
@@ -388,14 +388,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               const todayActivitiesCount = uniqueTodayActivities.size;
 
               if (todayActivitiesCount > 0) {
-              newNotifications.push(createNotification(
-                'info',
-                'Hoạt động hôm nay',
+                newNotifications.push(createNotification(
+                  'info',
+                  'Hoạt động hôm nay',
                   `Có ${todayActivitiesCount} hoạt động được lên lịch hôm nay.`,
-                'activity',
-                '/staff/activities',
+                  'activity',
+                  '/staff/activities',
                   { activitiesCount: todayActivitiesCount, staffId: user.id, role: 'staff' }
-              ));
+                ));
               }
             }
           } catch (error) {

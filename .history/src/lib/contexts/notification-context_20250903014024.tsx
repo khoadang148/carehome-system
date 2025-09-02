@@ -147,7 +147,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       );
     } else {
       // Fallback: clear all
-    setNotifications([]);
+      setNotifications([]);
     }
   }, [user]);
 
@@ -225,17 +225,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           // Care notes for linked residents - ensure proper filtering by resident IDs
           try {
             if (residentIds.length > 0) {
-              // Lấy tất cả care notes và filter theo resident IDs để đảm bảo chính xác
-              const allCareNotes = await careNotesAPI.getAll();
-              
-              // Filter care notes theo resident IDs của family member
-              const userCareNotes = allCareNotes.filter((note: any) => {
-                const noteResidentId = note.resident_id?._id || note.resident_id;
-                return residentIds.includes(noteResidentId);
-              });
+              // Use getAll with resident_ids filter instead of non-existent getByResidentId
+              const careNotes = await careNotesAPI.getAll({ resident_ids: residentIds.join(',') });
               
               const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-              const recentCareNotes = userCareNotes.filter((note: any) => 
+              const recentCareNotes = careNotes.filter((note: any) => 
                 new Date(note.created_at || note.date) > oneDayAgo
               );
               
@@ -257,20 +251,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           // Vital signs per resident - ensure proper filtering by resident IDs
           try {
             if (residentIds.length > 0) {
-              // Lấy tất cả vital signs và filter theo resident IDs để đảm bảo chính xác
-              const allVitalSigns = await vitalSignsAPI.getAll();
-              
-              // Filter vital signs theo resident IDs của family member
-              const userVitalSigns = allVitalSigns.filter((vital: any) => {
-                const vitalResidentId = vital.resident_id?._id || vital.resident_id;
-                return residentIds.includes(vitalResidentId);
-              });
-              
-              const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-              const recentVitalSigns = userVitalSigns.filter((v: any) => 
-                new Date(v.dateTime || v.created_at) > oneDayAgo
+              const results = await Promise.allSettled(
+                residentIds.map((id) => vitalSignsAPI.getByResidentId?.(id))
               );
-              
+              const vitalList: any[] = [];
+              results.forEach((r) => {
+                if (r.status === 'fulfilled' && Array.isArray(r.value)) vitalList.push(...r.value);
+              });
+              const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+              const recentVitalSigns = vitalList.filter((v: any) => new Date(v.dateTime || v.created_at) > oneDayAgo);
               if (recentVitalSigns.length > 0) {
                 newNotifications.push(createNotification(
                   'info',
@@ -371,8 +360,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             if (assignedResidentIds.length > 0) {
               // Lấy tất cả hoạt động trong ngày hôm nay
-            const activities = await activityParticipationsAPI.getAll();
-            const today = new Date().toISOString().split('T')[0];
+              const activities = await activityParticipationsAPI.getAll();
+              const today = new Date().toISOString().split('T')[0];
               
               // Đếm số hoạt động duy nhất trong ngày (không trùng lặp theo activity_id)
               const uniqueTodayActivities = new Set();
@@ -388,14 +377,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               const todayActivitiesCount = uniqueTodayActivities.size;
 
               if (todayActivitiesCount > 0) {
-              newNotifications.push(createNotification(
-                'info',
-                'Hoạt động hôm nay',
+                newNotifications.push(createNotification(
+                  'info',
+                  'Hoạt động hôm nay',
                   `Có ${todayActivitiesCount} hoạt động được lên lịch hôm nay.`,
-                'activity',
-                '/staff/activities',
+                  'activity',
+                  '/staff/activities',
                   { activitiesCount: todayActivitiesCount, staffId: user.id, role: 'staff' }
-              ));
+                ));
               }
             }
           } catch (error) {

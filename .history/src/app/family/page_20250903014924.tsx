@@ -227,54 +227,42 @@ function FamilyPortalPageContent() {
 
         const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
 
-                  if (!showActivityHistory) {
-            if (grouped[todayFromAPI] && grouped[todayFromAPI].length > 0) {
-              const uniqueActivities = grouped[todayFromAPI].reduce((acc: any[], current: any) => {
-                const activityId = current.activity_id?._id || current.activity_id;
-                const activityName = current.activity_id?.activity_name;
-                
-                // Bỏ qua hoạt động không có tên hoặc đã bị xóa
-                if (!activityName || activityName === '---') {
-                  return acc;
-                }
-                
-                const existingIndex = acc.findIndex(item =>
-                  (item.activity_id?._id || item.activity_id) === activityId
-                );
-
-                if (existingIndex === -1) {
-                  acc.push(current);
-                } else {
-                  const existing = acc[existingIndex];
-                  const existingTime = new Date(existing.updated_at || existing.created_at || 0);
-                  const currentTime = new Date(current.updated_at || current.created_at || 0);
-
-                  if (currentTime > existingTime) {
-                    acc[existingIndex] = current;
-                  }
-                }
+        if (!showActivityHistory) {
+          if (grouped[todayFromAPI] && grouped[todayFromAPI].length > 0) {
+            const uniqueActivities = grouped[todayFromAPI].reduce((acc: any[], current: any) => {
+              const activityId = current.activity_id?._id || current.activity_id;
+              const activityName = current.activity_id?.activity_name;
+              
+              // Bỏ qua hoạt động không có tên hoặc đã bị xóa
+              if (!activityName || activityName === '---') {
                 return acc;
-              }, []);
+              }
+              
+              const existingIndex = acc.findIndex(item =>
+                (item.activity_id?._id || item.activity_id) === activityId
+              );
 
-              // Sắp xếp hoạt động theo thời gian tăng dần
-              const sortedActivities = uniqueActivities.sort((a: any, b: any) => {
-                const timeA = activityTimes[a.activity_id?._id || a.activity_id]?.start || '';
-                const timeB = activityTimes[b.activity_id?._id || b.activity_id]?.start || '';
-                
-                if (!timeA && !timeB) return 0;
-                if (!timeA) return 1;
-                if (!timeB) return -1;
-                
-                return timeA.localeCompare(timeB);
-              });
+              if (existingIndex === -1) {
+                acc.push(current);
+              } else {
+                const existing = acc[existingIndex];
+                const existingTime = new Date(existing.updated_at || existing.created_at || 0);
+                const currentTime = new Date(current.updated_at || current.created_at || 0);
 
-              setSelectedActivityDate(todayFromAPI);
-              setActivities(sortedActivities);
-            } else {
-              setSelectedActivityDate('');
-              setActivities([]);
-            }
+                if (currentTime > existingTime) {
+                  acc[existingIndex] = current;
+                }
+              }
+              return acc;
+            }, []);
+
+            setSelectedActivityDate(todayFromAPI);
+            setActivities(uniqueActivities);
+          } else {
+            setSelectedActivityDate('');
+            setActivities([]);
           }
+        }
 
         setTabsLoaded(prev => ({ ...prev, 0: true }));
       } catch (error) {
@@ -545,20 +533,8 @@ function FamilyPortalPageContent() {
                 return acc;
               }, []);
 
-              // Sắp xếp hoạt động theo thời gian tăng dần
-              const sortedActivities = uniqueActivities.sort((a: any, b: any) => {
-                const timeA = activityTimes[a.activity_id?._id || a.activity_id]?.start || '';
-                const timeB = activityTimes[b.activity_id?._id || b.activity_id]?.start || '';
-                
-                if (!timeA && !timeB) return 0;
-                if (!timeA) return 1;
-                if (!timeB) return -1;
-                
-                return timeA.localeCompare(timeB);
-              });
-
               setSelectedActivityDate(todayFromAPI);
-              setActivities(sortedActivities);
+              setActivities(uniqueActivities);
             } else {
               setSelectedActivityDate('');
               setActivities([]);
@@ -622,19 +598,7 @@ function FamilyPortalPageContent() {
           return acc;
         }, []);
 
-        // Sắp xếp hoạt động theo thời gian tăng dần
-        const sortedActivities = uniqueActivities.sort((a: any, b: any) => {
-          const timeA = activityTimes[a.activity_id?._id || a.activity_id]?.start || '';
-          const timeB = activityTimes[b.activity_id?._id || b.activity_id]?.start || '';
-          
-          if (!timeA && !timeB) return 0;
-          if (!timeA) return 1;
-          if (!timeB) return -1;
-          
-          return timeA.localeCompare(timeB);
-        });
-
-        setActivities(sortedActivities);
+        setActivities(uniqueActivities);
       })
       .catch(() => setActivities([]))
       .finally(() => setActivitiesLoading(false));

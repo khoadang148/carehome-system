@@ -622,19 +622,7 @@ function FamilyPortalPageContent() {
           return acc;
         }, []);
 
-        // Sắp xếp hoạt động theo thời gian tăng dần
-        const sortedActivities = uniqueActivities.sort((a: any, b: any) => {
-          const timeA = activityTimes[a.activity_id?._id || a.activity_id]?.start || '';
-          const timeB = activityTimes[b.activity_id?._id || b.activity_id]?.start || '';
-          
-          if (!timeA && !timeB) return 0;
-          if (!timeA) return 1;
-          if (!timeB) return -1;
-          
-          return timeA.localeCompare(timeB);
-        });
-
-        setActivities(sortedActivities);
+        setActivities(uniqueActivities);
       })
       .catch(() => setActivities([]))
       .finally(() => setActivitiesLoading(false));
