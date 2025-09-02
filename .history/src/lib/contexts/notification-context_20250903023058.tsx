@@ -201,15 +201,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                  { bills: unpaidBills, totalAmount: totalUnpaidAmount, familyId: user.id }
                ));
              }
-             
-             // Check for recently paid bills (within last 24 hours)
-             const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-             const recentlyPaidBills = userBills.filter((bill: any) => 
-               bill.status === 'paid' && 
-               new Date(bill.updated_at || bill.paid_at || bill.created_at) > oneDayAgo
-             );
-             
-             if (recentlyPaidBills.length > 0) {
+            
+            // Check for recently paid bills (within last 24 hours)
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const recentlyPaidBills = userBills.filter((bill: any) => 
+              bill.status === 'paid' && 
+              new Date(bill.updated_at || bill.paid_at || bill.created_at) > oneDayAgo
+            );
+            
+                         if (recentlyPaidBills.length > 0) {
                const totalAmount = recentlyPaidBills.reduce((sum: number, bill: any) => 
                  sum + (bill.amount || 0), 0
                );
@@ -259,37 +259,37 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             if (!isForbidden(error)) console.error('Error fetching care notes:', error);
           }
 
-          // Vital signs per resident - bỏ qua để tránh lỗi 403
-          // try {
-          //   if (residentIds.length > 0) {
-          //     // Lấy tất cả vital signs và filter theo resident IDs để đảm bảo chính xác
-          //     const allVitalSigns = await vitalSignsAPI.getAll();
-          //     
-          //     // Filter vital signs theo resident IDs của family member
-          //     const userVitalSigns = allVitalSigns.filter((vital: any) => {
-          //       const vitalResidentId = vital.resident_id?._id || vital.resident_id;
-          //       return residentIds.includes(vitalResidentId);
-          //     });
-          //     
-          //     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          //     const recentVitalSigns = userVitalSigns.filter((v: any) => 
-          //       new Date(v.dateTime || v.created_at) > oneDayAgo
-          //     );
-          //     
-          //     if (recentVitalSigns.length > 0) {
-          //       newNotifications.push(createNotification(
-          //         'info',
-          //         'Chỉ số sức khỏe mới',
-          //         `Có ${recentVitalSigns.length} chỉ số sức khỏe mới được cập nhật.`,
-          //         'health',
-          //         '/family',
-          //         { vitalSigns: recentVitalSigns, familyId: user.id, residentIds }
-          //       ));
-          //     }
-          //   }
-          // } catch (error) {
-          //   if (!isForbidden(error)) console.error('Error fetching vital signs:', error);
-          // }
+          // Vital signs per resident - ensure proper filtering by resident IDs
+          try {
+            if (residentIds.length > 0) {
+              // Lấy tất cả vital signs và filter theo resident IDs để đảm bảo chính xác
+              const allVitalSigns = await vitalSignsAPI.getAll();
+              
+              // Filter vital signs theo resident IDs của family member
+              const userVitalSigns = allVitalSigns.filter((vital: any) => {
+                const vitalResidentId = vital.resident_id?._id || vital.resident_id;
+                return residentIds.includes(vitalResidentId);
+              });
+              
+              const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+              const recentVitalSigns = userVitalSigns.filter((v: any) => 
+                new Date(v.dateTime || v.created_at) > oneDayAgo
+              );
+              
+              if (recentVitalSigns.length > 0) {
+                newNotifications.push(createNotification(
+                  'info',
+                  'Chỉ số sức khỏe mới',
+                  `Có ${recentVitalSigns.length} chỉ số sức khỏe mới được cập nhật.`,
+                  'health',
+                  '/family',
+                  { vitalSigns: recentVitalSigns, familyId: user.id, residentIds }
+                ));
+              }
+            }
+          } catch (error) {
+            if (!isForbidden(error)) console.error('Error fetching vital signs:', error);
+          }
 
           // Visits upcoming for this family member - ensure proper filtering
           try {
