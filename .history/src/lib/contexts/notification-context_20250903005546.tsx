@@ -352,31 +352,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               : [];
 
             if (assignedResidentIds.length > 0) {
-              // Lấy tất cả hoạt động trong ngày hôm nay
+              // Lấy hoạt động tham gia chỉ cho những resident mà staff được phân công
               const activities = await activityParticipationsAPI.getAll();
               const today = new Date().toISOString().split('T')[0];
-              
-              // Đếm số hoạt động duy nhất trong ngày (không trùng lặp theo activity_id)
-              const uniqueTodayActivities = new Set();
-              activities.forEach((activity: any) => {
+              const todayActivities = activities.filter((activity: any) => {
                 const activityDate = activity.date ? new Date(activity.date).toISOString().split('T')[0] : null;
-                const activityId = activity.activity_id?._id || activity.activity_id;
+                const residentId = activity.resident_id?._id || activity.resident_id;
                 
-                if (activityDate === today && activityId) {
-                  uniqueTodayActivities.add(activityId);
-                }
+                return activityDate === today && 
+                       activity.attendance_status === 'pending' && 
+                       assignedResidentIds.includes(residentId);
               });
 
-              const todayActivitiesCount = uniqueTodayActivities.size;
-
-              if (todayActivitiesCount > 0) {
+              if (todayActivities.length > 0) {
                 newNotifications.push(createNotification(
                   'info',
                   'Hoạt động hôm nay',
-                  `Có ${todayActivitiesCount} hoạt động được lên lịch hôm nay.`,
+                  `Có ${todayActivities.length} hoạt động cần tham gia hôm nay.`,
                   'activity',
                   '/staff/activities',
-                  { activitiesCount: todayActivitiesCount, staffId: user.id, role: 'staff' }
+                  { activities: todayActivities, staffId: user.id, role: 'staff' }
                 ));
               }
             }
