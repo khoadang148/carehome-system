@@ -55,13 +55,8 @@ const ROLE_DASHBOARDS = {
         href: '/admin/staff-assignments',
         gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
       },
-      {
-        title: 'Phòng & giường',
-        description: 'Phân bổ phòng và giường cho người cao tuổi',
-        icon: BuildingOfficeIcon,
-        href: '/admin/room-management',
-        gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-      },
+    
+        
       {
         title: 'Chỉ số sức khỏe',
         description: 'Xem tất cả chỉ số sức khỏe của người cao tuổi',
