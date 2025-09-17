@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { ChatBubbleLeftRightIcon as ChatBubbleSolid } from '@heroicons/react/24/solid';
 import { messagesAPI } from '@/lib/api';
@@ -27,24 +27,31 @@ export default function StaffChatButton({
   const [unreadCount, setUnreadCount] = useState(0);
   const [isPulsing, setIsPulsing] = useState(false);
   const { chatState } = useChat();
+  const prevCountRef = useRef(0);
 
   useEffect(() => {
+    let isFetching = false;
     const fetchUnreadCount = async () => {
+      if (isFetching) return;
+      isFetching = true;
       try {
         const response = await messagesAPI.getUnreadCount();
         const newCount = response.unreadCount || 0;
         
         // Trigger pulse animation if count increased
-        if (newCount > unreadCount) {
+        if (newCount > prevCountRef.current) {
           setIsPulsing(true);
           setTimeout(() => setIsPulsing(false), 1000);
         }
         
         if (typeof newCount === 'number') {
           setUnreadCount(newCount);
+          prevCountRef.current = newCount;
         }
       } catch (error) {
         // Silent error handling
+      } finally {
+        isFetching = false;
       }
     };
 
@@ -52,7 +59,7 @@ export default function StaffChatButton({
     const interval = setInterval(fetchUnreadCount, 10000);
 
     return () => clearInterval(interval);
-  }, [familyMemberId, unreadCount]);
+  }, [familyMemberId]);
 
   const handleClick = () => {
     onChatOpen(familyMemberId, familyMemberName, residentId, residentName);

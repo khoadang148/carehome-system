@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useResidents } from '@/lib/contexts/residents-context';
@@ -38,6 +38,7 @@ import {
   staffAssignmentsAPI,
   bedAssignmentsAPI
 } from '@/lib/api';
+import { useVitalSigns as useVitalSignsSWR, useBedAssignments as useBedAssignmentsSWR, useRoom as useRoomSWR, useStaffAssignments as useStaffAssignmentsSWR } from '@/hooks/useSWRData';
 import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
 import SuccessModal from '@/components/SuccessModal';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -63,6 +64,19 @@ const formatDob = (dob: string) => {
   const month: string = String(d.getMonth() + 1).padStart(2, '0');
   const year: number = d.getFullYear();
   return `${day}-${month}-${year}`;
+};
+
+// Chuyển chuỗi thành dạng viết hoa chữ cái đầu mỗi từ (Việt Nam)
+const toTitleCase = (input: string) => {
+  if (!input) return input;
+  return input
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map(word =>
+      (word[0] ? word[0].toLocaleUpperCase('vi-VN') : '') + (word.slice(1) || '')
+    )
+    .join(' ');
 };
 
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
@@ -150,8 +164,12 @@ function FamilyPortalPageContent() {
   const [activeTab, setActiveTab] = useState(0);
   const [tabsLoaded, setTabsLoaded] = useState<{ [key: number]: boolean }>({ 0: false });
   const [tabLoading, setTabLoading] = useState<{ [key: number]: boolean }>({});
+  const activeResidentIdRef = useRef<string>('');
 
   useEffect(() => {
+    // Only sync vitals when the Vital Signs tab is active to avoid frequent
+    // background updates that can cascade into render loops.
+    if (typeof activeTab !== 'number' || activeTab !== 2) return;
     const checkLoginSuccess = () => {
     const msg = clientStorage.getItem('login_success');
     if (msg) {
@@ -225,15 +243,39 @@ function FamilyPortalPageContent() {
     setTimeout(() => setPageReady(true), 100);
   }, [residents]);
 
+  // Keep a ref of current resident to prevent stale updates
+  useEffect(() => {
+    activeResidentIdRef.current = selectedResidentId || '';
+  }, [selectedResidentId]);
+
+  // Immediately reset UI state when switching resident to avoid stale flashes
+  useEffect(() => {
+    if (!selectedResidentId) return;
+    // Reset per-resident sections synchronously
+    setActivities([]);
+    setActivityTimes({});
+    setActivityHistoryDates([]);
+    setSelectedActivityDate('');
+    setCareNotes([]);
+    setVitalSigns(null);
+    setVitalSignsHistory([]);
+    setTabsLoaded({ 0: false });
+    setTabLoading(prev => ({ ...prev, 0: true }));
+  }, [selectedResidentId]);
+
   useEffect(() => {
     if (!selectedResidentId || !pageReady) return;
 
     const loadActivitiesData = async () => {
+      const requestedResidentId = selectedResidentId;
       try {
         setTabLoading(prev => ({ ...prev, 0: true }));
 
-        const activitiesPromise = await activityParticipationsAPI.getByResidentId(selectedResidentId);
+        const activitiesPromise = await activityParticipationsAPI.getByResidentId(requestedResidentId);
         const arr = Array.isArray(activitiesPromise) ? activitiesPromise : [];
+
+        // If resident changed while waiting for API, abort
+        if (activeResidentIdRef.current !== requestedResidentId) return;
 
         const grouped: Record<string, any[]> = {};
         arr.forEach((item) => {
@@ -244,6 +286,7 @@ function FamilyPortalPageContent() {
         });
 
         const allDates = Object.keys(grouped).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        if (activeResidentIdRef.current !== requestedResidentId) return;
         setActivityHistoryDates(allDates);
 
         const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
@@ -289,20 +332,26 @@ function FamilyPortalPageContent() {
                 return timeA.localeCompare(timeB);
               });
 
+            if (activeResidentIdRef.current !== requestedResidentId) return;
             setSelectedActivityDate(todayFromAPI);
               setActivities(sortedActivities);
           } else {
+            if (activeResidentIdRef.current !== requestedResidentId) return;
             setSelectedActivityDate('');
             setActivities([]);
           }
         }
 
+        // Ignore if resident changed while loading
+        if (activeResidentIdRef.current !== requestedResidentId) return;
         setTabsLoaded(prev => ({ ...prev, 0: true }));
       } catch (error) {
 
         setActivitiesError('Không thể tải dữ liệu hoạt động.');
       } finally {
+        if (activeResidentIdRef.current === requestedResidentId) {
         setTabLoading(prev => ({ ...prev, 0: false }));
+        }
       }
     };
 
@@ -327,29 +376,18 @@ function FamilyPortalPageContent() {
     }
   };
 
+  // SWR: Vital signs — use manual sync when the tab is opened
+  const { vitalSigns: swrVital, vitalSignsHistory: swrVitalHistory, isLoading: swrVitalLoading } = useVitalSignsSWR(selectedResidentId);
   const loadVitalSignsData = async () => {
     if (tabsLoaded[2] || tabLoading[2]) return;
-
-    try {
       setTabLoading(prev => ({ ...prev, 2: true }));
-
-      const vitalSignsData = await vitalSignsAPI.getByResidentId(selectedResidentId);
-      if (Array.isArray(vitalSignsData) && vitalSignsData.length > 0) {
-        const sorted = [...vitalSignsData].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
-        setVitalSigns(sorted[0]);
-        setVitalSignsHistory(sorted);
-      } else {
-        setVitalSigns(null);
-        setVitalSignsHistory([]);
-      }
-
+    setVitalLoading(prev => (prev !== swrVitalLoading ? swrVitalLoading : prev));
+    const nextVital = swrVital || null;
+    setVitalSigns(prev => (prev !== nextVital ? nextVital : prev));
+    const nextHistory = Array.isArray(swrVitalHistory) ? swrVitalHistory : [];
+    setVitalSignsHistory(prev => (prev.length !== nextHistory.length ? nextHistory : prev));
       setTabsLoaded(prev => ({ ...prev, 2: true }));
-    } catch (error) {
-
-      setVitalError('Không thể tải chỉ số sức khỏe.');
-    } finally {
       setTabLoading(prev => ({ ...prev, 2: false }));
-    }
   };
 
   const handleTabChange = (index: number) => {
@@ -402,29 +440,7 @@ function FamilyPortalPageContent() {
     });
   }, [activities, activityTimes]);
 
-  useEffect(() => {
-    const getServerDate = async () => {
-      try {
-        const response = await fetch('/api/current-date', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setServerToday(data.date);
-        } else {
-          const clientDate = new Date().toISOString().slice(0, 10);
-          setServerToday(clientDate);
-        }
-      } catch (error) {
-        const clientDate = new Date().toISOString().slice(0, 10);
-        setServerToday(clientDate);
-      }
-    };
-    getServerDate();
-  }, []);
+  // server date can be wired with a small revalidation; keep effect minimal
 
   const [careNotesPage, setCareNotesPage] = useState(1);
   const [vitalPage, setVitalPage] = useState(1);
@@ -442,197 +458,38 @@ function FamilyPortalPageContent() {
   useEffect(() => { setCareNotesPage(1); }, [careNotes.length]);
   useEffect(() => { setVitalPage(1); }, [vitalSignsHistory.length]);
 
+  // SWR bed/room wiring
+  const { bedAssignment, roomId } = useBedAssignmentsSWR(selectedResidentId);
+  const { room, isLoading: roomIsLoading } = useRoomSWR(roomId || '');
   useEffect(() => {
-    if (!selectedResidentId || !pageReady) return;
+    setRoomLoading(prev => (prev !== roomIsLoading ? roomIsLoading : prev));
+    const nextRoomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
+    setRoomNumber(prev => (prev !== nextRoomNumber ? nextRoomNumber : prev));
+  }, [roomIsLoading, room?.room_number]);
 
-    const loadResidentData = async () => {
-      try {
-        // Clear dữ liệu cũ khi chuyển resident
-        setAssignedStaff([]);
-        setVitalSigns(null);
-        setVitalSignsHistory([]);
-        setCareNotes([]);
-        setActivities([]);
-        setRoomNumber('Chưa hoàn tất đăng kí');
-        setAssignedStaffLoading(true);
-        setAssignedStaffError('');
-        
-        console.log('Loading data for resident:', selectedResidentId);
-        
-        // Lấy thông tin phòng của resident trước
-        const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResidentId);
-        const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find(a => a.bed_id?.room_id) : null;
-        const roomId = bedAssignment?.bed_id?.room_id?._id || bedAssignment?.bed_id?.room_id;
+  // SWR: Staff assignments — load in parallel and convert to UI shape
+  const { assignedStaff: swrAssignedStaff, isLoading: swrAssignedLoading } = useStaffAssignmentsSWR(selectedResidentId);
+  const assignedCount = Array.isArray(swrAssignedStaff) ? swrAssignedStaff.length : 0;
+  useEffect(() => {
+    // Only update when values actually change to avoid loops from new array identities
+    setAssignedStaffLoading(prev => (prev !== swrAssignedLoading ? swrAssignedLoading : prev));
+    setAssignedStaff(prev => {
+      const next = Array.isArray(swrAssignedStaff) ? swrAssignedStaff : [];
+      if (prev.length !== next.length) return next;
+      return prev;
+    });
+  }, [swrAssignedLoading, assignedCount]);
 
-        const [
-          vitalSignsPromise,
-          vitalHistoryPromise,
-          careNotesPromise,
-          roomPromise,
-          assignedStaffPromise,
-          activitiesPromise
-        ] = await Promise.allSettled([
-          vitalSignsAPI.getByResidentId(selectedResidentId),
-          vitalSignsAPI.getByResidentId(selectedResidentId),
-          careNotesAPI.getAll({ resident_id: selectedResidentId }),
-          roomId ? roomsAPI.getById(roomId) : Promise.resolve(null),
-          // Sử dụng endpoint by-resident để lấy staff chăm sóc resident
-          staffAssignmentsAPI.getByResident(selectedResidentId),
-          activityParticipationsAPI.getByResidentId(selectedResidentId)
-        ]);
-
-        if (vitalSignsPromise.status === 'fulfilled') {
-          const data = vitalSignsPromise.value;
-          if (Array.isArray(data) && data.length > 0) {
-            const sorted = [...data].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
-            setVitalSigns(sorted[0]);
-            setVitalSignsHistory(sorted);
-          } else {
-            setVitalSigns(null);
-            setVitalSignsHistory([]);
-          }
-        }
-
-        if (careNotesPromise.status === 'fulfilled') {
-          setCareNotes(Array.isArray(careNotesPromise.value) ? careNotesPromise.value : []);
-        }
-
-        if (roomPromise.status === 'fulfilled' && roomPromise.value) {
-          setRoomNumber(roomPromise.value?.room_number || 'Chưa hoàn tất đăng kí');
-        } else {
-          setRoomNumber('Chưa hoàn tất đăng kí');
-        }
-
-        if (assignedStaffPromise.status === 'fulfilled') {
-          const staffData = assignedStaffPromise.value;
-          console.log('Staff data for resident', selectedResidentId, ':', staffData);
-          
-          // Endpoint by-resident trả về array của objects có cấu trúc { staff: {...}, assignment: {...} }
-          if (Array.isArray(staffData) && staffData.length > 0) {
-            // Xử lý dữ liệu từ API response
-            const processedStaff = staffData.map((item: any) => {
-              const staff = item.staff || item; // Fallback nếu không có nested structure
-              const assignment = item.assignment || {};
-              
-              return {
-                staff_id: {
-                  _id: staff.id || staff._id,
-                  id: staff.id || staff._id,
-                  full_name: staff.full_name,
-                  fullName: staff.full_name,
-                  email: staff.email,
-                  phone: staff.phone,
-                  position: staff.position || 'Nhân viên chăm sóc',
-                  avatar: staff.avatar,
-                  role: staff.role
-                },
-                ...assignment
-              };
-            });
-
-            console.log('Processed staff for resident', selectedResidentId, ':', processedStaff);
-            setAssignedStaff(processedStaff);
-          } else {
-            console.log('No staff data for resident', selectedResidentId);
-            setAssignedStaff([]);
-          }
-        } else {
-          console.log('Failed to fetch staff for resident', selectedResidentId, ':', assignedStaffPromise.reason);
-          setAssignedStaff([]);
-          // Không set error nếu chỉ là không có staff assignments
-          // setAssignedStaffError('Không thể tải thông tin nhân viên chăm sóc');
-        }
-        
-        setAssignedStaffLoading(false);
-
-        if (activitiesPromise.status === 'fulfilled') {
-          const arr = Array.isArray(activitiesPromise.value) ? activitiesPromise.value : [];
-          const grouped: Record<string, any[]> = {};
-          arr.forEach((item) => {
-            const date = item.date?.slice(0, 10);
-            if (!date) return;
-            if (!grouped[date]) grouped[date] = [];
-            grouped[date].push(item);
-          });
-
-          const allDates = Object.keys(grouped).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-          setActivityHistoryDates(allDates);
-
-          const todayFromAPI = serverToday || new Date().toISOString().slice(0, 10);
-
-          if (!showActivityHistory) {
-            if (grouped[todayFromAPI] && grouped[todayFromAPI].length > 0) {
-              const uniqueActivities = grouped[todayFromAPI].reduce((acc: any[], current: any) => {
-                const activityId = current.activity_id?._id || current.activity_id;
-                const activityName = current.activity_id?.activity_name;
-                
-                // Bỏ qua hoạt động không có tên hoặc đã bị xóa
-                if (!activityName || activityName === '---') {
-                  return acc;
-                }
-                
-                const existingIndex = acc.findIndex(item =>
-                  (item.activity_id?._id || item.activity_id) === activityId
-                );
-
-                if (existingIndex === -1) {
-                  acc.push(current);
-                } else {
-                  const existing = acc[existingIndex];
-                  const existingTime = new Date(existing.updated_at || existing.created_at || 0);
-                  const currentTime = new Date(current.updated_at || current.created_at || 0);
-
-                  if (currentTime > existingTime) {
-                    acc[existingIndex] = current;
-                  }
-                }
-                return acc;
-              }, []);
-
-              // Sắp xếp hoạt động theo thời gian tăng dần
-              const sortedActivities = uniqueActivities.sort((a: any, b: any) => {
-                const timeA = activityTimes[a.activity_id?._id || a.activity_id]?.start || '';
-                const timeB = activityTimes[b.activity_id?._id || b.activity_id]?.start || '';
-                
-                if (!timeA && !timeB) return 0;
-                if (!timeA) return 1;
-                if (!timeB) return -1;
-                
-                return timeA.localeCompare(timeB);
-              });
-
-              setSelectedActivityDate(todayFromAPI);
-              setActivities(sortedActivities);
-            } else {
-              setSelectedActivityDate('');
-              setActivities([]);
-            }
-          }
-        }
-
-        const transitionId = sessionStorage.getItem('current_transition_id');
-        if (transitionId) {
-          completePageTransition(transitionId);
-          sessionStorage.removeItem('current_transition_id');
-        }
-
-      } catch (error) {
-        console.error('Error loading resident data:', error);
-        // Chỉ báo lỗi khi thực sự có lỗi kết nối, không phải khi không có data
-        // setAssignedStaffError('Không thể tải thông tin nhân viên chăm sóc');
-        setAssignedStaffLoading(false);
-      }
-    };
-
-    loadResidentData();
-  }, [selectedResidentId, pageReady, serverToday, showActivityHistory]);
+  // Remove heavy manual resident data loader for room/vital/staff; handled by SWR hooks above
 
   useEffect(() => {
     if (!showActivityHistory || !selectedActivityDate || !selectedResidentId) return;
+    const requestedResidentId = selectedResidentId;
     setActivitiesLoading(true);
     setActivitiesError('');
-    activityParticipationsAPI.getByResidentId(selectedResidentId)
+    activityParticipationsAPI.getByResidentId(requestedResidentId)
       .then((data) => {
+        if (activeResidentIdRef.current !== requestedResidentId) return;
         const arr = Array.isArray(data) ? data : [];
         const grouped: Record<string, any[]> = {};
         arr.forEach((item) => {
@@ -684,7 +541,11 @@ function FamilyPortalPageContent() {
         setActivities(sortedActivities);
       })
       .catch(() => setActivities([]))
-      .finally(() => setActivitiesLoading(false));
+      .finally(() => {
+        if (activeResidentIdRef.current === requestedResidentId) {
+          setActivitiesLoading(false);
+        }
+      });
   }, [selectedActivityDate]);
 
   const selectedResident = residents.find(r => r._id === selectedResidentId);
@@ -726,6 +587,23 @@ function FamilyPortalPageContent() {
 
   const handleViewPhotos = () => {
     router.push('/family/photos');
+  };
+
+  // Clear UI immediately when switching resident to avoid showing stale data
+  const handleResidentChange = (id: string) => {
+    setActivities([]);
+    setActivityTimes({});
+    setActivityHistoryDates([]);
+    setSelectedActivityDate('');
+    setCareNotes([]);
+    setVitalSigns(null);
+    setVitalSignsHistory([]);
+    setTabsLoaded({ 0: false });
+    setTabLoading({ 0: true });
+    setAssignedStaff([]);
+    setAssignedStaffLoading(true);
+    setRoomNumber('Chưa hoàn tất đăng kí');
+    setSelectedResidentId(id);
   };
 
   useEffect(() => {
@@ -1035,7 +913,7 @@ function FamilyPortalPageContent() {
                       relationship: found.relationship || found.emergency_contact?.relationship || found.emergencyContact?.relationship || 'Chưa rõ'
                     } : null;
                   })()}
-                  onChange={opt => setSelectedResidentId(opt?.value || "")}
+                  onChange={opt => handleResidentChange(opt?.value || "")}
                   formatOptionLabel={formatOptionLabel}
                   isSearchable
                   styles={{
@@ -1214,7 +1092,7 @@ function FamilyPortalPageContent() {
                             if (!dob) return 'Chưa hoàn tất đăng kí';
                             const formattedDob = formatDob(dob);
                             const age = getAge(dob);
-                            return age ? `${formattedDob} (${age} tuổi)` : formattedDob;
+                            return age ? `${formattedDob} (${age} Tuổi)` : formattedDob;
                           })()}
                         </span>
                       </div>
@@ -1243,7 +1121,7 @@ function FamilyPortalPageContent() {
                       </div>
                       <div className="flex flex-col items-center p-3 bg-red-50 rounded-xl border border-red-200">
                         <span className="text-red-600 font-semibold text-xs mb-1">Quan hệ</span>
-                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.relationship || 'Chưa rõ'}</span>
+                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.relationship ? toTitleCase(selectedResident.emergency_contact.relationship) : 'Chưa rõ'}</span>
                       </div>
                       <div className="flex flex-col items-center p-3 bg-red-50 rounded-xl border border-red-200">
                         <span className="text-red-600 font-semibold text-xs mb-1">Số điện thoại</span>

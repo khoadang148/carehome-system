@@ -51,9 +51,13 @@ const withTimeout = async <T>(
   return Promise.race([promise, timeoutPromise]);
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (
-  process.env.NODE_ENV === 'production' ? 'https://sep490-be-xniz.onrender.com' : '/api'
-);
+// Prefer NEXT_PUBLIC_API_URL for consistency with next.config.js, fallback to legacy var
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://sep490-be-xniz.onrender.com'
+    : '/api');
 
 // Base URL for static files (uploads) - always use the deployed backend URL
 const STATIC_BASE_URL = process.env.NEXT_PUBLIC_STATIC_BASE_URL || 'https://sep490-be-xniz.onrender.com';
@@ -1150,8 +1154,8 @@ export const activityParticipationsAPI = {
 
   getByResidentId: async (residentId: string, params?: any) => {
     try {
-      const response = await apiClient.get(endpoints.activityParticipations, { 
-        params: { resident_id: residentId, ...params } 
+      const response = await apiClient.get(`${endpoints.activityParticipations}/by-resident`, {
+        params: { resident_id: residentId, ...params }
       });
       return response.data;
     } catch (error) {
@@ -2370,8 +2374,19 @@ export const messagesAPI = {
 
   getUnreadCount: async () => {
     try {
-      const response = await apiClient.get('/messages/unread-count');
-      return response.data;
+      const response = await retryRequest(
+        () =>
+          withTimeout(
+            apiClient.get('/messages/unread-count', {
+              headers: { 'Cache-Control': 'no-cache' },
+            }),
+            10000,
+            'messagesAPI.getUnreadCount'
+          ),
+        2,
+        1000
+      );
+      return response.data as any;
     } catch (error) {
       throw error;
     }

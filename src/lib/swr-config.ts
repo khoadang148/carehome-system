@@ -16,9 +16,10 @@ export const swrConfig: SWRConfiguration = {
   onError: (error) => {
     console.error('SWR Error:', error);
   },
-  onSuccess: (data, key) => {
-    console.log('SWR Success:', key, data);
-  },
+  // Disable verbose success logging to avoid console spam and potential perf issues
+  // onSuccess: (data, key) => {
+  //   console.log('SWR Success:', key, data);
+  // },
   onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
     // Don't retry on 404 or 403
     if (error.status === 404 || error.status === 403) return;

@@ -7,7 +7,7 @@ import { ArrowLeftIcon, PhotoIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownT
 import { useAuth } from "@/lib/contexts/auth-context";
 import { staffAPI } from "@/lib/api";
 import { residentAPI } from "@/lib/api";
-import { userAPI, photosAPI, activitiesAPI, activityParticipationsAPI } from "@/lib/api";
+import { userAPI, photosAPI } from "@/lib/api";
 import { clientStorage } from "@/lib/utils/clientStorage";
 
 export default function FamilyPhotosPage() {
@@ -29,15 +29,11 @@ export default function FamilyPhotosPage() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      router.replace('/login');
-      return;
-    }
+    if (!user) return;
 
-    if (user.role !== 'family') {
-      if (user.role === 'staff') router.replace('/staff');
-      else if (user.role === 'admin') router.replace('/admin');
-      else router.replace('/login');
+    if (!user) {
+      setLoading(false);
+      setError("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
       return;
     }
     const accessToken = clientStorage.getItem("access_token");
@@ -78,45 +74,11 @@ export default function FamilyPhotosPage() {
             senderPosition = staff ? (staff.position || '') : '';
           }
 
-          const mediaUrl = item.file_path ? photosAPI.getPhotoUrl(item.file_path) : "";
-          // Detect media type
-          const isVideo = typeof item.file_type === 'string' && item.file_type.startsWith('video');
-
-          // Resolve related activity and participation (if any)
-          let activityName: string | undefined;
-          let activityId: string | undefined;
-          let participationStatus: string | undefined;
-          
-          // Handle activityId - it might be an object (populated) or string
-          const rawActivityId = item.related_activity_id || item.activity_id;
-          if (rawActivityId) {
-            if (typeof rawActivityId === 'object' && rawActivityId._id) {
-              activityId = rawActivityId._id;
-              // If it's already populated, we can get the name directly
-              activityName = rawActivityId.activity_name || rawActivityId.name;
-            } else if (typeof rawActivityId === 'string') {
-              activityId = rawActivityId;
-            }
-          }
-          
-          try {
-            const residentId = typeof item.resident_id === 'object' ? item.resident_id?._id : item.resident_id;
-            if (activityId && residentId && !activityName) {
-              try {
-                const [act, part] = await Promise.all([
-                  activitiesAPI.getById(activityId).catch(() => null),
-                  activityParticipationsAPI.getByResidentAndActivity(residentId, activityId).catch(() => null)
-                ]);
-                activityName = act?.activity_name || act?.name || undefined;
-                participationStatus = part?.attendance_status || undefined;
-              } catch {}
-            }
-          } catch {}
-
+          let imageUrl = item.file_path ? photosAPI.getPhotoUrl(item.file_path) : "";
           const result = {
             ...item,
             id: item._id,
-            url: mediaUrl,
+            url: imageUrl,
             caption: item.caption || "",
             date: item.takenDate
               ? new Date(item.takenDate).toISOString().split("T")[0]
@@ -124,15 +86,14 @@ export default function FamilyPhotosPage() {
             uploadedByName: senderName,
             uploadedByPosition: senderPosition,
             residentId: typeof item.resident_id === 'object' ? item.resident_id._id : item.resident_id,
-            isVideo,
-            activityId,
-            activityName,
-            participationStatus,
           };
           return result;
         }));
 
         setAllPhotos(mapped);
+        if (mapped.length === 0) {
+          setError("Chưa có ảnh nào được chia sẻ cho người thân của bạn.");
+        }
         setLoading(false);
       })
       .catch(err => {
@@ -285,76 +246,7 @@ export default function FamilyPhotosPage() {
 
       <div className="max-w-7xl mx-auto px-10 pb-12">
         {sortedDates.length === 0 ? (
-          <div className="relative overflow-hidden">
-            {/* Background decorative elements */}
-            <div className="absolute -top-20 -right-20 w-40 h-40 bg-gradient-to-br from-orange-200/30 to-red-300/20 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-20 -left-20 w-32 h-32 bg-gradient-to-br from-emerald-200/30 to-emerald-300/20 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-blue-100/20 to-purple-100/20 rounded-full blur-3xl"></div>
-            
-            <div className="relative bg-gradient-to-br from-white via-slate-50/50 to-white rounded-3xl p-16 shadow-2xl border border-white/30 backdrop-blur-xl text-center">
-              <div className="max-w-3xl mx-auto">
-                {/* Main icon with enhanced styling */}
-                <div className="relative mb-12">
-                  <div className="w-32 h-32 bg-gradient-to-br from-orange-400 via-red-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6 transform hover:scale-105 transition-all duration-300">
-                    <PhotoIcon className="w-16 h-16 text-white drop-shadow-lg" />
-                  </div>
-                  {/* Floating decorative elements */}
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full animate-pulse"></div>
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full animate-pulse delay-1000"></div>
-                </div>
-                
-                {/* Enhanced heading */}
-                <div className="mb-8">
-                  <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 bg-clip-text text-transparent mb-4 leading-tight">
-                    Chưa có ảnh nào được chia sẻ
-                  </h2>
-                  <div className="w-24 h-1 bg-gradient-to-r from-orange-400 to-red-500 rounded-full mx-auto mb-6"></div>
-                  <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
-                    Hiện tại chưa có ảnh nào được chia sẻ cho người thân của bạn. Nhân viên chăm sóc sẽ cập nhật ảnh thường xuyên.
-                  </p>
-                </div>
-                
-                {/* Enhanced features section */}
-                <div className="bg-gradient-to-br from-orange-50 via-orange-50/80 to-red-100/50 rounded-3xl p-8 border border-orange-200/50 mb-10 shadow-lg backdrop-blur-sm">
-                  <div className="flex items-center justify-center gap-4 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <PhotoIcon className="w-7 h-7 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-orange-800">
-                      Khi có ảnh, bạn sẽ thấy:
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-orange-700">
-                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-orange-200/50 hover:bg-white/80 transition-all duration-200">
-                      <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-full shadow-sm"></div>
-                      <span className="font-semibold">Ảnh hoạt động hàng ngày</span>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-orange-200/50 hover:bg-white/80 transition-all duration-200">
-                      <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-full shadow-sm"></div>
-                      <span className="font-semibold">Khoảnh khắc đáng nhớ</span>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-orange-200/50 hover:bg-white/80 transition-all duration-200">
-                      <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-full shadow-sm"></div>
-                      <span className="font-semibold">Tải ảnh về máy</span>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-orange-200/50 hover:bg-white/80 transition-all duration-200">
-                      <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-full shadow-sm"></div>
-                      <span className="font-semibold">Xem chi tiết từng ảnh</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Enhanced footer text */}
-                <div className="flex items-center justify-center gap-2 text-slate-500">
-                  <div className="w-2 h-2 bg-gradient-to-br from-orange-400 to-red-500 rounded-full"></div>
-                  <p className="text-base font-medium">
-                    Ảnh sẽ được cập nhật thường xuyên bởi nhân viên chăm sóc
-                  </p>
-                  <div className="w-2 h-2 bg-gradient-to-br from-orange-400 to-red-500 rounded-full"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div className="text-center text-gray-500 text-xl my-10">Không tìm thấy ảnh phù hợp.</div>
         ) : (
           sortedDates.map(date => (
             <div key={date} className="mb-10">
@@ -365,49 +257,29 @@ export default function FamilyPhotosPage() {
                     key={photo.id || idx}
                     className="relative rounded-2xl overflow-hidden bg-slate-50 shadow-lg group"
                   >
-                    {photo.isVideo ? (
-                      <video
-                        src={photo.url}
-                        controls
-                        onClick={() => router.push(`/family/photos/${photo.id}`)}
-                        className="w-full h-56 object-cover bg-black rounded-2xl cursor-pointer"
-                      />
-                    ) : (
-                      <img
-                        src={photo.url}
-                        alt={photo.caption}
-                        onClick={() => router.push(`/family/photos/${photo.id}`)}
-                        className="w-full h-56 object-cover block bg-gray-100 rounded-2xl cursor-pointer transition-transform duration-200 group-hover:scale-105"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const placeholder = document.createElement('div');
-                          placeholder.innerHTML = `
-                            <div class="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-gray-500 text-sm font-medium">
-                              <div class="text-center">
-                                <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-2 opacity-50">
-                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                                  <polyline points="21,15 16,10 5,21"/>
-                                </svg>
-                                <div>Không thể tải ảnh</div>
-                              </div>
+                    <img
+                      src={photo.url}
+                      alt={photo.caption}
+                      onClick={() => router.push(`/family/photos/${photo.id}`)}
+                      className="w-full h-56 object-cover block bg-gray-100 rounded-2xl cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.innerHTML = `
+                          <div class="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-gray-500 text-sm font-medium">
+                            <div class="text-center">
+                              <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-2 opacity-50">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21,15 16,10 5,21"/>
+                              </svg>
+                              <div>Không thể tải ảnh</div>
                             </div>
-                          `;
-                          e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
-                        }}
-                      />
-                    )}
-
-                    {(photo.activityName || photo.participationStatus) && (
-                      <div className="absolute left-3 bottom-3 bg-white/85 backdrop-blur-sm rounded-lg px-3 py-1 text-xs font-semibold text-slate-700 shadow">
-                        {photo.activityName && <span>{photo.activityName}</span>}
-                        {photo.participationStatus && (
-                          <span className={`ml-2 px-2 py-0.5 rounded-full capitalize ${photo.participationStatus === 'attended' ? 'bg-emerald-100 text-emerald-700' : photo.participationStatus === 'absent' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {photo.participationStatus}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                          </div>
+                        `;
+                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                      }}
+                    />
 
                     <button
                       onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
@@ -449,21 +321,12 @@ export default function FamilyPhotosPage() {
             <ChevronLeftIcon className="w-9 h-9" />
           </button>
 
-          {filteredPhotos[lightboxIndex].isVideo ? (
-            <video
-              src={filteredPhotos[lightboxIndex].url}
-              controls
-              className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-black object-contain"
-              onClick={e => e.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={filteredPhotos[lightboxIndex].url}
-              alt={filteredPhotos[lightboxIndex].caption}
-              className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-white object-contain"
-              onClick={e => e.stopPropagation()}
-            />
-          )}
+          <img
+            src={filteredPhotos[lightboxIndex].url}
+            alt={filteredPhotos[lightboxIndex].caption}
+            className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-white object-contain"
+            onClick={e => e.stopPropagation()}
+          />
 
           <button
             onClick={e => { e.stopPropagation(); nextLightbox(); }}
@@ -483,22 +346,12 @@ export default function FamilyPhotosPage() {
               <div className="text-base font-medium opacity-90">
                 Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString("vi-VN")}
               </div>
-              {(filteredPhotos[lightboxIndex].activityName || filteredPhotos[lightboxIndex].participationStatus) && (
-                <div className="mt-2 text-base font-medium opacity-90">
-                  {filteredPhotos[lightboxIndex].activityName && (
-                    <span>Hoạt động: {filteredPhotos[lightboxIndex].activityName}</span>
-                  )}
-                  {filteredPhotos[lightboxIndex].participationStatus && (
-                    <span className="ml-3 capitalize">Trạng thái: {filteredPhotos[lightboxIndex].participationStatus}</span>
-                  )}
-                </div>
-              )}
               <button
-                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || (filteredPhotos[lightboxIndex].isVideo ? "video.mp4" : "photo.jpg")); }}
+                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || "photo.jpg"); }}
                 className="mt-5 bg-gradient-to-r from-red-500 to-orange-400 text-white border-none rounded-2xl py-3 px-8 font-bold text-lg cursor-pointer shadow-lg transition-all duration-200 hover:from-red-500 hover:to-orange-500"
-                title="Tải media này"
+                title="Tải ảnh này"
               >
-                <ArrowDownTrayIcon className="w-4 h-4 mr-3 inline align-middle" /> Tải về
+                <ArrowDownTrayIcon className="w-4 h-4 mr-3 inline align-middle" /> Tải ảnh
               </button>
             </div>
           </div>

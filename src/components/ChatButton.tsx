@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { ChatBubbleLeftRightIcon as ChatBubbleSolid } from '@heroicons/react/24/solid';
 import { messagesAPI } from '@/lib/api';
@@ -30,31 +30,35 @@ export default function ChatButton({
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isPulsing, setIsPulsing] = useState(false);
+  const prevCountRef = useRef(0);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     const fetchUnreadCount = async () => {
       if (!staffId) return;
       
       try {
-        setIsLoading(true);
-        console.log('Fetching unread count for staffId:', staffId);
+        setIsLoading(prev => (prev ? prev : true));
         const response = await messagesAPI.getUnreadCount();
-        console.log('Unread count API response:', response);
         const newCount = response.unreadCount || 0;
-        console.log('Parsed unread count:', newCount);
         
         // Trigger pulse animation if count increased
-        if (newCount > unreadCount) {
+        if (newCount > prevCountRef.current) {
           setIsPulsing(true);
           setTimeout(() => setIsPulsing(false), 1000);
         }
         
-        setUnreadCount(newCount);
+        if (isMountedRef.current) {
+          if (prevCountRef.current !== newCount) {
+            setUnreadCount(newCount);
+            prevCountRef.current = newCount;
+          }
+        }
       } catch (error) {
-        console.error('Error fetching unread count:', error);
         // Silent error handling
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) setIsLoading(false);
       }
     };
 
@@ -62,8 +66,11 @@ export default function ChatButton({
     
     const interval = setInterval(fetchUnreadCount, 15000); // Poll every 15 seconds
         
-    return () => clearInterval(interval);
-  }, [staffId, unreadCount]);
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(interval);
+    };
+  }, [staffId]);
 
   const handleClick = () => {
     // Luôn cho phép mở chat để giữ lịch sử, ngay cả khi không có staff assignment

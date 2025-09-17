@@ -52,22 +52,24 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
     setIsVisible(shouldShow);
   }, [user, pathname, hasResidents]);
 
-  // Fetch unread count
+  // Fetch unread count with in-flight protection
   useEffect(() => {
+    let isFetching = false;
     const fetchUnreadCount = async () => {
-      if (!user?.id) return;
-      
+      if (!user?.id || isFetching) return;
+      isFetching = true;
       try {
         const response = await messagesAPI.getUnreadCount();
         const newCount = response.unreadCount || 0;
         setActualUnreadCount(newCount);
       } catch (error) {
         console.error('Error fetching unread count:', error);
+      } finally {
+        isFetching = false;
       }
     };
 
     fetchUnreadCount();
-    
     // Poll every 15 seconds
     const interval = setInterval(fetchUnreadCount, 15000);
     return () => clearInterval(interval);
