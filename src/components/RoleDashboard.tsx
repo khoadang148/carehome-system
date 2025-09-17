@@ -69,6 +69,13 @@ const ROLE_DASHBOARDS = {
         href: '/admin/vital-signs',
         gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       },
+      {
+        title: 'Phê duyệt',
+        description: 'Phê duyệt tài khoản và thông tin người cao tuổi',
+        icon: UserPlusIcon,
+        href: '/admin/approvals',
+        gradient: 'linear-gradient(135deg,rgb(206, 227, 16) 0%,rgb(245, 224, 44) 100%)',
+      }
      
     ]
   },
@@ -76,7 +83,7 @@ const ROLE_DASHBOARDS = {
     title: 'Hệ thống quản lý chăm sóc của Nhân viên chăm sóc',
     description: ' Công cụ điều hành cho đội ngũ y tế!',
     cards: [
-      {
+      /*{
         title: 'Thêm người cao tuổi',
         description: 'Thêm người cao tuổi và tạo tài khoản ',
         icon: UserPlusIcon,
@@ -89,7 +96,7 @@ const ROLE_DASHBOARDS = {
         icon: ClipboardDocumentListIcon,
         href: '/services/purchase',
         gradient: 'linear-gradient(135deg,rgb(26, 169, 36) 0%,rgb(38, 220, 150) 100%)',
-      },
+      },*/
 
       {
         title: 'Lịch Thăm',
@@ -107,105 +114,17 @@ const ROLE_DASHBOARDS = {
       }
     ]
   },
-  family: {
-    title: 'Cổng thông tin Gia Đình ',
-    description: 'Theo dõi và kết nối với người thân',
-    cards: [
-      {
-        title: 'Thông tin người cao tuổi',  
-        description: 'Theo dõi tình trạng sức khỏe và sinh hoạt hàng ngày',
-        icon: HeartIcon,
-        href: '/family',
-        gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-        stats: 'Cập nhật hôm nay'
-      },
-      {
-        title: 'Chỉ số Sinh tồn',
-        description: 'Theo dõi các chỉ số sức khỏe quan trọng',
-        icon: HeartIcon,
-        href: '/family/vital-signs',
-        gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-        stats: 'Ghi nhận mới nhất'
-      },
-      {
-        title: 'Quản lý Thuốc',
-        description: 'Theo dõi lịch uống thuốc và tình trạng điều trị',
-        icon: CubeIcon,
-        href: '/family/medication',
-        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        stats: '3 loại thuốc'
-      },
-      {
-        title: 'Hoạt động Giải trí',
-        description: 'Theo dõi các hoạt động và chương trình tham gia',
-        icon: ClipboardDocumentListIcon,
-        href: '/family/activities',
-        gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-        stats: '3 chương trình tuần này'
-      },
-      {
-        title: 'Dịch vụ Chăm sóc',
-        description: 'Quản lý các dịch vụ chăm sóc đang sử dụng',
-        icon: UsersIcon,
-        href: '/services',
-        gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        stats: '5 dịch vụ'
-      },
-      {
-        title: 'Hóa đơn và thanh toán',
-        description: 'Xem chi phí và thanh toán',
-        icon: CurrencyDollarIcon,
-        href: '/finance',
-        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        stats: 'Tháng 1/2024'
-      },
-      {
-        title: 'Liên hệ đội ngũ',
-        description: 'Trao đổi với đội ngũ chăm sóc',
-        icon: UserGroupIcon,
-        href: '/family/contact',
-        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-        stats: '2 tin nhắn mới'
-      },
-      {
-        title: 'Đặt lịch thăm',
-        description: 'Đăng ký lịch thăm người thân',
-        icon: HomeIcon,
-        href: '/family/visits',
-        gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-        stats: 'Lịch tuần sau'
-      }
-    ]
-  }
+  
 };
 
 export default function RoleDashboard() {
   const { user } = useAuth();
   const router = useRouter();
 
+  // Previously fetched vital signs here to compute today's count.
+  // This triggered a global GET /vital-signs which may return 500 depending on BE state.
+  // We remove the background fetch to avoid noisy errors on the staff dashboard.
   const [vitalSignsToday, setVitalSignsToday] = useState<number | null>(null);
-
-  useEffect(() => {
-
-    if (user?.role === 'staff') {
-
-      vitalSignsAPI.getAll()
-        .then((data: any[]) => {
-          console.log('Vital signs data:', data);
-          data.forEach(item => console.log('Ngày:', item.date, item.recordedAt, item.createdAt));
-
-          const today = new Date();
-          const todayStr = today.toISOString().slice(0, 10);
-
-          const count = data.filter(item => {
-            const dateStr = (item.date || item.recordedAt || item.createdAt || '').slice(0, 10);
-            return dateStr === todayStr;
-          }).length;
-          setVitalSignsToday(count);
-        })
-        .catch(() => setVitalSignsToday(null));
-    }
-  }, [user?.role]);
 
   if (!user) {
     return null;

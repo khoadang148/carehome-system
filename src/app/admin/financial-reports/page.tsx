@@ -15,7 +15,7 @@ import {
   UserIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { billsAPI, bedAssignmentsAPI } from '../../../lib/api';
+import { billsAPI, bedAssignmentsAPI, residentAPI } from '../../../lib/api';
 import { Dialog } from '@headlessui/react';
 import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 import { clientStorage } from '@/lib/utils/clientStorage';
@@ -89,6 +89,7 @@ export default function FinancialReportsPage() {
   const [residentRooms, setResidentRooms] = useState<Record<string, string>>({});
   const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set());
   const [showTooltip, setShowTooltip] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [residentNames, setResidentNames] = useState<Record<string, string>>({});
 
   const ROOM_CACHE_TTL_MS = 60 * 1000; // 60s
   const roomCacheKey = (residentId: string) => `residentRoom:${residentId}`;
@@ -121,12 +122,46 @@ export default function FinancialReportsPage() {
     setLoading(true);
     try {
       const data = await billsAPI.getAll();
-      setRecords(data);
+
+      // Build allowed resident set and name map
+      const allowedStatuses = new Set(['admitted','active','discharged','deceased','accepted']);
+      const residentsRaw: any = await residentAPI.getAll();
+      const residentsArr: any[] = Array.isArray(residentsRaw)
+        ? residentsRaw
+        : (residentsRaw && Array.isArray((residentsRaw as any).data))
+          ? (residentsRaw as any).data
+          : [];
+      const allowedResidentIds = new Set<string>();
+      const namesMap: Record<string, string> = {};
+      (residentsArr as any[]).forEach((r: any) => {
+        const status = String(r?.status || '').toLowerCase();
+        if (!allowedStatuses.has(status)) return;
+        const id: string = (r._id || r.id || '').toString();
+        if (!id) return;
+        const name: string = r.full_name || r.name || r.fullName || r.resident_name || '';
+        if (name) namesMap[id] = name;
+        allowedResidentIds.add(id);
+      });
+      setResidentNames(namesMap);
+
+      // Filter bills to only those with allowed resident and resolvable name
+      const filteredBills = (Array.isArray(data) ? data : []).filter((record: any) => {
+        if (!record?.resident_id) return false;
+        const rid = typeof record.resident_id === 'object' ? (record.resident_id as any)._id : record.resident_id;
+        if (!rid) return false;
+        if (!allowedResidentIds.has(rid)) return false;
+        const hasName = typeof record.resident_id === 'object'
+          ? !!(record.resident_id as any).full_name
+          : !!namesMap[rid];
+        return hasName;
+      });
+
+      setRecords(filteredBills as any);
 
       // Progressive: fill rooms from cache immediately
       const roomMap: Record<string, string> = {};
       const residentIds = new Set<string>();
-      for (const record of data) {
+      for (const record of filteredBills as any[]) {
         if (!record.resident_id) continue;
         const rid = typeof record.resident_id === 'object' ? record.resident_id._id : record.resident_id;
         if (!rid) continue;

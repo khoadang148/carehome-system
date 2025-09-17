@@ -22,12 +22,16 @@ import {
   ClockIcon,
   MapPinIcon,
   UserIcon,
-  CalendarIcon
+  CalendarIcon,
+  CameraIcon,
+  PhotoIcon,
+  VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { useResidents } from '@/lib/contexts/residents-context';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { activitiesAPI, activityParticipationsAPI, staffAssignmentsAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, staffAssignmentsAPI, bedAssignmentsAPI, residentAPI, photosAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
+import UploadSuccessModal from '@/components/UploadSuccessModal';
 
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -47,6 +51,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [staffAssignments, setStaffAssignments] = useState<any[]>([]);
   const [assignedResidentIds, setAssignedResidentIds] = useState<string[]>([]);
+  const [assignedResidentsDetails, setAssignedResidentsDetails] = useState<any[]>([]);
   const [notificationModal, setNotificationModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -59,6 +64,23 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     type: 'info'
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Photo upload states
+  const [uploadPhotoModalOpen, setUploadPhotoModalOpen] = useState(false);
+  const [selectedResidentForPhoto, setSelectedResidentForPhoto] = useState<any>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [photoCaption, setPhotoCaption] = useState('');
+  const [photoActivityType, setPhotoActivityType] = useState('');
+  const [photoStaffNotes, setPhotoStaffNotes] = useState('');
+  const [residentPhotos, setResidentPhotos] = useState<{[residentId: string]: any[]}>({});
+  const [uploadSuccessModal, setUploadSuccessModal] = useState<{
+    open: boolean;
+    fileName?: string;
+    residentName?: string;
+    fileCount?: number;
+  }>({ open: false });
 
   const isActivityDatePassed = () => {
     if (!activity?.date) return false;
@@ -70,29 +92,39 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
   const isActivityToday = () => {
     if (!activity?.date) return false;
-    const activityDate = new Date(activity.date + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return activityDate.getTime() === today.getTime();
+    
+    // Sử dụng thời gian hiện tại (không cần trừ 7 giờ vì đã xử lý trong mapActivityFromAPI)
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    return activity.date === today;
   };
 
   const isActivityTimeReached = () => {
     if (!activity?.date || !activity?.scheduledTime) return false;
     
+    // Sử dụng thời gian hiện tại (không cần trừ 7 giờ vì đã xử lý trong mapActivityFromAPI)
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     
+    console.log('🔍 TIME CHECK - Activity date:', activity.date, 'Today:', today);
+    console.log('🔍 TIME CHECK - Activity time:', activity.scheduledTime, 'Current time:', now.toLocaleTimeString('vi-VN', { hour12: false }));
+    
     // Nếu không phải hôm nay, chưa đến giờ
     if (activity.date !== today) {
+      console.log('🔍 TIME CHECK - Not today, cannot evaluate');
       return false;
     }
     
     // Nếu là hôm nay, kiểm tra thời gian
     const [hours, minutes] = activity.scheduledTime.split(':');
-    const activityTime = new Date();
+    const activityTime = new Date(now);
     activityTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
     
-    return now >= activityTime;
+    const canEvaluate = now >= activityTime;
+    console.log('🔍 TIME CHECK - Can evaluate:', canEvaluate, 'Activity time:', activityTime.toLocaleTimeString('vi-VN', { hour12: false }));
+    
+    return canEvaluate;
   };
 
   const canEditOrEvaluate = () => {
@@ -154,24 +186,66 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       if (!user?.id) return;
 
       try {
-        const assignments = await staffAssignmentsAPI.getMyAssignments();
+        const assignmentsRes = await staffAssignmentsAPI.getMyAssignments();
+        const assignments = Array.isArray(assignmentsRes) ? assignmentsRes : [];
+        setStaffAssignments(assignments);
 
-        setStaffAssignments(Array.isArray(assignments) ? assignments : []);
+        const isAssignmentActive = (a: any) => {
+          if (!a) return false;
+          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+          if (!a.end_date) return true;
+          const end = new Date(a.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return end >= today;
+        };
 
-        const residentIds = Array.isArray(assignments)
-          ? assignments
-            .filter((assignment: any) => assignment.status === 'active' && assignment.resident_id)
+        const isRoomBased = assignments.some((a: any) => a && (a.room_id || a.residents));
+        let ids: string[] = [];
+
+        if (isRoomBased) {
+          const active = assignments.filter((a: any) => isAssignmentActive(a));
+          for (const a of active) {
+            const room = a.room_id;
+            const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+            let residents: any[] = Array.isArray(a.residents) ? a.residents : [];
+            if ((!residents || residents.length === 0) && roomId) {
+              try {
+                const beds = await bedAssignmentsAPI.getAll();
+                if (Array.isArray(beds)) {
+                  residents = beds
+                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .map((ba: any) => ba.resident_id)
+                    .filter(Boolean);
+                }
+              } catch {}
+            }
+            for (const r of residents) {
+              if (r?._id) ids.push(String(r._id));
+            }
+          }
+        } else {
+          ids = assignments
+            .filter((assignment: any) => isAssignmentActive(assignment) && assignment.resident_id)
             .map((assignment: any) =>
               typeof assignment.resident_id === 'object'
-                ? assignment.resident_id._id
-                : assignment.resident_id
-            )
-          : [];
+                ? String(assignment.resident_id._id)
+                : String(assignment.resident_id)
+            );
+        }
 
-        setAssignedResidentIds(residentIds);
+        const uniqueIds = Array.from(new Set(ids));
+        setAssignedResidentIds(uniqueIds);
+
+        // Fetch resident details for display in add modal
+        const details = await Promise.all(uniqueIds.map(async (rid) => {
+          try { return await residentAPI.getById(rid); } catch { return null; }
+        }));
+        setAssignedResidentsDetails(details.filter(Boolean));
       } catch (error) {
         setStaffAssignments([]);
         setAssignedResidentIds([]);
+        setAssignedResidentsDetails([]);
       }
     };
 
@@ -286,6 +360,32 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [addResidentModalOpen, activity?.id]);
 
+  // Cleanup preview URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      photoPreviewUrls.forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+    };
+  }, [photoPreviewUrls]);
+
+  // Load photos for attended residents when component mounts
+  useEffect(() => {
+    const loadAttendedResidentPhotos = async () => {
+      if (assignedResidentIds.length > 0) {
+        for (const residentId of assignedResidentIds) {
+          // Only load photos for residents who have attended
+          const evaluation = evaluations[residentId];
+          if (evaluation && evaluation.status === 'attended') {
+            await fetchResidentPhotos(residentId);
+          }
+        }
+      }
+    };
+    
+    loadAttendedResidentPhotos();
+  }, [assignedResidentIds, evaluations]);
+
 
 
   const mapActivityFromAPI = (apiActivity: any) => {
@@ -311,7 +411,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       }
 
       const convertToVietnamTime = (utcTime: Date) => {
-        const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
+        // Trừ 7 giờ từ UTC time để hiển thị đúng giờ Việt Nam
+        const vietnamTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
         return vietnamTime.toLocaleTimeString('vi-VN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -399,6 +500,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
       if (status === 'attended') {
         newReason = '';
+        // Load photos when status changes to attended
+        fetchResidentPhotos(residentId);
       } else if (status === 'absent') {
         if (!newReason || newReason.includes('Tham gia tích cực')) {
           newReason = 'Lý do sức khỏe';
@@ -494,7 +597,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
           await activityParticipationsAPI.update(existingParticipation._id, updateData);
         } else {
-          const resident = residents.find(r => r.id === residentId);
+          const resident = residents.find((r: any) => (r._id || r.id) === residentId);
           if (resident) {
             const currentStaffId = participations.length > 0 ?
               (participations[0].staff_id?._id || participations[0].staff_id) :
@@ -503,7 +606,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             await activityParticipationsAPI.create({
               staff_id: currentStaffId,
               activity_id: activity.id,
-              resident_id: resident.id,
+              resident_id: (resident as any)._id || (resident as any).id,
               date: activity.date + "T00:00:00Z",
               performance_notes: evaluation.status === 'attended' ?
                 'Tham gia tích cực, tinh thần tốt' :
@@ -602,12 +705,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     })
     .map((p: any) => {
       const residentId = p.resident_id?._id || p.resident_id;
-      const residentInfo = residents.find((r: any) => r.id === residentId);
+      const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
       return {
         id: residentId,
-        name: p.resident_id?.full_name || residentInfo?.name || 'N/A',
-        room: residentInfo?.room || '',
-        age: residentInfo?.age || '',
+        name: p.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A',
+        room: (residentInfo as any)?.room || '',
+        age: (residentInfo as any)?.age || '',
         participationId: p._id,
         participated: p.attendance_status === 'attended',
         reason: p.performance_notes || '',
@@ -646,13 +749,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         return pResidentId === residentId;
       });
 
-      const residentInfo = residents.find((r: any) => r.id === residentId);
+      const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
 
       return {
         id: residentId,
-        name: participation?.resident_id?.full_name || residentInfo?.name || 'N/A',
-        room: residentInfo?.room || '',
-        age: residentInfo?.age || '',
+        name: participation?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A',
+        room: (residentInfo as any)?.room || '',
+        age: (residentInfo as any)?.age || '',
         participationId: participation?._id || '',
         participated: evaluation.status === 'attended',
         reason: evaluation.reason || '',
@@ -675,28 +778,21 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
   const participationCount = activityResidents.length;
 
-  const residentsNotJoined = staffAssignments
-    .filter((assignment: any) => assignment.status === 'active')
-    .map((assignment: any) => {
-      const resident = assignment.resident_id;
-      const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
-
+  const residentsNotJoined = assignedResidentsDetails
+    .map((resident: any) => {
+      const age = resident?.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
       return {
-        id: resident._id,
-        name: resident.full_name || '',
+        id: resident?._id,
+        name: resident?.full_name || '',
         age: age || '',
-        careLevel: resident.care_level || '',
-        emergencyContact: resident.emergency_contact?.name || '',
-        contactPhone: resident.emergency_contact?.phone || '',
-        avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-        gender: (resident.gender || '').toLowerCase(),
-        assignmentStatus: assignment.status || 'unknown',
-        assignmentId: assignment._id,
-        endDate: assignment.end_date,
-        assignedDate: assignment.assigned_date,
+        careLevel: resident?.care_level || '',
+        emergencyContact: resident?.emergency_contact?.name || '',
+        contactPhone: resident?.emergency_contact?.phone || '',
+        avatar: Array.isArray(resident?.avatar) ? resident.avatar[0] : resident?.avatar || null,
+        gender: (resident?.gender || '').toLowerCase(),
       };
     })
-    .filter((resident: any) => !joinedResidentIds.includes(resident.id));
+    .filter((resident: any) => resident?.id && !joinedResidentIds.includes(resident.id as string));
 
   const handleAddResident = async () => {
     if (!selectedResidentId || !activity?.id || !activity.date) return;
@@ -780,6 +876,142 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       showNotification('Lỗi thêm người cao tuổi', errorMessage, 'error');
     } finally {
       setAddingResident(false);
+    }
+  };
+
+  // Photo upload functions
+  const handleOpenPhotoUpload = (resident: any) => {
+    setSelectedResidentForPhoto(resident);
+    setUploadPhotoModalOpen(true);
+    setSelectedFiles([]);
+    setPhotoPreviewUrls([]);
+    setPhotoCaption('');
+    setPhotoActivityType(activity?.category || '');
+    setPhotoStaffNotes('');
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles: File[] = [];
+    const previewUrls: string[] = [];
+
+    for (const file of files) {
+      // Validate file type
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        showNotification('Lỗi', `File ${file.name} không phải là ảnh hoặc video`, 'error');
+        continue;
+      }
+      
+      // Validate file size (100MB limit)
+      if (file.size > 100 * 1024 * 1024) {
+        showNotification('Lỗi', `File ${file.name} quá lớn. Kích thước tối đa là 100MB`, 'error');
+        continue;
+      }
+
+      validFiles.push(file);
+      previewUrls.push(URL.createObjectURL(file));
+    }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles]);
+      setPhotoPreviewUrls(prev => [...prev, ...previewUrls]);
+    }
+
+    // Reset input value to allow selecting the same files again
+    event.target.value = '';
+  };
+
+  const handleUploadPhoto = async () => {
+    if (selectedFiles.length === 0 || !selectedResidentForPhoto || !user?.id) {
+      showNotification('Lỗi', 'Vui lòng chọn ít nhất một file và đảm bảo đã đăng nhập', 'error');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const file of selectedFiles) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('resident_id', selectedResidentForPhoto.id);
+          formData.append('uploaded_by', user.id);
+          formData.append('caption', photoCaption);
+          formData.append('activity_type', photoActivityType);
+          formData.append('staff_notes', photoStaffNotes);
+          formData.append('related_activity_id', activity?.id || '');
+          formData.append('taken_date', new Date().toISOString());
+
+          await photosAPI.upload(formData);
+          successCount++;
+        } catch (error) {
+          console.error('Error uploading file:', file.name, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        // Show success modal
+        setUploadSuccessModal({
+          open: true,
+          fileName: selectedFiles.length === 1 ? selectedFiles[0].name : undefined,
+          residentName: selectedResidentForPhoto.name,
+          fileCount: successCount
+        });
+
+        // Refresh photos for this resident
+        await fetchResidentPhotos(selectedResidentForPhoto.id);
+      }
+
+      if (errorCount > 0 && successCount === 0) {
+        showNotification('Lỗi đăng', 'Không thể đăng bất kỳ file nào. Vui lòng thử lại.', 'error');
+      }
+
+      // Close modal and reset form
+      setUploadPhotoModalOpen(false);
+      setSelectedResidentForPhoto(null);
+      setSelectedFiles([]);
+      photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      setPhotoPreviewUrls([]);
+      setPhotoCaption('');
+      setPhotoActivityType('');
+      setPhotoStaffNotes('');
+    } catch (error: any) {
+      let errorMessage = 'Không thể đăng ảnh/video. Vui lòng thử lại.';
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showNotification('Lỗi đăng', errorMessage, 'error');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    const newPreviewUrls = photoPreviewUrls.filter((_, i) => i !== index);
+    
+    // Cleanup the removed preview URL
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    
+    setSelectedFiles(newFiles);
+    setPhotoPreviewUrls(newPreviewUrls);
+  };
+
+  const fetchResidentPhotos = async (residentId: string) => {
+    try {
+      const photos = await photosAPI.getByResidentId(residentId);
+      setResidentPhotos(prev => ({
+        ...prev,
+        [residentId]: photos
+      }));
+    } catch (error) {
+      console.error('Error fetching photos:', error);
     }
   };
 
@@ -1444,49 +1676,51 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 marginBottom: '1.25rem'
               }}>
                 <div>
-                  <h3 style={{
-                    fontSize: '1.125rem',
-                    fontWeight: 600,
-                    color: '#111827',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
-                    Đánh giá tham gia hoạt động
+                  <div>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: 600,
+                      color: '#111827',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <UserGroupIcon style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
+                      Đánh giá tham gia hoạt động
+                      {isRefreshing && (
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          color: '#f59e0b',
+                          marginLeft: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          <div style={{
+                            width: '0.75rem',
+                            height: '0.75rem',
+                            border: '2px solid transparent',
+                            borderTopColor: '#f59e0b',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }} />
+                          Đang cập nhật...
+                        </span>
+                      )}
+                    </h3>
                     {activity.date && (
-                      <span style={{
+                      <p style={{
                         fontSize: '0.875rem',
                         fontWeight: 500,
                         color: '#6b7280',
-                        marginLeft: '0.5rem'
+                        margin: '0.25rem 0 0 0'
                       }}>
-                        - Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
-                      </span>
+                        Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                      </p>
                     )}
-                    {isRefreshing && (
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: '#f59e0b',
-                        marginLeft: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}>
-                        <div style={{
-                          width: '0.75rem',
-                          height: '0.75rem',
-                          border: '2px solid transparent',
-                          borderTopColor: '#f59e0b',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} />
-                        Đang cập nhật...
-                      </span>
-                    )}
-                  </h3>
+                  </div>
                   {Object.keys(evaluations).length > 0 && (
                     <div style={{
                       display: 'flex',
@@ -1540,7 +1774,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     <ClockIcon style={{ width: '1rem', height: '1rem' }} />
                     {isActivityDatePassed() ? 'Hoạt động đã qua - Không thể chỉnh sửa' : 
                      isActivityToday() ? 'Chưa đến giờ hoạt động - Không thể đánh giá' : 
-                     'Hoạt động trong tương lai - Không thể chỉnh sửa'}
+                     'Chưa tới giờ bắt đầu hoạt động - Chưa thể đánh giá'}
                   </div>
                 )}
               </div>
@@ -1651,9 +1885,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           return pResidentId === residentId;
                         });
 
-                        const residentInfo = residents.find((r: any) => r.id === residentId);
-                        const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
-                        const residentRoom = residentInfo?.room || '';
+                        const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
+                        const residentName = participation?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A';
+                        const residentRoom = (residentInfo as any)?.room || '';
 
                         if (searchTerm && !residentName.toLowerCase().includes(searchTerm.toLowerCase()) &&
                           !residentRoom.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -1667,9 +1901,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           return pResidentId === residentId;
                         });
 
-                        const residentInfo = residents.find((r: any) => r.id === residentId);
-                        const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
-                        const residentRoom = residentInfo?.room || '';
+                        const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
+                        const residentName = participation?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A';
+                        const residentRoom = (residentInfo as any)?.room || '';
                         return (
                           <div
                             key={`${residentId}-${refreshTrigger}`}
@@ -1743,6 +1977,45 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                                     evaluation.status === 'absent' ? 'Không tham gia' : 'Chưa tham gia'}
                                 </div>
                               )}
+                              
+                              {/* Upload Photo Button - Only show for attended residents */}
+                              {evaluation.status === 'attended' && (
+                                <button
+                                  onClick={() => handleOpenPhotoUpload({
+                                    id: residentId,
+                                    name: residentName
+                                  })}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.5rem 0.75rem',
+                                    background: '#3b82f6',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.375rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  title="Đăng ảnh/video cho người cao tuổi này"
+                                >
+                                  <CameraIcon style={{ width: '0.875rem', height: '0.875rem' }} />
+                                  Ảnh/Video
+                                  {residentPhotos[residentId] && residentPhotos[residentId].length > 0 && (
+                                    <span style={{
+                                      background: 'rgba(255, 255, 255, 0.2)',
+                                      borderRadius: '50%',
+                                      padding: '0.125rem 0.375rem',
+                                      fontSize: '0.625rem',
+                                      fontWeight: 700
+                                    }}>
+                                      {residentPhotos[residentId].length}
+                                    </span>
+                                  )}
+                                </button>
+                              )}
                             </div>
                             {evaluation.status === 'absent' && canEditOrEvaluate() && isActivityTimeReached() && (
                               <div style={{ marginTop: '0.5rem' }}>
@@ -1777,9 +2050,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           const pResidentId = p.resident_id?._id || p.resident_id;
                           return pResidentId === residentId;
                         });
-                        const residentInfo = residents.find((r: any) => r.id === residentId);
-                        const residentName = participation?.resident_id?.full_name || residentInfo?.name || 'N/A';
-                        const residentRoom = residentInfo?.room || '';
+                        const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
+                        const residentName = participation?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A';
+                        const residentRoom = (residentInfo as any)?.room || '';
                         return residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           residentRoom.toLowerCase().includes(searchTerm.toLowerCase());
                       }).length;
@@ -1857,9 +2130,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                     <thead>
                       <tr style={{ background: '#f1f5f9' }}>
                         <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Tên người cao tuổi</th>
-                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Tham gia</th>
-                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Lý do (nếu vắng)</th>
-                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb' }}>Ngày đánh giá</th>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Tham gia</th>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Lý do (nếu vắng)</th>
+                        <th style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Ngày đánh giá</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1907,19 +2180,60 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                         return (
                           <tr key={residentId} style={{ background: getBackgroundColor(status) }}>
                             <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', fontWeight: 500 }}>
-                              {participation?.resident_id?.full_name || residentInfo?.name || 'N/A'}
+                              {participation?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A'}
                             </td>
                             <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: getStatusColor(status), fontWeight: 600 }}>
                               {getStatusText(status)}
                             </td>
-                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', textAlign: 'center' }}>
                               {status === 'attended' ? '-' : status === 'absent' ? (
                                 isValidAbsenceReason ? performanceNotes :
                                   <span style={{ color: '#f59e0b' }}>Chưa nhập lý do hoặc lý do không hợp lệ</span>
                               ) : status === 'pending' ? '-' : '-'}
                             </td>
-                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.875rem' }}>
-                              {participation?.date ? new Date(participation.date).toLocaleDateString('vi-VN') : 'N/A'}
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.875rem', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                <div>
+                                  {participation?.date ? new Date(participation.date).toLocaleDateString('vi-VN') : 'N/A'}
+                                </div>
+                                {status === 'attended' && (
+                                  <button
+                                    onClick={() => handleOpenPhotoUpload({
+                                      id: residentId,
+                                      name: participation?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A'
+                                    })}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem',
+                                      padding: '0.25rem 0.5rem',
+                                      background: '#3b82f6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '0.375rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                    title="Đăng ảnh/video cho người cao tuổi này"
+                                  >
+                                    <CameraIcon style={{ width: '0.75rem', height: '0.75rem' }} />
+                                    Ảnh/Video
+                                    {residentPhotos[residentId] && residentPhotos[residentId].length > 0 && (
+                                      <span style={{
+                                        background: 'rgba(255, 255, 255, 0.2)',
+                                        borderRadius: '50%',
+                                        padding: '0.125rem 0.25rem',
+                                        fontSize: '0.625rem',
+                                        fontWeight: 700
+                                      }}>
+                                        {residentPhotos[residentId].length}
+                                      </span>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2041,6 +2355,221 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           </Dialog.Panel>
         </div>
       </Dialog>
+
+      {/* Upload Photo Modal */}
+      <Dialog open={uploadPhotoModalOpen} onClose={() => setUploadPhotoModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+          <Dialog.Panel className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto z-15 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <CameraIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <Dialog.Title className="text-xl font-bold text-white">
+                      Đăng ảnh/video
+                    </Dialog.Title>
+                    <p className="text-blue-100 text-sm">
+                      Cho {selectedResidentForPhoto?.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setUploadPhotoModalOpen(false)}
+                  className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <XMarkIcon className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="space-y-6">
+                {/* File Upload Section */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Chọn file ảnh hoặc video
+                  </label>
+                  
+                  {/* Upload Area */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                       onClick={() => document.getElementById('file-input')?.click()}>
+                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <PhotoIcon className="w-8 h-8 text-blue-500" />
+                    </div>
+                    <p className="text-gray-600 font-medium mb-2">Kéo thả file vào đây hoặc click để chọn</p>
+                    <p className="text-sm text-gray-500">Hỗ trợ: JPG, PNG, GIF, MP4, MOV (Tối đa 100MB mỗi file)</p>
+                    <p className="text-xs text-gray-400 mt-1">Có thể chọn nhiều file cùng lúc</p>
+                  </div>
+
+                  {/* Selected Files */}
+                  {selectedFiles.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-700">
+                          Đã chọn {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}
+                        </p>
+                        <button
+                          onClick={() => {
+                            photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+                            setSelectedFiles([]);
+                            setPhotoPreviewUrls([]);
+                          }}
+                          className="text-sm text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Xóa tất cả
+                        </button>
+                      </div>
+
+                      {/* Files Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {selectedFiles.map((file, index) => (
+                          <div key={index} className="relative bg-gray-50 rounded-lg p-3">
+                            {/* File Info */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                {file.type.startsWith('image/') ? (
+                                  <PhotoIcon className="w-4 h-4 text-blue-600" />
+                                ) : (
+                                  <VideoCameraIcon className="w-4 h-4 text-blue-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-800 truncate">{file.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => removeFile(index)}
+                                className="w-6 h-6 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                              >
+                                <XMarkIcon className="w-3 h-3 text-red-600" />
+                              </button>
+                            </div>
+
+                            {/* Preview */}
+                            {photoPreviewUrls[index] && (
+                              <div className="relative">
+                                <div className="bg-gray-100 rounded-lg overflow-hidden">
+                                  {file.type.startsWith('image/') ? (
+                                    <img
+                                      src={photoPreviewUrls[index]}
+                                      alt="Preview"
+                                      className="w-full h-24 object-cover"
+                                    />
+                                  ) : file.type.startsWith('video/') ? (
+                                    <video
+                                      src={photoPreviewUrls[index]}
+                                      className="w-full h-24 object-cover"
+                                      muted
+                                    />
+                                  ) : null}
+                                </div>
+                                <div className="absolute top-1 right-1 bg-black/50 text-white px-1 py-0.5 rounded text-xs font-medium">
+                                  {file.type.startsWith('image/') ? 'Ảnh' : 'Video'}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <input
+                    id="file-input"
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Caption */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-800">
+                      Mô tả
+                    </label>
+                    <input
+                      type="text"
+                      value={photoCaption}
+                      onChange={(e) => setPhotoCaption(e.target.value)}
+                      placeholder="Nhập mô tả về ảnh/video..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  {/* Activity Type */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-800">
+                      Loại hoạt động
+                    </label>
+                    <input
+                      type="text"
+                      value={photoActivityType}
+                      onChange={(e) => setPhotoActivityType(e.target.value)}
+                      placeholder="Loại hoạt động..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Staff Notes */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Ghi chú của nhân viên
+                  </label>
+                  <textarea
+                    value={photoStaffNotes}
+                    onChange={(e) => setPhotoStaffNotes(e.target.value)}
+                    placeholder="Nhập ghi chú chi tiết..."
+                    rows={3}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => setUploadPhotoModalOpen(false)}
+                  className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors"
+                  disabled={uploadingPhoto}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleUploadPhoto}
+                  disabled={selectedFiles.length === 0 || uploadingPhoto}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
+                >
+                  {uploadingPhoto && (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {uploadingPhoto ? 'Đang đăng...' : `Đăng`}
+                </button>
+              </div>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {/* Upload Success Modal */}
+      <UploadSuccessModal
+        open={uploadSuccessModal.open}
+        onClose={() => setUploadSuccessModal({ open: false })}
+        fileName={uploadSuccessModal.fileName}
+        residentName={uploadSuccessModal.residentName}
+        fileCount={uploadSuccessModal.fileCount}
+      />
 
       <style jsx>{`
         @keyframes spin {

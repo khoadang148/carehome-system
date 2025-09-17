@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, memo, useCallback } from 'react';
+import { useState, useMemo, memo, useCallback, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import OptimizedLink from '../OptimizedLink';
+import { residentAPI } from '@/lib/api';
 import {
   UserIcon,
   UsersIcon,
@@ -20,6 +21,7 @@ import {
   SparklesIcon,
   DocumentTextIcon,
   ClipboardDocumentCheckIcon,
+  BuildingOffice2Icon,
   HeartIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline';
@@ -31,6 +33,7 @@ interface MenuItem {
   icon: React.ComponentType<{ style?: React.CSSProperties }>;
   roles: UserRole[];
   color: string;
+  requiresResident?: boolean; // Chỉ hiển thị khi có resident đã được duyệt (không phải pending)
 }
 
 interface MenuGroup {
@@ -54,7 +57,7 @@ const menuGroups: MenuGroup[] = [
     title: "Lối tắt chăm sóc",
     items: [
       { name: 'Ghi chú chăm sóc', href: '/staff/assessments', icon: HeartIcon, roles: ['staff'], color: '#3b82f6' },
-      { name: 'Đăng ảnh hoạt động', href: '/staff/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
+      //{ name: 'Đăng ảnh hoạt động', href: '/staff/photos', icon: PhotoIcon, roles: ['staff'], color: '#f59e0b' },
     ]
   },
   {
@@ -62,18 +65,19 @@ const menuGroups: MenuGroup[] = [
     items: [
       { name: 'Hoạt động sinh hoạt', href: '/activities', icon: CalendarIcon, roles: ['admin'], color: '#f59e0b' },
       { name: 'Hoạt động sinh hoạt', href: '/staff/activities', icon: CalendarIcon, roles: ['staff'], color: '#3b82f6' },
-      { name: 'Trợ lý thông minh', href: '/admin/ai-recommendations', icon: SparklesIcon, roles: ['admin'], color: '#8b5cf6' },
+      //{ name: 'Trợ lý thông minh', href: '/admin/ai-recommendations', icon: SparklesIcon, roles: ['admin'], color: '#8b5cf6' },
       { name: 'Thông tin', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
-      { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1' },
-      { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1' },
+      { name: 'Phòng & Giường', href: '/family/room', icon: BuildingOffice2Icon, roles: ['family'], color: '#6366f1' },
+      { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1', requiresResident: true },
+      { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1', requiresResident: true },
       { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'admin'], color: '#6366f1' },
-      { name: 'Dịch vụ', href: '/family/services', icon: CubeIcon, roles: ['family'], color: '#6366f1' },
+      { name: 'Dịch vụ', href: '/family/services', icon: CubeIcon, roles: ['family'], color: '#6366f1' }
     ]
   },
   {
     title: "Dữ liệu & Báo cáo",
     items: [
-      { name: 'Hóa đơn', href: '/family/finance', icon: BanknotesIcon, roles: ['family'], color: '#16a34a' },
+      { name: 'Hóa đơn', href: '/family/finance', icon: BanknotesIcon, roles: ['family'], color: '#16a34a', requiresResident: true },
       { name: 'Hóa đơn', href: '/admin/financial-reports', icon: BanknotesIcon, roles: ['admin'], color: '#16a34a' }
     ]
   },
@@ -233,15 +237,52 @@ function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
+  const [hasResidents, setHasResidents] = useState(false);
+  const [hasActiveResidents, setHasActiveResidents] = useState(false);
   
   const userRole = user?.role || null;
+
+  // Kiểm tra xem user có residents và trạng thái của chúng
+  useEffect(() => {
+    if (user?.id && userRole === 'family') {
+      residentAPI.getByFamilyMemberId(user.id)
+        .then((data) => {
+          const residents = Array.isArray(data) ? data : [data];
+          const validResidents = residents.filter(r => r && r._id);
+          setHasResidents(validResidents.length > 0);
+          
+          // Kiểm tra có resident nào đã được duyệt (không phải pending)
+          const activeResidents = validResidents.filter(r => r.status && r.status !== 'pending');
+          setHasActiveResidents(activeResidents.length > 0);
+        })
+        .catch(() => {
+          setHasResidents(false);
+          setHasActiveResidents(false);
+        });
+    } else {
+      setHasResidents(true); // Admin và Staff luôn có quyền truy cập
+      setHasActiveResidents(true);
+    }
+  }, [user?.id, userRole]);
 
   const filteredMenuGroups = useMemo(() => {
     return menuGroups.map(group => ({
       ...group,
-      items: group.items.filter(item => userRole && item.roles.includes(userRole))
+      items: group.items.filter(item => {
+        // Kiểm tra role
+        if (!userRole || !item.roles.includes(userRole)) {
+          return false;
+        }
+        
+        // Kiểm tra requiresResident - cần có resident đã được duyệt
+        if (item.requiresResident && !hasActiveResidents) {
+          return false;
+        }
+        
+        return true;
+      })
     })).filter(group => group.items.length > 0);
-  }, [userRole]);
+  }, [userRole, hasActiveResidents]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed(prev => !prev);

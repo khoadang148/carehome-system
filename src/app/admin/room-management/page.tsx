@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
 import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI, carePlanAssignmentsAPI } from "@/lib/api";
+import { clearCached } from "@/lib/utils/apiCache";
 import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 
@@ -25,7 +26,7 @@ interface Bed {
 
 interface BedAssignment {
   _id: string;
-  resident_id: { _id: string; full_name: string };
+  resident_id: { _id: string; full_name: string } | null;
   bed_id: {
     _id: string;
     bed_number: string;
@@ -63,25 +64,72 @@ export default function RoomManagementPage() {
 
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      roomsAPI.getAll(),
-      bedsAPI.getAll(),
-      bedAssignmentsAPI.getAll(),
-      roomTypesAPI.getAll(),
-    ])
-      .then(([rooms, beds, assignments, types]) => {
-        setRooms(rooms);
-        setBeds(beds);
-        setBedAssignments(assignments);
-        setRoomTypes(types);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        console.log('Loading room management data..');
+        
+        const [roomsData, bedsData, assignmentsData, typesData] = await Promise.all([
+          roomsAPI.getAll(),
+          bedsAPI.getAll(),
+          bedAssignmentsAPI.getAll(),
+          roomTypesAPI.getAll(),
+        ]);
+        
+        console.log('Rooms data received:', roomsData);
+        console.log('Beds data received:', bedsData);
+        console.log('Assignments data received:', assignmentsData);
+        console.log('Room types data received:', typesData);
+        
+        // Xử lý trường hợp API trả về empty array do timeout
+        if (Array.isArray(roomsData) && roomsData.length === 0) {
+          console.warn('Rooms API returned empty array - possible timeout or server issue');
+        }
+        
+        setRooms(roomsData || []);
+        setBeds(bedsData || []);
+        setBedAssignments(assignmentsData || []);
+        setRoomTypes(typesData || []);
+        
         setLoading(false);
-      })
-      .catch(() => {
+      } catch (error) {
+        console.error('Error loading data:', error);
         setError("Không thể tải dữ liệu phòng/giường.");
         setLoading(false);
-      });
+      }
+    };
+
+    loadData();
   }, []);
+
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      console.log('Refreshing data...');
+      clearCached(); // Clear API cache
+      
+      const [roomsData, bedsData, assignmentsData, typesData] = await Promise.all([
+        roomsAPI.getAll(),
+        bedsAPI.getAll(),
+        bedAssignmentsAPI.getAll(),
+        roomTypesAPI.getAll(),
+      ]);
+      
+      console.log('Refreshed - Rooms data received:', roomsData);
+      console.log('Refreshed - Beds data received:', bedsData);
+      
+      setRooms(roomsData || []);
+      setBeds(bedsData || []);
+      setBedAssignments(assignmentsData || []);
+      setRoomTypes(typesData || []);
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      setError("Không thể tải dữ liệu phòng/giường.");
+      setLoading(false);
+    }
+  };
 
   const getRoomType = (room_type: string) =>
     roomTypes.find((t) => t.room_type === room_type);
@@ -132,7 +180,7 @@ export default function RoomManagementPage() {
       }
     );
 
-    if (assignment) {
+    if (assignment && assignment.resident_id) {
       const residentName = assignment.resident_id.full_name;
       return residentName;
     }
@@ -285,6 +333,14 @@ export default function RoomManagementPage() {
                 Hiển thị: {filteredRooms.length} phòng
               </p>
             </div>
+            <button
+              onClick={refreshData}
+              disabled={loading}
+              className="px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-600/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowPathIcon className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Đang tải...' : 'Làm mới'}
+            </button>
           </div>
         </div>
 
@@ -546,8 +602,6 @@ export default function RoomManagementPage() {
             </button>
           </div>
         )}
-
-
       </div>
     </div>
   );

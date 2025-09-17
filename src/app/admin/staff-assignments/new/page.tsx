@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react'
+import useSWR from 'swr'
 import { toast } from 'react-toastify'
 import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
@@ -14,36 +15,44 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { staffAssignmentsAPI, staffAPI, residentAPI, carePlansAPI, roomsAPI, bedAssignmentsAPI } from '@/lib/api';
 import { getAvatarUrlWithFallback } from '@/lib/utils/avatarUtils';
-import { clientStorage } from '@/lib/utils/clientStorage';
+import { userAPI, roomsAPI, residentAPI, staffAssignmentsAPI, bedAssignmentsAPI } from '@/lib/api';
 
 export default function NewStaffAssignmentPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  // Local states thay cho Redux
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
   const [residents, setResidents] = useState<any[]>([]);
+  const [residentsLoading, setResidentsLoading] = useState(false);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [roomNumbers, setRoomNumbers] = useState<{ [residentId: string]: string }>({});
-  const [loadingData, setLoadingData] = useState(false);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [creatingAssignment, setCreatingAssignment] = useState(false);
+
+  const [roomResidents, setRoomResidents] = useState<{ [roomId: string]: any[] }>({});
+  const [loadingRoomResidents, setLoadingRoomResidents] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [formData, setFormData] = useState({
     staff_id: '',
-    resident_ids: [] as string[],
+    room_id: '',
     end_date: '',
     notes: '',
     responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'] as string[],
   });
 
-  const [submitting, setSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
 
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showResidentsModal, setShowResidentsModal] = useState(false);
+  const [selectedRoomForResidents, setSelectedRoomForResidents] = useState<any>(null);
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
@@ -68,145 +77,158 @@ export default function NewStaffAssignmentPage() {
     };
   }, [showDatePicker]);
 
+  // SWR data fetching for fast, cached loads
+  const enableFetch = Boolean(user && user.role === 'admin');
+  const { data: swrStaff, isLoading: swrStaffLoading } = useSWR(enableFetch ? 'staff:getByRoleWithStatus' : null, () => userAPI.getByRoleWithStatus('staff'), { revalidateOnFocus: false });
+  const { data: swrRooms, isLoading: swrRoomsLoading } = useSWR(enableFetch ? 'rooms:getAll' : null, () => roomsAPI.getAll(), { revalidateOnFocus: false });
+  const { data: swrResidents, isLoading: swrResidentsLoading } = useSWR(enableFetch ? 'residents:getAll' : null, () => residentAPI.getAll(), { revalidateOnFocus: false });
+  const { data: swrAssignments, isLoading: swrAssignmentsLoading } = useSWR(enableFetch ? 'staffAssignments:getAll' : null, () => staffAssignmentsAPI.getAll(), { revalidateOnFocus: false });
+  const { data: swrBedAssignments } = useSWR(enableFetch ? 'bedAssignments:getAll' : null, () => bedAssignmentsAPI.getAll(), { revalidateOnFocus: false });
+
+  // Sync SWR data into existing local states to minimize code churn
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    setStaffLoading(Boolean(enableFetch && swrStaffLoading));
+    if (Array.isArray(swrStaff)) setStaffList(swrStaff);
+  }, [enableFetch, swrStaff, swrStaffLoading]);
 
-    const loadData = async () => {
-      setLoadingData(true);
-      try {
-        // Try to load cached data first for instant display
-        try {
-          const cachedStaff = clientStorage.getItem('staffAssignmentsStaffCache');
-          const cachedResidents = clientStorage.getItem('staffAssignmentsResidentsCache');
-          const cachedAssignments = clientStorage.getItem('staffAssignmentsAssignmentsCache');
-          
-          if (cachedStaff) {
-            const parsed = JSON.parse(cachedStaff);
-            if (Array.isArray(parsed?.data)) setStaffList(parsed.data);
-          }
-          if (cachedResidents) {
-            const parsed = JSON.parse(cachedResidents);
-            if (Array.isArray(parsed?.data)) setResidents(parsed.data);
-          }
-          if (cachedAssignments) {
-            const parsed = JSON.parse(cachedAssignments);
-            if (Array.isArray(parsed?.data)) setAssignments(parsed.data);
-          }
-        } catch {}
+  useEffect(() => {
+    setRoomsLoading(Boolean(enableFetch && swrRoomsLoading));
+    if (Array.isArray(swrRooms)) setRooms(swrRooms as any[]);
+  }, [enableFetch, swrRooms, swrRoomsLoading]);
 
-        const [staffData, residentsData, assignmentsData] = await Promise.all([
-          staffAPI.getAll(),
-          residentAPI.getAll(),
-          staffAssignmentsAPI.getAllIncludingExpired(),
-        ]);
+  useEffect(() => {
+    setResidentsLoading(Boolean(enableFetch && swrResidentsLoading));
+    if (Array.isArray(swrResidents)) setResidents(swrResidents as any[]);
+  }, [enableFetch, swrResidents, swrResidentsLoading]);
 
-        const staffOnly = Array.isArray(staffData) ? staffData.filter((staff: any) => staff.role === 'staff') : [];
-        const activeStaffOnly = staffOnly.filter((staff: any) => staff.status === 'active');
-        setStaffList(activeStaffOnly);
-        try { clientStorage.setItem('staffAssignmentsStaffCache', JSON.stringify({ ts: Date.now(), data: activeStaffOnly })); } catch {}
+  useEffect(() => {
+    setAssignmentsLoading(Boolean(enableFetch && swrAssignmentsLoading));
+    if (Array.isArray(swrAssignments)) setAssignments(swrAssignments as any[]);
+  }, [enableFetch, swrAssignments, swrAssignmentsLoading]);
 
-        const residentsArray = Array.isArray(residentsData) ? residentsData : [];
-        // Filter for active residents who have completed service registration
-        const activeOfficialResidents = residentsArray.filter((resident: any) => resident.status === 'active');
-        setResidents(activeOfficialResidents);
-        try { clientStorage.setItem('staffAssignmentsResidentsCache', JSON.stringify({ ts: Date.now(), data: activeOfficialResidents })); } catch {}
+  // Load room residents when rooms data is available (do not block on residents)
+  useEffect(() => {
+    if (rooms.length > 0) {
+      loadRoomResidents();
+    }
+  }, [rooms, residents]);
 
-        setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-        try { clientStorage.setItem('staffAssignmentsAssignmentsCache', JSON.stringify({ ts: Date.now(), data: assignmentsData })); } catch {}
+  const loadRoomResidents = async () => {
+    setLoadingRoomResidents(true);
+    const roomResidentsMap: { [roomId: string]: any[] } = {};
 
-        // Filter residents to only show those with completed service registration
-        const residentsWithServices = await Promise.all(
-          activeOfficialResidents.map(async (resident: any) => {
-            try {
-              const residentId = typeof resident._id === 'object' && (resident._id as any)?._id
-                ? (resident._id as any)._id
-                : resident._id;
-              
-              // Check if resident has care plans (completed service registration)
-              const carePlans = await carePlansAPI.getByResidentId(residentId);
-              if (Array.isArray(carePlans) && carePlans.length > 0) {
-                return resident;
-              }
-              return null;
-            } catch {
-              return null;
-            }
-          })
-        );
-        
-        const validResidents = residentsWithServices.filter(r => r !== null);
-        setResidents(validResidents);
-        try { clientStorage.setItem('staffAssignmentsResidentsCache', JSON.stringify({ ts: Date.now(), data: validResidents })); } catch {}
+    try {
+      // Initialize room residents map
+      rooms.forEach(room => {
+        roomResidentsMap[room._id] = [];
+      });
 
-        // Load room info in background without blocking UI
-        setTimeout(() => {
-          validResidents.forEach(async (resident: any) => {
-          try {
-            const residentId = typeof resident._id === 'object' && (resident._id as any)?._id
-              ? (resident._id as any)._id
-              : resident._id;
+      // Get bed assignments to determine which residents are in which rooms (prefer SWR cache)
+      const bedAssignments = Array.isArray(swrBedAssignments)
+        ? swrBedAssignments
+        : await bedAssignmentsAPI.getAll();
+      console.log('Bed assignments:', bedAssignments);
+      console.log('Residents:', residents);
+      console.log('Rooms:', rooms);
+      
+      if (Array.isArray(bedAssignments)) {
+        // Cache to avoid refetching the same resident repeatedly
+        const residentStatusCache: Record<string, string> = {};
 
-            try {
-              const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-              const bedAssignment = Array.isArray(bedAssignments) ?
-                bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+        // Group residents by room based on active bed assignments (mirror room management page behavior)
+        for (const assignment of bedAssignments) {
+          console.log('Processing assignment:', assignment);
+          // Only consider active assignments (no unassigned_date)
+          if (assignment && assignment.resident_id && assignment.bed_id && !assignment.unassigned_date) {
+            const roomId = assignment.bed_id.room_id?._id || assignment.bed_id.room_id;
 
-              if (bedAssignment?.bed_id?.room_id) {
-                if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                  setRoomNumbers(prev => ({ ...prev, [resident._id]: bedAssignment.bed_id.room_id.room_number }));
-                  return;
-                } else {
-                  const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                  if (roomId) {
-                    const room = await roomsAPI.getById(roomId);
-                    setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
-                    return;
-                  }
+            // Prefer full resident object from residents list; fallback to populated resident on assignment
+            const residentIdStr = (assignment.resident_id as any)?._id || assignment.resident_id;
+            const residentFromList = residents.find(r => r._id === residentIdStr);
+            const resident = residentFromList || assignment.resident_id;
+
+            let status = String(
+              (residentFromList as any)?.status ??
+              (residentFromList as any)?.resident_status ??
+              (assignment.resident_id as any)?.status ??
+              (assignment.resident_id as any)?.resident_status ??
+              ''
+            ).toLowerCase();
+
+            // Fallback: fetch latest status if missing/not admitted and not cached
+            if (roomId && resident && status !== 'admitted') {
+              try {
+                if (!residentStatusCache[residentIdStr]) {
+                  const latest = await (residentAPI as any).getById?.(residentIdStr);
+                  residentStatusCache[residentIdStr] = String(latest?.status || latest?.resident_status || '').toLowerCase();
                 }
+                status = residentStatusCache[residentIdStr] || status;
+              } catch {}
+            }
+
+            console.log('Resolved resident:', resident, 'Final Status:', status, 'Room ID:', roomId);
+
+            // Only include rooms that have at least one resident with status 'admitted'
+            if (roomId && resident && status === 'admitted') {
+              // Avoid duplicates per room
+              const existingResident = roomResidentsMap[roomId]?.find(r => r._id === resident._id);
+              if (!existingResident) {
+                if (!roomResidentsMap[roomId]) {
+                  roomResidentsMap[roomId] = [];
+                }
+                roomResidentsMap[roomId].push(resident);
               }
-            } catch (bedError) {
             }
-
-            const assignments = await carePlansAPI.getByResidentId(residentId);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-            if (roomIdString) {
-              const room = await roomsAPI.getById(roomIdString);
-              setRoomNumbers(prev => ({ ...prev, [resident._id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
-            } else {
-              setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa hoàn tất đăng kí' }));
-            }
-          } catch {
-            setRoomNumbers(prev => ({ ...prev, [resident._id]: 'Chưa hoàn tất đăng kí' }));
           }
-        });
-        }, 100); // Small delay to let UI render first
-
-        setError('');
-      } catch (err) {
-        setError('Không thể tải dữ liệu. Vui lòng thử lại.');
-      } finally {
-        setLoadingData(false);
+        }
       }
-    };
 
-    loadData();
-  }, [user]);
+      console.log('Final room residents map:', roomResidentsMap);
+      setRoomResidents(roomResidentsMap);
+    } catch (error) {
+      console.error('Error loading room residents:', error);
+      // Fallback: initialize empty map
+      rooms.forEach(room => {
+        roomResidentsMap[room._id] = [];
+      });
+      setRoomResidents(roomResidentsMap);
+    } finally {
+      setLoadingRoomResidents(false);
+    }
+  };
+
+  // Helper functions thay thế Redux actions
+  const createAssignment = async (data: any) => {
+    setCreatingAssignment(true);
+    try {
+      const res = await (staffAssignmentsAPI as any).create?.(data);
+      if (res) setAssignments(prev => [res, ...prev]);
+    } catch (e: any) {
+      toast.error(getUserFriendlyError(e?.message || 'Không thể tạo phân công'));
+    } finally {
+      setCreatingAssignment(false);
+    }
+  };
+
+  const updateAssignment = async (id: string, data: any) => {
+    try {
+      const res = await (staffAssignmentsAPI as any).update?.(id, data);
+      if (res) setAssignments(prev => prev.map(a => (a._id === id ? res : a)));
+    } catch (e: any) {
+      toast.error(getUserFriendlyError(e?.message || 'Không thể cập nhật phân công'));
+    }
+  };
 
   const handleCreate = async () => {
     setValidationErrors({});
 
-    if (!formData.staff_id || formData.resident_ids.length === 0) {
-      toast.error('Vui lòng chọn nhân viên và ít nhất một người cao tuổi');
+    if (!formData.staff_id || !formData.room_id) {
+      toast.error('Vui lòng chọn nhân viên và phòng');
       return;
     }
 
-    if (!formData.end_date || formData.end_date.trim() === '') {
-      setValidationErrors({ end_date: 'Ngày kết thúc không được để trống' });
-      return;
-    }
-
+    // Only validate end date if it's provided
+    if (formData.end_date && formData.end_date.trim() !== '') {
     const endDate = new Date(formData.end_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -214,57 +236,36 @@ export default function NewStaffAssignmentPage() {
     if (endDate < today) {
       setValidationErrors({ end_date: 'Ngày kết thúc không được ở quá khứ' });
       return;
+      }
     }
-
-
 
     if (!formData.staff_id.match(/^[0-9a-fA-F]{24}$/)) {
       toast.error('ID nhân viên không hợp lệ');
       return;
     }
 
-    for (const residentId of formData.resident_ids) {
-      if (!residentId.match(/^[0-9a-fA-F]{24}$/)) {
-        toast.error('ID người cao tuổi không hợp lệ');
-        return;
-      }
+    if (!formData.room_id.match(/^[0-9a-fA-F]{24}$/)) {
+      toast.error('ID phòng không hợp lệ');
+      return;
     }
 
-    const existingActiveAssignments: string[] = [];
-    for (const residentId of formData.resident_ids) {
+    // Check if there's already an active assignment for this staff and room
       const existingAssignment = assignments.find(assignment => {
-        const assignmentResidentId = assignment.resident_id?._id || assignment.resident_id;
+      const assignmentRoomId = assignment.room_id?._id || assignment.room_id;
         const assignmentStaffId = assignment.staff_id?._id || assignment.staff_id;
-        return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
+      return assignmentRoomId === formData.room_id && assignmentStaffId === formData.staff_id;
       });
 
       // Only block if there's an active assignment (not expired)
       if (existingAssignment && existingAssignment.status === 'active') {
-        const resident = residents.find(r => r._id === residentId);
-        existingActiveAssignments.push(resident?.full_name || residentId.toString());
-      }
-      // If there's an expired assignment, allow reassignment (backend will handle updating it)
-    }
-
-    if (existingActiveAssignments.length > 0) {
-      toast.error(`Các người cao tuổi sau đã được phân công cho nhân viên này rồi: ${existingActiveAssignments.join(', ')}. Vui lòng bỏ chọn các người cao tuổi này hoặc chọn nhân viên khác.`);
+      const room = rooms.find(r => r._id === formData.room_id);
+      toast.error(`Phòng ${room?.room_number || formData.room_id} đã được phân công cho nhân viên này rồi. Vui lòng chọn phòng khác hoặc nhân viên khác.`);
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const newAssignments = await Promise.all(
-        formData.resident_ids.map(async (residentId) => {
-          // Check if there's an existing assignment (active or expired)
-          const existingAssignment = assignments.find(assignment => {
-            const assignmentResidentId = assignment.resident_id?._id || assignment.resident_id;
-            const assignmentStaffId = assignment.staff_id?._id || assignment.staff_id;
-            return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
-          });
-
           const assignmentData: any = {
             staff_id: formData.staff_id,
-            resident_id: residentId,
+      room_id: formData.room_id,
             assigned_date: new Date().toISOString(),
             assigned_by: user?.id,
             responsibilities: formData.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -285,63 +286,21 @@ export default function NewStaffAssignmentPage() {
           if (existingAssignment) {
             // Ensure the assignment is set to active when updating
             assignmentData.status = 'active';
-            return staffAssignmentsAPI.update(existingAssignment._id, assignmentData);
+            await updateAssignment(existingAssignment._id, assignmentData);
           } else {
-            return staffAssignmentsAPI.create(assignmentData);
+            await createAssignment(assignmentData);
           }
-        })
-      );
 
+    // Set success data for modal
       setSuccessData({
-        count: newAssignments.length,
+      count: 1,
         staff: selectedStaff,
-        residents: selectedResidents,
-        hasExpiredUpdates: formData.resident_ids.some(residentId => {
-          const assignment = assignments.find(a => {
-            const assignmentResidentId = a.resident_id?._id || a.resident_id;
-            const assignmentStaffId = a.staff_id?._id || a.staff_id;
-            return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
-          });
-          return assignment && (assignment.status === 'expired' || isExpired(assignment.end_date || ''));
-        }),
-      });
-      
-      // Refresh assignments data to get updated status
-      try {
-        const refreshedAssignments = await staffAssignmentsAPI.getAllIncludingExpired();
-        setAssignments(Array.isArray(refreshedAssignments) ? refreshedAssignments : []);
-      } catch (refreshError) {
-        console.error('Failed to refresh assignments:', refreshError);
-      }
+      room: selectedRoom,
+      residents: roomResidents[formData.room_id] || [],
+      hasExpiredUpdates: existingAssignment && (existingAssignment.status === 'expired' || isExpired(existingAssignment.end_date || '')),
+    });
       
       setShowSuccessModal(true);
-    } catch (err: any) {
-      let errorMessage = 'Không thể tạo phân công. Vui lòng thử lại.';
-
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      if (err.message && err.message.includes('E11000 duplicate key error')) {
-        errorMessage = 'Người cao tuổi này đã được phân công cho nhân viên này rồi. Nếu assignment đã hết hạn, bạn có thể phân công lại. Vui lòng kiểm tra lại danh sách phân công.';
-
-        try {
-          const refreshedAssignments = await staffAssignmentsAPI.getAllIncludingExpired();
-          setAssignments(Array.isArray(refreshedAssignments) ? refreshedAssignments : []);
-
-          setFormData(prev => ({ ...prev, resident_ids: [] }));
-        } catch (refreshError) {
-        }
-      }
-
-      toast.error(errorMessage);
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleSuccessClose = () => {
@@ -350,10 +309,20 @@ export default function NewStaffAssignmentPage() {
     window.location.href = '/admin/staff-assignments';
   };
 
+  const handleShowResidents = (room: any) => {
+    setSelectedRoomForResidents(room);
+    setShowResidentsModal(true);
+  };
+
+  const handleCloseResidentsModal = () => {
+    setShowResidentsModal(false);
+    setSelectedRoomForResidents(null);
+  };
+
   const resetForm = () => {
     setFormData({
       staff_id: '',
-      resident_ids: [],
+      room_id: '',
       end_date: '',
       notes: '',
       responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -373,82 +342,62 @@ export default function NewStaffAssignmentPage() {
     return endStartOfDay < nowStartOfDay;
   };
 
-  const getAvailableResidents = () => {
-    return residents.filter(resident => {
+  const getAvailableRooms = () => {
+    return rooms.filter(room => {
+      // First check if room has residents
+      const roomResidentsCount = roomResidents[room._id]?.length || 0;
+      if (roomResidentsCount === 0) {
+        return false; // Don't show rooms without residents
+      }
+
       const selectedStaffId = formData.staff_id;
       if (!selectedStaffId) {
-        const residentAssignments = assignments.filter(assignment => {
-          if (!assignment.resident_id) return false;
-          const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
-          const residentId = resident._id;
-          return assignmentResidentId === residentId;
-        });
-
-        if (residentAssignments.length === 0) {
+        // If no staff selected, show all rooms with residents
           return true;
-        }
-
-        const hasActiveAssignment = residentAssignments.some(assignment =>
-          !assignment.end_date || !isExpired(assignment.end_date)
-        );
-        if (hasActiveAssignment) {
-          return false;
-        }
-
-        const hasOnlyExpiredAssignments = residentAssignments.every(assignment =>
-          assignment.end_date && isExpired(assignment.end_date)
-        );
-        if (hasOnlyExpiredAssignments) {
-          return true;
-        }
-
-        return false;
       } else {
+        // Check if this room is already assigned to this staff
         const specificAssignment = assignments.find(assignment => {
-          if (!assignment.resident_id || !assignment.staff_id) return false;
-          const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+          if (!assignment.room_id || !assignment.staff_id) return false;
+          const assignmentRoomId = assignment.room_id._id || assignment.room_id;
           const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
-          const residentId = resident._id;
-          return assignmentResidentId === residentId && assignmentStaffId === selectedStaffId;
+          return assignmentRoomId === room._id && assignmentStaffId === selectedStaffId;
         });
 
         if (!specificAssignment) {
           return true;
         }
 
-        if (!specificAssignment.end_date || !isExpired(specificAssignment.end_date)) {
-          return false;
-        }
-
+        // If assignment exists but is expired, allow reassignment
         if (specificAssignment.end_date && isExpired(specificAssignment.end_date)) {
           return true;
         }
 
+        // If assignment is active, don't show this room
         return false;
       }
     });
   };
 
-  const hasExpiredAssignments = (residentId: string) => {
-    const residentAssignments = assignments.filter(assignment => {
-      if (!assignment.resident_id) return false;
-      const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
-      return assignmentResidentId === residentId;
+  const hasExpiredAssignments = (roomId: string) => {
+    const roomAssignments = assignments.filter(assignment => {
+      if (!assignment.room_id) return false;
+      const assignmentRoomId = assignment.room_id._id || assignment.room_id;
+      return assignmentRoomId === roomId;
     });
 
-    return residentAssignments.length > 0 && residentAssignments.every(assignment =>
+    return roomAssignments.length > 0 && roomAssignments.every(assignment =>
       assignment.end_date && isExpired(assignment.end_date)
     );
   };
 
-  const getAssignmentStatus = (residentId: string) => {
+  const getAssignmentStatus = (roomId: string) => {
     if (!formData.staff_id) return null;
 
     const assignment = assignments.find(assignment => {
-      if (!assignment.resident_id || !assignment.staff_id) return false;
-      const assignmentResidentId = assignment.resident_id._id || assignment.resident_id;
+      if (!assignment.room_id || !assignment.staff_id) return false;
+      const assignmentRoomId = assignment.room_id._id || assignment.room_id;
       const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
-      return assignmentResidentId === residentId && assignmentStaffId === formData.staff_id;
+      return assignmentRoomId === roomId && assignmentStaffId === formData.staff_id;
     });
 
     if (!assignment) return null;
@@ -458,20 +407,19 @@ export default function NewStaffAssignmentPage() {
     return 'active';
   };
 
-  const getFilteredResidents = () => {
-    const availableResidents = getAvailableResidents();
-    if (!searchTerm) return availableResidents;
+  const getFilteredRooms = () => {
+    const availableRooms = getAvailableRooms();
+    if (!searchTerm) return availableRooms;
 
-    return availableResidents.filter(resident =>
-      resident.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    return availableRooms.filter(room =>
+      room.room_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (room.room_type && room.room_type.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
 
   const selectedStaff = staffList.find(staff => staff._id === formData.staff_id);
-
-  const selectedResidents = residents.filter(resident =>
-    formData.resident_ids.includes(resident._id)
-  );
+  const selectedRoom = rooms.find(room => room._id === formData.room_id);
+  const selectedResidents = roomResidents[formData.room_id] || [];
 
 
 
@@ -494,17 +442,30 @@ export default function NewStaffAssignmentPage() {
   };
 
   const isFormValid = () => {
-    if (!formData.staff_id || formData.resident_ids.length === 0) return false;
+    if (!formData.staff_id || !formData.room_id) return false;
 
-    if (!formData.end_date || formData.end_date.trim() === '') return false;
-
+    // Only validate end date if it's provided
+    if (formData.end_date && formData.end_date.trim() !== '') {
     const endDate = new Date(formData.end_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (endDate < today) return false;
+    }
 
     return true;
   };
+
+  const loadingData = staffLoading || residentsLoading || roomsLoading || assignmentsLoading;
+  
+  // Optimize loading by checking if we have minimum required data
+  const hasMinimumData = staffList.length > 0 && rooms.length > 0;
+  const canShowForm = hasMinimumData && !staffLoading && !roomsLoading;
+  
+  // Show form even if residents/assignments are still loading
+  const showFormWithPartialData = hasMinimumData;
+  
+  // Show loading indicator for background data
+  const isBackgroundLoading = residentsLoading || assignmentsLoading;
 
   if (loading) {
     return (
@@ -632,9 +593,17 @@ export default function NewStaffAssignmentPage() {
                     margin: '0.25rem 0 0 0',
                     fontWeight: 500
                   }}>
-                    Phân công nhân viên phụ trách người cao tuổi
-                    ({getAvailableResidents().length} người cao tuổi khả dụng,
-                    {getAvailableResidents().filter(r => hasExpiredAssignments(r._id)).length} có thể phân công lại)
+                    Phân công nhân viên phụ trách theo phòng
+                    {isBackgroundLoading && (
+                      <span style={{
+                        marginLeft: '0.5rem',
+                        fontSize: '0.875rem',
+                        color: '#3b82f6',
+                        fontWeight: 600
+                      }}>
+                        • Đang tải dữ liệu bổ sung...
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -669,10 +638,10 @@ export default function NewStaffAssignmentPage() {
                 </button>
                 <button
                   onClick={handleCreate}
-                  disabled={submitting || !isFormValid()}
+                  disabled={creatingAssignment || !isFormValid()}
                   style={{
                     padding: '0.75rem 2rem',
-                    background: submitting || !isFormValid()
+                    background: creatingAssignment || !isFormValid()
                       ? '#9ca3af'
                       : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                     color: 'white',
@@ -680,32 +649,32 @@ export default function NewStaffAssignmentPage() {
                     borderRadius: '0.75rem',
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    cursor: submitting || !isFormValid() ? 'not-allowed' : 'pointer',
+                    cursor: creatingAssignment || !isFormValid() ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
                     transition: 'all 0.2s ease',
-                    boxShadow: submitting || !isFormValid()
+                    boxShadow: creatingAssignment || !isFormValid()
                       ? 'none'
                       : '0 4px 12px rgba(59, 130, 246, 0.3)',
-                    opacity: submitting || !isFormValid() ? 0.6 : 1
+                    opacity: creatingAssignment || !isFormValid() ? 0.6 : 1
                   }}
                   onMouseOver={e => {
-                    if (!submitting && isFormValid()) {
+                    if (!creatingAssignment && isFormValid()) {
                       e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
                       e.currentTarget.style.transform = 'translateY(-1px)';
                       e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
                     }
                   }}
                   onMouseOut={e => {
-                    if (!submitting && isFormValid()) {
+                    if (!creatingAssignment && isFormValid()) {
                       e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
                     }
                   }}
                 >
-                  {submitting ? (
+                  {creatingAssignment ? (
                     <>
                       <div style={{
                         width: '1.25rem',
@@ -740,11 +709,18 @@ export default function NewStaffAssignmentPage() {
           )}
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {loadingData ? (
+            {!showFormWithPartialData ? (
               <div className="flex justify-center items-center h-64">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Đang tải dữ liệu...</p>
+                  <p className="text-gray-600">
+                    {!hasMinimumData ? 'Đang tải dữ liệu cơ bản...' : 'Đang tải dữ liệu bổ sung...'}
+                  </p>
+                  {hasMinimumData && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Có thể bắt đầu sử dụng form ngay bây giờ
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -789,15 +765,14 @@ export default function NewStaffAssignmentPage() {
 
                       <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          Người cao tuổi được phân công <span className="text-red-500">*</span>
-                          <span className="text-sm font-normal text-gray-500 ml-2">(Có thể chọn nhiều)</span>
+                          Phòng được phân công <span className="text-red-500">*</span>
                         </label>
 
                         <div className="mb-4">
                           <div className="relative">
                             <input
                               type="text"
-                              placeholder="Tìm kiếm người cao tuổi theo tên..."
+                              placeholder="Tìm kiếm phòng theo số phòng..."
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
                               className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 focus:outline-none transition-all duration-200 text-lg"
@@ -819,37 +794,39 @@ export default function NewStaffAssignmentPage() {
                           {searchTerm && (
                             <p className="text-sm text-gray-500 mt-2 flex items-center">
                               <CheckIcon className="w-4 h-4 mr-1" />
-                              Tìm thấy {getFilteredResidents().length} người cao tuổi phù hợp
+                              Tìm thấy {getFilteredRooms().length} phòng phù hợp
                             </p>
                           )}
                         </div>
 
                         <div className="border-2 border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto bg-white shadow-inner">
+                          {loadingRoomResidents || residentsLoading ? (
+                            <div className="flex justify-center items-center py-8">
+                              <div className="text-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
+                                <p className="text-sm text-gray-600">Đang tải thông tin người cao tuổi...</p>
+                              </div>
+                            </div>
+                          ) : (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {getFilteredResidents().map((resident) => {
-                              const isSelected = formData.resident_ids.includes(resident._id);
+                              {getFilteredRooms().map((room) => {
+                                const isSelected = formData.room_id === room._id;
+                                const roomResidentsCount = roomResidents[room._id]?.length || 0;
                               return (
                                 <div
-                                  key={resident._id}
+                                    key={room._id}
                                   onClick={() => {
                                     // Only block if there's an active assignment (not expired)
-                                    if (formData.staff_id && getAssignmentStatus(resident._id) === 'active') {
-                                      toast.error(`Người cao tuổi ${resident.full_name} đã được phân công cho nhân viên này rồi. Vui lòng chọn người cao tuổi khác hoặc nhân viên khác.`);
+                                      if (formData.staff_id && getAssignmentStatus(room._id) === 'active') {
+                                        toast.error(`Phòng ${room.room_number} đã được phân công cho nhân viên này rồi. Vui lòng chọn phòng khác hoặc nhân viên khác.`);
                                       return;
                                     }
 
-                                    // Allow selection for residents with expired assignments or no assignments
-                                    if (isSelected) {
+                                      // Allow selection for rooms with expired assignments or no assignments
                                       setFormData({
                                         ...formData,
-                                        resident_ids: formData.resident_ids.filter(id => id !== resident._id)
+                                        room_id: isSelected ? '' : room._id
                                       });
-                                    } else {
-                                      setFormData({
-                                        ...formData,
-                                        resident_ids: [...formData.resident_ids, resident._id]
-                                      });
-                                    }
                                   }}
                                   className={`
                                 p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-[1.02]
@@ -874,20 +851,32 @@ export default function NewStaffAssignmentPage() {
                                       </div>
                                       <div>
                                         <p className={`font-semibold text-lg ${isSelected ? 'text-green-900' : 'text-gray-900'}`}>
-                                          {resident.full_name}
-                                        </p>
-                                        
-                                        {formData.staff_id && getAssignmentStatus(resident._id) === 'active' && (
+                                            Phòng {room.room_number}
+                                          </p>
+                                          <p className={`text-sm ${isSelected ? 'text-green-700' : 'text-gray-600'}`}>
+                                            • {roomResidentsCount} người cao tuổi
+                                          </p>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleShowResidents(room);
+                                            }}
+                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 transition-colors"
+                                          >
+                                            Xem danh sách người cao tuổi
+                                          </button>
+
+                                          {formData.staff_id && getAssignmentStatus(room._id) === 'active' && (
                                           <p className="text-xs text-red-600 font-medium mt-1">
                                             ⚠️ Đã được phân công cho nhân viên này
                                           </p>
                                         )}
-                                        {formData.staff_id && getAssignmentStatus(resident._id) === 'expired' && (
+                                          {formData.staff_id && getAssignmentStatus(room._id) === 'expired' && (
                                           <p className="text-xs text-orange-600 font-medium mt-1">
                                             🔄 Có thể phân công lại (đã hết hạn)
                                           </p>
                                         )}
-                                        {!formData.staff_id && hasExpiredAssignments(resident._id) && (
+                                          {!formData.staff_id && hasExpiredAssignments(room._id) && (
                                           <p className="text-xs text-orange-600 font-medium mt-1">
                                             🔄 Có thể phân công lại
                                           </p>
@@ -903,8 +892,9 @@ export default function NewStaffAssignmentPage() {
                               );
                             })}
                           </div>
+                          )}
 
-                          {getFilteredResidents().length === 0 && (
+                          {!loadingRoomResidents && getFilteredRooms().length === 0 && (
                             <div className="text-center py-12 text-gray-500">
                               {searchTerm ? (
                                 <>
@@ -913,7 +903,7 @@ export default function NewStaffAssignmentPage() {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
                                   </div>
-                                  <p className="text-lg font-medium mb-2">Không tìm thấy người cao tuổi nào phù hợp</p>
+                                  <p className="text-lg font-medium mb-2">Không tìm thấy phòng nào phù hợp</p>
                                   <p className="text-sm">Thử tìm kiếm với từ khóa khác</p>
                                 </>
                               ) : (
@@ -921,25 +911,28 @@ export default function NewStaffAssignmentPage() {
                                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <UserPlusIcon className="w-8 h-8 text-gray-400" />
                                   </div>
-                                  <p className="text-lg font-medium mb-2">Không có người cao tuổi nào khả dụng</p>
-                                  <p className="text-sm">Tất cả người cao tuổi đã được phân công, chưa có assignment expired, hoặc đã xuất viện</p>
+                                  <p className="text-lg font-medium mb-2">Không có phòng nào khả dụng</p>
+                                  <p className="text-sm">Tất cả phòng có người cao tuổi đã được phân công</p>
                                 </>
                               )}
                             </div>
                           )}
                         </div>
 
-                        {formData.resident_ids.length > 0 && (
+                        {formData.room_id && (
                           <div className="mt-4 flex items-center justify-between bg-white rounded-xl p-4 border-2 border-green-200">
                             <p className="text-sm text-gray-600 flex items-center">
                               <CheckIcon className="w-4 h-4 mr-2 text-green-500" />
-                              Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">{formData.resident_ids.length}</span> người cao tuổi
+                              Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">Phòng {selectedRoom?.room_number}</span>
+                              {selectedResidents.length > 0 && (
+                                <span className="text-gray-500">• {selectedResidents.length} người cao tuổi</span>
+                              )}
                             </p>
                             <button
-                              onClick={() => setFormData({ ...formData, resident_ids: [] })}
+                              onClick={() => setFormData({ ...formData, room_id: '' })}
                               className="text-sm text-red-600 hover:text-red-800 transition-colors font-medium"
                             >
-                              Bỏ chọn tất cả
+                              Bỏ chọn
                             </button>
                           </div>
                         )}
@@ -947,7 +940,7 @@ export default function NewStaffAssignmentPage() {
 
                       <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 date-picker-container">
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          Ngày kết thúc phân công <span className="text-red-500">*</span>
+                          Ngày kết thúc phân công <span className="text-gray-400">(Tùy chọn)</span>
                         </label>
                         <div className="relative">
                           <input
@@ -1022,6 +1015,12 @@ export default function NewStaffAssignmentPage() {
                             Ngày kết thúc không được ở quá khứ!
                           </p>
                         )}
+                        {!formData.end_date && (
+                          <p className="text-sm text-gray-500 mt-2 flex items-center">
+                            <CheckIcon className="w-4 h-4 mr-2" />
+                            Phân công sẽ không có ngày kết thúc (hoạt động vô thời hạn)
+                          </p>
+                        )}
                       </div>
 
                       <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6">
@@ -1086,62 +1085,66 @@ export default function NewStaffAssignmentPage() {
                         </div>
                       )}
 
-                      {selectedResidents.length > 0 && (
+                      {selectedRoom && (
                         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold text-green-900 flex items-center">
                               <CheckIcon className="w-4 h-4 mr-2" />
-                              Người cao tuổi được chọn ({selectedResidents.length})
+                              Phòng được chọn: {selectedRoom.room_number}
                             </h3>
                             <button
-                              onClick={() => setFormData({ ...formData, resident_ids: [] })}
+                              onClick={() => setFormData({ ...formData, room_id: '' })}
                               className="text-xs text-green-600 hover:text-green-800 transition-colors font-medium"
                             >
-                              Bỏ chọn tất cả
+                              Bỏ chọn
                             </button>
                           </div>
-                          <div className="space-y-3 max-h-48 overflow-y-auto">
-                            {selectedResidents.map((resident) => (
-                              <div
-                                key={resident._id}
-                                className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200 shadow-sm"
-                              >
+                          <div className="space-y-3">
+                            <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
                                 <div className="flex items-center">
-                                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-sm overflow-hidden">
-                                    {resident.avatar ? (
-                                      <img
-                                        src={getAvatarUrlWithFallback(resident.avatar)}
-                                        alt={resident.full_name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.src = "/default-avatar.svg";
-                                        }}
-                                      />
-                                    ) : (
-                                      <img
-                                        src="/default-avatar.svg"
-                                        alt={resident.full_name}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    )}
+                                <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-sm">
+                                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                  </svg>
                                   </div>
                                   <div>
-                                    <p className="text-sm font-semibold text-green-900">{resident.full_name}</p>
-    
+                                  <p className="text-sm font-semibold text-green-900">Phòng {selectedRoom.room_number}</p>
                                   </div>
                                 </div>
-                                <button
-                                  onClick={() => setFormData({
-                                    ...formData,
-                                    resident_ids: formData.resident_ids.filter(id => id !== resident._id)
-                                  })}
-                                  className="text-green-600 hover:text-green-800 p-1 rounded-full hover:bg-green-100 transition-colors"
-                                  title="Bỏ chọn người cao tuổi này"
-                                >
-                                  <XMarkIcon className="w-4 h-4" />
-                                </button>
+                            </div>
+                            {loadingRoomResidents ? (
+                              <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
+                                <div className="flex items-center justify-center py-2">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                                  <p className="text-xs text-gray-600">Đang tải...</p>
+                                </div>
+                              </div>
+                            ) : residentsLoading ? (
+                              <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
+                                <div className="flex items-center justify-center py-2">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                                  <p className="text-xs text-gray-600">Đang tải...</p>
+                                </div>
+                              </div>
+                            ) : selectedResidents.length > 0 ? (
+                              <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
+                                <p className="text-sm font-semibold text-green-900 mb-2">Người cao tuổi trong phòng ({selectedResidents.length})</p>
+                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                  {selectedResidents.map((resident) => (
+                                    <div key={resident._id} className="flex items-center text-xs">
+                                      <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center mr-2">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                      </div>
+                                      <span className="text-green-800">{resident.full_name}</span>
                               </div>
                             ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
+                                <p className="text-sm text-gray-600">Không có người cao tuổi nào trong phòng này</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1180,7 +1183,7 @@ export default function NewStaffAssignmentPage() {
                         <div className="text-sm text-yellow-800 space-y-2">
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                            Sẽ tạo <span className="font-bold text-yellow-900 mx-1">{formData.resident_ids.length}</span> phân công
+                            Sẽ tạo <span className="font-bold text-yellow-900 mx-1">1</span> phân công phòng
                           </p>
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
@@ -1188,12 +1191,27 @@ export default function NewStaffAssignmentPage() {
                           </p>
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                            Phòng: <span className="font-semibold text-yellow-900 ml-1">{selectedRoom?.room_number || 'Chưa chọn'}</span>
+                          </p>
+                          <p className="flex items-center">
+                            <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                            Người cao tuổi: <span className="font-semibold text-yellow-900 ml-1">
+                              {loadingRoomResidents ? 'Đang tải...' : `${selectedResidents.length} người`}
+                            </span>
+                          </p>
+                          <p className="flex items-center">
+                            <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
                             Trạng thái: <span className="font-semibold text-green-600 ml-1">Hoạt động</span>
                           </p>
-                          {formData.end_date && (
+                          {formData.end_date ? (
                             <p className="flex items-center">
                               <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
                               Kết thúc: <span className="font-semibold text-yellow-900 ml-1">{new Date(formData.end_date).toLocaleDateString('vi-VN')}</span>
+                            </p>
+                          ) : (
+                            <p className="flex items-center">
+                              <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                              Thời hạn: <span className="font-semibold text-blue-600 ml-1">Vô thời hạn</span>
                             </p>
                           )}
                         </div>
@@ -1229,6 +1247,10 @@ export default function NewStaffAssignmentPage() {
                       <span className="font-semibold text-gray-900">{successData.staff?.full_name}</span>
                     </div>
                     <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Phòng:</span>
+                      <span className="font-semibold text-gray-900">Phòng {successData.room?.room_number}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
                       <span className="text-gray-600">Người cao tuổi:</span>
                       <span className="font-semibold text-gray-900">{successData.residents.length} người</span>
                     </div>
@@ -1248,6 +1270,95 @@ export default function NewStaffAssignmentPage() {
                     className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     Xem danh sách phân công
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {showResidentsModal && selectedRoomForResidents && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-4 shadow-md">
+                      <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        Danh sách người cao tuổi
+                      </h2>
+                      <p className="text-gray-600">
+                        Phòng {selectedRoomForResidents.room_number}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCloseResidentsModal}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                {loadingRoomResidents ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Đang tải danh sách...</span>
+                  </div>
+                ) : roomResidents[selectedRoomForResidents._id]?.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Chưa có người cao tuổi</h3>
+                    <p className="text-gray-600">Phòng này hiện tại chưa có người cao tuổi nào.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {roomResidents[selectedRoomForResidents._id].map((resident) => (
+                      <div key={resident._id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-md overflow-hidden">
+                            <img
+                              src={resident.avatar ? getAvatarUrlWithFallback(resident.avatar) : "/default-avatar.svg"}
+                              alt={resident.full_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = "/default-avatar.svg";
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-lg font-semibold text-gray-900">{resident.full_name}</h4>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Tổng cộng: <span className="font-semibold">{roomResidents[selectedRoomForResidents._id]?.length || 0}</span> người cao tuổi
+                  </div>
+                  <button
+                    onClick={handleCloseResidentsModal}
+                    className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    Đóng
                   </button>
                 </div>
               </div>

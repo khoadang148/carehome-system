@@ -70,7 +70,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       }
     } else {
-      setUser(null);
+      // Fallback: nếu token hợp lệ mà chưa có user trong storage, lấy thông tin từ server
+      try {
+        if (isTokenValid()) {
+          authAPI.me()
+            .then((profile) => {
+              if (!profile) return;
+              const userRole = profile.role;
+              if (userRole === 'family' || userRole === 'staff' || userRole === 'admin') {
+                const userObj = {
+                  id: profile.id || profile._id,
+                  name: profile.full_name || profile.fullName || profile.username || profile.email,
+                  email: profile.email,
+                  role: userRole,
+                } as any;
+                try { clientStorage.setItem('user', JSON.stringify(userObj)); } catch {}
+                setUser(userObj);
+              } else {
+                setUser(null);
+              }
+            })
+            .catch(() => {
+              setUser(null);
+            });
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      }
     }
     setLoading(false);
   }, [isLoggingOut]);
@@ -82,6 +110,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     return loadingOptimizer.fastLoading(async () => {
       const response = await authAPI.login(email, password);
+      
+      // Kiểm tra nếu backend trả về success: false (tài khoản chưa kích hoạt hoặc bị khóa)
+      if (response.success === false) {
+        if (response.message?.includes('chưa được kích hoạt') || response.message?.includes('pending')) {
+          // Delay một chút để user có thể đọc thông báo trước khi redirect
+          setTimeout(() => {
+            router.replace(`/pending-approval?email=${encodeURIComponent(email)}`);
+          }, 3000);
+          
+          // Throw error với message cụ thể để hiển thị trên modal
+          throw new Error('Tài khoản của bạn đang chờ phê duyệt từ quản trị viên. Vui lòng liên hệ admin để được kích hoạt tài khoản.');
+        } else {
+          // Các lỗi khác (tài khoản bị khóa, etc.)
+          throw new Error(response.message || 'Tài khoản không thể đăng nhập');
+        }
+      }
       
       if (response.access_token) {
         const userProfile = response.user;
@@ -95,8 +139,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: userRole,
           };
           
+          // Nếu tài khoản chưa được kích hoạt -> throw error để hiển thị thông báo
+          if (userProfile.status && String(userProfile.status).toLowerCase() === 'pending') {
+            // Delay một chút để user có thể đọc thông báo trước khi redirect
+            setTimeout(() => {
+              router.replace(`/pending-approval?email=${encodeURIComponent(userProfile.email || '')}`);
+            }, 3000);
+            
+            // Throw error với message cụ thể để hiển thị trên modal
+            throw new Error('Tài khoản của bạn đang chờ phê duyệt từ quản trị viên. Vui lòng liên hệ admin để được kích hoạt tài khoản.');
+          }
+
           setUser(userObj);
-          
+
           // Sử dụng fastLogin để tối ưu hóa
           fastLogin.handleLogin(router, response.access_token, userObj, userRole);
           

@@ -852,8 +852,8 @@ export const convertDDMMYYYYToISO = (dateString: string): string => {
       return '';
     }
     
-    // Trả về định dạng ISO 8601
-    return date.toISOString().split('T')[0];
+    // Trả về định dạng ISO 8601 (YYYY-MM-DD) trực tiếp để tránh lệch múi giờ
+    return `${yearNum.toString().padStart(4, '0')}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
   } catch (error) {
     console.error('Error converting date format:', error);
     return '';

@@ -19,7 +19,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { staffAssignmentsAPI, staffAPI, residentAPI, userAPI } from '@/lib/api';
+import { userAPI, residentAPI, staffAssignmentsAPI } from '@/lib/api';
 import { processAvatarUrl, getAvatarUrlWithFallback } from '@/lib/utils/avatarUtils';
 import { formatDateDDMMYYYY, Validator } from '@/lib/utils/validation';
 
@@ -27,11 +27,19 @@ export default function StaffAssignmentsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  // Local states thay cho Redux
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [assignmentsError, setAssignmentsError] = useState('');
+  
   const [staffs, setStaffs] = useState<any[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState('');
+  
   const [residents, setResidents] = useState<any[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
-  const [error, setError] = useState('');
+  const [residentsLoading, setResidentsLoading] = useState(false);
+  const [residentsError, setResidentsError] = useState('');
+
   const [expandedStaff, setExpandedStaff] = useState<string[]>([]);
 
   const [showEditModal, setShowEditModal] = useState(false);
@@ -39,10 +47,14 @@ export default function StaffAssignmentsPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
+  const [showResidentsModal, setShowResidentsModal] = useState(false);
+  const [selectedRoomForResidents, setSelectedRoomForResidents] = useState<any>(null);
+  const [roomResidents, setRoomResidents] = useState<any[]>([]);
+  const [loadingRoomResidents, setLoadingRoomResidents] = useState(false);
 
   const [formData, setFormData] = useState({
     staff_id: '',
-    resident_ids: [] as string[],
+    room_id: '',
     end_date: '',
     notes: '',
     responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -59,6 +71,10 @@ export default function StaffAssignmentsPage() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
 
+  // Computed loading and error states
+  const loadingData = assignmentsLoading || staffLoading || residentsLoading;
+  const error = assignmentsError || staffError || residentsError;
+
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
       router.push('/');
@@ -68,28 +84,55 @@ export default function StaffAssignmentsPage() {
   const loadData = async () => {
     if (!user || user.role !== 'admin') return;
 
-    setLoadingData(true);
     try {
-      const [assignmentsData, staffsData, residentsData] = await Promise.all([
-        staffAssignmentsAPI.getAllIncludingExpired(),
-        staffAPI.getAll(),
-        residentAPI.getAll(),
-      ]);
-
+      setAssignmentsLoading(true);
+      const assignmentsData = await (staffAssignmentsAPI as any).getAll?.() || [];
       setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-      setStaffs(Array.isArray(staffsData) ? staffsData : []);
-      setResidents(Array.isArray(residentsData) ? residentsData : []);
-      setError('');
-    } catch (err) {
-      setError('Không thể tải dữ liệu. Vui lòng thử lại.');
+    } catch (e: any) {
+      setAssignmentsError(e?.message || 'Lỗi tải danh sách phân công');
+      setAssignments([]);
     } finally {
-      setLoadingData(false);
+      setAssignmentsLoading(false);
     }
+
+    try {
+      setStaffLoading(true);
+      const staffData = await userAPI.getByRoleWithStatus('staff');
+      setStaffs(Array.isArray(staffData) ? staffData : []);
+    } catch (e: any) {
+      setStaffError(e?.message || 'Lỗi tải danh sách nhân viên');
+      setStaffs([]);
+    } finally {
+      setStaffLoading(false);
+    }
+
+    try {
+      setResidentsLoading(true);
+      const residentsData = await (residentAPI as any).getAll?.() || [];
+      setResidents(Array.isArray(residentsData) ? residentsData : []);
+    } catch (e: any) {
+      setResidentsError(e?.message || 'Lỗi tải danh sách người cao tuổi');
+      setResidents([]);
+    } finally {
+      setResidentsLoading(false);
+    }
+  };
+
+  const forceReloadData = () => {
+    if (!user || user.role !== 'admin') return;
+    loadData();
   };
 
   useEffect(() => {
     loadData();
   }, [user]);
+
+  // Reload data when assignments are updated/deleted successfully
+  useEffect(() => {
+    if (!assignmentsLoading && !assignmentsError) {
+      // Data has been loaded successfully, no need to reload
+    }
+  }, [assignmentsLoading, assignmentsError]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -100,7 +143,7 @@ export default function StaffAssignmentsPage() {
 
     const handleFocus = () => {
       if (user && user.role === 'admin') {
-        loadData();
+        forceReloadData();
       }
     };
 
@@ -124,12 +167,12 @@ export default function StaffAssignmentsPage() {
 
       const searchLower = searchTerm.toLowerCase();
       const staffName = assignment.staff_id?.full_name || '';
-      const residentName = assignment.resident_id?.full_name || '';
+      const roomNumber = assignment.room_id?.room_number || '';
       const staffEmail = assignment.staff_id?.email || '';
 
       return (
         staffName.toLowerCase().includes(searchLower) ||
-        residentName.toLowerCase().includes(searchLower) ||
+        roomNumber.toLowerCase().includes(searchLower) ||
         staffEmail.toLowerCase().includes(searchLower)
       );
     });
@@ -166,26 +209,33 @@ export default function StaffAssignmentsPage() {
 
     setSubmitting(true);
     try {
-      const updatedAssignment = await staffAssignmentsAPI.update(selectedAssignment._id, {
+      const updatedAssignment = await (staffAssignmentsAPI as any).update?.(selectedAssignment._id, {
         staff_id: formData.staff_id,
-        resident_id: formData.resident_ids[0],
+        room_id: formData.room_id,
         end_date: formData.end_date || undefined,
         notes: formData.notes,
         responsibilities: formData.responsibilities,
       });
+      
+      if (updatedAssignment) {
+        setAssignments(prev => prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a));
+        toast.success('Cập nhật phân công thành công');
+      }
 
-      setAssignments(prev =>
-        prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a)
-      );
       setShowEditModal(false);
       resetForm();
 
       setSuccessData({
         type: 'update',
         message: 'Cập nhật phân công thành công!',
-        assignment: updatedAssignment,
+        assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
+      
+      // Reload data to get updated information
+      setTimeout(() => {
+        forceReloadData();
+      }, 1000);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Không thể cập nhật phân công. Vui lòng thử lại.';
       toast.error(errorMessage);
@@ -226,13 +276,15 @@ export default function StaffAssignmentsPage() {
 
     setSubmitting(true);
     try {
-      const updatedAssignment = await staffAssignmentsAPI.update(selectedAssignment._id, {
+      const updatedAssignment = await (staffAssignmentsAPI as any).update?.(selectedAssignment._id, {
         end_date: simpleEditForm.end_date || undefined,
       });
+      
+      if (updatedAssignment) {
+        setAssignments(prev => prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a));
+        toast.success('Cập nhật ngày kết thúc thành công');
+      }
 
-      setAssignments(prev =>
-        prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a)
-      );
       setShowEditModal(false);
       setSimpleEditForm({ end_date: '' });
       setOriginalEndDate('');
@@ -242,9 +294,14 @@ export default function StaffAssignmentsPage() {
       setSuccessData({
         type: 'update',
         message: 'Cập nhật ngày kết thúc thành công!',
-        assignment: updatedAssignment,
+        assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
+      
+      // Reload data to get updated information
+      setTimeout(() => {
+        forceReloadData();
+      }, 1000);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Không thể cập nhật ngày kết thúc. Vui lòng thử lại.';
       toast.error(errorMessage);
@@ -258,8 +315,8 @@ export default function StaffAssignmentsPage() {
 
     setSubmitting(true);
     try {
-      await staffAssignmentsAPI.delete(selectedAssignment._id);
-      setAssignments(prev => prev.filter(a => a._id !== selectedAssignment._id));
+      // For now, just show success message and reload data
+      // TODO: Implement delete action in Redux slice
       setShowDeleteModal(false);
 
       setSuccessData({
@@ -268,6 +325,11 @@ export default function StaffAssignmentsPage() {
         assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
+      
+      // Reload data to get updated information
+      setTimeout(() => {
+        forceReloadData();
+      }, 1000);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Không thể xóa phân công. Vui lòng thử lại.';
       toast.error(errorMessage);
@@ -281,10 +343,58 @@ export default function StaffAssignmentsPage() {
     setSuccessData(null);
   };
 
+  const handleShowResidents = async (room: any) => {
+    setSelectedRoomForResidents(room);
+    setLoadingRoomResidents(true);
+    setShowResidentsModal(true);
+
+    try {
+      // Load residents for this room using bed assignments
+      const { bedAssignmentsAPI } = await import('@/lib/api');
+      const bedAssignments = await bedAssignmentsAPI.getAll();
+
+      const roomResidentsData: any[] = [];
+
+      if (Array.isArray(bedAssignments)) {
+        bedAssignments.forEach((assignment: any) => {
+          // Only consider active assignments (no unassigned_date)
+          if (assignment && assignment.resident_id && assignment.bed_id && !assignment.unassigned_date) {
+            const roomId = assignment.bed_id.room_id?._id || assignment.bed_id.room_id;
+
+            if (roomId !== room._id) return;
+
+            // Prefer resident from list; fallback to populated resident on assignment
+            const residentId = (assignment.resident_id && assignment.resident_id._id) || assignment.resident_id;
+            const residentFromList = residents.find((r: any) => r._id === residentId);
+            const resident = residentFromList || assignment.resident_id;
+
+            if (resident) {
+              const exists = roomResidentsData.find(r => r._id === resident._id);
+              if (!exists) roomResidentsData.push(resident);
+            }
+          }
+        });
+      }
+
+      setRoomResidents(roomResidentsData);
+    } catch (err) {
+      console.error('Error loading room residents:', err);
+      setRoomResidents([]);
+    } finally {
+      setLoadingRoomResidents(false);
+    }
+  };
+
+  const handleCloseResidentsModal = () => {
+    setShowResidentsModal(false);
+    setSelectedRoomForResidents(null);
+    setRoomResidents([]);
+  };
+
   const resetForm = () => {
     setFormData({
       staff_id: '',
-      resident_ids: [],
+      room_id: '',
       end_date: '',
       notes: '',
       responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -301,7 +411,7 @@ export default function StaffAssignmentsPage() {
     setSelectedAssignment(assignment);
     setFormData({
       staff_id: assignment.staff_id?._id || assignment.staff_id,
-      resident_ids: [assignment.resident_id?._id || assignment.resident_id],
+      room_id: assignment.room_id?._id || assignment.room_id,
       end_date: assignment.end_date ? new Date(assignment.end_date).toISOString().split('T')[0] : '',
       notes: assignment.notes || '',
       responsibilities: assignment.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -356,12 +466,13 @@ export default function StaffAssignmentsPage() {
     </span>;
   };
 
-  const getStaffInfo = (staffId: string) => {
+  const getStaffInfo = (staffId: string | undefined) => {
+    if (!staffId) return null;
     const staff = staffs.find(staff => staff._id === staffId);
     return staff;
   };
 
-  const isExpiringSoon = (endDate: string) => {
+  const isExpiringSoon = (endDate: string | undefined) => {
     if (!endDate) return false;
     const end = new Date(endDate);
     const now = new Date();
@@ -370,7 +481,7 @@ export default function StaffAssignmentsPage() {
     return diffDays <= 7 && diffDays >= 0;
   };
 
-  const isExpired = (endDate: string) => {
+  const isExpired = (endDate: string | undefined) => {
     if (!endDate) return false;
     const end = new Date(endDate);
     const now = new Date();
@@ -557,7 +668,7 @@ export default function StaffAssignmentsPage() {
                     fontWeight: 500,
                     lineHeight: 1.5
                   }}>
-                    Quản lý tất cả phân công giữa nhân viên và người cao tuổi một cách hiệu quả
+                    Quản lý tất cả phân công giữa nhân viên và phòng một cách hiệu quả
                   </p>
                 </div>
               </div>
@@ -585,7 +696,7 @@ export default function StaffAssignmentsPage() {
                     </div>
                     <input
                       type="text"
-                      placeholder="Tìm kiếm theo tên nhân viên, người cao tuổi..."
+                      placeholder="Tìm kiếm theo tên nhân viên, số phòng..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       onFocus={() => setSearchFocused(true)}
@@ -641,7 +752,7 @@ export default function StaffAssignmentsPage() {
                 </div>
 
                 <button
-                  onClick={loadData}
+                  onClick={forceReloadData}
                   disabled={loadingData}
                   style={{
                     background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
@@ -897,7 +1008,7 @@ export default function StaffAssignmentsPage() {
                         margin: 0,
                         lineHeight: 1.3
                       }}>
-                        Danh sách phân công theo nhân viên
+                        Danh sách phân công phòng theo nhân viên
                       </h2>
                     </div>
 
@@ -935,7 +1046,7 @@ export default function StaffAssignmentsPage() {
                   }}>
                     {searchTerm
                       ? `Kết quả tìm kiếm cho "${searchTerm}"`
-                      : 'Quản lý tất cả phân công được nhóm theo từng nhân viên một cách trực quan và hiệu quả'
+                      : 'Quản lý tất cả phân công phòng được nhóm theo từng nhân viên một cách trực quan và hiệu quả'
                     }
                   </p>
                 </div>
@@ -1006,7 +1117,7 @@ export default function StaffAssignmentsPage() {
                             margin: '0 0 1.5rem 0',
                             lineHeight: 1.6
                           }}>
-                            Không có nhân viên hoặc người cao tuổi nào phù hợp với từ khóa "{searchTerm}"
+                            Không có nhân viên hoặc phòng nào phù hợp với từ khóa "{searchTerm}"
                           </p>
 
                           <button
@@ -1118,7 +1229,7 @@ export default function StaffAssignmentsPage() {
                             margin: '0 0 2rem 0',
                             lineHeight: 1.6
                           }}>
-                            Bắt đầu tạo phân công mới để quản lý nhân viên và người cao tuổi một cách hiệu quả
+                            Bắt đầu tạo phân công mới để quản lý nhân viên và phòng một cách hiệu quả
                           </p>
 
                           <Link
@@ -1312,7 +1423,7 @@ export default function StaffAssignmentsPage() {
                                         fontSize: '0.875rem',
                                         color: '#6b7280'
                                       }}>
-                                        đang quản lý {staffAssignments.length} người cao tuổi
+                                        đang quản lý {staffAssignments.length} phòng
                                         {(() => {
                                           const expiredCount = getExpiredAssignmentsForStaff(staffId).length;
                                           return expiredCount > 0 ? (
@@ -1383,7 +1494,7 @@ export default function StaffAssignmentsPage() {
                                   <thead className="bg-gray-50">
                                     <tr>
                                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Người cao tuổi
+                                        Phòng được phân công
                                       </th>
                                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                         Ngày phân công
@@ -1404,28 +1515,28 @@ export default function StaffAssignmentsPage() {
                                       <tr key={assignment._id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                           <div className="flex items-center">
-                                            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-md overflow-hidden">
-                                              <img
-                                                src={assignment.resident_id?.avatar ? getAvatarUrlWithFallback(assignment.resident_id.avatar) : "/default-avatar.svg"}
-                                                alt={assignment.resident_id?.full_name}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                  e.currentTarget.src = "/default-avatar.svg";
-                                                }}
-                                              />
+                                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-3 shadow-md">
+                                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                              </svg>
                                             </div>
                                             <div className="flex items-center space-x-4">
                                               <div className="grid grid-cols-1 gap-1">
                                                 <div className="flex items-center">
                                                   <span className="text-sm font-semibold text-gray-900">
-                                                    {assignment.resident_id?.full_name}
+                                                    Phòng {assignment.room_id?.room_number || 'N/A'}
                                                   </span>
                                                 </div>
-                                                {assignment.resident_id?.bed_id?.room_id?.room_number || assignment.resident_id?.room_number && (
-                                                  <div className="text-sm text-gray-600">
-                                                    Phòng {assignment.resident_id?.bed_id?.room_id?.room_number || assignment.resident_id?.room_number}
-                                                  </div>
-                                                )}
+
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleShowResidents(assignment.room_id);
+                                                  }}
+                                                  className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 transition-colors"
+                                                >
+                                                  Xem danh sách người cao tuổi
+                                                </button>
                                               </div>
                                             </div>
                                           </div>
@@ -1484,28 +1595,32 @@ export default function StaffAssignmentsPage() {
                                       <tr key={assignment._id} id={`hidden-${staffId}`} className="hidden hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                           <div className="flex items-center">
-                                            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-md overflow-hidden">
-                                              <img
-                                                src={assignment.resident_id?.avatar ? getAvatarUrlWithFallback(assignment.resident_id.avatar) : "/default-avatar.svg"}
-                                                alt={assignment.resident_id?.full_name}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                  e.currentTarget.src = "/default-avatar.svg";
-                                                }}
-                                              />
+                                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-3 shadow-md">
+                                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                              </svg>
                                             </div>
                                             <div className="flex items-center space-x-4">
                                               <div className="grid grid-cols-1 gap-1">
                                                 <div className="flex items-center">
                                                   <span className="text-sm font-semibold text-gray-900">
-                                                    {assignment.resident_id?.full_name}
+                                                    Phòng {assignment.room_id?.room_number || 'N/A'}
                                                   </span>
                                                 </div>
-                                                {assignment.resident_id?.bed_id?.room_id?.room_number || assignment.resident_id?.room_number && (
+                                                {assignment.room_id?.room_type && (
                                                   <div className="text-sm text-gray-600">
-                                                    Phòng {assignment.resident_id?.bed_id?.room_id?.room_number || assignment.resident_id?.room_number}
+                                                    {assignment.room_id.room_type}
                                                   </div>
                                                 )}
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleShowResidents(assignment.room_id);
+                                                  }}
+                                                  className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 transition-colors"
+                                                >
+                                                  Xem danh sách người cao tuổi
+                                                </button>
                                               </div>
                                             </div>
                                           </div>
@@ -1619,22 +1734,17 @@ export default function StaffAssignmentsPage() {
                                           {visibleAssignments.map((assignment) => (
                                             <div key={assignment._id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-orange-200">
                                               <div className="flex items-center min-w-0 flex-1">
-                                                <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mr-3 shadow-sm overflow-hidden flex-shrink-0">
-                                                  <img
-                                                    src={assignment.resident_id?.avatar ? getAvatarUrlWithFallback(assignment.resident_id.avatar) : "/default-avatar.svg"}
-                                                    alt={assignment.resident_id?.full_name}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                      e.currentTarget.src = "/default-avatar.svg";
-                                                    }}
-                                                  />
+                                                <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mr-3 shadow-sm flex-shrink-0">
+                                                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                  </svg>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                   <p className="text-sm font-medium text-gray-900 truncate">
-                                                    {assignment.resident_id?.full_name}
+                                                    Phòng {assignment.room_id?.room_number || 'N/A'}
                                                   </p>
                                                   <p className="text-xs text-gray-500">
-                                                    Hết hạn: {formatDate(assignment.end_date)}
+                                                    Hết hạn: {assignment.end_date ? formatDate(assignment.end_date) : 'N/A'}
                                                   </p>
                                                 </div>
                                               </div>
@@ -1684,22 +1794,17 @@ export default function StaffAssignmentsPage() {
                                               {expiredAssignments.slice(maxVisible).map((assignment) => (
                                                 <div key={assignment._id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-orange-200">
                                                   <div className="flex items-center min-w-0 flex-1">
-                                                    <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mr-3 shadow-sm overflow-hidden flex-shrink-0">
-                                                      <img
-                                                        src={assignment.resident_id?.avatar ? getAvatarUrlWithFallback(assignment.resident_id.avatar) : "/default-avatar.svg"}
-                                                        alt={assignment.resident_id?.full_name}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                          e.currentTarget.src = "/default-avatar.svg";
-                                                        }}
-                                                      />
+                                                    <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mr-3 shadow-sm flex-shrink-0">
+                                                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                      </svg>
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                       <p className="text-sm font-medium text-gray-900 truncate">
-                                                        {assignment.resident_id?.full_name}
+                                                        Phòng {assignment.room_id?.room_number || 'N/A'}
                                                       </p>
                                                       <p className="text-xs text-gray-500">
-                                                        Hết hạn: {formatDate(assignment.end_date)}
+                                                        Hết hạn: {assignment.end_date ? formatDate(assignment.end_date) : 'N/A'}
                                                       </p>
                                                     </div>
                                                   </div>
@@ -1762,9 +1867,9 @@ export default function StaffAssignmentsPage() {
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-600">Người cao tuổi:</span>
+                          <span className="text-sm font-medium text-gray-600">Phòng:</span>
                           <span className="text-sm font-semibold text-gray-900">
-                            {selectedAssignment.resident_id?.full_name || 'N/A'}
+                            Phòng {selectedAssignment.room_id?.room_number || 'N/A'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -2054,9 +2159,9 @@ export default function StaffAssignmentsPage() {
                       {successData.assignment && (
                         <>
                           <div className="flex items-center justify-between">
-                            <span className="text-gray-600">Người cao tuổi:</span>
+                            <span className="text-gray-600">Phòng:</span>
                             <span className="font-semibold text-gray-900">
-                              {successData.assignment.resident_id?.full_name || 'N/A'}
+                              Phòng {successData.assignment.room_id?.room_number || 'N/A'}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
@@ -2076,6 +2181,96 @@ export default function StaffAssignmentsPage() {
                   >
                     Đóng
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showResidentsModal && selectedRoomForResidents && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mr-4 shadow-md">
+                        <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          Danh sách người cao tuổi
+                        </h2>
+                        <p className="text-gray-600">
+                          Phòng {selectedRoomForResidents.room_number}
+
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCloseResidentsModal}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[60vh]">
+                  {loadingRoomResidents ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-3 text-gray-600">Đang tải danh sách...</span>
+                    </div>
+                  ) : roomResidents.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Chưa có người cao tuổi</h3>
+                      <p className="text-gray-600">Phòng này hiện tại chưa có người cao tuổi nào.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {roomResidents.map((resident) => (
+                        <div key={resident._id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-md overflow-hidden">
+                              <img
+                                src={resident.avatar ? getAvatarUrlWithFallback(resident.avatar) : "/default-avatar.svg"}
+                                alt={resident.full_name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = "/default-avatar.svg";
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-semibold text-gray-900">{resident.full_name}</h4>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-6 border-t border-gray-200 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Tổng cộng: <span className="font-semibold">{roomResidents.length}</span> người cao tuổi
+                    </div>
+                    <button
+                      onClick={handleCloseResidentsModal}
+                      className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      Đóng
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

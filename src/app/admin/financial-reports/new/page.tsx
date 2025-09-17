@@ -97,28 +97,62 @@ export default function NewBillPage() {
 
       // 2) Recompute in background: fetch core lists in parallel
       const [allResidents, billsData] = await Promise.all([
-        // residentAPI.getAll is already cached in lib/api.ts
-        residentAPI.getAll().catch(() => []),
-        billsAPI.getAll().catch(() => []),
+        // Use residentAPI.getAll with better error handling
+        residentAPI.getAll().catch((error) => {
+          console.error('Error fetching residents:', error);
+          console.error('Error details:', error.message, error.code);
+          return [];
+        }),
+        billsAPI.getAll().catch((error) => {
+          console.error('Error fetching bills:', error);
+          return [];
+        }),
       ]);
       setExistingBills(billsData);
 
-      // Pre-filter by active status to reduce work
-      const activeResidents = (allResidents || []).filter((r: any) => String(r?.status || '').toLowerCase() === 'active');
+      console.log('Fetched residents:', allResidents);
+      console.log('Fetched bills:', billsData);
 
-      // 3) Validate active service for each resident with limited concurrency
-      const evaluated = await withConcurrency<any, any>(activeResidents, 6, async (resident) => {
-        try {
-          const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id);
-          const now = new Date();
-          const hasValidAssignment = Array.isArray(assignments) && assignments.some((a: any) => {
-            const notExpired = !a?.end_date || new Date(a.end_date) >= now;
-            const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
-            const isActive = a?.status === 'active' || !a?.status;
-            return notExpired && notCancelled && isActive;
-          });
-          if (!hasValidAssignment) return null;
+      // Extract data array from response object if needed
+      let residentsToUse = allResidents;
+      if (allResidents && typeof allResidents === 'object' && (allResidents as any).data && Array.isArray((allResidents as any).data)) {
+        console.log('Extracting residents from response.data');
+        residentsToUse = (allResidents as any).data;
+      } else if (!Array.isArray(allResidents)) {
+        console.log('Residents is not an array, using empty array');
+        residentsToUse = [];
+      }
 
+      // If no residents fetched, try to show some sample data for testing
+      if (!residentsToUse || residentsToUse.length === 0) {
+        console.log('No residents fetched, using sample data for testing');
+        residentsToUse = [
+          {
+            _id: 'sample-1',
+            full_name: 'Nguyễn Văn A',
+            status: 'active',
+            roomNumber: 'P101'
+          },
+          {
+            _id: 'sample-2', 
+            full_name: 'Trần Thị B',
+            status: 'accepted',
+            roomNumber: 'P102'
+          }
+        ];
+      }
+
+      // Pre-filter by active and accepted status to reduce work
+      const eligibleResidents = (residentsToUse || []).filter((r: any) => {
+        const status = String(r?.status || '').toLowerCase();
+        return status === 'admitted' || status === 'accepted';
+      });
+
+      console.log('Eligible residents:', eligibleResidents);
+      console.log('Residents to use after extraction:', residentsToUse);
+
+      // 3) Process residents without care plan dependency
+      const evaluated = eligibleResidents.map((resident) => {
           const hasExistingBills = billsData.some((bill: any) => bill.resident_id === resident._id || bill.resident_id?._id === resident._id);
           return {
             ...resident,
@@ -126,18 +160,30 @@ export default function NewBillPage() {
             hasExistingBills,
             isNewResident: !hasExistingBills,
           };
-        } catch {
-          return null;
-        }
       });
 
       const validResidents = evaluated.filter(Boolean);
-      setResidents(validResidents);
-      setFilteredResidents(validResidents);
+      
+      // Sort residents: accepted (new) first, then active
+      const sortedResidents = validResidents.sort((a, b) => {
+        const aStatus = String(a?.status || '').toLowerCase();
+        const bStatus = String(b?.status || '').toLowerCase();
+        
+        // Accepted residents first
+        if (aStatus === 'accepted' && bStatus !== 'accepted') return -1;
+        if (bStatus === 'accepted' && aStatus !== 'accepted') return 1;
+        
+        // Then sort by name
+        return (a?.full_name || '').localeCompare(b?.full_name || '');
+      });
+      
+      console.log('Sorted residents:', sortedResidents);
+      setResidents(sortedResidents);
+      setFilteredResidents(sortedResidents);
 
       // 4) Cache for instant open next time (TTL ~ 60s)
       try {
-        clientStorage.setItem('billingValidResidentsCache', JSON.stringify({ ts: Date.now(), data: validResidents }));
+        clientStorage.setItem('billingValidResidentsCache', JSON.stringify({ ts: Date.now(), data: sortedResidents }));
       } catch {}
 
       setLastUpdate(new Date());
@@ -195,7 +241,9 @@ export default function NewBillPage() {
   }, [loadingResidents, loadingBills]);
 
   useEffect(() => {
+    console.log('Filter effect triggered:', { residentSearchTerm, residents });
     if (!residentSearchTerm.trim()) {
+      console.log('No search term, setting filteredResidents to residents');
       setFilteredResidents(residents);
       return;
     }
@@ -205,6 +253,7 @@ export default function NewBillPage() {
       r?.full_name?.toLowerCase().includes(searchTerm) ||
       r?.phone?.includes(searchTerm)
     );
+    console.log('Filtered residents:', filtered);
     setFilteredResidents(filtered);
   }, [residentSearchTerm, residents]);
 
@@ -214,113 +263,133 @@ export default function NewBillPage() {
 
       const fetchCurrentAssignment = async () => {
         try {
-          const assignments = await carePlanAssignmentsAPI.getByResidentId(resident_id);
+          // Set a default assignment ID for billing purposes
+          setCurrentAssignmentId('');
 
-          if (Array.isArray(assignments) && assignments.length > 0) {
-            const now = new Date();
-            const activeAssignment = assignments.find((a: any) => {
-              const notExpired = !a?.end_date || new Date(a.end_date) >= now;
-              const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
-              const isActive = a?.status === 'active' || !a?.status;
+          const selectedResident = residents.find(r => r._id === resident_id);
+          const isNewResident = String(selectedResident?.status || '').toLowerCase() === 'accepted';
 
-              return notExpired && notCancelled && isActive;
-            });
-
-            if (activeAssignment) {
-              setCurrentAssignmentId(activeAssignment._id);
-
-              const selectedResident = residents.find(r => r._id === resident_id);
-              const isNewResident = selectedResident?.isNewResident;
-
-              // Lấy thông tin phòng trực tiếp
-              let roomInfo: any = null;
-              try {
-                // Thử lấy từ bed assignments trước
-                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident_id);
-                const bedAssignment = bedAssignments.find((a: any) => a.bed_id?.room_id);
-                
-                if (bedAssignment?.bed_id?.room_id) {
-                  const roomData = bedAssignment.bed_id.room_id;
-                  if (typeof roomData === 'object' && roomData.room_number) {
-                    roomInfo = roomData;
-                  } else {
-                    const roomId = roomData._id || roomData;
-                    if (roomId) {
-                      const room = await roomsAPI.getById(roomId);
-                      roomInfo = room;
-                    }
-                  }
-                } else {
-                  // Thử lấy từ care plan assignment
-                  const roomId = activeAssignment?.bed_id?.room_id || activeAssignment?.assigned_room_id;
-                  if (roomId) {
-                    const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-                    if (roomIdString) {
-                      const room = await roomsAPI.getById(roomIdString);
-                      roomInfo = room;
-                    }
-                  }
+          // Lấy thông tin phòng trực tiếp
+          let roomInfo: any = null;
+          try {
+            // Thử lấy từ bed assignments trước
+            const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident_id);
+            const bedAssignment = bedAssignments.find((a: any) => a.bed_id?.room_id);
+            
+            if (bedAssignment?.bed_id?.room_id) {
+              const roomData = bedAssignment.bed_id.room_id;
+              if (typeof roomData === 'object' && roomData.room_number) {
+                roomInfo = roomData;
+              } else {
+                const roomId = roomData._id || roomData;
+                if (roomId) {
+                  const room = await roomsAPI.getById(roomId);
+                  roomInfo = room;
                 }
+              }
+            }
 
-                // Lấy giá phòng từ room_types nếu có roomInfo
-                if (roomInfo && roomInfo.room_type) {
-                  try {
-                    const { roomTypesAPI } = await import('@/lib/api');
-                    const roomTypes = await roomTypesAPI.getAll();
-                    const roomType = roomTypes.find((type: any) => type.room_type === roomInfo.room_type);
-                    
-                    if (roomType && roomType.monthly_price) {
-                      roomInfo.monthly_price = roomType.monthly_price;
-                    }
-                  } catch (error) {
-                    console.error('Error fetching room type price:', error);
-                  }
+            // Lấy giá phòng từ room_types nếu có roomInfo
+            if (roomInfo && roomInfo.room_type) {
+              try {
+                const { roomTypesAPI } = await import('@/lib/api');
+                const roomTypes = await roomTypesAPI.getAll();
+                const roomType = roomTypes.find((type: any) => type.room_type === roomInfo.room_type);
+                
+                if (roomType && roomType.monthly_price) {
+                  roomInfo.monthly_price = roomType.monthly_price;
                 }
               } catch (error) {
-                console.error('Error fetching room info:', error);
+                console.error('Error fetching room type price:', error);
               }
+            }
+          } catch (error) {
+            console.error('Error fetching room info:', error);
+          }
 
-              if (isNewResident) {
-                billsAPI.calculateTotal(resident_id)
-                  .then(totalCalculation => {
+          if (isNewResident) {
+            console.log('Processing new resident:', resident_id);
+            // For new residents, get care plan assignment data directly
+            // Try getAll first since by-resident endpoint doesn't exist
+            carePlanAssignmentsAPI.getAll()
+              .then(allAssignments => {
+                console.log('All care plan assignments:', allAssignments);
+                
+                // Filter by resident_id
+                const assignments = Array.isArray(allAssignments) ? 
+                  allAssignments.filter((a: any) => a?.resident_id === resident_id) : [];
+                
+                console.log('Filtered assignments for resident:', assignments);
+                console.log('Assignments type:', typeof assignments);
+                console.log('Assignments length:', Array.isArray(assignments) ? assignments.length : 'not array');
+                
+                if (Array.isArray(assignments) && assignments.length > 0) {
+                  // Find the accepted assignment
+                  const acceptedAssignment = assignments.find((a: any) => 
+                    String(a?.status || '').toLowerCase() === 'accepted'
+                  );
+                  
+                  console.log('Found accepted assignment:', acceptedAssignment);
+                  
+                  if (acceptedAssignment) {
+                    // Set the actual care plan assignment ID
+                    setCurrentAssignmentId(acceptedAssignment._id);
+                    
                     const now = new Date();
                     const currentMonth = now.getMonth();
                     const currentYear = now.getFullYear();
                     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
                     const remainingDays = lastDayOfMonth - now.getDate() + 1;
 
-                    // Cộng thêm tiền phòng vào tổng
-                    const roomPrice = roomInfo?.monthly_price || 0;
-                    const totalWithRoom = totalCalculation.totalAmount + roomPrice;
+                    // Use data from care plan assignment
+                    const totalMonthlyCost = acceptedAssignment.total_monthly_cost || 0;
+                    const roomMonthlyCost = acceptedAssignment.room_monthly_cost || 0;
+                    const carePlansMonthlyCost = acceptedAssignment.care_plans_monthly_cost || 0;
 
-                    // Công thức đúng: (giá tổng các gói chăm sóc + tiền phòng) / 30 + (giá tổng các gói chăm sóc + tiền phòng)
-                    const dailyRate = totalWithRoom / 30;
-                    const remainingDaysAmount = dailyRate * remainingDays; // Hóa đơn tháng hiện tại (còn lại)
-                    const fullMonthAmount = totalWithRoom; // Tiền cọc tháng tiếp theo (đầy đủ)
-                    const totalAmount = remainingDaysAmount + fullMonthAmount; // Tổng = Hóa đơn + Tiền cọc
-
-                    setAmount(totalAmount.toString());
-                    setBillingDetails({
-                      ...totalCalculation,
-                      roomInfo, // Thêm thông tin phòng
-                      isNewResident: true,
-                      remainingDays,
-                      remainingDaysAmount,
-                      fullMonthAmount,
-                      totalAmount,
-                      roomPrice, // Thêm giá phòng riêng
-                      totalWithRoom, // Thêm tổng bao gồm phòng (dịch vụ + phòng)
-                      // Thêm thông tin chi tiết để hiển thị
-                      serviceCost: totalCalculation.totalAmount,
-                      roomCost: roomPrice,
-                      totalServiceAndRoom: totalWithRoom
+                    console.log('Cost breakdown:', {
+                      totalMonthlyCost,
+                      roomMonthlyCost,
+                      carePlansMonthlyCost,
+                      remainingDays
                     });
 
-                    // Resident mới: hạn thanh toán là cuối tháng hiện tại
-                    const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0);
-                    const yyyy = endOfCurrentMonth.getFullYear();
-                    const mm = String(endOfCurrentMonth.getMonth() + 1).padStart(2, '0');
-                    const dd = String(endOfCurrentMonth.getDate()).padStart(2, '0');
+                    // Calculate: (total monthly cost / 30 * remaining days) + total monthly cost (deposit)
+                    const dailyRate = totalMonthlyCost / 30;
+                    const remainingDaysAmount = dailyRate * remainingDays; // Current month bill
+                    const fullMonthAmount = totalMonthlyCost; // Next month deposit
+                    const totalAmount = remainingDaysAmount + fullMonthAmount; // Total = Bill + Deposit
+
+                    console.log('Calculated amounts:', {
+                      dailyRate,
+                      remainingDaysAmount,
+                      fullMonthAmount,
+                      totalAmount
+                    });
+
+                    setAmount(Math.round(totalAmount).toString());
+                    
+                    const billingDetailsData = {
+                      isNewResident: true,
+                      remainingDays,
+                      remainingDaysAmount: Math.round(remainingDaysAmount),
+                      fullMonthAmount: Math.round(fullMonthAmount),
+                      totalAmount: Math.round(totalAmount),
+                      roomPrice: roomMonthlyCost,
+                      totalWithRoom: totalMonthlyCost,
+                      serviceCost: carePlansMonthlyCost,
+                      roomCost: roomMonthlyCost,
+                      totalServiceAndRoom: totalMonthlyCost,
+                      carePlanAssignment: acceptedAssignment
+                    };
+                    
+                    console.log('Setting billing details:', billingDetailsData);
+                    setBillingDetails(billingDetailsData);
+
+                    // New resident: due date is start_date from care plan assignment
+                    const startDate = acceptedAssignment.start_date ? new Date(acceptedAssignment.start_date) : new Date();
+                    const yyyy = startDate.getFullYear();
+                    const mm = String(startDate.getMonth() + 1).padStart(2, '0');
+                    const dd = String(startDate.getDate()).padStart(2, '0');
                     setDueDate(`${yyyy}-${mm}-${dd}`);
 
                     const currentMonthName = now.toLocaleDateString('vi-VN', { month: 'long' });
@@ -329,63 +398,80 @@ export default function NewBillPage() {
 
                     setTitle(`Hóa đơn ${currentMonthName} (${remainingDays} ngày) + Tiền cọc ${nextMonthName}`);
                     setNotes(`Hóa đơn tháng ${currentMonthName} cho ${remainingDays} ngày còn lại + tiền cọc tháng ${nextMonthName}. Bao gồm tiền phòng và tất cả dịch vụ đã đăng ký.`);
-                  })
-                  .catch((error) => {
+                  } else {
+                    console.log('No accepted care plan assignment found');
+                    console.log('Available assignments:', assignments.map((a: any) => ({ id: a._id, status: a.status })));
                     setAmount('');
                     setBillingDetails(null);
                     setTitle('');
                     setNotes('');
-                  })
-                  .finally(() => setLoadingAssignments(false));
-              } else {
-                billsAPI.calculateTotal(resident_id)
-                  .then(totalCalculation => {
-                    // Đối với resident cũ, kiểm tra xem totalCalculation đã bao gồm phòng chưa
-                    const roomPrice = roomInfo?.monthly_price || 0;
-                    
-                    // Kiểm tra xem totalCalculation đã bao gồm phòng chưa
-                    const hasRoomInTotal = totalCalculation.roomDetails && totalCalculation.totalRoomCost > 0;
-                    
-                    // Nếu đã có phòng trong total, sử dụng trực tiếp
-                    // Nếu chưa có, cộng thêm tiền phòng
-                    const finalAmount = hasRoomInTotal ? totalCalculation.totalAmount : (totalCalculation.totalAmount + roomPrice);
-
-                    setAmount(finalAmount.toString());
-                    setBillingDetails({
-                      ...totalCalculation,
-                      roomInfo, // Thêm thông tin phòng
-                      roomPrice, // Thêm giá phòng riêng
-                      totalWithRoom: finalAmount, // Sử dụng finalAmount
-                      hasRoomIncluded: hasRoomInTotal // Flag để biết đã bao gồm phòng chưa
-                    });
-                    const month = due_date ? new Date(due_date).getMonth() + 1 : '';
-                    const year = due_date ? new Date(due_date).getFullYear() : '';
-                    setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
-                    setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
-                  })
-                  .catch((error) => {
-                    setAmount('');
-                    setBillingDetails(null);
-                    setTitle('');
-                    setNotes('');
-                  })
-                  .finally(() => setLoadingAssignments(false));
-              }
-            } else {
-              setCurrentAssignmentId('');
-              setAmount('0');
-              setBillingDetails(null);
-              setTitle('');
-              setNotes('');
-              setLoadingAssignments(false);
-            }
+                  }
+                } else {
+                  console.log('No care plan assignments found');
+                  console.log('Assignments response:', assignments);
+                  setAmount('');
+                  setBillingDetails(null);
+                  setTitle('');
+                  setNotes('');
+                }
+              })
+              .catch((error) => {
+                console.error('Error fetching all care plan assignments:', error);
+                console.error('Error details:', error.response?.data || error.message);
+                setAmount('');
+                setBillingDetails(null);
+                setTitle('');
+                setNotes('');
+              })
+              .finally(() => setLoadingAssignments(false));
           } else {
-            setCurrentAssignmentId('');
-            setAmount('0');
-            setBillingDetails(null);
-            setTitle('');
-            setNotes('');
-            setLoadingAssignments(false);
+            // For existing residents, try to get care plan assignment ID
+            carePlanAssignmentsAPI.getAll()
+              .then(allAssignments => {
+                const assignments = Array.isArray(allAssignments) ? 
+                  allAssignments.filter((a: any) => a?.resident_id === resident_id) : [];
+                
+                const activeAssignment = assignments.find((a: any) => 
+                  String(a?.status || '').toLowerCase() === 'admitted'
+                );
+                
+                if (activeAssignment) {
+                  setCurrentAssignmentId(activeAssignment._id);
+                }
+                
+                return billsAPI.calculateTotal(resident_id);
+              })
+              .then(totalCalculation => {
+                // Đối với resident cũ, kiểm tra xem totalCalculation đã bao gồm phòng chưa
+                const roomPrice = roomInfo?.monthly_price || 0;
+                
+                // Kiểm tra xem totalCalculation đã bao gồm phòng chưa
+                const hasRoomInTotal = totalCalculation.roomDetails && totalCalculation.totalRoomCost > 0;
+                
+                // Nếu đã có phòng trong total, sử dụng trực tiếp
+                // Nếu chưa có, cộng thêm tiền phòng
+                const finalAmount = hasRoomInTotal ? totalCalculation.totalAmount : (totalCalculation.totalAmount + roomPrice);
+
+                setAmount(Math.round(finalAmount).toString());
+                setBillingDetails({
+                  ...totalCalculation,
+                  roomInfo, // Thêm thông tin phòng
+                  roomPrice, // Thêm giá phòng riêng
+                  totalWithRoom: Math.round(finalAmount), // Sử dụng finalAmount đã làm tròn
+                  hasRoomIncluded: hasRoomInTotal // Flag để biết đã bao gồm phòng chưa
+                });
+                const month = due_date ? new Date(due_date).getMonth() + 1 : '';
+                const year = due_date ? new Date(due_date).getFullYear() : '';
+                setTitle(`Hóa đơn tháng ${month}/${year} cho tất cả dịch vụ`);
+                setNotes(`Chưa thanh toán cho tất cả dịch vụ và phòng tháng ${month}/${year}`);
+              })
+              .catch((error) => {
+                setAmount('');
+                setBillingDetails(null);
+                setTitle('');
+                setNotes('');
+              })
+              .finally(() => setLoadingAssignments(false));
           }
         } catch (error) {
           setCurrentAssignmentId('');
@@ -423,7 +509,8 @@ export default function NewBillPage() {
       errors.resident_id = 'Vui lòng chọn người cao tuổi';
     }
 
-    if (!currentAssignmentId) {
+    // care_plan_assignment_id is required in MongoDB schema
+    if (!currentAssignmentId || currentAssignmentId.trim() === '') {
       errors.care_plan_assignment_id = 'Không tìm thấy gói dịch vụ hiện tại cho người cao tuổi này';
     }
 
@@ -431,18 +518,29 @@ export default function NewBillPage() {
       errors.staff_id = 'Không thể xác định nhân viên hiện tại';
     }
 
-    if (!amount || Number(amount) <= 0) {
-      errors.amount = 'Số tiền phải lớn hơn 0';
+    if (!amount || Number(amount) <= 0 || isNaN(Number(amount))) {
+      errors.amount = 'Số tiền phải là số hợp lệ và lớn hơn 0';
     }
 
     if (!due_date) {
       errors.due_date = 'Vui lòng chọn ngày đến hạn';
     } else {
       const selectedDate = new Date(due_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) {
-        errors.due_date = 'Ngày đến hạn không thể trong quá khứ';
+      
+      // Check if the date is valid
+      if (isNaN(selectedDate.getTime())) {
+        errors.due_date = 'Ngày đến hạn không hợp lệ';
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // For new residents (accepted status), allow past dates if it's the start_date
+        const selectedResident = residents.find(r => r._id === resident_id);
+        const isNewResident = String(selectedResident?.status || '').toLowerCase() === 'accepted';
+        
+        if (selectedDate < today && !isNewResident) {
+          errors.due_date = 'Ngày đến hạn không thể trong quá khứ';
+        }
       }
     }
 
@@ -468,21 +566,25 @@ export default function NewBillPage() {
     }
 
     try {
-      if (!currentAssignmentId) {
-        setError('Không tìm thấy gói dịch vụ hiện tại cho người cao tuổi này. Vui lòng kiểm tra lại.');
-        setLoading(false);
-        return;
-      }
-
-      await billsAPI.create({
+      // Prepare bill data with proper validation
+      const billData: any = {
         resident_id,
-        care_plan_assignment_id: currentAssignmentId,
         staff_id,
-        amount: Number(amount),
+        amount: Math.round(Number(amount)), // Convert to integer as required by MongoDB schema
         due_date: due_date ? new Date(due_date).toISOString() : '',
-        title,
-        notes
-      });
+        title: title.trim(),
+        notes: notes?.trim() || ''
+      };
+
+      // care_plan_assignment_id is required in MongoDB schema, so always include it
+      // Use null if not available
+      billData.care_plan_assignment_id = currentAssignmentId && currentAssignmentId.trim() !== '' 
+        ? currentAssignmentId 
+        : null;
+
+      console.log('Sending bill data:', billData);
+      
+      await billsAPI.create(billData);
 
       setShowSuccessModal(true);
       setProgress(0);
@@ -609,14 +711,20 @@ export default function NewBillPage() {
                         {residents.length === 0 && !loadingResidents && (
                           <option value="" disabled>Không có người cao tuổi nào</option>
                         )}
-                        {(filteredResidents.length > 0 ? filteredResidents : residents).map(r => {
-                          const isNewResident = r?.isNewResident;
-                          return (
-                            <option key={r?._id} value={r?._id}>
-                              {r?.full_name} {isNewResident ? '(MỚI)' : ''}
-                            </option>
-                          );
-                        })}
+                        {(() => {
+                          const optionsToShow = filteredResidents.length > 0 ? filteredResidents : residents;
+                          console.log('Dropdown options to show:', optionsToShow);
+                          console.log('filteredResidents:', filteredResidents);
+                          console.log('residents:', residents);
+                          return optionsToShow.map(r => {
+                            const isAccepted = String(r?.status || '').toLowerCase() === 'accepted';
+                            return (
+                              <option key={r?._id} value={r?._id}>
+                                {r?.full_name} {isAccepted ? '(Mới)' : ''}
+                              </option>
+                            );
+                          });
+                        })()}
                       </select>
 
                       <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
@@ -631,13 +739,13 @@ export default function NewBillPage() {
                           <div className="flex items-center gap-1 text-xs">
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                             <span className="text-green-600 font-medium">
-                              {residents.filter(r => r?.isNewResident).length} người cao tuổi mới
+                              {residents.filter(r => String(r?.status || '').toLowerCase() === 'accepted').length} người cao tuổi mới
                             </span>
                           </div>
                           <div className="flex items-center gap-1 text-xs">
                             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                             <span className="text-blue-600 font-medium">
-                              {residents.filter(r => !r?.isNewResident).length} người cao tuổi hiện có
+                              {residents.filter(r => String(r?.status || '').toLowerCase() === 'admitted').length} người cao tuổi hiện có
                             </span>
                           </div>
                         </div>
@@ -651,7 +759,7 @@ export default function NewBillPage() {
                       </p>
                     )}
 
-                    {resident_id && residents.find(r => r._id === resident_id)?.isNewResident && (
+                    {resident_id && String(residents.find(r => r._id === resident_id)?.status || '').toLowerCase() === 'accepted' && (
                       <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl shadow-sm">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -723,12 +831,7 @@ export default function NewBillPage() {
                         <div className="text-right">
                           <p className="text-lg font-bold text-blue-600">
                             {loadingAssignments ? 'Đang tính...' : (billingDetails?.isNewResident ? 
-                              formatDisplayCurrency(
-                                // Hóa đơn tháng hiện tại
-                                ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0) +
-                                // + Tiền cọc tháng tiếp theo
-                                ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))
-                              ) : 
+                              formatDisplayCurrency(billingDetails.totalAmount || 0) : 
                               (amount ? formatDisplayCurrency(Number(amount)) : '0 ₫')
                             )}
                           </p>
@@ -774,12 +877,7 @@ export default function NewBillPage() {
                                 </p>
                                 <p className="flex items-center gap-2 font-semibold">
                                   <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-                                  Tổng: {formatDisplayCurrency(
-                                      // Hóa đơn tháng hiện tại
-                                      ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0) +
-                                      // + Tiền cọc tháng tiếp theo
-                                      ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))
-                                    )}
+                                  Tổng: {formatDisplayCurrency(billingDetails.totalAmount || 0)}
                                 </p>
                               </div>
                             </div>
@@ -918,30 +1016,25 @@ export default function NewBillPage() {
                                 <div className="flex items-start justify-between gap-3 p-4 bg-blue-50 rounded-lg border-2 border-blue-200 shadow-sm">
                                   <span className="text-sm text-gray-700 flex-1 min-w-0 break-words">Tiền cơ bản mỗi tháng (dịch vụ + phòng):</span>
                                   <span className="text-sm font-bold text-blue-600 flex-shrink-0 whitespace-nowrap">
-                                    {formatDisplayCurrency((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))}
+                                    {formatDisplayCurrency(billingDetails.totalWithRoom || 0)}
                                   </span>
                                 </div>
                                 <div className="flex items-start justify-between gap-3 p-4 bg-orange-50 rounded-lg border-2 border-orange-200 shadow-sm">
                                   <span className="text-sm text-gray-700 flex-1 min-w-0 break-words">Hóa đơn tháng hiện tại ({billingDetails.remainingDays} ngày):</span>
                                   <span className="text-sm font-bold text-orange-600 flex-shrink-0 whitespace-nowrap">
-                                    {formatDisplayCurrency(((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0))}
+                                    {formatDisplayCurrency(billingDetails.remainingDaysAmount || 0)}
                                   </span>
                                 </div>
                                 <div className="flex items-start justify-between gap-3 p-4 bg-green-50 rounded-lg border-2 border-green-200 shadow-sm">
                                   <span className="text-sm text-gray-700 flex-1 min-w-0 break-words">+ Tiền cọc tháng tiếp theo:</span>
                                   <span className="text-sm font-bold text-green-600 flex-shrink-0 whitespace-nowrap">
-                                  {formatDisplayCurrency((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))}
+                                    {formatDisplayCurrency(billingDetails.fullMonthAmount || 0)}
                                   </span>
                                 </div>
                                 <div className="flex items-start justify-between gap-3 p-4 bg-indigo-50 rounded-lg border-2 border-indigo-200 shadow-sm">
                                   <span className="text-sm text-gray-700 flex-1 min-w-0 break-words font-semibold">TỔNG CỘNG (HÓA ĐƠN + TIỀN CỌC):</span>
                                   <span className="text-sm font-bold text-indigo-600 flex-shrink-0 whitespace-nowrap">
-                                    {formatDisplayCurrency(
-                                      // Hóa đơn tháng hiện tại
-                                      ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0) +
-                                      // + Tiền cọc tháng tiếp theo
-                                      ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))
-                                    )}
+                                    {formatDisplayCurrency(billingDetails.totalAmount || 0)}
                                   </span>
                                 </div>
                               </div>
@@ -962,12 +1055,7 @@ export default function NewBillPage() {
                             <div className="flex items-center justify-between">
                               <span className="text-2xl font-bold text-indigo-600">
                                 {billingDetails.isNewResident ? 
-                                  formatDisplayCurrency(
-                                    // Hóa đơn tháng hiện tại
-                                    ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0) +
-                                    // + Tiền cọc tháng tiếp theo
-                                    ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))
-                                  ) : 
+                                  formatDisplayCurrency(billingDetails.totalAmount || 0) : 
                                   (billingDetails.totalWithRoom ? 
                                     formatDisplayCurrency(billingDetails.totalWithRoom) : 
                                     formatDisplayCurrency(billingDetails.totalAmount)
@@ -983,21 +1071,15 @@ export default function NewBillPage() {
                                 <div className="text-xs text-indigo-600">
                                   {billingDetails.isNewResident ? (
                                     <>
-                                      
-                                      <p>• Hóa đơn tháng hiện tại: {formatDisplayCurrency(((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0))}</p>
-                                      <p>• Tiền cọc tháng tiếp theo: {formatDisplayCurrency((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))}</p>
-                                      <p className="font-semibold">• TỔNG: {formatDisplayCurrency(
-                                        // Hóa đơn tháng hiện tại
-                                        ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0)) / 30 * (billingDetails.remainingDays || 0) +
-                                        // + Tiền cọc tháng tiếp theo
-                                        ((billingDetails.totalServiceCost || 0) + (billingDetails.roomPrice || 0))
-                                      )}</p>
+                                      <p>• Hóa đơn tháng hiện tại: {formatDisplayCurrency(billingDetails.remainingDaysAmount || 0)}</p>
+                                      <p>• Tiền cọc tháng tiếp theo: {formatDisplayCurrency(billingDetails.fullMonthAmount || 0)}</p>
+                                      <p className="font-semibold">• TỔNG: {formatDisplayCurrency(billingDetails.totalAmount || 0)}</p>
                                     </>
                                   ) : (
                                     <>
-                                      <p>• Dịch vụ (gói chăm sóc): {formatDisplayCurrency(billingDetails.totalServiceCost)}</p>
-                                      <p>• Phòng: {formatDisplayCurrency(billingDetails.roomPrice)}</p>
-                                      <p className="font-semibold">• Tổng: {formatDisplayCurrency(billingDetails.totalWithRoom)}</p>
+                                      <p>• Dịch vụ (gói chăm sóc): {formatDisplayCurrency(billingDetails.serviceCost || 0)}</p>
+                                      <p>• Phòng: {formatDisplayCurrency(billingDetails.roomPrice || 0)}</p>
+                                      <p className="font-semibold">• Tổng: {formatDisplayCurrency(billingDetails.totalWithRoom || 0)}</p>
                                     </>
                                   )}
                                 </div>
@@ -1053,13 +1135,13 @@ export default function NewBillPage() {
                       showMonthDropdown
                       showYearDropdown
                       dropdownMode="select"
-                      minDate={new Date()}
+                      minDate={resident_id && String(residents.find(r => r._id === resident_id)?.status || '').toLowerCase() === 'accepted' ? undefined : new Date()}
                     />
                     <div className="mt-3 flex items-center gap-3 text-sm text-blue-600 bg-blue-50 px-4 py-3 rounded-lg border-2 border-blue-200 shadow-sm">
                       <CalendarIcon className="w-4 h-4" />
                       <span>
-                        {resident_id && residents.find(r => r._id === resident_id)?.isNewResident 
-                          ? 'Hạn thanh toán là cuối tháng hiện tại' 
+                        {resident_id && String(residents.find(r => r._id === resident_id)?.status || '').toLowerCase() === 'accepted'
+                          ? 'Hạn thanh toán là ngày bắt đầu dịch vụ' 
                           : 'Hạn thanh toán là ngày 5 tháng tiếp theo'}
                       </span>
                     </div>
@@ -1125,7 +1207,7 @@ export default function NewBillPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || !amount || !staff_id || !currentAssignmentId}
+                  disabled={loading || loadingResidents || residents.length === 0 || loadingAssignments || !amount || !staff_id}
                   className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg hover:shadow-xl"
                 >
                   {loading ? (

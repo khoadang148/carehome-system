@@ -33,12 +33,17 @@ import 'react-datepicker/dist/react-datepicker.css';
 const mapActivityFromAPI = (apiActivity: any) => {
   try {
     if (!apiActivity.schedule_time || typeof apiActivity.schedule_time !== 'string') {
+      console.warn('Invalid schedule_time for activity:', apiActivity._id);
       return null;
     }
 
-    const scheduleTime = new Date(apiActivity.schedule_time);
+    const scheduleTimeStr = apiActivity.schedule_time.endsWith('Z')
+      ? apiActivity.schedule_time
+      : `${apiActivity.schedule_time}Z`;
+    const scheduleTime = new Date(scheduleTimeStr);
 
     if (isNaN(scheduleTime.getTime())) {
+      console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
       return null;
     }
 
@@ -46,19 +51,30 @@ const mapActivityFromAPI = (apiActivity: any) => {
     const endTime = new Date(scheduleTime.getTime() + durationInMinutes * 60000);
 
     if (isNaN(endTime.getTime())) {
+      console.error('Invalid end time calculated for activity:', apiActivity._id);
       return null;
     }
+
+    const convertToVietnamTime = (utcTime: Date) => {
+      // Trừ 7 giờ để hiển thị đúng thời gian (database lưu UTC+7, cần trừ để hiển thị đúng)
+      const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
+      return correctTime.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    };
 
     return {
       id: apiActivity._id,
       name: apiActivity.activity_name,
       description: apiActivity.description,
       activity_type: apiActivity.activity_type,
-      category: getCategoryLabel(apiActivity.activity_type),
+      category: getCategoryLabel(apiActivity.activity_type), // dùng cho hiển thị màu sắc
       duration: apiActivity.duration,
-      startTime: scheduleTime.toTimeString().slice(0, 5),
-      endTime: endTime.toTimeString().slice(0, 5),
-      date: scheduleTime.toLocaleDateString('en-CA'),
+      startTime: convertToVietnamTime(scheduleTime),
+      endTime: convertToVietnamTime(endTime),
+      date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
       location: apiActivity.location,
       capacity: apiActivity.capacity,
       participants: 0,
@@ -66,6 +82,7 @@ const mapActivityFromAPI = (apiActivity: any) => {
       recurring: 'Không lặp lại'
     };
   } catch (error) {
+    console.error('Error mapping activity:', apiActivity._id, error);
     return null;
   }
 };

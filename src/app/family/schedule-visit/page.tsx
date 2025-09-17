@@ -36,6 +36,20 @@ export default function ScheduleVisitPage() {
   }
 
   useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    if (user.role !== 'family') {
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
+      return;
+    }
+  }, [user, router]);
+
+  useEffect(() => {
     setLoadingResidents(true);
     if (user?.id) {
       residentAPI.getByFamilyMemberId(user.id)

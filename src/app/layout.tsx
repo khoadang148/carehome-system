@@ -7,7 +7,9 @@ import { ResidentsProvider } from "@/lib/contexts/residents-context";
 import { ActivitiesProvider } from "@/lib/contexts/activities-context";
 import { ChatProvider } from "@/lib/contexts/chat-provider";
 import { NotificationProvider } from "@/lib/contexts/notification-context";
+import { SWRProvider } from "@/lib/contexts/swr-provider";
 import PreloadData from "@/components/PreloadData";
+// ReduxProvider removed after migrating to AuthContext-only
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -52,20 +54,22 @@ export default function RootLayout({
         }}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          <NotificationProvider>
-            <ResidentsProvider>
-              <ActivitiesProvider>
-                <ChatProvider>
-                  <ClientLayout>
-                    {children}
-                    <PreloadData />
-                  </ClientLayout>
-                </ChatProvider>
-              </ActivitiesProvider>
-            </ResidentsProvider>
-          </NotificationProvider>
-        </AuthProvider>
+        <SWRProvider>
+          <AuthProvider>
+              <NotificationProvider>
+                <ResidentsProvider>
+                  <ActivitiesProvider>
+                    <ChatProvider>
+                      <ClientLayout>
+                        {children}
+                        <PreloadData />
+                      </ClientLayout>
+                    </ChatProvider>
+                  </ActivitiesProvider>
+                </ResidentsProvider>
+              </NotificationProvider>
+          </AuthProvider>
+        </SWRProvider>
       </body>
     </html>
   );

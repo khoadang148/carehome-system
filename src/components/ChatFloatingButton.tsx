@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useChat } from '@/lib/contexts/chat-provider';
+import { useResidents } from '@/lib/contexts/residents-context';
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { messagesAPI } from '@/lib/api';
 import './chat-widget.css';
@@ -16,6 +17,7 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
+  const { hasResidents } = useResidents();
   // Temporarily comment out useChat to debug
   // const { chatState } = useChat();
   const [isVisible, setIsVisible] = useState(false);
@@ -30,24 +32,25 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
   const totalUnread = actualUnreadCount || unreadCount;
 
   useEffect(() => {
-    // Simple logic: show for family and staff, hide only on messages pages and auth pages
+    // Show for staff always, for family only if they have residents
     const shouldShow = Boolean(user && 
-      (user.role === 'family' || user.role === 'staff') && 
+      (user.role === 'staff' || (user.role === 'family' && hasResidents)) && 
       !pathname.includes('/messages') &&
       !pathname.includes('/login') &&
       !pathname.includes('/register'));
     
-    // Debug logging
-    console.log('ChatFloatingButton Debug:', {
-      user: user ? { id: user.id, role: user.role } : null,
-      pathname,
-      shouldShow,
-      isOnMessagesPage: pathname.includes('/messages'),
-      isOnAuthPage: pathname.includes('/login') || pathname.includes('/register')
-    });
+    // Debug logging (commented out to reduce console noise)
+    // console.log('ChatFloatingButton Debug:', {
+    //   user: user ? { id: user.id, role: user.role } : null,
+    //   pathname,
+    //   hasResidents,
+    //   shouldShow,
+    //   isOnMessagesPage: pathname.includes('/messages'),
+    //   isOnAuthPage: pathname.includes('/login') || pathname.includes('/register')
+    // });
     
     setIsVisible(shouldShow);
-  }, [user, pathname]);
+  }, [user, pathname, hasResidents]);
 
   // Fetch unread count
   useEffect(() => {

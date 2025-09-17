@@ -4,7 +4,8 @@
 // 2. Mobile app paths: "file:///var/mobile/Containers/..."
 // 3. Full URLs: "http://example.com/image.jpg"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com';
+// Use the deployed backend URL for static files (uploads)
+const STATIC_BASE_URL = process.env.NEXT_PUBLIC_STATIC_BASE_URL || 'https://sep490-be-xniz.onrender.com';
 
 export const processAvatarUrl = (avatarPath: string): string => {
   if (!avatarPath) return '/default-avatar.svg';
@@ -28,7 +29,7 @@ export const processAvatarUrl = (avatarPath: string): string => {
   // Kiểm tra xem path đã có 'uploads/' chưa
   const finalPath = cleanPath.includes('uploads/') ? cleanPath : `uploads/${cleanPath}`;
   
-  return `${API_BASE_URL}/${finalPath}`;
+  return `${STATIC_BASE_URL}/${finalPath}`;
 };
 
 // Helper function để kiểm tra xem avatar có phải là mobile app path không

@@ -224,26 +224,28 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                ));
              }
           } catch (error) {
-            if (!isForbidden(error)) console.error('Error fetching bills:', error);
+            if (!isForbidden(error)) console.warn('Error fetching bills:', error);
           }
 
-          // Care notes for linked residents - ensure proper filtering by resident IDs
+          // Care notes for linked residents - fetch per resident to avoid 500 on BE when resident_id is missing
           try {
             if (residentIds.length > 0) {
-              // Lấy tất cả care notes và filter theo resident IDs để đảm bảo chính xác
-              const allCareNotes = await careNotesAPI.getAll();
-              
-              // Filter care notes theo resident IDs của family member
-              const userCareNotes = allCareNotes.filter((note: any) => {
-                const noteResidentId = note.resident_id?._id || note.resident_id;
-                return residentIds.includes(noteResidentId);
-              });
-              
+              const settled = await Promise.allSettled(
+                residentIds.map((rid) => careNotesAPI.getAll({ resident_id: rid }))
+              );
+
+              const userCareNotes: any[] = [];
+              for (const r of settled) {
+                if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+                  userCareNotes.push(...r.value);
+                }
+              }
+
               const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-              const recentCareNotes = userCareNotes.filter((note: any) => 
+              const recentCareNotes = userCareNotes.filter((note: any) =>
                 new Date(note.created_at || note.date) > oneDayAgo
               );
-              
+
               if (recentCareNotes.length > 0) {
                 newNotifications.push(createNotification(
                   'info',
@@ -256,7 +258,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               }
             }
           } catch (error) {
-            if (!isForbidden(error)) console.error('Error fetching care notes:', error);
+            if (!isForbidden(error)) console.warn('Error fetching care notes:', error);
           }
 
           // Vital signs per resident - bỏ qua để tránh lỗi 403
@@ -311,7 +313,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               ));
             }
           } catch (error) {
-            if (!isForbidden(error)) console.error('Error fetching visits:', error);
+            if (!isForbidden(error)) console.warn('Error fetching visits:', error);
           }
           break;
 
@@ -336,28 +338,53 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               ));
             }
           } catch (error) {
-            console.error('Error fetching assignments:', error);
+            console.warn('Error fetching assignments:', error);
           }
 
-          // Check for pending care notes
+          // Check for pending care notes - use staff assignments to get assigned residents first
           try {
-            const pendingCareNotes = await careNotesAPI.getAll();
-            const staffPendingNotes = pendingCareNotes.filter((note: any) => 
-              !note.conducted_by && note.status === 'pending'
-            );
+            // Get staff assignments to find assigned residents
+            const staffAssignments = await staffAssignmentsAPI.getMyAssignments();
+            const assignedResidentIds = Array.isArray(staffAssignments) 
+              ? staffAssignments
+                  .filter((assignment: any) => assignment.status === 'active' && assignment.resident_id)
+                  .map((assignment: any) => 
+                    typeof assignment.resident_id === 'object' 
+                      ? assignment.resident_id._id 
+                      : assignment.resident_id
+                  )
+              : [];
 
-            if (staffPendingNotes.length > 0) {
-              newNotifications.push(createNotification(
-                'warning',
-                'Ghi chú chăm sóc chờ xử lý',
-                `Có ${staffPendingNotes.length} ghi chú chăm sóc cần được xử lý.`,
-                'care',
-                '/staff/assessments',
-                { careNotes: staffPendingNotes, staffId: user.id, role: 'staff' }
-              ));
+            if (assignedResidentIds.length > 0) {
+              // Fetch care notes for assigned residents only
+              const settled = await Promise.allSettled(
+                assignedResidentIds.map((rid) => careNotesAPI.getAll({ resident_id: rid }))
+              );
+
+              const allCareNotes: any[] = [];
+              for (const r of settled) {
+                if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+                  allCareNotes.push(...r.value);
+                }
+              }
+
+              const staffPendingNotes = allCareNotes.filter((note: any) => 
+                !note.conducted_by && note.status === 'pending'
+              );
+
+              if (staffPendingNotes.length > 0) {
+                newNotifications.push(createNotification(
+                  'warning',
+                  'Ghi chú chăm sóc chờ xử lý',
+                  `Có ${staffPendingNotes.length} ghi chú chăm sóc cần được xử lý.`,
+                  'care',
+                  '/staff/assessments',
+                  { careNotes: staffPendingNotes, staffId: user.id, role: 'staff' }
+                ));
+              }
             }
           } catch (error) {
-            console.error('Error fetching pending care notes:', error);
+            console.warn('Error fetching pending care notes:', error);
           }
 
           // Check for today's activities
@@ -404,7 +431,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               }
             }
           } catch (error) {
-            console.error('Error fetching activities:', error);
+            console.warn('Error fetching activities:', error);
           }
           break;
 
@@ -425,12 +452,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               ));
             }
           } catch (error) {
-            console.error('Error fetching pending bills:', error);
+            console.warn('Error fetching pending bills:', error);
           }
 
           // Check for new residents
           try {
-            const recentResidents = await residentAPI.getAll();
+            const recentResidentsRaw = await residentAPI.getAll();
+            const recentResidents = Array.isArray(recentResidentsRaw) ? recentResidentsRaw : [];
             const newResidents = recentResidents.filter((resident: any) => {
               const admissionDate = new Date(resident.admission_date || resident.created_at);
               const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -448,12 +476,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               ));
             }
           } catch (error) {
-            console.error('Error fetching new residents:', error);
+            console.warn('Error fetching new residents:', error);
           }
 
           // Check for bed assignments
           try {
-            const bedAssignments = await bedAssignmentsAPI.getAll();
+            const bedAssignmentsRaw = await bedAssignmentsAPI.getAll();
+            const bedAssignments = Array.isArray(bedAssignmentsRaw) ? bedAssignmentsRaw : [];
             const pendingAssignments = bedAssignments.filter((assignment: any) => 
               assignment.status === 'pending'
             );
@@ -469,16 +498,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               ));
             }
           } catch (error) {
-            console.error('Error fetching bed assignments:', error);
+            console.warn('Error fetching bed assignments:', error);
           }
 
           // Check for system alerts
           try {
-            const recentResidents = await residentAPI.getAll();
-            const bedAssignments = await bedAssignmentsAPI.getAll();
+            const recentResidentsRaw2 = await residentAPI.getAll();
+            const bedAssignmentsRaw2 = await bedAssignmentsAPI.getAll();
+            const recentResidents2 = Array.isArray(recentResidentsRaw2) ? recentResidentsRaw2 : [];
+            const bedAssignments2 = Array.isArray(bedAssignmentsRaw2) ? bedAssignmentsRaw2 : [];
             
-            const totalResidents = recentResidents.length;
-            const occupiedBeds = bedAssignments.filter((assignment: any) => 
+            const totalResidents = recentResidents2.length;
+            const occupiedBeds = bedAssignments2.filter((assignment: any) => 
               assignment.status === 'active'
             ).length;
             
@@ -497,7 +528,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               }
             }
           } catch (error) {
-            console.error('Error calculating occupancy rate:', error);
+            console.warn('Error calculating occupancy rate:', error);
           }
           break;
       }
@@ -540,7 +571,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
 
     } catch (error) {
-      console.error('Error generating notifications:', error);
+      console.warn('Error generating notifications:', error);
     }
   }, [user]);
 

@@ -241,9 +241,17 @@ export default function NewActivityPage() {
 
     // Validate thời gian
     const time24 = to24Hour(form.time);
-    const scheduleDateTime = form.date && form.time ? `${form.date}T${time24}:00` : '';
-    // Tạo Date object từ local time string, không thêm Z để tránh chuyển đổi UTC
-    const selectedDateTime = new Date(scheduleDateTime);
+    // Xây dựng Date theo múi giờ local để tránh bị lệch ngày
+    let selectedDateTime = new Date();
+    let scheduleISOString = '';
+    if (form.date && form.time) {
+      const [y, m, d] = form.date.split('-').map((n) => parseInt(n, 10));
+      const [hh, mm] = time24.split(':').map((n) => parseInt(n, 10));
+      const local = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
+      selectedDateTime = local;
+      // Chuẩn hóa sang ISO UTC nhưng giữ nguyên thời gian local (tránh +1 ngày trên BE)
+      scheduleISOString = new Date(local.getTime() - local.getTimezoneOffset() * 60000).toISOString();
+    }
     const now = new Date();
     
     // Kiểm tra không được tạo trong quá khứ
@@ -270,7 +278,7 @@ export default function NewActivityPage() {
       activity_name: form.activity_name,
       description: form.description,
       duration: Number(form.duration),
-      schedule_time: scheduleDateTime,
+      schedule_time: scheduleISOString || undefined,
       location: showCustomLocationInput ? customLocation : form.location,
       capacity: Number(form.capacity),
       activity_type: showCustomInput ? customActivityType : form.activity_type,

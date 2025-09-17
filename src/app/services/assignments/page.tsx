@@ -39,64 +39,90 @@ export default function ServiceAssignmentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const resList = await residentAPI.getAll();
-      const activeResidents = Array.isArray(resList) ? resList.filter((r: any) => r.status === 'active') : [];
-      setResidents(activeResidents);
+      // Lấy tất cả đăng ký dịch vụ trực tiếp từ BE
+      const rawAssignments = await carePlanAssignmentsAPI.getAll();
 
-      const allAssignments = await Promise.all(
-        activeResidents.map(async (r: any) => {
+      if (!Array.isArray(rawAssignments) || rawAssignments.length === 0) {
+        setAssignments([]);
+        setResidents([]);
+        setTotalItems(0);
+        return;
+      }
+
+      // Chọn 1 đăng ký hiện hành cho mỗi resident (ưu tiên còn hạn; nếu không có thì lấy mới nhất)
+      const byResident: Record<string, any[]> = {};
+      for (const a of rawAssignments) {
+        const rid = typeof a.resident_id === 'object' && a.resident_id?._id ? a.resident_id._id : a.resident_id;
+        if (!rid) continue;
+        if (!byResident[rid]) byResident[rid] = [];
+        byResident[rid].push(a);
+      }
+
+      const selectedAssignments = Object.entries(byResident).map(([rid, arr]) => {
+        const list = [...arr];
+        const now = new Date();
+        list.sort((a: any, b: any) => new Date(b?.start_date || b?.createdAt || 0).getTime() - new Date(a?.start_date || a?.createdAt || 0).getTime());
+        const active = list.find((a: any) => {
+          const notExpired = !a?.end_date || new Date(a.end_date) >= now;
+          const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
+          return notExpired && notCancelled;
+        });
+        return active || list[0];
+      });
+
+      // Enrich: fetch resident info + ensure care_plan_ids có chi tiết
+      const enriched = await Promise.all(
+        selectedAssignments.map(async (a: any) => {
+          const residentId = typeof a.resident_id === 'object' && a.resident_id?._id ? a.resident_id._id : a.resident_id;
+          let resident = a.resident || null;
           try {
-            const residentId = typeof r._id === 'object' && (r._id as any)?._id
-              ? (r._id as any)._id
-              : r._id;
-            const data = await carePlansAPI.getByResidentId(residentId);
-            const assignments = Array.isArray(data) ? data : [];
+            if (!resident) resident = await residentAPI.getById(residentId);
+          } catch {}
 
-            if (assignments.length === 0) {
-              return [];
-            }
+          let detailedCarePlans: any[] = [];
+          try {
+            const rawCarePlans = Array.isArray(a?.care_plan_ids) ? a.care_plan_ids : [];
+            detailedCarePlans = await Promise.all(
+              rawCarePlans.map(async (cp: any) => {
+                if (cp && typeof cp === 'object' && (cp.description || cp.plan_name || cp.name)) {
+                  return cp;
+                }
+                const id = typeof cp === 'object' && cp?._id ? cp._id : cp;
+                try {
+                  const cpData = await carePlansAPI.getById(String(id));
+                  return cpData || { _id: id };
+                } catch {
+                  return { _id: id };
+                }
+              })
+            );
+          } catch {}
 
-            const now = new Date();
-            const sortedByStart = [...assignments].sort((a: any, b: any) => {
-              const da = new Date(a?.start_date || a?.createdAt || 0).getTime();
-              const db = new Date(b?.start_date || b?.createdAt || 0).getTime();
-              return db - da;
-            });
-            const activeAssignmentOnly = sortedByStart.find((a: any) => {
-              const notExpired = !a?.end_date || new Date(a.end_date) >= now;
-              const notCancelled = !['cancelled', 'completed', 'expired'].includes(String(a?.status || '').toLowerCase());
-              return notExpired && notCancelled;
-            });
-            const currentAssignment = activeAssignmentOnly || sortedByStart[0];
-
-            const mergedAssignment = {
-              _id: currentAssignment?._id || assignments[0]._id,
-              resident_id: residentId,
-              resident: r,
-              status: currentAssignment?.status,
-              start_date: currentAssignment?.start_date,
-              end_date: currentAssignment?.end_date,
-              notes: currentAssignment?.notes,
-              consultation_notes: currentAssignment?.consultation_notes,
-              family_preferences: currentAssignment?.family_preferences,
-              care_plans_monthly_cost: assignments.reduce((total: number, a: any) => total + (a.care_plans_monthly_cost || 0), 0),
-              total_monthly_cost: assignments.reduce((total: number, a: any) => total + (a.total_monthly_cost || 0), 0),
-              room_monthly_cost: currentAssignment?.room_monthly_cost || 0,
-              selected_room_type: currentAssignment?.selected_room_type,
-              assigned_room_id: currentAssignment?.assigned_room_id,
-              assigned_bed_id: currentAssignment?.assigned_bed_id,
-              additional_medications: currentAssignment?.additional_medications,
-              care_plan_ids: Array.isArray(currentAssignment?.care_plan_ids) ? currentAssignment.care_plan_ids : []
-            };
-
-            return [mergedAssignment];
-          } catch {
-            return [];
-          }
+          return {
+            _id: a?._id,
+            resident_id: residentId,
+            resident,
+            status: a?.status,
+            start_date: a?.start_date,
+            end_date: a?.end_date,
+            notes: a?.notes,
+            consultation_notes: a?.consultation_notes,
+            family_preferences: a?.family_preferences,
+            care_plans_monthly_cost: a?.care_plans_monthly_cost || 0,
+            total_monthly_cost: a?.total_monthly_cost || 0,
+            room_monthly_cost: a?.room_monthly_cost || 0,
+            selected_room_type: a?.selected_room_type,
+            assigned_room_id: a?.assigned_room_id,
+            assigned_bed_id: a?.assigned_bed_id,
+            additional_medications: a?.additional_medications,
+            care_plan_ids: detailedCarePlans,
+          };
         })
       );
-      setAssignments(allAssignments.flat());
-      setTotalItems(allAssignments.flat().length);
+
+      setResidents([]); // không dùng danh sách resident tách rời nữa
+      setAssignments(enriched);
+      setTotalItems(enriched.length);
     } catch (error) {
       setError('Không thể tải danh sách người cao tuổi hoặc đăng ký dịch vụ.');
     } finally {
@@ -455,9 +481,7 @@ export default function ServiceAssignmentsPage() {
                               <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', margin: 0 }}>
                                 {a.resident?.full_name || a.resident?.name || ''}
                               </p>
-                              <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>
-                                ID: {a.resident?._id || ''}
-                              </p>
+                              
                             </div>
                           </div>
                         </td>

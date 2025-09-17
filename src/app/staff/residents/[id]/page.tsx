@@ -14,7 +14,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, userAPI } from '@/lib/api';
+import { residentAPI, userAPI, API_BASE_URL } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { vitalSignsAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
@@ -41,14 +41,43 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [roomLoading, setRoomLoading] = useState(false);
   const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
   const [activeAssignments, setActiveAssignments] = useState<any[]>([]);
+  const [carePlanMap, setCarePlanMap] = useState<{ [id: string]: any }>({});
   const [bedNumber, setBedNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [bedLoading, setBedLoading] = useState(false);
+  const [residentId, setResidentId] = useState<string>('');
   
-  const residentId = React.use(params).id;
+  // Get residentId from params
+  useEffect(() => {
+    const getParams = async () => {
+      try {
+        const resolvedParams = await params;
+        console.log('Resolved params:', resolvedParams);
+        if (resolvedParams?.id) {
+          console.log('Setting residentId to:', resolvedParams.id);
+          setResidentId(resolvedParams.id);
+        }
+      } catch (error) {
+        console.error('Error getting params:', error);
+      }
+    };
+    getParams();
+  }, [params]);
+  
+  const buildFileUrl = (filePath?: string) => {
+    if (!filePath) return '';
+    if (filePath.startsWith('http')) return filePath;
+    const staticBaseUrl = process.env.NEXT_PUBLIC_STATIC_BASE_URL || 'https://sep490-be-xniz.onrender.com';
+    const cleanBase = staticBaseUrl.replace(/\/$/, '');
+    const cleanPath = filePath.replace(/^\\+|^\/+/, '').replace(/\\/g, '/');
+    return `${cleanBase}/${cleanPath}`;
+  };
   
   useEffect(() => {
+    if (!residentId) return; // Don't fetch if no residentId yet
+    
     const fetchResident = async () => {
       try {
+        console.log('Fetching resident with ID:', residentId);
         const data = await residentAPI.getById(residentId);
         const mapped = {
           id: data._id,
@@ -178,7 +207,9 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           setCareNotes([]);
         }
       } catch (error) {
-        router.push('/staff/residents');
+        console.error('Error fetching resident:', error);
+        // Don't auto-redirect, let the user see the error state
+        setResident(null);
       } finally {
         setLoading(false);
         setVitalLoading(false);
@@ -186,6 +217,38 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     };
     fetchResident();
   }, [residentId, router, refreshKey]);
+
+  // Load care plan details by ID for display of name and price (like admin page)
+  useEffect(() => {
+    const loadCarePlanDetails = async () => {
+      try {
+        const ids = new Set<string>();
+        (carePlanAssignments || []).forEach((assignment: any) => {
+          const cps = Array.isArray(assignment?.care_plan_ids) ? assignment.care_plan_ids : [];
+          cps.forEach((cp: any) => {
+            const id = (cp && typeof cp === 'object') ? (cp._id || cp.id) : cp;
+            if (typeof id === 'string' && id.length >= 12) ids.add(id);
+          });
+        });
+
+        const toFetch = Array.from(ids).filter(id => !(id in carePlanMap));
+        if (toFetch.length === 0) return;
+
+        const results = await Promise.allSettled(toFetch.map(id => carePlansAPI.getById(id)));
+        const nextMap: { [id: string]: any } = { ...carePlanMap };
+        results.forEach((res, idx) => {
+          const id = toFetch[idx];
+          if (res.status === 'fulfilled' && res.value) {
+            nextMap[id] = res.value;
+          }
+        });
+        setCarePlanMap(nextMap);
+      } catch {
+        // ignore
+      }
+    };
+    loadCarePlanDetails();
+  }, [carePlanAssignments]);
   
   const handleEditClick = () => {
     router.push(`/staff/residents/${residentId}/edit`);
@@ -195,7 +258,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     setRefreshKey(prev => prev + 1);
   };
   
-  if (loading) {
+  if (loading || !residentId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
         <div className="bg-white rounded-2xl p-8 shadow-lg text-center">
@@ -379,6 +442,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         
         <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 shadow-lg border border-white/20">
           {activeTab === 'overview' && (
+            <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200/50">
                 <div className="flex items-center gap-3 mb-4">
@@ -414,6 +478,14 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                       {resident.admission_date ? formatDateDDMMYYYY(resident.admission_date) : 'Chưa hoàn tất đăng kí'}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 mb-1">
+                      Số CCCD
+                    </p>
+                    <p className="text-sm text-slate-800 m-0 font-medium">
+                      {resident.cccd_id || 'Chưa hoàn tất đăng kí'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -437,20 +509,25 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   <div className="grid gap-3">
                     {activeAssignments.map((assignment: any, assignmentIdx: number) => (
                       assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
-                        assignment.care_plan_ids.map((plan: any, planIdx: number) => (
-                          <div
-                            key={`${assignment._id}-${plan._id || planIdx}`}
-                            className="bg-white/80 rounded-lg p-4 border border-green-200 mb-2"
-                          >
-                            <div className="font-semibold text-base text-green-700">
-                              <span>{plan.plan_name || 'Gói dịch vụ'}</span>
+                        assignment.care_plan_ids.map((planRef: any, planIdx: number) => {
+                          const planId = (planRef && typeof planRef === 'object') ? (planRef._id || planRef.id) : planRef;
+                          const plan = planId && carePlanMap[planId] ? carePlanMap[planId] : (planRef || {});
+                          const name = plan?.plan_name || plan?.name || 'Gói dịch vụ';
+                          const price = plan?.monthly_price;
+                          return (
+                            <div
+                              key={`${assignment._id}-${planId || planIdx}`}
+                              className="bg-white/80 rounded-lg p-4 border border-green-200 mb-2"
+                            >
+                              <div className="font-semibold text-base text-green-700">
+                                <span>{name}</span>
+                              </div>
+                              <div className="text-sm text-gray-700 mb-2">
+                                Giá: {price !== undefined ? formatDisplayCurrency(price) : '---'}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-700 mb-2">
-                              Giá: {plan.monthly_price !== undefined ? formatDisplayCurrency(plan.monthly_price) : '---'}
-                            </div>
-                            
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div key={`empty-assignment-${assignmentIdx}`} className="bg-white/80 rounded-lg p-4 border border-gray-200 text-sm text-gray-500">
                           Assignment {assignmentIdx + 1}: Không có gói dịch vụ được gán
@@ -482,6 +559,76 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
               </div>
             </div>
+            {/* CCCD Images Section */}
+            <div className="mt-6 grid gap-6">
+              <div className="bg-purple-50/50 rounded-2xl p-6 border border-purple-200/50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base font-semibold m-0 text-slate-800">
+                    Giấy tờ tùy thân (CCCD)
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 mb-3">CCCD mặt trước</p>
+                    {resident.cccd_front ? (
+                      <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 bg-gray-50">
+                        <img
+                          src={buildFileUrl(resident.cccd_front)}
+                          alt="CCCD mặt trước"
+                          className="w-full h-52 object-cover block"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const next = target.nextElementSibling as HTMLElement;
+                            if (next) next.style.display = 'flex';
+                          }}
+                        />
+                        <div className="hidden w-full h-52 items-center justify-center bg-gray-100 text-gray-500 text-sm">
+                          Không thể tải hình ảnh
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-52 flex items-center justify-center bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm">
+                        Chưa có hình ảnh
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 mb-3">CCCD mặt sau</p>
+                    {resident.cccd_back ? (
+                      <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 bg-gray-50">
+                        <img
+                          src={buildFileUrl(resident.cccd_back)}
+                          alt="CCCD mặt sau"
+                          className="w-full h-52 object-cover block"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const next = target.nextElementSibling as HTMLElement;
+                            if (next) next.style.display = 'flex';
+                          }}
+                        />
+                        <div className="hidden w-full h-52 items-center justify-center bg-gray-100 text-gray-500 text-sm">
+                          Không thể tải hình ảnh
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-52 flex items-center justify-center bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm">
+                        Chưa có hình ảnh
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            </>
           )}
 
           {activeTab === 'medical' && (

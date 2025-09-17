@@ -23,8 +23,23 @@ export default function InvoiceDetailPage() {
   const params = useParams();
   const { user } = useAuth();
   const [invoice, setInvoice] = useState<any>(null);
+  const [derivedDetails, setDerivedDetails] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    if (user.role !== 'family') {
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
+      return;
+    }
+  }, [user, router]);
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -33,8 +48,81 @@ export default function InvoiceDetailPage() {
         const invoiceId = params.id as string;
 
         const invoiceData = await billsAPI.getById(invoiceId);
-
         setInvoice(invoiceData);
+
+        // Build a derived breakdown if backend didn't store billing_details
+        try {
+          if (!invoiceData?.billing_details && invoiceData?.care_plan_assignment_id) {
+            const cpa = invoiceData.care_plan_assignment_id;
+            const carePlans = Array.isArray(cpa?.care_plan_ids) ? cpa.care_plan_ids : [];
+
+            const serviceDetails = carePlans.map((p: any) => ({
+              plan_name: p?.plan_name,
+              description: p?.description,
+              monthly_price: Number(p?.monthly_price) || 0,
+            }));
+            const totalServiceCost = typeof cpa?.care_plans_monthly_cost === 'number'
+              ? cpa.care_plans_monthly_cost
+              : serviceDetails.reduce((sum: number, s: any) => sum + (Number(s.monthly_price) || 0), 0);
+
+            const roomDetails = cpa?.assigned_room_id ? {
+              room_number: cpa.assigned_room_id?.room_number,
+              room_type: cpa.assigned_room_id?.room_type,
+              monthly_price: typeof cpa?.room_monthly_cost === 'number' ? cpa.room_monthly_cost : undefined,
+            } : undefined;
+            const totalRoomCost = typeof cpa?.room_monthly_cost === 'number' ? cpa.room_monthly_cost : (roomDetails?.monthly_price || 0);
+
+            // Detect first-month bill with deposit pattern and compute breakdown similar to admin new bill
+            const totalMonthlyCost = typeof cpa?.total_monthly_cost === 'number'
+              ? cpa.total_monthly_cost
+              : totalServiceCost + totalRoomCost;
+
+            // Heuristic: if title/notes mention deposit or we have start_date in the same month as due_date, treat as new resident bill
+            const title: string = String(invoiceData?.title || '').toLowerCase();
+            const notes: string = String(invoiceData?.notes || '').toLowerCase();
+            const mentionsDeposit = title.includes('cọc') || notes.includes('cọc');
+            const startDate = cpa?.start_date ? new Date(cpa.start_date) : null;
+            const dueDate = invoiceData?.due_date ? new Date(invoiceData.due_date) : null;
+            let isNewResident = false;
+            let remainingDays = 0;
+            let remainingDaysAmount = 0;
+            let fullMonthAmount = 0;
+            let totalAmount = Number(invoiceData?.amount) || 0;
+
+            if (startDate && dueDate && startDate.getMonth() === dueDate.getMonth() && startDate.getFullYear() === dueDate.getFullYear()) {
+              isNewResident = true;
+            }
+            if (mentionsDeposit) {
+              isNewResident = true;
+            }
+
+            if (isNewResident) {
+              const lastDayOfMonth = new Date(startDate ? startDate.getFullYear() : dueDate!.getFullYear(), (startDate ? startDate.getMonth() : dueDate!.getMonth()) + 1, 0).getDate();
+              const startDay = (startDate || dueDate)!.getDate();
+              remainingDays = Math.max(0, lastDayOfMonth - startDay + 1);
+              const dailyRate = totalMonthlyCost / 30;
+              remainingDaysAmount = Math.round(dailyRate * remainingDays);
+              fullMonthAmount = totalMonthlyCost;
+              // If backend amount present, prefer it as total; else compute
+              totalAmount = Number(invoiceData?.amount) || (remainingDaysAmount + fullMonthAmount);
+            }
+
+            setDerivedDetails({
+              serviceDetails,
+              totalServiceCost,
+              roomDetails,
+              totalRoomCost,
+              totalWithRoom: totalMonthlyCost,
+              isNewResident,
+              remainingDays,
+              remainingDaysAmount,
+              fullMonthAmount,
+              totalAmount,
+            });
+          } else {
+            setDerivedDetails(null);
+          }
+        } catch {}
       } catch (err: any) {
         setError(err?.message || 'Không thể tải thông tin hóa đơn');
       } finally {
@@ -213,77 +301,134 @@ export default function InvoiceDetailPage() {
                 Chi tiết hóa đơn
               </h2>
               <div className="flex flex-col gap-4">
-                {invoice.billing_details?.serviceDetails && invoice.billing_details.serviceDetails.length > 0 ? (
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
-                    <div className="flex flex-col gap-2">
-                      {invoice.billing_details.serviceDetails.map((service: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-md border border-blue-100">
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-slate-800 mb-1">{service.plan_name}</div>
-                            {service.description && (
-                              <div className="text-xs text-slate-500 leading-snug">{service.description}</div>
+                {(invoice.billing_details?.serviceDetails && invoice.billing_details.serviceDetails.length > 0) ? (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
+                        <div className="flex flex-col gap-2">
+                          {invoice.billing_details.serviceDetails.map((service: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-md border border-blue-100">
+                              <div className="flex-1">
+                                <div className="text-sm font-semibold text-slate-800 mb-1">{service.plan_name}</div>
+                                {service.description && (
+                                  <div className="text-xs text-slate-500 leading-snug">{service.description}</div>
+                                )}
+                              </div>
+                              <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(service.monthly_price)}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 p-3 bg-sky-50 rounded-md border border-sky-200">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-semibold text-slate-800">Tổng tiền dịch vụ:</span>
+                            <span className="font-bold text-blue-500">{formatDisplayCurrency(invoice.billing_details.totalServiceCost || 0)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : derivedDetails?.serviceDetails && derivedDetails.serviceDetails.length > 0 ? (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
+                        <div className="flex flex-col gap-2">
+                          {derivedDetails.serviceDetails.map((service: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-md border border-blue-100">
+                              <div className="flex-1">
+                                <div className="text-sm font-semibold text-slate-800 mb-1">{service.plan_name}</div>
+                                {service.description && (
+                                  <div className="text-xs text-slate-500 leading-snug">{service.description}</div>
+                                )}
+                              </div>
+                              <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(service.monthly_price)}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 p-3 bg-sky-50 rounded-md border border-sky-200">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-semibold text-slate-800">Tổng tiền dịch vụ:</span>
+                            <span className="font-bold text-blue-500">{formatDisplayCurrency(derivedDetails.totalServiceCost || 0)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
+                        <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-slate-800 mb-1">{invoice.care_plan_snapshot?.planName || 'Gói chăm sóc cơ bản'}</div>
+                              <div className="text-xs text-slate-500 leading-snug">{invoice.care_plan_snapshot?.description || 'Dịch vụ chăm sóc và hỗ trợ hàng ngày'}</div>
+                            </div>
+                            <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(invoice.amount * 0.7)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {invoice.billing_details?.roomDetails ? (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
+                        <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-slate-800 mb-1">Phòng {invoice.billing_details.roomDetails.room_number}</div>
+                            </div>
+                            <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(invoice.billing_details.roomDetails.monthly_price)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : derivedDetails?.roomDetails ? (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
+                        <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-slate-800 mb-1">Phòng {derivedDetails.roomDetails.room_number}</div>
+                            </div>
+                            {derivedDetails.roomDetails.monthly_price && (
+                              <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(derivedDetails.roomDetails.monthly_price)}</div>
                             )}
                           </div>
-                          <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(service.monthly_price)}</div>
                         </div>
-                      ))}
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
+                        <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-slate-800 mb-1">Phòng tiêu chuẩn</div>
+                              <div className="text-xs text-slate-500 leading-snug">Bao gồm giường, tủ, nhà vệ sinh riêng</div>
+                            </div>
+                            <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(invoice.amount * 0.3)}</div>
+                          </div>
+                        </div>
+                  </div>
+                )}
+
+                {/* Totals section */}
+                {derivedDetails?.isNewResident ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-slate-700">Hóa đơn tháng hiện tại ({derivedDetails.remainingDays} ngày)</span>
+                      <span className="font-bold text-blue-600">{formatDisplayCurrency(derivedDetails.remainingDaysAmount)}</span>
                     </div>
-                    <div className="mt-3 p-3 bg-sky-50 rounded-md border border-sky-200">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold text-slate-800">Tổng tiền dịch vụ:</span>
-                        <span className="font-bold text-blue-500">{formatDisplayCurrency(invoice.billing_details.totalServiceCost || 0)}</span>
+                    <div className="p-3 bg-green-50 rounded-lg border border-green-200 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-slate-700">+ Tiền cọc tháng tiếp theo</span>
+                      <span className="font-bold text-green-600">{formatDisplayCurrency(derivedDetails.fullMonthAmount)}</span>
+                    </div>
+                    <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-lg border-2 border-slate-300">
+                      <div className="flex items-center justify-between text-base font-bold">
+                        <span className="text-slate-800">TỔNG CỘNG:</span>
+                        <span className="text-blue-500 text-lg">{formatDisplayCurrency(derivedDetails.totalAmount || invoice.amount)}</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Gói dịch vụ:</h3>
-                    <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-slate-800 mb-1">{invoice.care_plan_snapshot?.planName || 'Gói chăm sóc cơ bản'}</div>
-                          <div className="text-xs text-slate-500 leading-snug">{invoice.care_plan_snapshot?.description || 'Dịch vụ chăm sóc và hỗ trợ hàng ngày'}</div>
-                        </div>
-                        <div className="text-sm font-bold text-blue-500 ml-4">{formatDisplayCurrency(invoice.amount * 0.7)}</div>
-                      </div>
+                  <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-lg border-2 border-slate-300">
+                    <div className="flex items-center justify-between text-base font-bold">
+                      <span className="text-slate-800">TỔNG CỘNG:</span>
+                      <span className="text-blue-500 text-lg">{formatDisplayCurrency(invoice.amount)}</span>
                     </div>
                   </div>
                 )}
-
-                {invoice.billing_details?.roomDetails ? (
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
-                    <div className="p-3 bg-green-50 rounded-md border border-green-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-slate-800 mb-1">Phòng {invoice.billing_details.roomDetails.room_number}</div>
-                        </div>
-                        <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(invoice.billing_details.roomDetails.monthly_price)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">Thông tin phòng:</h3>
-                    <div className="p-3 bg-green-50 rounded-md border border-green-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-slate-800 mb-1">Phòng tiêu chuẩn</div>
-                          <div className="text-xs text-slate-500 leading-snug">Bao gồm giường, tủ, nhà vệ sinh riêng</div>
-                        </div>
-                        <div className="text-sm font-bold text-green-600 ml-4">{formatDisplayCurrency(invoice.amount * 0.3)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-lg border-2 border-slate-300">
-                  <div className="flex items-center justify-between text-base font-bold">
-                    <span className="text-slate-800">TỔNG CỘNG:</span>
-                    <span className="text-blue-500 text-lg">{formatDisplayCurrency(invoice.amount)}</span>
-                  </div>
-                </div>
               </div>
             </div>
 

@@ -77,75 +77,117 @@ export default function StaffVitalSignsPage() {
         const myAssignmentsData = await staffAssignmentsAPI.getMyAssignments();
         const myAssignments = Array.isArray(myAssignmentsData) ? myAssignmentsData : [];
         
-        const activeAssignments = myAssignments.filter((assignment: any) => assignment.status === 'active');
-        
+        const isAssignmentActive = (a: any) => {
+          if (!a) return false;
+          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+          if (!a.end_date) return true;
+          const end = new Date(a.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return end >= today;
+        };
+
+        const isRoomBased = myAssignments.some((a: any) => a && (a.room_id || a.residents));
+        let residentRows: any[] = [];
+
+        if (isRoomBased) {
+          const activeRoomAssignments = myAssignments.filter((a: any) => isAssignmentActive(a));
+          for (const assignment of activeRoomAssignments) {
+            const room = assignment.room_id;
+            const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+            let residentsList: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+            if ((!residentsList || residentsList.length === 0) && roomId) {
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getAll();
+                if (Array.isArray(bedAssignments)) {
+                  residentsList = bedAssignments
+                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .map((ba: any) => ba.resident_id)
+                    .filter(Boolean);
+                }
+              } catch {}
+            }
+            for (const res of residentsList) {
+              residentRows.push({ id: res?._id, name: res?.full_name || '', avatar: Array.isArray(res?.avatar) ? res.avatar[0] : res?.avatar || null, roomId });
+            }
+          }
+
+          const enriched = await Promise.all(residentRows.map(async (r) => {
+            try {
+              const detail = await residentAPI.getById(r.id);
+              return { ...r, name: detail?.full_name || r.name, avatar: detail?.avatar ? (Array.isArray(detail.avatar) ? detail.avatar[0] : detail.avatar) : r.avatar };
+            } catch { return r; }
+          }));
+
+          const uniqueRoomIds = Array.from(new Set(enriched.map(r => r.roomId).filter(Boolean)));
+          const fetchedRooms = await Promise.all(uniqueRoomIds.map(async (rid) => {
+            try { return [rid, await roomsAPI.getById(rid)] as const; } catch { return [rid, null] as const; }
+          }));
+          const ridToNumber: {[rid: string]: string} = {};
+          fetchedRooms.forEach(([rid, room]) => { if (room?.room_number) ridToNumber[rid as any] = room.room_number; });
+
+          const finalResidents = enriched.map(r => ({
+            id: r.id,
+            name: r.name,
+            avatar: r.avatar,
+            roomNumber: ridToNumber[r.roomId] || 'Chưa hoàn tất đăng kí',
+            hasRoom: !!ridToNumber[r.roomId]
+          }));
+
+          const validResidents = finalResidents.filter(r => r.hasRoom);
+          setResidents(validResidents);
+          const roomNumbersMap: {[residentId: string]: string} = {};
+          validResidents.forEach((resident: any) => { roomNumbersMap[resident.id] = resident.roomNumber; });
+          setRoomNumbers(roomNumbersMap);
+        } else {
+          const activeAssignments = myAssignments.filter((assignment: any) => isAssignmentActive(assignment));
         const assignedResidents = await Promise.all(
           activeAssignments.map(async (assignment: any) => {
             let residentIdToFetch = assignment.resident_id;
-            
             if (assignment.resident_id && typeof assignment.resident_id === 'object' && assignment.resident_id._id) {
               residentIdToFetch = assignment.resident_id._id;
             }
-            
-            if (!residentIdToFetch) {
-              return null;
-            }
-
+              if (!residentIdToFetch) return null;
             try {
               const resident = await residentAPI.getById(residentIdToFetch);
-              
               let roomNumber = 'Chưa hoàn tất đăng kí';
               try {
                 const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
                 const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
                 const roomId = bedAssignment?.bed_id?.room_id || bedAssignment?.assigned_room_id;
                 const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-                
                 if (roomIdString) {
                   const room = await roomsAPI.getById(roomIdString);
                   roomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
                 }
-              } catch (roomError) {
-              }
-              
+                } catch {}
               return {
                 id: resident._id,
                 name: resident.full_name || '',
                 avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-                assignmentStatus: 'active',
-                assignmentId: assignment._id,
-                assignedStaff: assignment.staff_id,
-                roomNumber: roomNumber,
+                  roomNumber,
                 hasRoom: roomNumber !== 'Chưa hoàn tất đăng kí'
               };
-            } catch (residentError) {
+              } catch {
               if (assignment.resident_id && typeof assignment.resident_id === 'object') {
                 return {
                   id: assignment.resident_id._id || assignment.resident_id,
                   name: assignment.resident_id.full_name || '',
                   avatar: Array.isArray(assignment.resident_id.avatar) ? assignment.resident_id.avatar[0] : assignment.resident_id.avatar || null,
-                  assignmentStatus: 'active',
-                  assignmentId: assignment._id,
-                  assignedStaff: assignment.staff_id,
                   roomNumber: 'Chưa hoàn tất đăng kí',
                   hasRoom: false
                 };
               }
-              
               return null;
             }
           })
         );
-        
-        const validResidents = assignedResidents.filter((resident: any) => resident && resident.hasRoom);
-        
+          const validResidents = (assignedResidents || []).filter((resident: any) => resident && resident.hasRoom);
         setResidents(validResidents);
-        
         const roomNumbersMap: {[residentId: string]: string} = {};
-        validResidents.forEach((resident: any) => {
-          roomNumbersMap[resident.id] = resident.roomNumber;
-        });
+          validResidents.forEach((resident: any) => { roomNumbersMap[resident.id] = resident.roomNumber; });
         setRoomNumbers(roomNumbersMap);
+        }
         
       } catch (err) {
         setResidents([]);

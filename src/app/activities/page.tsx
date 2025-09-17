@@ -38,7 +38,11 @@ const mapActivityFromAPI = (apiActivity: any) => {
       console.warn('Invalid schedule_time for activity:', apiActivity._id);
       return null;
     }
-    const scheduleTime = new Date(apiActivity.schedule_time);
+
+    const scheduleTimeStr = apiActivity.schedule_time.endsWith('Z')
+      ? apiActivity.schedule_time
+      : `${apiActivity.schedule_time}Z`;
+    const scheduleTime = new Date(scheduleTimeStr);
 
     if (isNaN(scheduleTime.getTime())) {
       console.error('Invalid date after parsing for activity:', apiActivity._id, apiActivity.schedule_time);
@@ -53,6 +57,16 @@ const mapActivityFromAPI = (apiActivity: any) => {
       return null;
     }
 
+    const convertToVietnamTime = (utcTime: Date) => {
+      // Trừ 7 giờ để hiển thị đúng thời gian (database lưu UTC+7, cần trừ để hiển thị đúng)
+      const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
+      return correctTime.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    };
+
     return {
       id: apiActivity._id,
       name: apiActivity.activity_name,
@@ -60,8 +74,8 @@ const mapActivityFromAPI = (apiActivity: any) => {
       activity_type: apiActivity.activity_type,
       category: getCategoryLabel(apiActivity.activity_type), // dùng cho hiển thị màu sắc
       duration: apiActivity.duration,
-      startTime: scheduleTime.toTimeString().slice(0, 5),
-      endTime: endTime.toTimeString().slice(0, 5),
+      startTime: convertToVietnamTime(scheduleTime),
+      endTime: convertToVietnamTime(endTime),
       date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
       location: apiActivity.location,
       capacity: apiActivity.capacity,
@@ -1233,8 +1247,18 @@ export default function ActivitiesPage() {
                         </div>
                       </div>
                     </div>
-                    
-                  
+
+                    <div className="flex items-center gap-3 p-3 bg-amber-100 rounded-lg border border-amber-200">
+                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+                        <UserGroupIcon className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-[0.75rem] text-gray-500 font-medium mb-0.5">Số lượng người cao tuổi tham gia:</div>
+                        <div className="text-sm text-gray-900 font-semibold">
+                          {(activityParticipantCounts[activity.id] || 0)}/{activity.capacity}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Actions */}

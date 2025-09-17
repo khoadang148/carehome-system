@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { useResidents } from '@/lib/contexts/residents-context';
 import { clientStorage } from '@/lib/utils/clientStorage';
 import { ChatProvider, useChat } from '@/lib/contexts/chat-provider';
 import ChatButton from '@/components/ChatButton';
@@ -66,6 +67,10 @@ const formatDob = (dob: string) => {
 
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath || avatarPath.trim() === '' || avatarPath === 'null' || avatarPath === 'undefined') {
+    // Sử dụng đường dẫn tuyệt đối để tránh bị rewrite
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/default-avatar.svg`;
+    }
     return '/default-avatar.svg';
   }
 
@@ -73,6 +78,21 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
     return avatarPath;
   }
 
+  // Use deployed backend URL for static files
+  const staticBaseUrl = process.env.NEXT_PUBLIC_STATIC_BASE_URL || 'https://sep490-be-xniz.onrender.com';
+  
+  // Nếu avatarPath đã chứa đường dẫn đầy đủ, sử dụng trực tiếp
+  if (avatarPath.includes('/uploads/')) {
+    const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '');
+    // Nếu đã có http thì không thêm nữa
+    if (cleanPath.startsWith('http')) {
+      return cleanPath;
+    }
+    // Sử dụng static base URL
+    return `${staticBaseUrl}${cleanPath}`;
+  }
+
+  // Fallback: sử dụng userAPI.getAvatarUrl
   const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
   return userAPI.getAvatarUrl(cleanPath);
 };
@@ -80,6 +100,7 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
 function FamilyPortalPageContent() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { residents, hasResidents, loading: residentsLoading } = useResidents();
   const { chatState, openChat, closeChat } = useChat();
 
   interface Notification {
@@ -89,9 +110,7 @@ function FamilyPortalPageContent() {
     message: string;
     timestamp: string;
   }
-  const [residents, setResidents] = useState<any[]>([]);
   const [selectedResidentId, setSelectedResidentId] = useState<string>("");
-  const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState('');
   const [pageReady, setPageReady] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -133,12 +152,36 @@ function FamilyPortalPageContent() {
   const [tabLoading, setTabLoading] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
+    const checkLoginSuccess = () => {
     const msg = clientStorage.getItem('login_success');
     if (msg) {
       setSuccessMessage(msg);
       setShowSuccessModal(true);
       clientStorage.removeItem('login_success');
     }
+    };
+
+    // Kiểm tra ngay lập tức
+    checkLoginSuccess();
+
+    // Lắng nghe sự kiện storage change (khi đăng nhập từ tab khác)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'login_success' && e.newValue) {
+        setSuccessMessage(e.newValue);
+        setShowSuccessModal(true);
+        clientStorage.removeItem('login_success');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Kiểm tra định kỳ (fallback cho trường hợp storage event không hoạt động)
+    const interval = setInterval(checkLoginSuccess, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -175,34 +218,12 @@ function FamilyPortalPageContent() {
   }, []);
 
   useEffect(() => {
-    if (user?.id) {
-      setDataLoading(true);
+    if (residents.length > 0) {
+      setSelectedResidentId(residents[0]._id);
       setError('');
-
-      const timeoutId = setTimeout(() => {
-        setError('Không thể tải dữ liệu trong thời gian chờ. Vui lòng thử lại.');
-        setDataLoading(false);
-      }, 10000);
-
-      residentAPI.getByFamilyMemberId(user.id)
-        .then((data) => {
-          clearTimeout(timeoutId);
-          const arr = Array.isArray(data) ? data : [data];
-          setResidents(arr);
-          setSelectedResidentId(arr.length > 0 ? arr[0]._id : "");
-          setError('');
-        })
-        .catch((err) => {
-          clearTimeout(timeoutId);
-          setError('Không tìm thấy thông tin người thân hoặc lỗi kết nối API.');
-          setResidents([]);
-        })
-        .finally(() => {
-          setDataLoading(false);
-          setTimeout(() => setPageReady(true), 100);
-        });
     }
-  }, [user]);
+    setTimeout(() => setPageReady(true), 100);
+  }, [residents]);
 
   useEffect(() => {
     if (!selectedResidentId || !pageReady) return;
@@ -355,7 +376,14 @@ function FamilyPortalPageContent() {
         .then(data => {
           const convertToVietnamTime = (utcTime: string) => {
             if (!utcTime) return '';
-            return utcTime;
+            const date = new Date(utcTime);
+            // Trừ 7 giờ để hiển thị đúng thời gian (database lưu UTC+7, cần trừ để hiển thị đúng)
+            const correctTime = new Date(date.getTime() - (7 * 60 * 60 * 1000));
+            return correctTime.toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            });
           };
 
           setActivityTimes(prev => ({
@@ -419,6 +447,23 @@ function FamilyPortalPageContent() {
 
     const loadResidentData = async () => {
       try {
+        // Clear dữ liệu cũ khi chuyển resident
+        setAssignedStaff([]);
+        setVitalSigns(null);
+        setVitalSignsHistory([]);
+        setCareNotes([]);
+        setActivities([]);
+        setRoomNumber('Chưa hoàn tất đăng kí');
+        setAssignedStaffLoading(true);
+        setAssignedStaffError('');
+        
+        console.log('Loading data for resident:', selectedResidentId);
+        
+        // Lấy thông tin phòng của resident trước
+        const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResidentId);
+        const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find(a => a.bed_id?.room_id) : null;
+        const roomId = bedAssignment?.bed_id?.room_id?._id || bedAssignment?.bed_id?.room_id;
+
         const [
           vitalSignsPromise,
           vitalHistoryPromise,
@@ -430,19 +475,8 @@ function FamilyPortalPageContent() {
           vitalSignsAPI.getByResidentId(selectedResidentId),
           vitalSignsAPI.getByResidentId(selectedResidentId),
           careNotesAPI.getAll({ resident_id: selectedResidentId }),
-          bedAssignmentsAPI.getByResidentId(selectedResidentId).then(assignments => {
-            const assignment = Array.isArray(assignments) ? assignments.find(a => a.bed_id?.room_id) : null;
-            if (assignment?.bed_id?.room_id) {
-              if (typeof assignment.bed_id.room_id === 'object' && assignment.bed_id.room_id.room_number) {
-                return { room_number: assignment.bed_id.room_id.room_number };
-              }
-              const roomId = assignment.bed_id.room_id._id || assignment.bed_id.room_id;
-              if (roomId) {
-                return roomsAPI.getById(roomId);
-              }
-            }
-            return null;
-          }),
+          roomId ? roomsAPI.getById(roomId) : Promise.resolve(null),
+          // Sử dụng endpoint by-resident để lấy staff chăm sóc resident
           staffAssignmentsAPI.getByResident(selectedResidentId),
           activityParticipationsAPI.getByResidentId(selectedResidentId)
         ]);
@@ -470,36 +504,46 @@ function FamilyPortalPageContent() {
         }
 
         if (assignedStaffPromise.status === 'fulfilled') {
-          const assignments = Array.isArray(assignedStaffPromise.value) ? assignedStaffPromise.value : [];
-          const activeAssignments = assignments.filter((assignment: any) =>
-            assignment.status === 'active' || !assignment.status
-          );
+          const staffData = assignedStaffPromise.value;
+          console.log('Staff data for resident', selectedResidentId, ':', staffData);
+          
+          // Endpoint by-resident trả về array của objects có cấu trúc { staff: {...}, assignment: {...} }
+          if (Array.isArray(staffData) && staffData.length > 0) {
+            // Xử lý dữ liệu từ API response
+            const processedStaff = staffData.map((item: any) => {
+              const staff = item.staff || item; // Fallback nếu không có nested structure
+              const assignment = item.assignment || {};
+              
+              return {
+                staff_id: {
+                  _id: staff.id || staff._id,
+                  id: staff.id || staff._id,
+                  full_name: staff.full_name,
+                  fullName: staff.full_name,
+                  email: staff.email,
+                  phone: staff.phone,
+                  position: staff.position || 'Nhân viên chăm sóc',
+                  avatar: staff.avatar,
+                  role: staff.role
+                },
+                ...assignment
+              };
+            });
 
-          const staffWithDetails = await Promise.allSettled(
-            activeAssignments.map(async (assignment: any) => {
-              try {
-                if (assignment.staff_id?._id) {
-                  const staffDetails = await userAPI.getById(assignment.staff_id._id);
-                  return {
-                    ...assignment,
-                    staff_id: {
-                      ...assignment.staff_id,
-                      ...staffDetails
-                    }
-                  };
-                }
-                return assignment;
-              } catch (error) {
-
-                return assignment;
-              }
-            })
-          );
-
-          setAssignedStaff(staffWithDetails.map(result =>
-            result.status === 'fulfilled' ? result.value : null
-          ).filter(Boolean));
+            console.log('Processed staff for resident', selectedResidentId, ':', processedStaff);
+            setAssignedStaff(processedStaff);
+          } else {
+            console.log('No staff data for resident', selectedResidentId);
+            setAssignedStaff([]);
+          }
+        } else {
+          console.log('Failed to fetch staff for resident', selectedResidentId, ':', assignedStaffPromise.reason);
+          setAssignedStaff([]);
+          // Không set error nếu chỉ là không có staff assignments
+          // setAssignedStaffError('Không thể tải thông tin nhân viên chăm sóc');
         }
+        
+        setAssignedStaffLoading(false);
 
         if (activitiesPromise.status === 'fulfilled') {
           const arr = Array.isArray(activitiesPromise.value) ? activitiesPromise.value : [];
@@ -573,7 +617,10 @@ function FamilyPortalPageContent() {
         }
 
       } catch (error) {
-
+        console.error('Error loading resident data:', error);
+        // Chỉ báo lỗi khi thực sự có lỗi kết nối, không phải khi không có data
+        // setAssignedStaffError('Không thể tải thông tin nhân viên chăm sóc');
+        setAssignedStaffLoading(false);
       }
     };
 
@@ -720,7 +767,7 @@ function FamilyPortalPageContent() {
     );
   }
 
-  if (dataLoading) {
+  if (residentsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
         <div className="text-center">
@@ -729,8 +776,160 @@ function FamilyPortalPageContent() {
       </div>
     );
   }
-
+  
   if (error) return <div style={{ color: 'red' }}>{error}</div>;
+  
+  // Nếu chưa có người thân nào được đăng ký hoặc tất cả đều ở trạng thái pending
+  const hasActiveResidents = residents.some(r => r.status && r.status !== 'pending');
+  if (residents.length === 0 || !hasActiveResidents) {
+    return (
+      <>
+        <SuccessModal open={showSuccessModal} onClose={() => setShowSuccessModal(false)} name={successMessage} />
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
+          <div className="absolute inset-0 bg-gradient-radial from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-radial from-purple-500/5 via-transparent to-transparent pointer-events-none" style={{ backgroundPosition: '80% 20%' }} />
+          <div className="absolute inset-0 bg-gradient-radial from-blue-500/3 via-transparent to-transparent pointer-events-none" style={{ backgroundPosition: '40% 40%' }} />
+
+          <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
+            <div className="w-full max-w-6xl mx-auto">
+              <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 mb-8 shadow-xl border border-white/20 backdrop-blur-xl w-full">
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <UsersIcon className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-purple-600 bg-clip-text text-transparent tracking-tight">
+                        Thông tin người thân
+                      </h1>
+                      <p className="text-base text-slate-500 mt-1 font-medium">
+                        Theo dõi và kết nối với người thân của bạn
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Giao diện khi chưa có người thân */}
+              <div className="relative overflow-hidden">
+                {/* Background decorative elements */}
+                <div className="absolute -top-20 -right-20 w-40 h-40 bg-gradient-to-br from-purple-200/30 to-purple-300/20 rounded-full blur-3xl"></div>
+                <div className="absolute -bottom-20 -left-20 w-32 h-32 bg-gradient-to-br from-emerald-200/30 to-emerald-300/20 rounded-full blur-3xl"></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-blue-100/20 to-purple-100/20 rounded-full blur-3xl"></div>
+                
+                <div className="relative bg-gradient-to-br from-white via-slate-50/50 to-white rounded-3xl p-16 shadow-2xl border border-white/30 backdrop-blur-xl text-center">
+                  <div className="max-w-3xl mx-auto">
+                    {/* Main icon with enhanced styling */}
+                    <div className="relative mb-12">
+                      <div className="w-32 h-32 bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6 transform hover:scale-105 transition-all duration-300">
+                        <UsersIcon className="w-16 h-16 text-white drop-shadow-lg" />
+                      </div>
+                      {/* Floating decorative elements */}
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full animate-pulse"></div>
+                      <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full animate-pulse delay-1000"></div>
+                    </div>
+                    
+                    {/* Enhanced heading */}
+                    <div className="mb-8">
+                      <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 bg-clip-text text-transparent mb-4 leading-tight">
+                        {residents.length === 0 
+                          ? 'Chưa có người cao tuổi nào được đăng ký'
+                          : 'Đang chờ phê duyệt đăng ký'
+                        }
+                      </h2>
+                      <div className="w-24 h-1 bg-gradient-to-r from-purple-500 to-emerald-500 rounded-full mx-auto mb-6"></div>
+                      <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                        {residents.length === 0 
+                          ? 'Để theo dõi thông tin sức khỏe và hoạt động của người thân, bạn cần đăng ký thông tin người thân trước.'
+                          : 'Đơn đăng ký của bạn đang được xem xét. Chúng tôi sẽ thông báo kết quả trong thời gian sớm nhất.'
+                        }
+                      </p>
+                    </div>
+                    
+                    {/* Enhanced features section */}
+                    <div className="bg-gradient-to-br from-emerald-50 via-emerald-50/80 to-emerald-100/50 rounded-3xl p-8 border border-emerald-200/50 mb-10 shadow-lg backdrop-blur-sm">
+                      <div className="flex items-center justify-center gap-4 mb-6">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                          <CheckCircleIcon className="w-7 h-7 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-emerald-800">
+                          Sau khi đăng ký, bạn sẽ có thể:
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-emerald-700">
+                        <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-emerald-200/50 hover:bg-white/80 transition-all duration-200">
+                          <div className="w-3 h-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full shadow-sm"></div>
+                          <span className="font-semibold">Theo dõi chỉ số sức khỏe hàng ngày</span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-emerald-200/50 hover:bg-white/80 transition-all duration-200">
+                          <div className="w-3 h-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full shadow-sm"></div>
+                          <span className="font-semibold">Xem lịch hoạt động và tham gia</span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-emerald-200/50 hover:bg-white/80 transition-all duration-200">
+                          <div className="w-3 h-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full shadow-sm"></div>
+                          <span className="font-semibold">Đọc ghi chú chăm sóc từ nhân viên</span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-emerald-200/50 hover:bg-white/80 transition-all duration-200">
+                          <div className="w-3 h-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full shadow-sm"></div>
+                          <span className="font-semibold">Liên hệ trực tiếp với nhân viên phụ trách</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Enhanced CTA button */}
+                    <div className="mb-8">
+                      {residents.length === 0 ? (
+                        <button 
+                          onClick={() => router.push('/family/residents/new')}
+                          className="group relative inline-flex items-center gap-4 px-12 py-5 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 text-white font-bold text-xl rounded-3xl shadow-2xl hover:shadow-purple-500/25 transform hover:scale-105 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                        >
+                          {/* Button background animation */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                          
+                          {/* Button content */}
+                          <div className="relative flex items-center gap-4">
+                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                              <UsersIcon className="w-5 h-5" />
+                            </div>
+                            <span>Đăng ký</span>
+                            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center group-hover:translate-x-1 transition-transform duration-300">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="flex items-center justify-center gap-4 px-12 py-5 bg-gradient-to-r from-yellow-100 to-yellow-200 border-2 border-yellow-300 rounded-3xl shadow-lg">
+                          <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center">
+                            <ClockIcon className="w-5 h-5 text-white" />
+                          </div>
+                          <span className="text-yellow-800 font-bold text-xl">Đang chờ phê duyệt</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Enhanced footer text */}
+                    <div className="flex items-center justify-center gap-2 text-slate-500">
+                      <div className="w-2 h-2 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full"></div>
+                      <p className="text-base font-medium">
+                        {residents.length === 0 
+                          ? 'Quá trình đăng ký sẽ được hướng dẫn chi tiết và hoàn toàn miễn phí'
+                          : 'Vui lòng chờ đợi trong khi chúng tôi xem xét đơn đăng ký của bạn'
+                        }
+                      </p>
+                      <div className="w-2 h-2 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+  
   if (!selectedResident) return <div>Không có dữ liệu người thân.</div>;
 
   const formatOptionLabel = (option: any) => (
@@ -836,7 +1035,7 @@ function FamilyPortalPageContent() {
                       relationship: found.relationship || found.emergency_contact?.relationship || found.emergencyContact?.relationship || 'Chưa rõ'
                     } : null;
                   })()}
-                  onChange={opt => setSelectedResidentId(opt?.value)}
+                  onChange={opt => setSelectedResidentId(opt?.value || "")}
                   formatOptionLabel={formatOptionLabel}
                   isSearchable
                   styles={{
@@ -922,7 +1121,7 @@ function FamilyPortalPageContent() {
                 <img
                   src={getAvatarUrl(selectedResident?.avatar)}
                   alt="avatar"
-                  className="w-30 h-30 rounded-full border-4 border-indigo-500 shadow-lg object-cover mb-3"
+                  className="w-24 h-24 rounded-full border-4 border-indigo-500 shadow-lg object-cover mb-3"
                   onError={(e) => {
                     e.currentTarget.src = '/default-avatar.svg';
                   }}
@@ -933,11 +1132,50 @@ function FamilyPortalPageContent() {
                 <h1 className="font-extrabold text-3xl text-slate-800 m-0 leading-tight text-center">
                   {selectedResident?.full_name}
                 </h1>
-                <div className={`text-sm font-semibold mt-2 text-white rounded-full px-4 py-1.5 shadow-lg uppercase tracking-wider text-center ${selectedResident?.status === 'active'
-                  ? 'bg-gradient-to-r from-emerald-500 to-emerald-600'
-                  : 'bg-gradient-to-r from-slate-500 to-slate-600'
-                  }`}>
-                  {selectedResident?.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}
+                <div className={`text-sm font-semibold mt-2 text-white rounded-full px-4 py-1.5 shadow-lg uppercase tracking-wider text-center ${(() => {
+                  switch (selectedResident?.status) {
+                    case 'active':
+                      return 'bg-gradient-to-r from-emerald-500 to-emerald-600';
+                    case 'admitted':
+                      return 'bg-gradient-to-r from-sky-500 to-sky-600';
+                    case 'discharged':
+                      return 'bg-gradient-to-r from-blue-500 to-blue-600';
+                    case 'deceased':
+                      return 'bg-gradient-to-r from-gray-500 to-gray-600';
+                    case 'accepted':
+                      return 'bg-gradient-to-r from-green-500 to-green-600';
+                    case 'rejected':
+                      return 'bg-gradient-to-r from-red-500 to-red-600';
+                    case 'cancelled':
+                      return 'bg-gradient-to-r from-rose-500 to-rose-600';
+                    case 'pending':
+                      return 'bg-gradient-to-r from-yellow-500 to-yellow-600';
+                    default:
+                      return 'bg-gradient-to-r from-slate-500 to-slate-600';
+                  }
+                })()}`}>
+                  {(() => {
+                    switch (selectedResident?.status) {
+                      case 'active':
+                        return 'Hoàn tất đăng ký';
+                      case 'admitted':
+                        return 'Đang nằm viện';
+                      case 'discharged':
+                        return 'Đã xuất viện';
+                      case 'deceased':
+                        return 'Đã qua đời';
+                      case 'accepted':
+                        return 'Đã duyệt';
+                      case 'rejected':
+                        return 'Bị từ chối';
+                      case 'cancelled':
+                        return 'Đã hủy';
+                      case 'pending':
+                        return 'Chờ xử lý';
+                      default:
+                        return 'Chưa xác định';
+                    }
+                  })()}
                 </div>
                 <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-2">
                   <CalendarDaysIcon className="w-4 h-4" />
@@ -971,10 +1209,13 @@ function FamilyPortalPageContent() {
                       <div className="flex flex-col p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl border border-slate-300">
                         <span className="text-slate-600 font-semibold text-sm mb-1.5 uppercase tracking-wider">Ngày sinh</span>
                         <span className="text-slate-800 font-extrabold text-lg">
-                          {selectedResident?.date_of_birth || selectedResident?.dateOfBirth ?
-                            `${formatDob(selectedResident.date_of_birth || selectedResident.dateOfBirth)}${getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) ? ' (' + getAge(selectedResident.date_of_birth || selectedResident.dateOfBirth) + ' tuổi)' : ''}` :
-                            'Chưa hoàn tất đăng kí'
-                          }
+                          {(() => {
+                            const dob = selectedResident?.date_of_birth || selectedResident?.dateOfBirth;
+                            if (!dob) return 'Chưa hoàn tất đăng kí';
+                            const formattedDob = formatDob(dob);
+                            const age = getAge(dob);
+                            return age ? `${formattedDob} (${age} tuổi)` : formattedDob;
+                          })()}
                         </span>
                       </div>
                       <div className="flex flex-col p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl border border-slate-300">
@@ -998,15 +1239,15 @@ function FamilyPortalPageContent() {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="flex flex-col items-center p-3 bg-red-50 rounded-xl border border-red-200">
                         <span className="text-red-600 font-semibold text-xs mb-1">Tên người liên hệ</span>
-                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.name}</span>
+                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.name || 'Chưa rõ'}</span>
                       </div>
                       <div className="flex flex-col items-center p-3 bg-red-50 rounded-xl border border-red-200">
                         <span className="text-red-600 font-semibold text-xs mb-1">Quan hệ</span>
-                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.relationship}</span>
+                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.relationship || 'Chưa rõ'}</span>
                       </div>
                       <div className="flex flex-col items-center p-3 bg-red-50 rounded-xl border border-red-200">
                         <span className="text-red-600 font-semibold text-xs mb-1">Số điện thoại</span>
-                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.phone}</span>
+                        <span className="text-slate-800 font-bold text-sm text-center">{selectedResident.emergency_contact.phone || 'Chưa rõ'}</span>
                       </div>
                     </div>
                   ) : (
@@ -1023,7 +1264,7 @@ function FamilyPortalPageContent() {
                     </span>
                   </div>
                   <div className="text-sm text-slate-500 mb-5 text-center p-2 bg-slate-50 rounded-lg">
-                    Lần cập nhật gần nhất: {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYYWithTimezone(vitalSigns.date_time) : 'Không có dữ liệu'}
+                    Lần cập nhật gần nhất: {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYYWithTimezone(vitalSigns.date_time) : 'chưa hoàn tất đăng kí'}
                   </div>
                   <div className="grid grid-cols-6 gap-4 text-sm mb-5">
                     <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200 text-center">
@@ -1238,12 +1479,8 @@ function FamilyPortalPageContent() {
 
                           const formatTimeForDisplay = (isoTime: string) => {
                             if (!isoTime) return '';
-                            const date = new Date(isoTime);
-                            return date.toLocaleTimeString('vi-VN', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: false
-                            });
+                            // isoTime đã được xử lý đúng trong convertToVietnamTime, chỉ cần format
+                            return isoTime;
                           };
 
                           const time = activityTimes[activityId]?.start ? formatTimeForDisplay(activityTimes[activityId].start) : '';
@@ -1481,22 +1718,22 @@ function FamilyPortalPageContent() {
                                     {vital.date_time ? formatTimeWithTimezone(vital.date_time) : ''}
                                   </td>
                                   <td className="p-4 font-bold text-red-500 text-base">
-                                    {vital.blood_pressure ?? <span className="text-gray-400">--</span>}
+                                    {vital.blood_pressure ? `${vital.blood_pressure} mmHg` : <span className="text-gray-400">--</span>}
                                   </td>
                                   <td className="p-4 font-bold text-emerald-600 text-base">
-                                    {vital.heart_rate ?? <span className="text-gray-400">--</span>}
+                                    {vital.heart_rate ? `${vital.heart_rate} bpm` : <span className="text-gray-400">--</span>}
                                   </td>
                                   <td className="p-4 font-bold text-amber-600 text-base">
-                                    {vital.temperature ?? <span className="text-gray-400">--</span>}
+                                    {vital.temperature ? `${vital.temperature}°C` : <span className="text-gray-400">--</span>}
                                   </td>
                                   <td className="p-4 font-bold text-blue-600 text-base">
-                                    {vital.oxygen_level ?? vital.oxygen_saturation ?? <span className="text-gray-400">--</span>}
+                                    {(vital.oxygen_level ?? vital.oxygen_saturation) ? `${vital.oxygen_level ?? vital.oxygen_saturation}%` : <span className="text-gray-400">--</span>}
                                   </td>
                                   <td className="p-4 font-bold text-purple-600 text-base">
-                                    {vital.respiratory_rate ?? <span className="text-gray-400">--</span>}
+                                    {vital.respiratory_rate ? `${vital.respiratory_rate} lần/phút` : <span className="text-gray-400">--</span>}
                                   </td>
                                   <td className="p-4 font-bold text-indigo-600 text-base">
-                                    {vital.weight ?? <span className="text-gray-400">--</span>}
+                                    {vital.weight ? `${vital.weight} kg` : <span className="text-gray-400">--</span>}
                                   </td>
                                   <td className="p-4 text-gray-500 italic text-sm">
                                     {vital.notes ?? <span className="text-gray-400">--</span>}

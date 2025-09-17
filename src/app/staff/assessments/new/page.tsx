@@ -12,7 +12,7 @@ import {
   UserIcon,
   LightBulbIcon
 } from '@heroicons/react/24/outline';
-import { careNotesAPI } from '@/lib/api';
+import { careNotesAPI, staffAssignmentsAPI, roomsAPI, bedAssignmentsAPI, residentAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { userAPI } from '@/lib/api';
 
@@ -46,6 +46,7 @@ export default function NewCareNotePage() {
 
   const { user } = useAuth();
   const [staffName, setStaffName] = useState<string>('');
+  const [residentOptions, setResidentOptions] = useState<{ id: string; name: string; room?: string }[]>([]);
 
   useEffect(() => {
     if (user && (user as any).full_name) {
@@ -57,6 +58,79 @@ export default function NewCareNotePage() {
         .catch(() => setStaffName('---'));
     }
   }, [user]);
+
+  // Load resident options based on room-based assignments when residentId is not prefilled
+  useEffect(() => {
+    const loadResidents = async () => {
+      try {
+        const myAssignmentsData = await staffAssignmentsAPI.getMyAssignments();
+        const assignments = Array.isArray(myAssignmentsData) ? myAssignmentsData : [];
+
+        const isAssignmentActive = (a: any) => {
+          if (!a) return false;
+          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+          if (!a.end_date) return true;
+          const end = new Date(a.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return end >= today;
+        };
+
+        const isRoomBased = assignments.some((a: any) => a && (a.room_id || a.residents));
+        const rows: any[] = [];
+
+        if (isRoomBased) {
+          const active = assignments.filter((a: any) => isAssignmentActive(a));
+          for (const a of active) {
+            const room = a.room_id;
+            const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+            let residents: any[] = Array.isArray(a.residents) ? a.residents : [];
+            if ((!residents || residents.length === 0) && roomId) {
+              try {
+                const beds = await bedAssignmentsAPI.getAll();
+                if (Array.isArray(beds)) {
+                  residents = beds
+                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .map((ba: any) => ba.resident_id)
+                    .filter(Boolean);
+                }
+              } catch {}
+            }
+            for (const r of residents) {
+              rows.push({ id: r?._id, name: r?.full_name || '', roomId });
+            }
+          }
+
+          const enriched = await Promise.all(rows.map(async (r) => {
+            try {
+              const detail = await residentAPI.getById(r.id);
+              return { ...r, name: detail?.full_name || r.name };
+            } catch { return r; }
+          }));
+
+          const uniqueRoomIds = Array.from(new Set(enriched.map(r => r.roomId).filter(Boolean)));
+          const ridToNumber: Record<string, string> = {};
+          const fetchedRooms = await Promise.all(uniqueRoomIds.map(async (rid) => {
+            try { return [rid, await roomsAPI.getById(rid as any)] as const; } catch { return [rid, null] as const; }
+          }));
+          fetchedRooms.forEach(([rid, room]) => { if (room?.room_number) ridToNumber[rid as any] = room.room_number; });
+
+          setResidentOptions(enriched.map(r => ({ id: r.id, name: r.name, room: ridToNumber[r.roomId] })));
+        } else {
+          const active = assignments.filter((a: any) => isAssignmentActive(a));
+          const base = active.map((a: any) => a.resident_id).filter(Boolean);
+          const opts = base.map((r: any) => ({ id: r?._id || r?.id, name: r?.full_name || '' }));
+          setResidentOptions(opts);
+        }
+      } catch {
+        setResidentOptions([]);
+      }
+    };
+
+    if (!searchParams?.get('residentId')) {
+      loadResidents();
+    }
+  }, [searchParams]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CareNoteData>({
     defaultValues: {
@@ -136,12 +210,29 @@ export default function NewCareNotePage() {
                   <UserIcon className="w-5 h-5 text-blue-500" />
                   Tên người cao tuổi *
                 </label>
-                <input
-                  {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
-                  className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none bg-gray-100/80 cursor-not-allowed transition-all duration-300 shadow-sm"
-                  placeholder="Nhập tên người cao tuổi"
-                  readOnly
-                />
+                {searchParams?.get('residentId') ? (
+                  <input
+                    {...register('residentName', { required: 'Vui lòng nhập tên người cao tuổi' })}
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none bg-gray-100/80 cursor-not-allowed transition-all duration-300 shadow-sm"
+                    placeholder="Nhập tên người cao tuổi"
+                    readOnly
+                  />
+                ) : (
+                  <select
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm outline-none bg-white transition-all duration-300 shadow-sm"
+                    value={watchedValues.residentId}
+                    onChange={(e) => {
+                      const opt = residentOptions.find(o => o.id === e.target.value);
+                      setValue('residentId', e.target.value);
+                      setValue('residentName', opt?.name || '');
+                    }}
+                  >
+                    <option value="">Chọn người cao tuổi</option>
+                    {residentOptions.map(o => (
+                      <option key={o.id} value={o.id}>{o.name}{o.room ? ` - Phòng ${o.room}` : ''}</option>
+                    ))}
+                  </select>
+                )}
                 {errors.residentName && (
                   <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
                     <span className="w-1 h-1 bg-red-500 rounded-full"></span>

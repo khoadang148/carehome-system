@@ -38,6 +38,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
   const [carePlans, setCarePlans] = useState<any[]>([]);
+  const [carePlanMap, setCarePlanMap] = useState<{ [id: string]: any }>({});
   const [vitalSigns, setVitalSigns] = useState<any>(null);
   const [vitalLoading, setVitalLoading] = useState(true);
   const [careNotes, setCareNotes] = useState<any[]>([]);
@@ -48,13 +49,21 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [bedLoading, setBedLoading] = useState(false);
 
   const now = new Date();
-  // Chỉ hiển thị assignments đang hoạt động
+  // Hiển thị tất cả assignments (không cần kiểm tra trạng thái active)
   const activeAssignments = carePlanAssignments.filter((assignment: any) => {
     const notExpired = !assignment?.end_date || new Date(assignment.end_date) >= now;
     const notCancelled = !['cancelled', 'completed'].includes(String(assignment?.status || '').toLowerCase());
-    const isActive = assignment?.status === 'active' || !assignment?.status;
-    return notExpired && notCancelled && isActive;
+    console.log('Filtering assignment:', assignment, {
+      notExpired,
+      notCancelled,
+      status: assignment?.status,
+      end_date: assignment?.end_date
+    });
+    return notExpired && notCancelled;
   });
+  
+  console.log('All care plan assignments:', carePlanAssignments);
+  console.log('Active assignments:', activeAssignments);
 
   // Loại bỏ các biến không cần thiết
   // const allAssignments = carePlanAssignments.filter((assignment: any) => {
@@ -94,8 +103,9 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         setRoomLoading(true);
         try {
           const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+          console.log('Bed assignments for room:', bedAssignments);
           const bedAssignment = Array.isArray(bedAssignments) ?
-            bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+            bedAssignments.find((a: any) => a.bed_id?.room_id && !a.unassigned_date) : null;
 
           if (bedAssignment?.bed_id?.room_id) {
             if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
@@ -110,8 +120,8 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
               }
             }
           } else {
-            const assignments = await carePlansAPI.getByResidentId(residentId);
-            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const carePlanAssignments = await carePlansAPI.getByResidentId(residentId);
+            const assignment = Array.isArray(carePlanAssignments) ? carePlanAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
             const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
             const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
             if (roomIdString) {
@@ -125,13 +135,20 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
           setRoomNumber('Chưa hoàn tất đăng kí');
         }
         setRoomLoading(false);
-        const assignments = await carePlansAPI.getByResidentId(residentId);
-        setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
+        try {
+          const assignments = await carePlansAPI.getByResidentId(residentId);
+          console.log('Care plan assignments:', assignments);
+          setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
+        } catch (error) {
+          console.log('No care plan assignments found for resident:', residentId);
+          setCarePlanAssignments([]);
+        }
         setBedLoading(true);
         try {
           const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
+          console.log('Bed assignments for bed:', bedAssignments);
           const bedAssignment = Array.isArray(bedAssignments) ?
-            bedAssignments.find((a: any) => a.bed_id) : null;
+            bedAssignments.find((a: any) => a.bed_id && !a.unassigned_date) : null;
 
           if (bedAssignment?.bed_id) {
             if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
@@ -147,10 +164,10 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
             }
           } else {
             let currentAssignment: any = null;
-            if (Array.isArray(assignments)) {
-              currentAssignment = assignments.find(a =>
+            if (Array.isArray(carePlanAssignments)) {
+              currentAssignment = carePlanAssignments.find(a =>
                 (a.resident_id?._id || a.resident_id) === residentId
-              ) || assignments[0];
+              ) || carePlanAssignments[0];
             }
             const assignedBedId = currentAssignment?.assigned_bed_id as any;
             const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
@@ -188,6 +205,38 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
     };
     fetchResident();
   }, [residentId, router, refreshKey]);
+
+  // Load care plan details by ID for display of name and price
+  useEffect(() => {
+    const loadCarePlanDetails = async () => {
+      try {
+        const ids = new Set<string>();
+        (carePlanAssignments || []).forEach((assignment: any) => {
+          const cps = Array.isArray(assignment?.care_plan_ids) ? assignment.care_plan_ids : [];
+          cps.forEach((cp: any) => {
+            const id = (cp && typeof cp === 'object') ? (cp._id || cp.id) : cp;
+            if (typeof id === 'string' && id.length >= 12) ids.add(id);
+          });
+        });
+
+        const toFetch = Array.from(ids).filter(id => !(id in carePlanMap));
+        if (toFetch.length === 0) return;
+
+        const results = await Promise.allSettled(toFetch.map(id => carePlansAPI.getById(id)));
+        const nextMap: { [id: string]: any } = { ...carePlanMap };
+        results.forEach((res, idx) => {
+          const id = toFetch[idx];
+          if (res.status === 'fulfilled' && res.value) {
+            nextMap[id] = res.value;
+          }
+        });
+        setCarePlanMap(nextMap);
+      } catch {
+        // ignore
+      }
+    };
+    loadCarePlanDetails();
+  }, [carePlanAssignments]);
 
   const handleEditClick = () => {
     router.push(`/admin/residents/${residentId}/edit`);
@@ -618,6 +667,14 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                       {resident.admission_date ? formatDateDDMMYYYY(resident.admission_date) : 'Chưa hoàn tất đăng kí'}
                     </p>
                   </div>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.25rem 0' }}>
+                      Số CCCD
+                    </p>
+                    <p style={{ fontSize: '0.875rem', color: '#1e293b', margin: 0, fontWeight: 500 }}>
+                      {resident.cccd_id || 'Chưa hoàn tất đăng kí'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -658,29 +715,35 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     {/* Active Assignments */}
                     {activeAssignments.map((assignment: any, assignmentIdx: number) => (
                       assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
-                        assignment.care_plan_ids.map((plan: any, planIdx: number) => (
-                          <div
-                            key={`active-${assignment._id}-${plan._id || planIdx}`}
-                            style={{
-                              background: 'rgba(255,255,255,0.8)',
-                              borderRadius: '0.5rem',
-                              padding: '1rem',
-                              border: '1px solid #d1fae5',
-                              marginBottom: '0.5rem'
-                            }}
-                          >
-                            <div style={{
-                              fontWeight: 600,
-                              fontSize: '1rem',
-                              color: '#059669'
-                            }}>
-                              <span>{plan.plan_name || 'Gói dịch vụ'}</span>
+                        assignment.care_plan_ids.map((planRef: any, planIdx: number) => {
+                          const planId = (planRef && typeof planRef === 'object') ? (planRef._id || planRef.id) : planRef;
+                          const plan = planId && carePlanMap[planId] ? carePlanMap[planId] : (planRef || {});
+                          const name = plan?.plan_name || plan?.name || 'Gói dịch vụ';
+                          const price = plan?.monthly_price;
+                          return (
+                            <div
+                              key={`active-${assignment._id}-${planId || planIdx}`}
+                              style={{
+                                background: 'rgba(255,255,255,0.8)',
+                                borderRadius: '0.5rem',
+                                padding: '1rem',
+                                border: '1px solid #d1fae5',
+                                marginBottom: '0.5rem'
+                              }}
+                            >
+                              <div style={{
+                                fontWeight: 600,
+                                fontSize: '1rem',
+                                color: '#059669'
+                              }}>
+                                <span>{name}</span>
+                              </div>
+                              <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
+                                Giá: {price !== undefined ? formatDisplayCurrency(price) : '---'}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '0.95rem', color: '#374151', marginBottom: '0.5rem' }}>
-                              Giá: {plan.monthly_price !== undefined ? formatDisplayCurrency(plan.monthly_price) : '---'}
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div key={`empty-active-${assignmentIdx}`} style={{
                           background: 'rgba(255,255,255,0.8)',
@@ -748,6 +811,173 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     </Link>
                   </div>
                 )}
+              </div>
+
+              {/* CCCD Images Section */}
+              <div style={{
+                background: 'rgba(168, 85, 247, 0.05)',
+                borderRadius: '1rem',
+                padding: '1.5rem',
+                border: '1px solid rgba(168, 85, 247, 0.2)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{
+                    width: '2rem',
+                    height: '2rem',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg style={{ width: '1rem', height: '1rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                    </svg>
+                  </div>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    margin: 0,
+                    color: '#1e293b'
+                  }}>
+                    Giấy tờ tùy thân (CCCD)
+                  </h3>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                  gap: '1.5rem'
+                }}>
+                  {/* CCCD Front */}
+                  <div>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.75rem 0' }}>
+                      CCCD mặt trước
+                    </p>
+                    {resident.cccd_front ? (
+                      <div style={{
+                        position: 'relative',
+                        borderRadius: '0.75rem',
+                        overflow: 'hidden',
+                        border: '2px solid #e5e7eb',
+                        background: '#f9fafb'
+                      }}>
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/${resident.cccd_front}`}
+                          alt="CCCD mặt trước"
+                          style={{
+                            width: '100%',
+                            height: '200px',
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const nextElement = target.nextElementSibling as HTMLElement;
+                            if (nextElement) {
+                              nextElement.style.display = 'flex';
+                            }
+                          }}
+                        />
+                        <div style={{
+                          display: 'none',
+                          width: '100%',
+                          height: '200px',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: '#f3f4f6',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          Không thể tải hình ảnh
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '200px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#f3f4f6',
+                        borderRadius: '0.75rem',
+                        border: '2px dashed #d1d5db',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        Chưa có hình ảnh
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CCCD Back */}
+                  <div>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b', margin: '0 0 0.75rem 0' }}>
+                      CCCD mặt sau
+                    </p>
+                    {resident.cccd_back ? (
+                      <div style={{
+                        position: 'relative',
+                        borderRadius: '0.75rem',
+                        overflow: 'hidden',
+                        border: '2px solid #e5e7eb',
+                        background: '#f9fafb'
+                      }}>
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/${resident.cccd_back}`}
+                          alt="CCCD mặt sau"
+                          style={{
+                            width: '100%',
+                            height: '200px',
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const nextElement = target.nextElementSibling as HTMLElement;
+                            if (nextElement) {
+                              nextElement.style.display = 'flex';
+                            }
+                          }}
+                        />
+                        <div style={{
+                          display: 'none',
+                          width: '100%',
+                          height: '200px',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: '#f3f4f6',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          Không thể tải hình ảnh
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '200px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#f3f4f6',
+                        borderRadius: '0.75rem',
+                        border: '2px dashed #d1d5db',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        Chưa có hình ảnh
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

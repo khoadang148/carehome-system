@@ -3,28 +3,87 @@ import { clientStorage } from './utils/clientStorage';
 import { isTokenValid } from './utils/tokenUtils';
 import { buildCacheKey, getCached, setCached } from './utils/apiCache';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sep490-be-xniz.onrender.com';
+// Retry mechanism helper
+export const retryRequest = async (requestFn: () => Promise<any>, maxRetries: number = 3, delay: number = 1000): Promise<any> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await requestFn();
+    } catch (error: any) {
+      const isLastAttempt = i === maxRetries - 1;
+
+      const status: number | undefined = error?.response?.status;
+      const networkish = error?.code === 'ECONNABORTED' ||
+        (typeof error?.message === 'string' && (
+          error.message.includes('timeout') ||
+          error.message.includes('Network Error')
+        )) ||
+        !error?.response;
+
+      // Retry on transient HTTP errors
+      const transientHttp = typeof status === 'number' && (status >= 500 || status === 429);
+
+      const isRetryableError = networkish || transientHttp;
+
+      if (isLastAttempt || !isRetryableError) {
+        throw error;
+      }
+
+      const retryDelay = delay * Math.pow(2, i);
+      // Light log to aid debugging without spamming
+      console.warn(`Retrying request due to ${status || error?.code || 'network error'} in ${retryDelay}ms (attempt ${i + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+};
+
+// Timeout wrapper for API calls
+const withTimeout = async <T>(
+  promise: Promise<T>, 
+  timeoutMs: number = 30000,
+  context: string = 'API call'
+): Promise<T> => {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`${context} timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]);
+};
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (
+  process.env.NODE_ENV === 'production' ? 'https://sep490-be-xniz.onrender.com' : '/api'
+);
+
+// Base URL for static files (uploads) - always use the deployed backend URL
+const STATIC_BASE_URL = process.env.NEXT_PUBLIC_STATIC_BASE_URL || 'https://sep490-be-xniz.onrender.com';
 
 const loginClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
-  timeout: 3000, 
+  timeout: 30000, // Tăng timeout lên 30s để tránh socket hang up
 });
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
-  timeout: 10000, 
+  timeout: 30000, // Tăng timeout lên 30s để tránh socket hang up
 });
 
-// Transparent GET cache helper for list-like endpoints
+// Transparent GET cache helper for list-like endpoints with retry
 async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 30_000): Promise<T> {
   const key = buildCacheKey(API_BASE_URL, url, params);
   const cached = typeof window !== 'undefined' ? getCached<T>(key) : null;
   if (cached) return cached.data;
-  const res = await apiClient.get<T>(url, { params });
+  
+  const res = await retryRequest(
+    () => apiClient.get<T>(url, { params }),
+    2, // max retries for cached requests
+    1000 // initial delay
+  );
+  
   if (typeof window !== 'undefined') {
     setCached<T>(key, { data: res.data as any, status: res.status, statusText: res.statusText }, ttlMs);
   }
@@ -58,14 +117,47 @@ export const isAuthenticated = () => {
 const handleApiError = (error: any, context: string) => {
   if (error.response) {
     const { status, data } = error.response;
-    if (data?.detail) return data.detail;
+    
+    // Ưu tiên hiển thị message từ backend
     if (data?.message) return data.message;
-    return `Lỗi ${status}: ${status === 401 ? 'Không có quyền truy cập' : 
-            status === 403 ? 'Bị từ chối truy cập' : 
-            status === 404 ? 'Không tìm thấy' : 
-            status === 500 ? 'Lỗi máy chủ' : 'Có lỗi xảy ra'}`;
+    if (data?.detail) return data.detail;
+    
+    // Xử lý các status code cụ thể
+    switch (status) {
+      case 400:
+        return 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
+      case 401:
+        return 'Không có quyền truy cập. Vui lòng đăng nhập lại.';
+      case 403:
+        return 'Bị từ chối truy cập. Bạn không có quyền thực hiện thao tác này.';
+      case 404:
+        return 'Không tìm thấy dữ liệu yêu cầu.';
+      case 409:
+        return 'Dữ liệu đã tồn tại trong hệ thống.';
+      case 422:
+        return 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+      case 500:
+        // Xử lý đặc biệt cho database error
+        if (data?.error === 'Database Error') {
+          return 'Lỗi cơ sở dữ liệu. Vui lòng thử lại sau hoặc liên hệ quản trị viên.';
+        }
+        return 'Lỗi máy chủ. Vui lòng thử lại sau.';
+      case 502:
+        return 'Máy chủ tạm thời không khả dụng. Vui lòng thử lại sau.';
+      case 503:
+        return 'Dịch vụ đang bảo trì. Vui lòng thử lại sau.';
+      default:
+        return `Lỗi ${status}: Có lỗi xảy ra. Vui lòng thử lại.`;
+    }
   }
-  if (error.request) return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
+  
+  if (error.request) {
+    if (error.code === 'ECONNABORTED') {
+      return 'Yêu cầu hết thời gian chờ. Máy chủ phản hồi chậm, vui lòng thử lại sau.';
+    }
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
+  }
+  
   return 'Có lỗi xảy ra. Vui lòng thử lại sau.';
 };
 
@@ -87,21 +179,40 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      clientStorage.removeItem('access_token');
-      clientStorage.removeItem('user');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-      return Promise.reject(error);
-    }
-    
-    if (error.response?.status === 403) {
+    // Smart handling for 401/403 to avoid hard redirects and flakes
+    const status = error.response?.status;
+    const config: any = error.config || {};
+    const isBrowser = typeof window !== 'undefined';
+    const pathname = isBrowser ? window.location.pathname : '';
+    const isPublicPath = ['/login', '/register', '/pending-approval', '/', '/offline'].some(p => pathname.startsWith(p));
+
+    // Attempt silent refresh once on 401 if token seems valid
+    if (status === 401 && !config._retry) {
       const token = clientStorage.getItem('access_token');
-      if (token && !isTokenValid()) {
+      if (token && isTokenValid()) {
+        try {
+          config._retry = true;
+          const refreshRes = await loginClient.post(endpoints.auth.refresh);
+          if (refreshRes?.data?.access_token) {
+            clientStorage.setItem('access_token', refreshRes.data.access_token);
+            // update header and retry original request
+            config.headers = config.headers || {};
+            config.headers['Authorization'] = `Bearer ${refreshRes.data.access_token}`;
+            return apiClient.request(config);
+          }
+        } catch (_) {
+          // fall through to redirect logic
+        }
+      }
+    }
+
+    // For 401/403: only redirect if not on public path
+    if ((status === 401 || status === 403) && !isPublicPath) {
+      const token = clientStorage.getItem('access_token');
+      if (!token || !isTokenValid()) {
         clientStorage.removeItem('access_token');
         clientStorage.removeItem('user');
-        if (typeof window !== 'undefined') {
+        if (isBrowser) {
           window.location.href = '/login';
         }
       }
@@ -145,7 +256,11 @@ const endpoints = {
 export const authAPI = {
   login: async (email: string, password: string) => {
     try {
-      const response = await loginClient.post('/auth/login', { email, password });
+      const response = await retryRequest(
+        () => loginClient.post('/auth/login', { email, password }),
+        3, // max retries
+        1000 // initial delay
+      );
       const { access_token } = response.data;
       if (typeof window !== 'undefined') {
         clientStorage.setItem('access_token', access_token);
@@ -156,7 +271,7 @@ export const authAPI = {
         throw new Error('Email hoặc mật khẩu không chính xác');
       }
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+        throw new Error('Kết nối chậm. Vui lòng kiểm tra mạng và thử lại.');
       }
       if (error.response?.status === 500) {
         throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
@@ -167,7 +282,11 @@ export const authAPI = {
 
   sendOtp: async (phone: string) => {
     try {
-      const response = await loginClient.post('/auth/send-otp', { phone });
+      const response = await retryRequest(
+        () => loginClient.post('/auth/send-otp', { phone }),
+        2, // max retries
+        1000 // initial delay
+      );
       if (response.data.success) {
         return response.data;
       }
@@ -177,7 +296,7 @@ export const authAPI = {
         throw new Error(error.response.data.message);
       }
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+        throw new Error('Kết nối chậm. Vui lòng kiểm tra mạng và thử lại.');
       }
       if (error.response?.status === 500) {
         throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
@@ -188,7 +307,11 @@ export const authAPI = {
 
   verifyOtp: async (phone: string, otp: string) => {
     try {
-      const response = await loginClient.post('/auth/verify-otp', { phone, otp });
+      const response = await retryRequest(
+        () => loginClient.post('/auth/verify-otp', { phone, otp }),
+        2, // max retries
+        1000 // initial delay
+      );
       if (response.data.success) {
         const { access_token } = response.data;
         if (typeof window !== 'undefined') {
@@ -202,7 +325,7 @@ export const authAPI = {
         throw new Error(error.response.data.message);
       }
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+        throw new Error('Kết nối chậm. Vui lòng kiểm tra mạng và thử lại.');
       }
       if (error.response?.status === 500) {
         throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
@@ -260,7 +383,11 @@ export const authAPI = {
 
   forgotPassword: async (email: string) => {
     try {
-      const response = await loginClient.post('/auth/forgot-password', { email });
+      const response = await retryRequest(
+        () => loginClient.post('/auth/forgot-password', { email }),
+        2, // max retries
+        1000 // initial delay
+      );
       return response.data;
     } catch (error: any) {
       if (error.response?.data?.message) {
@@ -270,7 +397,7 @@ export const authAPI = {
         throw new Error('Email không tồn tại trong hệ thống hoặc tài khoản đã bị khóa');
       }
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        throw new Error('Kết nối chậm. Vui lòng thử lại.');
+        throw new Error('Kết nối chậm. Vui lòng kiểm tra mạng và thử lại.');
       }
       if (error.response?.status === 500) {
         throw new Error('Lỗi máy chủ. Vui lòng thử lại sau.');
@@ -283,11 +410,45 @@ export const authAPI = {
 export const userAPI = {
   getAll: async (params?: any) => {
     try {
-      const data = await getWithCache<any[]>('/users', params, 30_000);
+      const data = await getWithCache<any[]>('/users', params, 60_000); // Tăng cache time lên 1 phút
       return data as any[];
     } catch (error) {
       return [];
     }
+  },
+  getById: async (id: string) => {
+    try {
+      if (!id || id === 'null' || id === 'undefined') {
+        throw new Error(`Invalid user ID: ${id}`);
+      }
+      const response = await apiClient.get(`/users/${id}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`User with ID ${id} not found`);
+      }
+      throw error;
+    }
+  },
+  getByRoleWithStatus: async (role: string, status?: string) => {
+    try {
+      // Backend supports /users/by-role?role=...
+      const url = `/users/by-role?role=${encodeURIComponent(role)}`;
+      const response = await apiClient.get(url);
+      const arr = Array.isArray(response.data) ? response.data : [];
+      if (!status) return arr;
+      return arr.filter((u: any) => String(u.status || '').toLowerCase() === String(status).toLowerCase());
+    } catch (error) {
+      return [];
+    }
+  },
+  approveUser: async (id: string) => {
+    const response = await apiClient.patch(`/users/${id}/approve`);
+    return response.data;
+  },
+  deactivateUser: async (id: string, reason?: string) => {
+    const response = await apiClient.patch(`/users/${id}/deactivate`, reason ? { reason } : {});
+    return response.data;
   },
   getProfile: async () => {
     try {
@@ -371,15 +532,6 @@ export const userAPI = {
     }
   },
 
-  getById: async (id: string) => {
-    try {
-      const response = await apiClient.get(`${endpoints.users}/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  },
-
   update: async (id: string, data: any) => {
     try {
       const response = await apiClient.patch(`/users/${id}`, data);
@@ -403,7 +555,7 @@ export const userAPI = {
     if (!avatarPath) return '';
     if (avatarPath.startsWith('http')) return avatarPath;
     const cleanPath = avatarPath.replace(/^\\+|^\/+/g, '').replace(/\\/g, '/');
-    const fullUrl = `${API_BASE_URL}/${cleanPath}`;
+    const fullUrl = `${STATIC_BASE_URL}/${cleanPath}`;
     return fullUrl;
   },
   getAvatarUrlById: (id: string) => {
@@ -436,6 +588,20 @@ export const userAPI = {
       throw error;
     }
   },
+  uploadMyCccd: async (params: { cccd_id: string; cccd_front?: File | null; cccd_back?: File | null }) => {
+    try {
+      const formData = new FormData();
+      formData.append('cccd_id', params.cccd_id);
+      if (params.cccd_front) formData.append('cccd_front', params.cccd_front);
+      if (params.cccd_back) formData.append('cccd_back', params.cccd_back);
+      const response = await apiClient.post('/users/upload-cccd', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
   resetPassword: async (id: string, newPassword: string) => {
     try {
       const response = await apiClient.patch(`/users/${id}/reset-password`, { newPassword });
@@ -449,10 +615,20 @@ export const userAPI = {
 export const residentAPI = {
   getAll: async (params?: any) => {
     try {
-      const data = await getWithCache<any[]>(endpoints.residents, params, 30_000);
+      const data = await getWithCache<any[]>(endpoints.residents, params, 60_000); // Tăng cache time lên 1 phút
       return data as any[];
     } catch (error) {
       return [];
+    }
+  },
+
+  // Mark resident attendance -> transition to admitted
+  markAttendance: async (id: string) => {
+    try {
+      const response = await apiClient.post(`${endpoints.residents}/${id}/attendance`);
+      return response.data;
+    } catch (error) {
+      throw error;
     }
   },
 
@@ -465,9 +641,56 @@ export const residentAPI = {
     }
   },
 
+  getPendingResidents: async () => {
+    try {
+      const response = await apiClient.get(`${endpoints.residents}/admin/pending`);
+      return response.data;
+    } catch (error) {
+      return [];
+    }
+  },
+
+  approveResident: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`${endpoints.residents}/admin/${id}/approve`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  rejectResident: async (id: string, reason?: string) => {
+    try {
+      const response = await apiClient.patch(`${endpoints.residents}/admin/${id}/reject`, reason ? { reason } : {});
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   create: async (resident: any) => {
     try {
+      if (resident instanceof FormData) {
+        const response = await apiClient.post(endpoints.residents, resident, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+      }
       const response = await apiClient.post(endpoints.residents, resident);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  createMy: async (resident: any) => {
+    try {
+      if (resident instanceof FormData) {
+        const response = await apiClient.post(`${endpoints.residents}/my-resident`, resident, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+      }
+      const response = await apiClient.post(`${endpoints.residents}/my-resident`, resident);
       return response.data;
     } catch (error) {
       throw error;
@@ -523,18 +746,23 @@ export const residentAPI = {
 
   getByFamilyMemberId: async (familyMemberId: string) => {
     try {
-      const response = await apiClient.get(`${endpoints.residents}/family-member/${familyMemberId}`);
+      const response = await retryRequest(
+        () => apiClient.get(`${endpoints.residents}/family-member/${familyMemberId}`),
+        3, // max retries
+        1000 // initial delay
+      );
       return response.data;
     } catch (error) {
+      console.error('Error fetching residents by family member ID:', error);
       throw error;
     }
   },
   getAvatarUrl: (id: string) => {
     if (!id) return '';
-    return `${API_BASE_URL}/residents/${id}/avatar`;
+    return `${STATIC_BASE_URL}/uploads/residents/${id}/avatar`;
   },
   fetchAvatar: async (id: string) => {
-    const response = await fetch(`${API_BASE_URL}/residents/${id}/avatar`);
+    const response = await fetch(`${API_BASE_URL}/uploads/residents/${id}/avatar`);
     if (!response.ok) throw new Error('Không lấy được avatar');
     return await response.blob();
   },
@@ -649,9 +877,12 @@ export const staffAPI = {
 export const staffAssignmentsAPI = {
   getAll: async (params?: any) => {
     try {
+      console.log('Fetching all staff assignments with params:', params);
       const response = await apiClient.get('/staff-assignments', { params });
+      console.log('Staff assignments response:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error fetching staff assignments:', error);
       throw error;
     }
   },
@@ -668,6 +899,15 @@ export const staffAssignmentsAPI = {
   getById: async (id: string) => {
     try {
       const response = await apiClient.get(`/staff-assignments/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getByResident: async (residentId: string) => {
+    try {
+      const response = await apiClient.get(`/staff-assignments/by-resident/${residentId}/staff`);
       return response.data;
     } catch (error) {
       throw error;
@@ -710,14 +950,15 @@ export const staffAssignmentsAPI = {
     }
   },
 
-  getByResident: async (residentId: string) => {
+  getByRoom: async (roomId: string) => {
     try {
-      const response = await apiClient.get(`/staff-assignments/by-resident/${residentId}`);
+      const response = await apiClient.get(`/staff-assignments/by-room/${roomId}`);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
+
 
   getMyAssignments: async () => {
     try {
@@ -732,7 +973,7 @@ export const staffAssignmentsAPI = {
 export const activitiesAPI = {
   getAll: async (params?: any) => {
     try {
-      const data = await getWithCache<any[]>(endpoints.activities, params, 20_000);
+      const data = await getWithCache<any[]>(endpoints.activities, params, 30_000); // Tăng cache time lên 30s
       return data as any[];
     } catch (error) {
       return [];
@@ -941,6 +1182,18 @@ export const activityParticipationsAPI = {
       throw error;
     }
   },
+  
+  // Fetch one participation by resident and activity
+  getByResidentAndActivity: async (residentId: string, activityId: string) => {
+    try {
+      const response = await apiClient.get(`${endpoints.activityParticipations}/by-resident-activity`, {
+        params: { resident_id: residentId, activity_id: activityId }
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 
 export const medicationAPI = {
@@ -1078,7 +1331,7 @@ export const familyMembersAPI = {
       const response = await apiClient.get(`${endpoints.familyMembers}/${id}`);
       const familyMember = response.data;
       if (familyMember && familyMember.avatar) {
-        familyMember.avatar = `${API_BASE_URL}/family-members/${id}/avatar`;
+        familyMember.avatar = `${API_BASE_URL}/users/${id}/avatar`;
       }
       return familyMember;
     } catch (error) {
@@ -1112,17 +1365,46 @@ export const familyMembersAPI = {
 
   getAvatarUrl: (id: string) => {
     if (!id) return '';
-    return `${API_BASE_URL}/users/${id}/avatar`;
+    return `${STATIC_BASE_URL}/users/${id}/avatar`;
   },
 };
 
 export const roomsAPI = {
   getAll: async (params?: any) => {
     try {
-      const data = await getWithCache<any[]>(endpoints.rooms, params, 60_000);
-      return data as any[];
-    } catch (error) {
-      return [];
+      console.log('Calling rooms API with params:', params);
+      
+      // Sử dụng retry mechanism với timeout wrapper
+      const response = await retryRequest(
+        () => withTimeout(
+          apiClient.get(endpoints.rooms, { params }),
+          25000, // 25s timeout
+          'Rooms API'
+        ),
+        3, // max retries
+        2000 // initial delay
+      );
+      
+      console.log('Rooms API response:', response.data);
+      return response.data as any[];
+    } catch (error: any) {
+      console.error('Rooms API error:', error);
+      
+      // Xử lý timeout error cụ thể
+      if (error.code === 'ECONNABORTED' || 
+          error.message.includes('timeout') || 
+          error.message.includes('Rooms API timeout')) {
+        console.warn('Rooms API timeout - returning empty array');
+        return [];
+      }
+      
+      // Xử lý các lỗi khác
+      if (error.response?.status >= 500) {
+        console.warn('Rooms API server error - returning empty array');
+        return [];
+      }
+      
+      throw error;
     }
   },
 
@@ -1588,7 +1870,7 @@ export const photosAPI = {
   getPhotoUrl: (file_path: string) => {
     if (!file_path) return '';
     const cleanPath = file_path.replace(/\\/g, '/').replace(/"/g, '');
-    return `${API_BASE_URL}/${cleanPath}`;
+    return `${STATIC_BASE_URL}/${cleanPath}`;
   },
 
   getByResidentId: async (residentId: string) => {
@@ -1714,7 +1996,11 @@ export const carePlansAPI = {
     try {
       const response = await apiClient.get(`/care-plan-assignments/by-resident/${residentId}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // If 404, return empty array instead of throwing
+      if (error.response?.status === 404) {
+        return [];
+      }
       throw error;
     }
   },
@@ -1777,6 +2063,38 @@ export const bedAssignmentsAPI = {
       return [];
     }
   },
+  getPendingAssignments: async () => {
+    try {
+      const response = await apiClient.get('/bed-assignments/admin/pending');
+      return response.data;
+    } catch (error) {
+      return [];
+    }
+  },
+  approveAssignment: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/bed-assignments/admin/${id}/approve`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  rejectAssignment: async (id: string, reason?: string) => {
+    try {
+      const response = await apiClient.patch(`/bed-assignments/admin/${id}/reject`, reason ? { reason } : {});
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  activateAssignment: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/bed-assignments/admin/${id}/activate`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
   create: async (data: any) => {
     try {
       const response = await apiClient.post('/bed-assignments', data);
@@ -1830,6 +2148,38 @@ export const carePlanAssignmentsAPI = {
       return response.data;
     } catch (error) {
       return [];
+    }
+  },
+  getPendingAssignments: async () => {
+    try {
+      const response = await apiClient.get('/care-plan-assignments/admin/pending');
+      return response.data;
+    } catch (error) {
+      return [];
+    }
+  },
+  approveAssignment: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/admin/${id}/approve`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  rejectAssignment: async (id: string, reason?: string) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/admin/${id}/reject`, reason ? { reason } : {});
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  activateAssignment: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/care-plan-assignments/admin/${id}/activate`);
+      return response.data;
+    } catch (error) {
+      throw error;
     }
   },
   create: async (data: any) => {
@@ -1928,7 +2278,21 @@ export const billsAPI = {
 export const bedsAPI = {
   getAll: async (params?: any) => {
     try {
+      console.log('Calling beds API with params:', params);
+      // Temporarily bypass cache to debug
       const response = await apiClient.get('/beds', { params });
+      console.log('Beds API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Beds API error:', error);
+      return [];
+    }
+  },
+  getByRoom: async (roomId: string, status?: 'available' | 'occupied') => {
+    try {
+      const response = await apiClient.get(`/beds/by-room/${roomId}`, {
+        params: status ? { status } : undefined,
+      });
       return response.data;
     } catch (error) {
       return [];
@@ -1994,9 +2358,10 @@ export const messagesAPI = {
     }
   },
 
-  getConversation: async (partnerId: string) => {
+  getConversation: async (partnerId: string, residentId?: string) => {
     try {
-      const response = await apiClient.get(`/messages/conversation/${partnerId}`);
+      const params = residentId ? { residentId } : {};
+      const response = await apiClient.get(`/messages/conversation/${partnerId}`, { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -2038,6 +2403,59 @@ export const messagesAPI = {
       throw error;
     }
   },
+};
+
+// SWR Fetcher function
+export const fetcher = async (url: string): Promise<any> => {
+  try {
+    const response = await apiClient.get(url);
+    return response.data;
+  } catch (error: any) {
+    // Transform axios error to a format SWR can understand
+    const swrError = new Error(error?.response?.data?.message || error?.message || 'An error occurred');
+    (swrError as any).status = error?.response?.status;
+    (swrError as any).info = error?.response?.data;
+    throw swrError;
+  }
+};
+
+// Custom fetcher for POST requests
+export const postFetcher = async (url: string, data: any): Promise<any> => {
+  try {
+    const response = await apiClient.post(url, data);
+    return response.data;
+  } catch (error: any) {
+    const swrError = new Error(error?.response?.data?.message || error?.message || 'An error occurred');
+    (swrError as any).status = error?.response?.status;
+    (swrError as any).info = error?.response?.data;
+    throw swrError;
+  }
+};
+
+// Custom fetcher for PUT requests
+export const putFetcher = async (url: string, data: any): Promise<any> => {
+  try {
+    const response = await apiClient.put(url, data);
+    return response.data;
+  } catch (error: any) {
+    const swrError = new Error(error?.response?.data?.message || error?.message || 'An error occurred');
+    (swrError as any).status = error?.response?.status;
+    (swrError as any).info = error?.response?.data;
+    throw swrError;
+  }
+};
+
+// Custom fetcher for DELETE requests
+export const deleteFetcher = async (url: string): Promise<any> => {
+  try {
+    const response = await apiClient.delete(url);
+    return response.data;
+  } catch (error: any) {
+    const swrError = new Error(error?.response?.data?.message || error?.message || 'An error occurred');
+    (swrError as any).status = error?.response?.status;
+    (swrError as any).info = error?.response?.data;
+    throw swrError;
+  }
 };
 
 

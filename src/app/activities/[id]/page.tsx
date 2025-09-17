@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { useResidents } from '@/lib/contexts/residents-context';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI, staffAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI, staffAPI, bedAssignmentsAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
 import ConfirmModal from '@/components/ConfirmModal';
 import NotificationModal from '@/components/NotificationModal';
@@ -53,16 +53,25 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const isActivityDatePassed = () => {
     if (!activity?.date) return false;
     const activityDate = new Date(activity.date + 'T00:00:00');
-    const today = new Date();
+    // Lấy thời gian hiện tại và trừ 7 giờ để so sánh
+    const now = new Date();
+    const adjustedNow = new Date(now.getTime() - (7 * 60 * 60 * 1000));
+    const today = new Date(adjustedNow);
     today.setHours(0, 0, 0, 0);
-    return activityDate < today;
+    
+    const datePassed = activityDate < today;
+    return datePassed;
   };
 
   const isActivityTimePassed = () => {
-    if (!activity?.date || !activity?.scheduledTime) return false;
+    if (!activity?.date || !activity?.scheduledTime) {
+      return false;
+    }
     
+    // Lấy thời gian hiện tại và trừ 7 giờ để so sánh với scheduledTime
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const adjustedNow = new Date(now.getTime() - (7 * 60 * 60 * 1000));
+    const today = adjustedNow.toISOString().split('T')[0];
     
     // Nếu không phải hôm nay, kiểm tra ngày
     if (activity.date !== today) {
@@ -71,10 +80,20 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     
     // Nếu là hôm nay, kiểm tra thời gian
     const [hours, minutes] = activity.scheduledTime.split(':');
-    const activityTime = new Date();
+    const activityTime = new Date(adjustedNow);
     activityTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
     
-    return now > activityTime;
+    const timePassed = adjustedNow > activityTime;
+    console.log('🔍 TIME CHECK:', {
+      activityDate: activity.date,
+      today: today,
+      scheduledTime: activity.scheduledTime,
+      currentTime: adjustedNow.toLocaleTimeString('vi-VN'),
+      activityTime: activityTime.toLocaleTimeString('vi-VN'),
+      timePassed: timePassed
+    });
+    
+    return timePassed;
   };
 
   useEffect(() => {
@@ -113,16 +132,47 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const fetchStaffList = async () => {
       try {
+        // 1) Load all active staff users
         const users = await staffAPI.getAll();
-        const staff = users.filter((u: any) => 
-          u.role === 'staff' && 
-          u.status === 'active' && 
-          typeof u._id === 'string' && 
+        const allActiveStaff = users.filter((u: any) =>
+          u.role === 'staff' &&
+          u.status === 'active' &&
+          typeof u._id === 'string' &&
           u._id.length === 24
         );
-        const uniqueStaff = Array.from(
-          new Map(staff.map((u: any) => [u._id, u])).values()
-        );
+
+        // 2) Load staff assignments and keep only active ones
+        let assignments: any[] = [];
+        try {
+          assignments = await staffAssignmentsAPI.getAll();
+        } catch (e) {
+          assignments = [];
+        }
+
+        const isAssignmentActive = (a: any) => {
+          if (!a) return false;
+          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+          if (!a.end_date) return true;
+          const end = new Date(a.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return end >= today;
+        };
+
+        const activeAssignments = Array.isArray(assignments) ? assignments.filter(isAssignmentActive) : [];
+
+        // 3) Extract staff IDs from active assignments
+        const assignedStaffIds = new Set<string>();
+        for (const a of activeAssignments) {
+          const sid = (a as any)?.staff_id?._id || (a as any)?.staff_id || (a as any)?.staff;
+          if (typeof sid === 'string' && sid.length === 24) {
+            assignedStaffIds.add(sid);
+          }
+        }
+
+        // 4) Filter active staff to those who have assignments
+        const filteredStaff = allActiveStaff.filter((u: any) => assignedStaffIds.has(u._id));
+        const uniqueStaff = Array.from(new Map(filteredStaff.map((u: any) => [u._id, u])).values());
 
         setStaffList(uniqueStaff.map((u: any) => ({
           id: u._id,
@@ -270,8 +320,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       }
 
       const convertToVietnamTime = (utcTime: Date) => {
-        const vietnamTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
-        return vietnamTime.toLocaleTimeString('vi-VN', {
+        // Trừ 7 giờ để hiển thị đúng thời gian (database lưu UTC+7, cần trừ để hiển thị đúng)
+        const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
+        return correctTime.toLocaleTimeString('vi-VN', {
           hour: '2-digit',
           minute: '2-digit',
           hour12: false
@@ -432,12 +483,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
           await activityParticipationsAPI.update(existingParticipation._id, updateData);
         } else {
-          const resident = residents.find(r => r.id === residentId);
+          const resident = residents.find((r: any) => (r._id || r.id) === residentId);
           if (resident) {
             await activityParticipationsAPI.create({
               staff_id: assignedStaffList.length > 0 ? assignedStaffList[0].id : (user?.id || "664f1b2c2f8b2c0012a4e750"),
               activity_id: activity.id,
-              resident_id: resident.id,
+              resident_id: (resident as any)._id || (resident as any).id,
               date: activity.date + "T00:00:00Z",
               performance_notes: evaluation.status === 'attended' ?
                 'Lý do sức khỏe' :
@@ -557,14 +608,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     })
     .map((p: any) => {
       const residentId = p.resident_id?._id || p.resident_id;
-      const residentInfo = residents.find((r: any) => r.id === residentId);
+      const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
       const participated = p.attendance_status === 'attended';
 
       return {
         id: residentId,
-        name: p.resident_id?.full_name || residentInfo?.name || 'N/A',
-        room: residentInfo?.room || '',
-        age: residentInfo?.age || '',
+        name: (p as any)?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A',
+        room: (residentInfo as any)?.room || '',
+        age: (residentInfo as any)?.age || '',
         participationId: p._id,
         participated: participated,
         reason: p.performance_notes || '',
@@ -603,13 +654,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         return pResidentId === residentId;
       });
 
-      const residentInfo = residents.find((r: any) => r.id === residentId);
+      const residentInfo = residents.find((r: any) => (r._id || r.id) === residentId);
 
       return {
         id: residentId,
-        name: participation?.resident_id?.full_name || residentInfo?.name || 'N/A',
-        room: residentInfo?.room || '',
-        age: residentInfo?.age || '',
+        name: (participation as any)?.resident_id?.full_name || (residentInfo as any)?.full_name || (residentInfo as any)?.fullName || 'N/A',
+        room: (residentInfo as any)?.room || '',
+        age: (residentInfo as any)?.age || '',
         participationId: participation?._id || '',
         participated: evaluation.status === 'attended',
         reason: evaluation.reason || '',
@@ -777,6 +828,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const handleAssignStaff = async () => {
+    console.log('🚀 HANDLE ASSIGN STAFF CALLED:', { selectedStaffId, activityId: activity?.id });
     if (!selectedStaffId || !activity?.id) return;
 
     if (user?.role !== 'admin') {
@@ -812,20 +864,82 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     setAssigningStaff(true);
     setUpdatingData(true);
     try {
-      const staffAssignments = await staffAssignmentsAPI.getByStaff(selectedStaffId);
-      // Chỉ lấy resident có assignment còn hiệu lực (không hết hạn)
-      const validAssignments = staffAssignments.filter((assignment: any) => {
-        // Kiểm tra assignment còn hiệu lực
-        if (assignment.status === 'expired') return false;
-        if (assignment.end_date) {
-          const endDate = new Date(assignment.end_date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (endDate < today) return false;
+      console.log('📋 Starting staff assignment for staff:', selectedStaffId);
+      
+      // Lấy danh sách staff assignments - sử dụng getMyAssignments nếu là staff hiện tại
+      let staffAssignments = [];
+      if (selectedStaffId === user?.id) {
+        // Nếu chọn chính staff hiện tại, dùng getMyAssignments
+        staffAssignments = await staffAssignmentsAPI.getMyAssignments();
+      } else {
+        // Nếu chọn staff khác, dùng getByStaff
+        staffAssignments = await staffAssignmentsAPI.getByStaff(selectedStaffId);
+      }
+      
+      console.log('📋 Staff assignments found:', staffAssignments.length);
+      console.log('📋 Raw assignments data:', staffAssignments);
+      
+      // Kiểm tra assignment còn hiệu lực (giống logic trong staff/residents page)
+      const isAssignmentActive = (a: any) => {
+        if (!a) return false;
+        if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+        if (!a.end_date) return true;
+        const end = new Date(a.end_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return end >= today;
+      };
+      
+      const validAssignments = staffAssignments.filter(isAssignmentActive);
+      console.log('📋 Valid assignments:', validAssignments.length);
+      
+      // Xử lý cả room-based và resident-based assignments
+      const assignedResidentIds: string[] = [];
+      
+      // Detect new room-based shape: item has room_id and residents array
+      const isRoomBased = validAssignments.some((a: any) => a && ((a as any).room_id || (a as any).residents));
+      
+      if (isRoomBased) {
+        console.log('🏠 Room-based assignments detected');
+        // Flatten residents from each assigned room
+        for (const assignment of validAssignments) {
+          const room = (assignment as any).room_id;
+          let residents: any[] = Array.isArray((assignment as any).residents) ? (assignment as any).residents : [];
+          
+          // Fallback: if BE doesn't include residents in assignment, derive from bed assignments by room
+          if ((!residents || residents.length === 0) && room) {
+            try {
+              const bedAssignments = await bedAssignmentsAPI.getAll();
+              if (Array.isArray(bedAssignments)) {
+                const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+                residents = bedAssignments
+                  .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                  .map((ba: any) => ba.resident_id)
+                  .filter(Boolean);
+              }
+            } catch (error) {
+              console.error('Error fetching bed assignments:', error);
+            }
+          }
+          
+          for (const resident of residents) {
+            if (resident?._id) {
+              assignedResidentIds.push(resident._id);
+            }
+          }
         }
-        return true;
-      });
-      const assignedResidentIds = validAssignments.map((assignment: any) => assignment.resident_id?._id || assignment.resident_id);
+      } else {
+        console.log('👤 Resident-based assignments detected');
+        // Backward compatibility: resident-based assignments
+        for (const assignment of validAssignments) {
+          const resident = (assignment as any).resident_id;
+          if (resident?._id) {
+            assignedResidentIds.push(resident._id);
+          }
+        }
+      }
+      
+      console.log('👥 Valid resident IDs:', assignedResidentIds);
 
       const currentActivityParticipations = participations.filter(p => {
         const participationActivityId = p.activity_id?._id || p.activity_id;
@@ -839,6 +953,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       const newResidentIds = assignedResidentIds.filter((residentId: string) =>
         !currentParticipantIds.includes(residentId)
       );
+      console.log('➕ New resident IDs to add:', newResidentIds);
 
       const currentParticipantCount = currentParticipantIds.length;
       const totalAfterAdding = currentParticipantCount + newResidentIds.length;
@@ -858,26 +973,40 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       let addedCount = 0;
       for (const residentId of newResidentIds) {
         try {
-          await activityParticipationsAPI.create({
+          // Validate resident ID format (should be 24 character hex string)
+          if (!residentId || typeof residentId !== 'string' || !residentId.match(/^[0-9a-fA-F]{24}$/)) {
+            console.error('❌ Invalid resident ID format:', residentId);
+            continue;
+          }
+          
+          const participationData = {
             staff_id: selectedStaffId,
             activity_id: activity.id,
             resident_id: residentId,
             date: activity.date + 'T00:00:00Z',
             attendance_status: 'pending',
             performance_notes: ''
-          });
+          };
+          
+          await activityParticipationsAPI.create(participationData);
           addedCount++;
+          console.log('✅ Successfully added resident:', residentId);
 
           setNewResidentsAdded(addedCount);
         } catch (error) {
-          
+          console.error('❌ Error adding resident:', residentId, error);
         }
       }
 
+      // Cập nhật staff cho các participation hiện tại
       for (const participation of currentActivityParticipations) {
-        await activityParticipationsAPI.update(participation._id, {
-          staff_id: selectedStaffId
-        });
+        try {
+          await activityParticipationsAPI.update(participation._id, {
+            staff_id: selectedStaffId
+          });
+        } catch (error) {
+          console.error('❌ Error updating participation:', participation._id, error);
+        }
       }
 
       const assignedStaff = staffList.find(staff => staff.id === selectedStaffId);
@@ -943,6 +1072,33 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       setAssignStaffModalOpen(false);
       setSelectedStaffId('');
 
+      // Force refresh the page data
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Reload participations to get updated data
+      const updatedParticipations = await activityParticipationsAPI.getByActivityId(
+        activity.id,
+        activity.date
+      );
+      setParticipations(updatedParticipations);
+      
+      // Update evaluations with new data
+      const newEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
+      updatedParticipations.forEach((participation: any) => {
+        const residentId = participation.resident_id?._id || participation.resident_id;
+        const status = participation.attendance_status === 'attended' ? 'attended' :
+          participation.attendance_status === 'absent' ? 'absent' : 'pending';
+        const reason = participation.performance_notes || '';
+
+        if (residentId) {
+          newEvaluations[residentId] = {
+            status,
+            reason
+          };
+        }
+      });
+      setEvaluations(newEvaluations);
+
       if (addedCount > 0) {
         setNotificationModal({
           open: true,
@@ -959,6 +1115,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         });
       }
     } catch (error: any) {
+      console.error('❌ Error in handleAssignStaff:', error);
       let errorMessage = 'Không thể phân công nhân viên hướng dẫn. Vui lòng thử lại.';
 
       if (error.response?.data?.message) {
@@ -1616,9 +1773,21 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                       <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>
                         Nhân viên hướng dẫn:
                       </div>
-                      {user?.role === 'admin' && assignedStaffList.length === 0 && !isActivityTimePassed() && (
+                      {(() => {
+                        const canAssign = user?.role === 'admin' && assignedStaffList.length === 0 && !isActivityTimePassed();
+                        console.log('🔘 BUTTON CHECK:', {
+                          userRole: user?.role,
+                          assignedStaffListLength: assignedStaffList.length,
+                          isActivityTimePassed: isActivityTimePassed(),
+                          canAssign: canAssign
+                        });
+                        return canAssign;
+                      })() && (
                         <button
-                          onClick={() => setAssignStaffModalOpen(true)}
+                          onClick={() => {
+                            console.log('🖱️ BUTTON CLICKED: Assign staff');
+                            setAssignStaffModalOpen(true);
+                          }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -2242,7 +2411,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 Hủy
               </button>
               <button
-                onClick={handleAssignStaff}
+                onClick={() => {
+                  console.log('🖱️ MODAL BUTTON CLICKED:', { selectedStaffId, assigningStaff, isActivityTimePassed: isActivityTimePassed() });
+                  handleAssignStaff();
+                }}
                 className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold"
                 disabled={assigningStaff || !selectedStaffId || isActivityTimePassed()}
               >

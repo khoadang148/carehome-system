@@ -272,18 +272,80 @@ export default function AddVitalSignsPage() {
       if (user?.role === 'staff') {
         const data = await staffAssignmentsAPI.getMyAssignments();
         const assignmentsData = Array.isArray(data) ? data : [];
-        mapped = assignmentsData
-          .filter((assignment: any) => assignment.status === 'active')
-          .map((assignment: any) => {
-            const resident = assignment.resident_id;
-            return {
-              id: resident._id,
-              name: resident.full_name || '',
-              avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-              assignmentStatus: assignment.status || 'unknown',
-              assignmentId: assignment._id,
-            };
-          });
+
+        const isAssignmentActive = (a: any) => {
+          if (!a) return false;
+          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+          if (!a.end_date) return true;
+          const end = new Date(a.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return end >= today;
+        };
+
+        const isRoomBased = assignmentsData.some((a: any) => a && (a.room_id || a.residents));
+
+        if (isRoomBased) {
+          const activeRoomAssignments = assignmentsData.filter((a: any) => isAssignmentActive(a));
+          const result: any[] = [];
+          for (const assignment of activeRoomAssignments) {
+            const room = assignment.room_id;
+            const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+            let residents: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+            if ((!residents || residents.length === 0) && roomId) {
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getAll();
+                if (Array.isArray(bedAssignments)) {
+                  residents = bedAssignments
+                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .map((ba: any) => ba.resident_id)
+                    .filter(Boolean);
+                }
+              } catch {}
+            }
+            for (const resident of residents) {
+              result.push({
+                id: resident?._id,
+                name: resident?.full_name || '',
+                avatar: Array.isArray(resident?.avatar) ? resident.avatar[0] : resident?.avatar || null,
+              });
+            }
+          }
+          // Enrich from resident detail to ensure name/avatar correctness
+          mapped = await Promise.all(result.map(async (r) => {
+            try {
+              const detail = await residentAPI.getById(r.id);
+              return {
+                ...r,
+                name: detail?.full_name || r.name,
+                avatar: detail?.avatar ? (Array.isArray(detail.avatar) ? detail.avatar[0] : detail.avatar) : r.avatar,
+              };
+            } catch { return r; }
+          }));
+        } else {
+          mapped = assignmentsData
+            .filter((assignment: any) => isAssignmentActive(assignment))
+            .map((assignment: any) => {
+              const resident = assignment.resident_id;
+              return {
+                id: resident._id,
+                name: resident.full_name || '',
+                avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+              };
+            });
+
+          // Enrich details
+          mapped = await Promise.all(mapped.map(async (r) => {
+            try {
+              const detail = await residentAPI.getById(r.id);
+              return {
+                ...r,
+                name: detail?.full_name || r.name,
+                avatar: detail?.avatar ? (Array.isArray(detail.avatar) ? detail.avatar[0] : detail.avatar) : r.avatar,
+              };
+            } catch { return r; }
+          }));
+        }
       } else if (user?.role === 'admin') {
         const data = await residentAPI.getAll();
         const residentsData = Array.isArray(data) ? data : [];
@@ -293,7 +355,9 @@ export default function AddVitalSignsPage() {
           avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
         }));
       }
+
       setResidents(mapped);
+
       const roomEntries = await Promise.all(
         mapped.map(async (resident: any) => {
           try {

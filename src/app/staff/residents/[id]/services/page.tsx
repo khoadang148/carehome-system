@@ -45,8 +45,24 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [residentId, setResidentId] = useState<string>('');
 
-  const residentId = React.use(params).id;
+  // Get residentId from params
+  useEffect(() => {
+    const getParams = async () => {
+      try {
+        const resolvedParams = await params;
+        console.log('Services page - Resolved params:', resolvedParams);
+        if (resolvedParams?.id) {
+          console.log('Services page - Setting residentId to:', resolvedParams.id);
+          setResidentId(resolvedParams.id);
+        }
+      } catch (error) {
+        console.error('Services page - Error getting params:', error);
+      }
+    };
+    getParams();
+  }, [params]);
 
   useEffect(() => {
     if (!autoRefreshEnabled || !residentId) return;
@@ -71,9 +87,12 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
   }, [user, router]);
 
   useEffect(() => {
+    if (!residentId) return; // Don't fetch if no residentId yet
+    
     const loadResident = async () => {
       try {
         setLoading(true);
+        console.log('Services page - Fetching resident with ID:', residentId);
         const data = await residentAPI.getById(residentId);
         const mapped = {
           id: data._id,
@@ -94,7 +113,9 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
         };
         setResident(mapped);
       } catch (error) {
-        router.push('/staff/residents');
+        console.error('Services page - Error fetching resident:', error);
+        // Don't auto-redirect, let the user see the error state
+        setResident(null);
       } finally {
         setLoading(false);
       }
@@ -261,7 +282,7 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
   const roomMonthlyCost = 0; 
   const carePlansMonthlyCost = totalMonthlyCost;
 
-  if (loading) {
+  if (loading || !residentId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
         <div className="bg-white rounded-2xl p-8 shadow-lg text-center">
@@ -375,18 +396,6 @@ export default function ResidentServicesPage({ params }: { params: Promise<{ id:
                 <div className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                 <span>{autoRefreshEnabled ? 'Tự động cập nhật' : 'Tắt cập nhật'}</span>
               </div>
-              
-              <button
-                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                  autoRefreshEnabled 
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-                title={autoRefreshEnabled ? 'Tắt tự động cập nhật' : 'Bật tự động cập nhật'}
-              >
-                {autoRefreshEnabled ? 'Tắt' : 'Bật'}
-              </button>
             </div>
           </div>
         </div>

@@ -157,9 +157,6 @@ export default function StaffVisitsPage() {
       if (rawPath) return userAPI.getAvatarUrl(rawPath);
 
       if (family?._id) {
-        return `${API_BASE_URL}/family-members/${family._id}/avatar`;
-      }
-      if (family?._id) {
         return userAPI.getAvatarUrlById(family._id);
       }
       return '';

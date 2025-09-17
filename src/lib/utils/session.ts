@@ -28,8 +28,17 @@ export function isSessionValid(): boolean {
   const user = clientStorage.getItem('user');
   const sessionStart = clientStorage.getItem('session_start');
   
-  if (!token || !user || !sessionStart) {
+  if (!token || !user) {
     return false;
+  }
+  
+  // Fallback: if token and user exist but session_start missing, initialize it
+  if (!sessionStart) {
+    try {
+      const now = Date.now().toString();
+      clientStorage.setItem('session_start', now);
+    } catch {}
+    return true;
   }
   
   const startTime = parseInt(sessionStart);

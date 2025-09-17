@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { 
   MagnifyingGlassIcon, 
   FunnelIcon, 
@@ -29,15 +30,72 @@ export default function ResidentsPage() {
   const router = useRouter();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [residentsData, setResidentsData] = useState<any[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState<number | null>(null);
-  const [carePlanOptions, setCarePlanOptions] = useState<any[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<{[residentId: string]: string}>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
-  const [activeTab, setActiveTab] = useState<'assigned' | 'unassigned' | 'discharged'>('assigned');
+  const [activeTab, setActiveTab] = useState<'admitted' | 'active' | 'discharged'>('admitted');
+
+  // SWR fetcher function
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+
+  // Fetch residents data with SWR
+  const { data: residentsResponse, error: residentsError, mutate: mutateResidents } = useSWR(
+    user ? '/api/residents' : null,
+    () => residentAPI.getAll(),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 5000,
+    }
+  );
+
+  // Fetch care plans data with SWR
+  const { data: carePlansData, error: carePlansError } = useSWR(
+    user ? '/api/care-plans' : null,
+    () => carePlansAPI.getAll(),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 10000,
+    }
+  );
+
+  // Process residents data
+  const residentsData = React.useMemo(() => {
+    if (!residentsResponse) return [];
+    
+    let apiData: any[] = [];
+    if (Array.isArray(residentsResponse)) {
+      apiData = residentsResponse;
+    } else {
+      try {
+        apiData = (residentsResponse as any).data || [];
+      } catch (error) {
+        apiData = [];
+      }
+    }
+
+    return apiData.map((r: any) => ({
+      id: r._id,
+      name: r.full_name || '',
+      age: r.date_of_birth ? (new Date().getFullYear() - new Date(r.date_of_birth).getFullYear()) : '',
+      careLevel: r.care_level || '',
+      emergencyContact: r.emergency_contact?.name || '',
+      contactPhone: r.emergency_contact?.phone || '',
+      avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
+      gender: (r.gender || '').toLowerCase(),
+      status: r.status || 'active',
+      discharge_date: r.discharge_date || null,
+    }));
+  }, [residentsResponse]);
+
+  // Process care plans data
+  const carePlanOptions = React.useMemo(() => {
+    return Array.isArray(carePlansData) ? carePlansData : [];
+  }, [carePlansData]);
   
 
   
@@ -51,97 +109,84 @@ export default function ResidentsPage() {
       router.push('/');
       return;
     }
-    
-
   }, [user, router]);
-  
 
-  
-  useEffect(() => {
-    const fetchResidents = async () => {
-      try {
-        const apiData = await residentAPI.getAll();
-        const mapped = apiData.map((r: any) => ({
-          id: r._id,
-          name: r.full_name || '',
-          age: r.date_of_birth ? (new Date().getFullYear() - new Date(r.date_of_birth).getFullYear()) : '',
-          careLevel: r.care_level || '',
-          emergencyContact: r.emergency_contact?.name || '',
-          contactPhone: r.emergency_contact?.phone || '',
-          avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
-          gender: (r.gender || '').toLowerCase(),
-          status: r.status || 'active',
-        }));
-        setResidentsData(mapped);
-        mapped.forEach(async (resident: any) => {
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-            const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-            
-            if (bedAssignment?.bed_id?.room_id) {
-              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: bedAssignment.bed_id.room_id.room_number }));
-              } else {
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
-                  setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
-                } else {
-                  setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
-                }
-              }
+  // Load room numbers for residents (optimized with useMemo)
+  React.useEffect(() => {
+    if (!residentsData.length) return;
+
+    const loadRoomNumbers = async () => {
+      const roomNumbersMap: { [residentId: string]: string } = {};
+      
+      // Process all residents in parallel
+      const promises = residentsData.map(async (resident: any) => {
+        try {
+          const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+          const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+
+          if (bedAssignment?.bed_id?.room_id) {
+            if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+              roomNumbersMap[resident.id] = bedAssignment.bed_id.room_id.room_number;
             } else {
-              const assignments = await carePlansAPI.getByResidentId(resident.id);
-              const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-              const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              if (roomIdString) {
-                const room = await roomsAPI.getById(roomIdString);
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
+              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                roomNumbersMap[resident.id] = room?.room_number || 'Chưa hoàn tất đăng kí';
               } else {
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+                roomNumbersMap[resident.id] = 'Chưa hoàn tất đăng kí';
               }
             }
-          } catch (error) {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+          } else {
+            const assignments = await carePlansAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
+              roomNumbersMap[resident.id] = room?.room_number || 'Chưa hoàn tất đăng kí';
+            } else {
+              roomNumbersMap[resident.id] = 'Chưa hoàn tất đăng kí';
+            }
           }
-        });
-        
-      } catch (err) {
-        setResidentsData([]);
-      }
-    };
-    fetchResidents();
-  }, []);
+        } catch (error) {
+          roomNumbersMap[resident.id] = 'Chưa hoàn tất đăng kí';
+        }
+      });
 
-  useEffect(() => {
-    const fetchCarePlans = async () => {
-      try {
-        const data = await carePlansAPI.getAll();
-        setCarePlanOptions(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setCarePlanOptions([]);
-      }
+      await Promise.all(promises);
+      setRoomNumbers(roomNumbersMap);
     };
-    fetchCarePlans();
-  }, []);
+
+    loadRoomNumbers();
+  }, [residentsData]);
   
 
   
+  // Loading and error states
+  const isLoading = !residentsResponse && !residentsError;
+  const hasError = residentsError;
+
   const filteredResidents = residentsData.filter((resident) => {
-    const searchValue = (searchTerm || '').toString();
-    const residentName = (resident.name || '').toString();
-    const residentRoom = (roomNumbers[resident.id] || '').toString();
-    return residentName.toLowerCase().includes(searchValue.toLowerCase()) ||
-                         residentRoom.toLowerCase().includes(searchValue.toLowerCase());
+    const searchValue = (searchTerm || '').toString().trim();
+    
+    // If no search term, show all residents
+    if (!searchValue) {
+      return true;
+    }
+    
+    const residentName = (resident.name || '').toString().toLowerCase();
+    const residentRoom = (roomNumbers[resident.id] || '').toString().toLowerCase();
+    
+    return residentName.includes(searchValue.toLowerCase()) ||
+      residentRoom.includes(searchValue.toLowerCase());
   });
 
-  const residentsWithRooms = filteredResidents.filter(resident => 
-    resident.status === 'active' && roomNumbers[resident.id] && roomNumbers[resident.id] !== 'Chưa hoàn tất đăng kí'
+  const residentsAdmitted = filteredResidents.filter(resident => 
+    resident.status === 'admitted'
   );
   
-  const residentsWithoutRooms = filteredResidents.filter(resident => 
-    resident.status === 'active' && (!roomNumbers[resident.id] || roomNumbers[resident.id] === 'Chưa hoàn tất đăng kí')
+  const residentsActive = filteredResidents.filter(resident => 
+    resident.status === 'active'
   );
 
   const residentsDischarged = filteredResidents.filter(resident => 
@@ -165,20 +210,20 @@ export default function ResidentsPage() {
     if (residentToDelete !== null) {
       try {
         await residentAPI.delete(residentToDelete.toString());
-        
-        const updatedResidents = residentsData.filter(resident => resident.id !== residentToDelete);
-        setResidentsData(updatedResidents);
-        
+
+        // Refresh data using SWR mutate
+        mutateResidents();
+
         setShowDeleteModal(false);
         setResidentToDelete(null);
-        
+
         setSuccessMessage('Đã xóa thông tin người cao tuổi thành công! Tài khoản gia đình vẫn được giữ nguyên.');
         setModalType('success');
         setShowSuccessModal(true);
       } catch (error) {
         setShowDeleteModal(false);
         setResidentToDelete(null);
-        
+
         setSuccessMessage('Có lỗi xảy ra khi xóa người cao tuổi. Vui lòng thử lại.');
         setModalType('error');
         setShowSuccessModal(true);
@@ -436,13 +481,13 @@ export default function ResidentsPage() {
                 margin: '0 0 0.5rem 0',
                 color: '#374151'
               }}>
-            {activeTab === 'assigned' ? 'Không có người cao tuổi nào đã được phân phòng' : 
-             activeTab === 'unassigned' ? 'Không có người cao tuổi nào chưa được phân phòng' :
+            {activeTab === 'admitted' ? 'Không có người cao tuổi nào đã được phân phòng' : 
+             activeTab === 'active' ? 'Không có người cao tuổi nào chưa được phân phòng' :
              'Không có người cao tuổi nào đã xuất viện'}
               </h3>
               <p style={{margin: 0, fontSize: '0.875rem'}}>
-            {activeTab === 'assigned' ? 'Tất cả người cao tuổi đều chưa được phân phòng' : 
-             activeTab === 'unassigned' ? 'Tất cả người cao tuổi đều đã được phân phòng' :
+            {activeTab === 'admitted' ? 'Tất cả người cao tuổi đều chưa được phân phòng' : 
+             activeTab === 'active' ? 'Tất cả người cao tuổi đều đã được phân phòng' :
              'Tất cả người cao tuổi đều đang ở viện'}
               </p>
             </div>
@@ -456,11 +501,18 @@ export default function ResidentsPage() {
 
   
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      position: 'relative'
-    }}>
+    <>
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        position: 'relative'
+      }}>
 
 
       <div style={{
@@ -634,8 +686,8 @@ export default function ResidentsPage() {
                 margin: 0,
                 fontWeight: 600
               }}>
-                Hiển thị: {activeTab === 'assigned' ? residentsWithRooms.length : 
-                           activeTab === 'unassigned' ? residentsWithoutRooms.length :
+                Hiển thị: {activeTab === 'admitted' ? residentsAdmitted.length : 
+                           activeTab === 'active' ? residentsActive.length :
                            residentsDischarged.length} người cao tuổi
               </p>
             </div>
@@ -658,7 +710,7 @@ export default function ResidentsPage() {
             marginBottom: '1rem'
           }}>
             <button
-              onClick={() => setActiveTab('assigned')}
+              onClick={() => setActiveTab('admitted')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -666,20 +718,20 @@ export default function ResidentsPage() {
                 padding: '0.75rem 1.5rem',
                 borderRadius: '0.5rem',
                 border: 'none',
-                background: activeTab === 'assigned' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
-                color: activeTab === 'assigned' ? 'white' : '#6b7280',
+                background: activeTab === 'admitted' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                color: activeTab === 'admitted' ? 'white' : '#6b7280',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '0.875rem',
                 transition: 'all 0.2s ease',
-                boxShadow: activeTab === 'assigned' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
+                boxShadow: activeTab === 'admitted' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
               }}
             >
               <HomeIcon style={{width: '1.125rem', height: '1.125rem'}} />
-              Đã phân phòng ({residentsWithRooms.length} người)
+              Đã phân phòng ({residentsAdmitted.length} người)
             </button>
             <button
-              onClick={() => setActiveTab('unassigned')}
+              onClick={() => setActiveTab('active')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -687,17 +739,17 @@ export default function ResidentsPage() {
                 padding: '0.75rem 1.5rem',
                 borderRadius: '0.5rem',
                 border: 'none',
-                background: activeTab === 'unassigned' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
-                color: activeTab === 'unassigned' ? 'white' : '#6b7280',
+                background: activeTab === 'active' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                color: activeTab === 'active' ? 'white' : '#6b7280',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '0.875rem',
                 transition: 'all 0.2s ease',
-                boxShadow: activeTab === 'unassigned' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                boxShadow: activeTab === 'active' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
               }}
             >
               <ExclamationTriangleIcon style={{width: '1.125rem', height: '1.125rem'}} />
-              Chưa phân phòng ({residentsWithoutRooms.length} người)
+              Chưa phân phòng ({residentsActive.length} người)
             </button>
             <button
               onClick={() => setActiveTab('discharged')}
@@ -727,9 +779,95 @@ export default function ResidentsPage() {
 
         </div>
 
-        {activeTab === 'assigned' ? renderResidentsTable(residentsWithRooms, true, false) : 
-         activeTab === 'unassigned' ? renderResidentsTable(residentsWithoutRooms, false, false) :
-         renderResidentsTable(residentsDischarged, false, true)}
+        {isLoading ? (
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1rem',
+            padding: '3rem',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <div style={{
+              display: 'inline-block',
+              width: '2rem',
+              height: '2rem',
+              border: '3px solid #e5e7eb',
+              borderTop: '3px solid #667eea',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginBottom: '1rem'
+            }}></div>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              margin: '0 0 0.5rem 0',
+              color: '#374151'
+            }}>
+              Đang tải dữ liệu...
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+              Vui lòng chờ trong giây lát
+            </p>
+          </div>
+        ) : hasError ? (
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '1rem',
+            padding: '3rem',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              margin: '0 auto 1rem',
+              color: '#ef4444'
+            }}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              margin: '0 0 0.5rem 0',
+              color: '#374151'
+            }}>
+              Lỗi tải dữ liệu
+            </h3>
+            <p style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
+              Không thể tải danh sách người cao tuổi
+            </p>
+            <button
+              onClick={() => mutateResidents()}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          activeTab === 'admitted' ? renderResidentsTable(residentsAdmitted, true, false) : 
+          activeTab === 'active' ? renderResidentsTable(residentsActive, false, false) :
+          renderResidentsTable(residentsDischarged, false, true)
+        )}
 
       </div>
 
@@ -879,5 +1017,6 @@ export default function ResidentsPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

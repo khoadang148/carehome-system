@@ -35,13 +35,23 @@ export default function PreloadData() {
     if (!shouldPrefetchData) return;
 
     const prefetchTimer = setTimeout(() => {
-      if (userRole === 'family' && userId) {
-        residentAPI.getByFamilyMemberId(userId).catch(() => {});
-      } else if (userRole === 'admin' || userRole === 'staff') {
-        residentAPI.getAll().catch(() => {});
+      try {
+        if (userRole === 'family' && userId) {
+          residentAPI.getByFamilyMemberId(userId).catch((error) => {
+            console.debug('Prefetch residents failed:', error);
+          });
+        } else if (userRole === 'admin' || userRole === 'staff') {
+          residentAPI.getAll().catch((error) => {
+            console.debug('Prefetch all residents failed:', error);
+          });
+        }
+        
+        activitiesAPI.getAll().catch((error) => {
+          console.debug('Prefetch activities failed:', error);
+        });
+      } catch (error) {
+        console.debug('Prefetch data error:', error);
       }
-      
-      activitiesAPI.getAll().catch(() => {});
     }, 100);
 
     return () => clearTimeout(prefetchTimer);
@@ -52,10 +62,22 @@ export default function PreloadData() {
 
     const routePrefetchTimer = setTimeout(() => {
       prefetchRoutes.forEach(route => {
-        const link = document.createElement('link');
-        link.rel = 'prefetch';
-        link.href = route;
-        document.head.appendChild(link);
+        try {
+          // Only prefetch if we're in the browser and route is valid
+          if (typeof window !== 'undefined' && route && route.startsWith('/')) {
+            const link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.href = route;
+            link.onerror = () => {
+              // Silently handle prefetch errors
+              console.debug(`Prefetch failed for route: ${route}`);
+            };
+            document.head.appendChild(link);
+          }
+        } catch (error) {
+          // Silently handle any prefetch errors
+          console.debug(`Prefetch error for route ${route}:`, error);
+        }
       });
     }, 200);
 

@@ -160,7 +160,19 @@ export function useVitalSigns(): UseVitalSignsReturn {
       const residentsList = await loadResidents();
       console.log('Residents loaded:', residentsList.length);
       
-      const vsList = await vitalSignsAPI.getAll();
+      // Fetch vital signs per resident to avoid heavy/global GET and reduce BE errors
+      let vsList: any[] = [];
+      if (Array.isArray(residentsList) && residentsList.length > 0) {
+        const settled = await Promise.allSettled(
+          residentsList.map((r: any) => vitalSignsAPI.getByResidentId(r.id))
+        );
+        for (const r of settled) {
+          if (r.status === 'fulfilled') {
+            const items = Array.isArray(r.value) ? r.value : [];
+            vsList.push(...items);
+          }
+        }
+      }
       console.log('Raw vital signs from API:', vsList);
       
       const mappedVitalSigns: VitalSigns[] = vsList.map((vs: any) => {

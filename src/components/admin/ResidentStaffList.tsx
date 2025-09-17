@@ -96,14 +96,24 @@ export default function ResidentStaffList() {
       setLoading(true);
       
       const residentsData = await residentAPI.getAll();
-      const activeResidents = residentsData.filter((resident: any) => 
-        resident.status === 'active'
+      const residentsArr: any[] = Array.isArray(residentsData)
+        ? residentsData
+        : (residentsData && Array.isArray((residentsData as any).data))
+          ? (residentsData as any).data
+          : [];
+      const admittedResidents = residentsArr.filter((resident: any) => 
+        resident.status === 'admitted'
       );
-      setResidents(activeResidents);
-      setFilteredResidents(activeResidents);
+      setResidents(admittedResidents);
+      setFilteredResidents(admittedResidents);
 
       const staffData = await userAPI.getAll();
-      const activeStaff = staffData.filter((user: any) => 
+      const staffArr: any[] = Array.isArray(staffData)
+        ? staffData
+        : (staffData && Array.isArray((staffData as any).data))
+          ? (staffData as any).data
+          : [];
+      const activeStaff = staffArr.filter((user: any) => 
         user.role === 'staff' && user.status === 'active'
       );
       setStaff(activeStaff);

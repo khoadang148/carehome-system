@@ -87,12 +87,14 @@ export default function FinancePage() {
 
   useEffect(() => {
     if (!user) {
-      router.push('/login');
+      router.replace('/login');
       return;
     }
 
     if (user.role !== 'family') {
-      router.push('/');
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
       return;
     }
   }, [user, router]);

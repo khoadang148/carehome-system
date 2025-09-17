@@ -8,6 +8,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import SessionTimeoutModal from '@/components/SessionTimeoutModal';
 import TransitionLoading from '@/components/TransitionLoading';
 import { NotificationProvider } from '@/lib/contexts/notification-context';
+import { ResidentsProvider } from '@/lib/contexts/residents-context';
 import { ToastProvider } from '@/components/ToastProvider';
 
 // Dynamic imports for performance
@@ -70,40 +71,44 @@ function ClientLayout({ children }: { children: React.ReactNode }) {
   if (!isProtectedRoute || isPaymentRoute) {
     return (
       <NotificationProvider>
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
-          <main className="flex-1 relative z-10">
-            {children}
-          </main>
-          <PerformanceMonitor />
-          <ToastProvider />
-          <ChatFloatingButton />
-        </div>
+        <ResidentsProvider>
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
+            <main className="flex-1 relative z-10">
+              {children}
+            </main>
+            <PerformanceMonitor />
+            <ToastProvider />
+            <ChatFloatingButton />
+          </div>
+        </ResidentsProvider>
       </NotificationProvider>
     );
   }
 
   return (
     <NotificationProvider>
-      <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex overflow-hidden relative">
-        <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 relative z-10">
-          <Header />
-          <main className="flex-1 overflow-auto relative">
-            <TransitionLoading />
-            {children}
-          </main>
+      <ResidentsProvider>
+        <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex overflow-hidden relative">
+          <Sidebar />
+          <div className="flex-1 flex flex-col min-w-0 relative z-10">
+            <Header />
+            <main className="flex-1 overflow-auto relative">
+              <TransitionLoading />
+              {children}
+            </main>
+          </div>
+          <SessionTimeoutModal 
+            isOpen={false}
+            onExtend={() => {}}
+            onLogout={() => {}}
+            remainingTime={0}
+          />
+          <PerformanceMonitor />
+          <ToastProvider />
+          <ChatFloatingButton />
+          <PreloadData />
         </div>
-        <SessionTimeoutModal 
-          isOpen={false}
-          onExtend={() => {}}
-          onLogout={() => {}}
-          remainingTime={0}
-        />
-        <PerformanceMonitor />
-        <ToastProvider />
-        <ChatFloatingButton />
-        <PreloadData />
-      </div>
+      </ResidentsProvider>
     </NotificationProvider>
   );
 }

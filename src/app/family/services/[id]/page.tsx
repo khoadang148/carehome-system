@@ -52,12 +52,14 @@ export default function ServiceDetailsPage() {
 
   useEffect(() => {
     if (!user) {
-      router.push('/login');
+      router.replace('/login');
       return;
     }
 
     if (user?.role !== 'family') {
-      router.push('/');
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
       return;
     }
   }, [user, router]);
@@ -724,7 +726,7 @@ export default function ServiceDetailsPage() {
                       {selectedRelative.full_name || selectedRelative.name || 'Người thân'} chưa đăng ký gói dịch vụ nào
                     </p>
                     <button
-                      onClick={() => router.push('/family/services')}
+                      onClick={() => router.push('/services/purchase')}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                       aria-label="Chuyển đến trang đăng ký dịch vụ mới"
                     >

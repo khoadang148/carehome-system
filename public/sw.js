@@ -1,6 +1,7 @@
-const CACHE_NAME = 'carehome-v1';
-const STATIC_CACHE = 'static-v1';
-const API_CACHE = 'api-v1';
+// Bump versions to invalidate old, potentially broken caches
+const CACHE_NAME = 'carehome-v2';
+const STATIC_CACHE = 'static-v2';
+const API_CACHE = 'api-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -50,6 +51,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Never cache Next.js runtime and chunk assets to avoid stale Webpack/runtime
+  // issues that lead to ChunkLoadError during development or after deploys.
+  if (url.pathname.startsWith('/_next/')) {
+    return event.respondWith(fetch(request));
+  }
 
   // Handle API requests
   if (url.pathname.startsWith('/api/')) {

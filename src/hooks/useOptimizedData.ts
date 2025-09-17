@@ -177,44 +177,59 @@ export function useResidentsAssignmentStatus(residents: any[]) {
   const key = `assignments-${residents.map(r => r._id || r.id).join('-')}`;
   
   return useOptimizedData(key, async () => {
-    const entries = await Promise.all(
-      (residents || []).map(async (r) => {
-        const residentId = r._id || r.id;
-        if (!residentId) {
-          return [null, { hasAssignment: false, isExpired: false }] as const;
-        }
-        
-        try {
-          const assignments = await carePlanAssignmentsAPI.getByResidentId(residentId);
-          const activeAssignments = Array.isArray(assignments) ? assignments : [];
-          
-          if (activeAssignments.length === 0) {
-            return [residentId, { hasAssignment: false, isExpired: false }] as const;
+    const ids = (residents || [])
+      .map(r => r?._id || r?.id)
+      .filter(Boolean) as string[];
+
+    // simple in-fetch memoization to avoid duplicate calls within the same batch
+    const memo = new Map<string, { hasAssignment: boolean; isExpired: boolean; endDate?: string }>();
+
+    const results: Array<[string, { hasAssignment: boolean; isExpired: boolean; endDate?: string }]> = [];
+
+    const concurrency = 8; // limit parallel requests
+    for (let i = 0; i < ids.length; i += concurrency) {
+      const slice = ids.slice(i, i + concurrency);
+      // process a chunk in parallel
+      const chunk = await Promise.all(
+        slice.map(async (residentId): Promise<[string, { hasAssignment: boolean; isExpired: boolean; endDate?: string }]> => {
+          if (memo.has(residentId)) {
+            return [residentId, memo.get(residentId)!];
           }
-          
-          const latestAssignment = activeAssignments[0];
-          const endDate = latestAssignment?.end_date || latestAssignment?.endDate;
-          
-          if (!endDate) {
-            return [residentId, { hasAssignment: true, isExpired: false, endDate }] as const;
+          try {
+            const assignments = await carePlanAssignmentsAPI.getByResidentId(residentId);
+            const activeAssignments = Array.isArray(assignments) ? assignments : [];
+            if (activeAssignments.length === 0) {
+              const v = { hasAssignment: false, isExpired: false };
+              memo.set(residentId, v);
+              return [residentId, v];
+            }
+            const latestAssignment = activeAssignments[0];
+            const endDate = latestAssignment?.end_date || latestAssignment?.endDate;
+            if (!endDate) {
+              const v = { hasAssignment: true, isExpired: false, endDate };
+              memo.set(residentId, v);
+              return [residentId, v];
+            }
+            const now = new Date();
+            const end = new Date(endDate);
+            const isExpired = end < now;
+            const v = { hasAssignment: true, isExpired, endDate };
+            memo.set(residentId, v);
+            return [residentId, v];
+          } catch (error) {
+            const v = { hasAssignment: false, isExpired: false };
+            memo.set(residentId, v);
+            return [residentId, v];
           }
-          
-          const now = new Date();
-          const end = new Date(endDate);
-          const isExpired = end < now;
-          
-          return [residentId, { hasAssignment: true, isExpired, endDate }] as const;
-        } catch (error) {
-          return [residentId, { hasAssignment: false, isExpired: false }] as const;
-        }
-      })
-    );
+        })
+      );
+      results.push(...chunk);
+    }
 
     const map: Record<string, { hasAssignment: boolean; isExpired: boolean; endDate?: string }> = {};
-    for (const [id, status] of entries) {
+    for (const [id, status] of results) {
       if (id) map[id] = status;
     }
-    
     return map;
   }, { ttl: 2 * 60 * 1000 }); // 2 minutes cache for assignments
 }

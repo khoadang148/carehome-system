@@ -2,12 +2,13 @@
 import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   MagnifyingGlassIcon, 
   UserGroupIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
-import { staffAssignmentsAPI, carePlansAPI, roomsAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
+import { staffAssignmentsAPI, carePlansAPI, roomsAPI, userAPI, bedAssignmentsAPI, residentAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import Avatar from '@/components/Avatar';
 
@@ -62,70 +63,187 @@ export default function StaffResidentsPage() {
       try {
         const data = await staffAssignmentsAPI.getMyAssignments();
         const assignmentsData = Array.isArray(data) ? data : [];
-        
-        const mapped = assignmentsData
-          .filter((assignment: any) => assignment.status === 'active')
-          .map((assignment: any) => {
-            const resident = assignment.resident_id;
-            const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
-            
-            return {
-              id: resident._id,
-              name: resident.full_name || '',
-              age: age || '',
-              careLevel: resident.care_level || '',
-              emergencyContact: resident.emergency_contact?.name || '',
-              contactPhone: resident.emergency_contact?.phone || '',
-              avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
-              gender: (resident.gender || '').toLowerCase(),
-              assignmentStatus: assignment.status || 'unknown',
-              assignmentId: assignment._id,
-              endDate: assignment.end_date,
-              assignedDate: assignment.assigned_date,
-            };
-          });
-        
-        setResidentsData(mapped);
-        
-        const roomEntries = await Promise.all(
-          mapped.map(async (resident: any) => {
-            try {
-              const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-              const bedAssignment = Array.isArray(bedAssignments)
-                ? bedAssignments.find((a: any) => a.bed_id?.room_id)
-                : null;
-              if (bedAssignment?.bed_id?.room_id) {
-                if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                  return [resident.id, bedAssignment.bed_id.room_id.room_number] as [string, string];
+
+        const isAssignmentActive = (a: any) => {
+          if (!a) return false;
+          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+          if (!a.end_date) return true;
+          const end = new Date(a.end_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return end >= today;
+        };
+
+        // Detect new room-based shape: item has room_id and residents array
+        const isRoomBased = assignmentsData.some((a: any) => a && (a.room_id || a.residents));
+
+        if (isRoomBased) {
+          // Flatten residents from each assigned room
+          const uniqueRooms: { [roomId: string]: any } = {};
+          const flattened: any[] = [];
+
+          const activeRoomAssignments = assignmentsData.filter((a: any) => isAssignmentActive(a));
+
+          for (const assignment of activeRoomAssignments) {
+            const room = assignment.room_id;
+            let residents: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+
+            // Cache room info for later number resolution
+            const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+            if (roomId && !uniqueRooms[roomId]) uniqueRooms[roomId] = room;
+
+            // Fallback: if BE doesn't include residents in assignment, derive from bed assignments by room
+            if ((!residents || residents.length === 0) && roomId) {
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getAll();
+                if (Array.isArray(bedAssignments)) {
+                  residents = bedAssignments
+                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .map((ba: any) => ba.resident_id)
+                    .filter(Boolean);
                 }
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
+              } catch {}
+            }
+
+            for (const resident of residents) {
+              const age = resident?.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
+              flattened.push({
+                id: resident?._id,
+                name: resident?.full_name || '',
+                age: age || '',
+                careLevel: resident?.care_level || '',
+                emergencyContact: resident?.emergency_contact?.name || '',
+                contactPhone: resident?.emergency_contact?.phone || '',
+                avatar: Array.isArray(resident?.avatar) ? resident.avatar[0] : resident?.avatar || null,
+                gender: (resident?.gender || '').toLowerCase(),
+                assignmentStatus: assignment.status || 'active',
+                assignmentId: assignment._id,
+                endDate: assignment.end_date,
+                assignedDate: assignment.assigned_date,
+                __roomId: roomId,
+              });
+            }
+          }
+
+          // Enrich with avatar + emergency contact from resident detail
+          const enriched = await Promise.all(flattened.map(async (r) => {
+            try {
+              const detail = await residentAPI.getById(r.id);
+              const emergency = detail?.emergency_contact || {};
+              return {
+                ...r,
+                emergencyContact: emergency?.name || r.emergencyContact || '',
+                contactPhone: emergency?.phone || r.contactPhone || '',
+                avatar: detail?.avatar ? residentAPI.getAvatarUrl(r.id) : r.avatar,
+              };
+            } catch {
+              return r;
+            }
+          }));
+
+          setResidentsData(enriched);
+
+          // Resolve room numbers for residents
+          const roomNumberMap: { [roomId: string]: string } = {};
+          // First, take known numbers from objects
+          for (const [rid, roomVal] of Object.entries(uniqueRooms)) {
+            const rn = (roomVal && typeof roomVal === 'object' && roomVal.room_number) ? roomVal.room_number : '';
+            if (rn) roomNumberMap[rid] = rn;
+          }
+          // Fetch missing room objects only once per room id
+          const missingRoomIds = Object.keys(uniqueRooms).filter(rid => !roomNumberMap[rid]);
+          const fetchedRooms = await Promise.all(missingRoomIds.map(async (rid) => {
+            try { return [rid, await roomsAPI.getById(rid)] as const; } catch { return [rid, null] as const; }
+          }));
+          fetchedRooms.forEach(([rid, room]) => {
+            if (room?.room_number) roomNumberMap[rid] = room.room_number;
+          });
+
+          const nextMap: { [key: string]: string } = {};
+          flattened.forEach((r) => {
+            if (r.__roomId && roomNumberMap[r.__roomId]) nextMap[r.id] = roomNumberMap[r.__roomId];
+          });
+          setRoomNumbers(nextMap);
+        } else {
+          // Backward compatibility: resident-based assignments
+          const mapped = assignmentsData
+            .filter((assignment: any) => isAssignmentActive(assignment))
+            .map((assignment: any) => {
+              const resident = assignment.resident_id;
+              const age = resident.date_of_birth ? (new Date().getFullYear() - new Date(resident.date_of_birth).getFullYear()) : '';
+              return {
+                id: resident._id,
+                name: resident.full_name || '',
+                age: age || '',
+                careLevel: resident.care_level || '',
+                emergencyContact: resident.emergency_contact?.name || '',
+                contactPhone: resident.emergency_contact?.phone || '',
+                avatar: Array.isArray(resident.avatar) ? resident.avatar[0] : resident.avatar || null,
+                gender: (resident.gender || '').toLowerCase(),
+                assignmentStatus: assignment.status || 'active',
+                assignmentId: assignment._id,
+                endDate: assignment.end_date,
+                assignedDate: assignment.assigned_date,
+              };
+            });
+
+          const enriched = await Promise.all(mapped.map(async (r) => {
+            try {
+              const detail = await residentAPI.getById(r.id);
+              const emergency = detail?.emergency_contact || {};
+              return {
+                ...r,
+                emergencyContact: emergency?.name || r.emergencyContact || '',
+                contactPhone: emergency?.phone || r.contactPhone || '',
+                avatar: detail?.avatar ? residentAPI.getAvatarUrl(r.id) : r.avatar,
+              };
+            } catch {
+              return r;
+            }
+          }));
+
+          setResidentsData(enriched);
+
+          const roomEntries = await Promise.all(
+            mapped.map(async (resident: any) => {
+              try {
+                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+                const bedAssignment = Array.isArray(bedAssignments)
+                  ? bedAssignments.find((a: any) => a.bed_id?.room_id)
+                  : null;
+                if (bedAssignment?.bed_id?.room_id) {
+                  if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+                    return [resident.id, bedAssignment.bed_id.room_id.room_number] as [string, string];
+                  }
+                  const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+                  if (roomId) {
+                    const room = await roomsAPI.getById(roomId);
+                    return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
+                  }
+                }
+
+                const assignments = await carePlansAPI.getByResidentId(resident.id);
+                const assignment = Array.isArray(assignments)
+                  ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id)
+                  : null;
+                const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+                const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+                if (roomIdString) {
+                  const room = await roomsAPI.getById(roomIdString);
                   return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
                 }
+                return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
+              } catch {
+                return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
               }
-
-              const assignments = await carePlansAPI.getByResidentId(resident.id);
-              const assignment = Array.isArray(assignments)
-                ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id)
-                : null;
-              const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              if (roomIdString) {
-                const room = await roomsAPI.getById(roomIdString);
-                return [resident.id, room?.room_number || 'Chưa hoàn tất đăng kí'] as [string, string];
-              }
-              return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
-            } catch {
-              return [resident.id, 'Chưa hoàn tất đăng kí'] as [string, string];
-            }
-          })
-        );
-        const nextMap: { [key: string]: string } = {};
-        roomEntries.forEach(([id, number]) => {
-          nextMap[id] = number;
-        });
-        setRoomNumbers(nextMap);
+            })
+          );
+          const nextMap: { [key: string]: string } = {};
+          roomEntries.forEach(([id, number]) => {
+            nextMap[id] = number;
+          });
+          setRoomNumbers(nextMap);
+        }
         
         setError('');
       } catch (err) {
@@ -149,9 +267,6 @@ export default function StaffResidentsPage() {
            residentRoom.toLowerCase().includes(searchValue.toLowerCase());
   });
   
-  const handleViewResident = (residentId: number) => {
-    router.push(`/staff/residents/${residentId}`);
-  };
 
   if (!user) {
     return (
@@ -266,7 +381,7 @@ export default function StaffResidentsPage() {
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar
-                            src={resident.avatar ? userAPI.getAvatarUrl(resident.avatar) : undefined}
+                            src={resident.avatar ? residentAPI.getAvatarUrl(resident.id) : undefined}
                             alt={resident.name}
                             size="small"
                             className="w-10 h-10"
@@ -317,13 +432,13 @@ export default function StaffResidentsPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => handleViewResident(resident.id)}
+                          <Link
+                            href={`/staff/residents/${resident.id}`}
                             title="Xem thông tin chi tiết người cao tuổi"
-                            className="p-2 rounded-md border-none bg-blue-100 text-blue-600 cursor-pointer transition-all duration-200 hover:bg-blue-600 hover:text-white"
+                            className="p-2 rounded-md border-none bg-blue-100 text-blue-600 cursor-pointer transition-all duration-200 hover:bg-blue-600 hover:text-white no-underline"
                           >
                             <EyeIcon className="w-4 h-4" />
-                          </button>
+                          </Link>
                         </div>
                       </td>
                     </tr>

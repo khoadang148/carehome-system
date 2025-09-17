@@ -2,10 +2,11 @@
 
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import useSWR from 'swr';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlansAPI, residentAPI, roomsAPI, bedsAPI, roomTypesAPI, carePlanAssignmentsAPI, userAPI, apiClient, bedAssignmentsAPI } from '@/lib/api';
 import { clientStorage } from '@/lib/utils/clientStorage';
-import { useOptimizedCarePlansAll, useOptimizedResidentsByRole, useOptimizedRooms, useOptimizedBeds, useOptimizedRoomTypes, useResidentsAssignmentStatus } from '@/hooks/useOptimizedData';
+import { useResidentsAssignmentStatus } from '@/hooks/useOptimizedData';
 import { ArrowLeftIcon, CheckCircleIcon, UserIcon, MagnifyingGlassIcon, FunnelIcon, CalendarIcon, PhoneIcon, MapPinIcon, GiftIcon, PlusIcon } from '@heroicons/react/24/outline';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -47,7 +48,7 @@ export default function SelectPackagesPage() {
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [registrationPeriod, setRegistrationPeriod] = useState('6');
+  const [registrationPeriod, setRegistrationPeriod] = useState('1');
   const [medicalNotes, setMedicalNotes] = useState('');
   const [familyPreferences, setFamilyPreferences] = useState({
     preferred_room_gender: '',
@@ -65,6 +66,8 @@ export default function SelectPackagesPage() {
   const [residentsWithAssignmentStatus, setResidentsWithAssignmentStatus] = useState<{ [key: string]: { hasAssignment: boolean; isExpired: boolean; endDate?: string } }>({});
   const [loadingAssignmentStatus, setLoadingAssignmentStatus] = useState(false);
   const [displayedResidentIds, setDisplayedResidentIds] = useState<string[]>([]);
+  const [residentServiceStatus, setResidentServiceStatus] = useState<{[key: string]: any}>({});
+  const [loadingServiceStatus, setLoadingServiceStatus] = useState(false);
 
   // New state for re-registration
   const [keepExistingRoomBed, setKeepExistingRoomBed] = useState(false);
@@ -72,18 +75,146 @@ export default function SelectPackagesPage() {
   const [existingBedInfo, setExistingBedInfo] = useState<any>(null);
   const [loadingExistingInfo, setLoadingExistingInfo] = useState(false);
 
+  // Resident gender for filtering rooms consistently on step 4
+  const [residentGenderForFilter, setResidentGenderForFilter] = useState<string>('');
+
+  // Pending new resident payload from previous step
+  const [pendingResident, setPendingResident] = useState<any | null>(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('pending_resident_payload');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setPendingResident(parsed);
+        setStep(2); // Skip resident selection
+      }
+    } catch {}
+  }, []);
+
+  // If we have residentId in URL, prefer that flow and clear any leftover cached pending payload
+  useEffect(() => {
+    if (residentId) {
+      try { sessionStorage.removeItem('pending_resident_payload'); } catch {}
+      setPendingResident(null);
+    }
+  }, [residentId]);
+
+  const isNewResidentFlow = useMemo(() => Boolean(pendingResident), [pendingResident]);
+
+  // Helper: dataURL -> Blob
+  const dataURLToBlob = (dataUrl: string | null): Blob | null => {
+    if (!dataUrl) return null;
+    try {
+      const arr = dataUrl.split(',');
+      const header = arr[0] || '';
+      const match = header.match(/:(.*?);/);
+      const mime = match && match[1] ? match[1] : 'application/octet-stream';
+      const bstr = atob(arr[1] || '');
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    } catch {
+      return null;
+    }
+  };
+
+  // Helper: create resident from cached payload after we have care_plan_assignment_id
+  const createResidentFromPending = async (carePlanAssignmentId: string) => {
+    if (!pendingResident) return null;
+    const formData = new FormData();
+    try {
+      if (pendingResident.files?.avatar) {
+        const blob = dataURLToBlob(pendingResident.files.avatar);
+        if (blob) formData.append('avatar', blob, 'avatar.jpg');
+      }
+      if (pendingResident.files?.cccd_front) {
+        const blob = dataURLToBlob(pendingResident.files.cccd_front);
+        if (blob) formData.append('cccd_front', blob, 'cccd_front.jpg');
+      }
+      if (pendingResident.files?.cccd_back) {
+        const blob = dataURLToBlob(pendingResident.files.cccd_back);
+        if (blob) formData.append('cccd_back', blob, 'cccd_back.jpg');
+      }
+      if (pendingResident.files?.user_cccd_front) {
+        const blob = dataURLToBlob(pendingResident.files.user_cccd_front);
+        if (blob) formData.append('user_cccd_front', blob, 'user_cccd_front.jpg');
+      }
+      if (pendingResident.files?.user_cccd_back) {
+        const blob = dataURLToBlob(pendingResident.files.user_cccd_back);
+        if (blob) formData.append('user_cccd_back', blob, 'user_cccd_back.jpg');
+      }
+
+      formData.append('full_name', pendingResident.full_name);
+      formData.append('gender', pendingResident.gender);
+      formData.append('date_of_birth', pendingResident.date_of_birth);
+      formData.append('cccd_id', pendingResident.cccd_id);
+      formData.append('user_cccd_id', pendingResident.user_cccd_id);
+      formData.append('family_member_id', pendingResident.family_member_id);
+      formData.append('relationship', pendingResident.relationship);
+      formData.append('medical_history', pendingResident.medical_history || 'Không có');
+      formData.append('current_medications', JSON.stringify(pendingResident.current_medications || []));
+      formData.append('allergies', JSON.stringify(pendingResident.allergies || []));
+      formData.append('emergency_contact', JSON.stringify(pendingResident.emergency_contact || {}));
+      if (pendingResident.admission_date) formData.append('admission_date', pendingResident.admission_date);
+      if (carePlanAssignmentId) formData.append('care_plan_assignment_id', carePlanAssignmentId);
+
+      const res = await residentAPI.create(formData);
+      try { sessionStorage.removeItem('pending_resident_payload'); } catch {}
+      return res;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const isInitialLoading = useMemo(() => {
     return !residents.length || !carePlans.length;
   }, [residents, carePlans]);
 
   useEffect(() => {
-    if (startDate && registrationPeriod) {
+    if (startDate && registrationPeriod && registrationPeriod !== 'custom') {
       const start = new Date(startDate);
       const end = new Date(start);
       end.setMonth(end.getMonth() + parseInt(registrationPeriod));
       setEndDate(end.toISOString().split('T')[0]);
     }
   }, [startDate, registrationPeriod]);
+
+  // Ensure start date is set when entering step 6
+  useEffect(() => {
+    if (step !== 6) return;
+    if (startDate) return;
+    // Prefer pending resident
+    if (pendingResident?.admission_date) {
+      try {
+        const iso = new Date(pendingResident.admission_date).toISOString().split('T')[0];
+        setStartDate(iso);
+        return;
+      } catch {}
+    }
+    // Fetch by id if needed
+    const rid = residentId || selectedResidentId;
+    if (!rid) return;
+    const local = residents.find(x => (x._id || x.id) === rid);
+    if (local?.admission_date) {
+      try {
+        const iso = new Date(local.admission_date).toISOString().split('T')[0];
+        setStartDate(iso);
+      } catch {}
+      return;
+    }
+    (async () => {
+      try {
+        const r = await residentAPI.getById?.(rid);
+        if (r?.admission_date) {
+          const iso = new Date(r.admission_date).toISOString().split('T')[0];
+          setStartDate(iso);
+        }
+      } catch {}
+    })();
+  }, [step, startDate, pendingResident?.admission_date, residentId, selectedResidentId, residents]);
 
   const { data: assignmentMap, refetch: fetchAssignmentMap } = useResidentsAssignmentStatus(residents);
 
@@ -204,14 +335,27 @@ export default function SelectPackagesPage() {
     return residents
       .filter(r => r.status === 'active')
       .filter(r => ((r.full_name || r.name || '').toLowerCase().includes(searchLower)))
+      .filter(r => {
+        // Chỉ hiển thị resident chưa đăng ký dịch vụ hoặc có dịch vụ hết hạn
+        const serviceStatus = residentServiceStatus[r._id || r.id];
+        if (!serviceStatus) return false; // Chờ load trạng thái
+        
+        // Chỉ hiển thị resident đã được duyệt (không phải pending)
+        if (serviceStatus.residentStatus && serviceStatus.residentStatus === 'pending') {
+          return false;
+        }
+        
+        // Hiển thị nếu chưa có dịch vụ active và không đang chờ duyệt
+        return !serviceStatus.hasActiveService && !serviceStatus.hasPendingService;
+      })
       .map(r => r._id || r.id)
       .filter(Boolean);
-  }, [residents, searchTerm]);
+  }, [residents, searchTerm, residentServiceStatus]);
 
   const hasCompleteStatusForView = useMemo(() => {
     if (!activeAndSearchedIds.length) return true;
-    return activeAndSearchedIds.every(id => Boolean(residentsWithAssignmentStatus[id]));
-  }, [activeAndSearchedIds, residentsWithAssignmentStatus]);
+    return activeAndSearchedIds.every(id => Boolean(residentServiceStatus[id]));
+  }, [activeAndSearchedIds, residentServiceStatus]);
 
   useEffect(() => {
     if (!hasCompleteStatusForView) return;
@@ -221,14 +365,21 @@ export default function SelectPackagesPage() {
       .filter(r => ((r.full_name || r.name || '').toLowerCase().includes(searchLower)))
       .filter(r => {
         const id = r._id || r.id;
-        const st = residentsWithAssignmentStatus[id];
-        if (!st) return false;
-        return !st.hasAssignment || st.isExpired;
+        const serviceStatus = residentServiceStatus[id];
+        if (!serviceStatus) return false;
+        
+        // Chỉ hiển thị resident đã được duyệt (không phải pending)
+        if (serviceStatus.residentStatus && serviceStatus.residentStatus === 'pending') {
+          return false;
+        }
+        
+        // Hiển thị nếu chưa có dịch vụ active và không đang chờ duyệt
+        return !serviceStatus.hasActiveService && !serviceStatus.hasPendingService;
       })
       .map(r => r._id || r.id);
     setDisplayedResidentIds(filtered);
-    setLoadingAssignmentStatus(false);
-  }, [hasCompleteStatusForView, residents, residentsWithAssignmentStatus, searchTerm]);
+    setLoadingServiceStatus(false);
+  }, [hasCompleteStatusForView, residents, residentServiceStatus, searchTerm]);
 
   const filteredAndSortedResidents = useMemo(() => {
     if (!displayedResidentIds.length) return [];
@@ -266,70 +417,134 @@ export default function SelectPackagesPage() {
     }
   }, [user, router]);
 
-  // Optimized care plans loading - prioritize cached data
-  const { data: carePlansData, refetch: fetchCarePlans } = useOptimizedCarePlansAll();
+  // Derive resident gender for room filtering (handles: new flow, selected, or by query param)
   useEffect(() => {
-    // Use cached data first for instant display
-    if (carePlansData && Array.isArray(carePlansData) && carePlansData.length > 0) {
-      setCarePlans(carePlansData);
-      setLoading(false);
-    } else if (!carePlans.length) { // Only fetch if we don't have data
-    setLoading(true);
-    setError(null);
-    fetchCarePlans()
-      .then((data) => {
-          const next = Array.isArray(data) ? data : [];
-        setCarePlans(next);
-      })
-      .catch(() => setError('Không thể tải danh sách gói dịch vụ'))
-      .finally(() => setLoading(false));
+    // 1) From new resident flow cached data
+    if (pendingResident?.gender) {
+      setResidentGenderForFilter(pendingResident.gender);
+      return;
     }
-  }, [carePlansData, carePlans.length]); // Remove fetchCarePlans dependency
+    // 2) From selected resident in list
+    const rid = residentId || selectedResidentId;
+    if (rid && Array.isArray(residents) && residents.length > 0) {
+      const r = residents.find((x) => (x._id || x.id) === rid);
+      if (r?.gender) {
+        setResidentGenderForFilter(r.gender);
+        return;
+      }
+    }
+  }, [pendingResident?.gender, residentId, selectedResidentId, residents]);
 
-  // Optimized residents loading - prioritize cached data
-  const { data: residentsData, refetch: fetchResidents } = useOptimizedResidentsByRole(user?.role, user?.id);
+  // Fallback: If gender still unknown but have residentId, fetch that resident once
+  useEffect(() => {
+    const rid = residentId || selectedResidentId;
+    if (!residentGenderForFilter && rid) {
+      (async () => {
+        try {
+          const r = await residentAPI.getById?.(rid);
+          if (r?.gender) setResidentGenderForFilter(r.gender);
+        } catch {}
+      })();
+    }
+  }, [residentGenderForFilter, residentId, selectedResidentId]);
+
+  // Care plans via SWR
+  const { data: swrCarePlans, isLoading: isCarePlansLoading, error: carePlansError } = useSWR(
+    'care-plans',
+    () => carePlansAPI.getAll(),
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
+  useEffect(() => {
+    setLoading(isCarePlansLoading);
+    if (Array.isArray(swrCarePlans)) setCarePlans(swrCarePlans);
+    if (carePlansError) setError('Không thể tải danh sách gói dịch vụ');
+  }, [swrCarePlans, isCarePlansLoading, carePlansError]);
+
+  // Residents via SWR (by role)
+  const { data: swrResidents } = useSWR(
+    user ? ['residents-by-role', user.role, user.id] : null,
+    async () => {
+      if (user?.role === 'family' && user?.id) {
+        const res = await residentAPI.getByFamilyMemberId(user.id);
+        return Array.isArray(res) ? res : (res ? [res] : []);
+      }
+      if (user?.role === 'admin' || user?.role === 'staff') {
+        const res = await residentAPI.getAll?.({});
+        return Array.isArray(res) ? res : [];
+      }
+      return [];
+    },
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
   useEffect(() => {
     if (!user) return;
     if (residentId) {
       setSelectedResidentId(residentId);
       setStep(2);
+      // Do not return here; still allow residents list to load below
+    }
+    if (isNewResidentFlow && !residentId) {
+      // Skip loading residents only for brand-new flow without residentId
       return;
     }
-    
-    // Use cached data first for instant display
-    if (residentsData && Array.isArray(residentsData) && residentsData.length > 0) {
-      setResidents(residentsData);
-        } else {
-      fetchResidents()
-        .then((data) => {
-          const next = Array.isArray(data) ? data : [];
-          setResidents(next);
-        })
-        .catch(() => setResidents([]));
+    if (Array.isArray(swrResidents)) {
+      setResidents(swrResidents);
+      
+      // Kiểm tra trạng thái dịch vụ cho từng resident
+      if (swrResidents.length > 0) {
+        setLoadingServiceStatus(true);
+        const statusPromises = swrResidents.map(async (resident: any) => {
+          try {
+            const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id);
+            return {
+              residentId: resident._id,
+              assignments: Array.isArray(assignments) ? assignments : [],
+              hasActiveService: assignments.some((a: any) => a.status === 'active' || a.status === 'approved'),
+              hasPendingService: assignments.some((a: any) => a.status === 'pending'),
+              hasRejectedService: assignments.some((a: any) => a.status === 'rejected'),
+              residentStatus: resident.status
+            };
+          } catch (error) {
+            return {
+              residentId: resident._id,
+              assignments: [],
+              hasActiveService: false,
+              hasPendingService: false,
+              hasRejectedService: false,
+              residentStatus: resident.status
+            };
+          }
+        });
+        
+        Promise.all(statusPromises).then((statuses) => {
+          const statusMap: {[key: string]: any} = {};
+          statuses.forEach(status => {
+            statusMap[status.residentId] = status;
+          });
+          setResidentServiceStatus(statusMap);
+          setLoadingServiceStatus(false);
+        });
+      }
     }
-  }, [user, residentId, residentsData, residents.length]); // Remove fetchResidents dependency
+  }, [user, residentId, swrResidents, isNewResidentFlow]);
 
-  // Optimized room types loading - prioritize cached data
-  const { data: roomTypesData, refetch: fetchRoomTypes } = useOptimizedRoomTypes();
+  // Room types via SWR
+  const { data: swrRoomTypes, isLoading: isRoomTypesLoading } = useSWR(
+    'room-types',
+    () => roomTypesAPI.getAll(),
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
   useEffect(() => {
-    // Use cached data first for instant display
-    if (roomTypesData && Array.isArray(roomTypesData) && roomTypesData.length > 0) {
-      setRoomTypes(roomTypesData);
-      setLoadingRoomTypes(false);
-    } else if (!roomTypes.length) { // Only fetch if we don't have data
-    setLoadingRoomTypes(true);
-    fetchRoomTypes()
-      .then((data) => {
-          const next = Array.isArray(data) ? data : [];
-        setRoomTypes(next);
-      })
-      .catch(() => setRoomTypes([]))
-      .finally(() => setLoadingRoomTypes(false));
-    }
-  }, [roomTypesData, roomTypes.length]); // Remove fetchRoomTypes dependency
+    setLoadingRoomTypes(isRoomTypesLoading);
+    if (Array.isArray(swrRoomTypes)) setRoomTypes(swrRoomTypes);
+  }, [swrRoomTypes, isRoomTypesLoading]);
 
-  // Optimized rooms loading - prioritize cached data
-  const { data: roomsData, refetch: fetchRooms } = useOptimizedRooms();
+  // Rooms via SWR
+  const { data: swrRooms, isLoading: isRoomsLoading } = useSWR(
+    'rooms',
+    () => roomsAPI.getAll(),
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
 
   // Load rooms from cache immediately if available
   useEffect(() => {
@@ -346,59 +561,30 @@ export default function SelectPackagesPage() {
   }, []);
 
   useEffect(() => {
-    // Use cached data first for instant display
-    if (roomsData && Array.isArray(roomsData) && roomsData.length > 0) {
-      setRooms(roomsData);
-      setLoadingRooms(false);
-      try { clientStorage.setItem('roomsCache', JSON.stringify(roomsData)); } catch {}
-    } else if (!rooms.length) { // Only fetch if we don't have data
-    setLoadingRooms(true);
-    fetchRooms()
-      .then((data) => {
-          const next = Array.isArray(data) ? data : [];
-        setRooms(next);
-        try { clientStorage.setItem('roomsCache', JSON.stringify(next)); } catch {}
-      })
-      .catch(() => setRooms([]))
-      .finally(() => setLoadingRooms(false));
+    setLoadingRooms(isRoomsLoading);
+    if (Array.isArray(swrRooms)) {
+      setRooms(swrRooms);
+      try { clientStorage.setItem('roomsCache', JSON.stringify(swrRooms)); } catch {}
     }
-  }, [roomsData, rooms.length]); // Remove fetchRooms dependency
+  }, [swrRooms, isRoomsLoading]);
 
-  // Optimized beds loading - prioritize cached data
-  const { data: bedsData, refetch: fetchBeds } = useOptimizedBeds();
+  // Beds via SWR: only fetch for selected room
+  const shouldFetchBeds = Boolean(selectedRoomId) && !keepExistingRoomBed;
+  const { data: swrBeds, isLoading: isBedsLoading } = useSWR(
+    shouldFetchBeds ? ['beds-by-room', selectedRoomId] : null,
+    () => bedsAPI.getByRoom(selectedRoomId, 'available'),
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
 
-  // Load beds from cache immediately if available
   useEffect(() => {
-    try {
-      const raw = clientStorage.getItem('bedsCache');
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Array.isArray(cached) && cached.length > 0 && beds.length === 0) {
-          setBeds(cached);
+    if (!shouldFetchBeds) {
+      setBeds([]);
           setLoadingBeds(false);
-        }
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    // Use cached data first for instant display
-    if (bedsData && Array.isArray(bedsData) && bedsData.length > 0) {
-      setBeds(bedsData);
-      setLoadingBeds(false);
-      try { clientStorage.setItem('bedsCache', JSON.stringify(bedsData)); } catch {}
-    } else if (!beds.length) { // Only fetch if we don't have data
-    setLoadingBeds(true);
-    fetchBeds()
-      .then((data) => {
-          const next = Array.isArray(data) ? data : [];
-        setBeds(next);
-        try { clientStorage.setItem('bedsCache', JSON.stringify(next)); } catch {}
-      })
-      .catch(() => setBeds([]))
-      .finally(() => setLoadingBeds(false));
+      return;
     }
-  }, [bedsData, beds.length]); // Remove fetchBeds dependency
+    setLoadingBeds(isBedsLoading);
+    setBeds(Array.isArray(swrBeds) ? swrBeds : []);
+  }, [shouldFetchBeds, isBedsLoading, swrBeds]);
 
   // Pre-index beds by room for O(1) lookup
   const bedsByRoomId = useMemo(() => {
@@ -556,17 +742,14 @@ export default function SelectPackagesPage() {
   };
 
   const handleSubmit = async () => {
-    if (!mainPackageId || (!residentId && !selectedResidentId)) return;
+    if (!mainPackageId) return;
 
     setIsSubmitting(true);
     try {
       const finalResidentId = residentId || selectedResidentId;
 
-      const residentAssignmentStatus = residentsWithAssignmentStatus[finalResidentId];
-      const isReRegistering = residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired;
-
-      if (isReRegistering) {
-      }
+      const residentAssignmentStatus = finalResidentId ? residentsWithAssignmentStatus[finalResidentId] : undefined;
+      const isReRegistering = Boolean(finalResidentId && residentAssignmentStatus?.hasAssignment && residentAssignmentStatus?.isExpired);
 
       let assignedBedId: string | null = null;
 
@@ -574,44 +757,104 @@ export default function SelectPackagesPage() {
         assignedBedId = selectedBedId;
       } else if (selectedBedId && selectedBedId.includes('_bed_')) {
         const selectedRoom = rooms.find(r => r._id === selectedRoomId);
-        const resident = residents.find(r => r._id === finalResidentId);
-        const residentGender = resident?.gender;
-
+        const residentGender = (pendingResident?.gender) || residents.find(r => r._id === finalResidentId)?.gender;
         const availableBeds = getBedsForRoom(selectedRoomId, residentGender);
-
         const bedNumber = selectedBedId.split('_bed_')[1];
         const actualBed = availableBeds.find(b => b.bed_number == bedNumber && !b._id.includes('_bed_'));
-
         if (actualBed && actualBed._id) {
           assignedBedId = actualBed._id;
-        } else {
         }
       }
-
-      const resident = residents.find(r => r._id === finalResidentId);
-      const residentGender = resident?.gender || '';
 
       const selectedRoom = rooms.find(r => r._id === selectedRoomId);
       const selectedRoomType = selectedRoom?.room_type || '';
 
-      const payload = {
+      // Normalize dates to ISO strings for BE (bsonType: date)
+      const startISO = startDate ? new Date(startDate).toISOString() : '';
+      const endISO = endDate ? new Date(endDate).toISOString() : '';
+
+      // Calculate costs
+      const mainPlan = mainPlans.find(p => p._id === mainPackageId);
+      const supplementaryPlansList = supplementaryPlans.filter(p => supplementaryIds.includes(p._id));
+      
+      const mainPlanPrice = mainPlan?.monthly_price || 0;
+      const supplementaryPlansPrice = supplementaryPlansList.reduce((total, plan) => total + (plan.monthly_price || 0), 0);
+      const carePlansMonthlyCost = mainPlanPrice + supplementaryPlansPrice;
+
+      // Calculate room price
+      let roomPrice = 0;
+      if (keepExistingRoomBed && existingRoomInfo) {
+        const existingRoomTypeObj = roomTypes.find(rt => rt.room_type === existingRoomInfo.room_type);
+        roomPrice = existingRoomTypeObj?.monthly_price || 0;
+      } else {
+        const selectedRoom = rooms.find(r => r._id === selectedRoomId);
+        const roomTypeObj = roomTypes.find(rt => rt.room_type === selectedRoom?.room_type);
+        roomPrice = roomTypeObj?.monthly_price || 0;
+      }
+
+      const totalMonthlyCost = carePlansMonthlyCost + roomPrice;
+
+      // Build care plan assignment payload
+      const basePayload: any = {
         care_plan_ids: [mainPackageId, ...supplementaryIds],
-        resident_id: finalResidentId,
-        start_date: startDate,
-        end_date: endDate,
+        start_date: startISO,
+        end_date: endISO,
+        registration_date: startISO,
         consultation_notes: medicalNotes || "",
         family_preferences: {
-          preferred_room_gender: residentGender || "any",
+          preferred_room_gender: (pendingResident?.gender || residents.find(r => r._id === finalResidentId)?.gender || "any"),
           preferred_floor: Number(familyPreferences.preferred_floor) || 0,
           special_requests: familyPreferences.special_requests || ""
         },
         assigned_room_id: selectedRoomId,
         selected_room_type: selectedRoomType,
         ...(assignedBedId ? { assigned_bed_id: assignedBedId } : {}),
-        status: "active"
+        staff_id: user?.id || "",
+        status: "pending",
+        // Add cost fields
+        total_monthly_cost: totalMonthlyCost,
+        room_monthly_cost: roomPrice,
+        care_plans_monthly_cost: carePlansMonthlyCost
       };
 
-      await carePlanAssignmentsAPI.create(payload);
+      if (!isNewResidentFlow) {
+        basePayload.resident_id = finalResidentId;
+      }
+
+      console.log('Care plan assignment payload:', basePayload);
+
+      const assignmentRes = await carePlanAssignmentsAPI.create(basePayload);
+      const assignmentId = assignmentRes?._id || assignmentRes?.id || assignmentRes?.data?._id || assignmentRes?.data?.id || '';
+
+      let actualResidentId = finalResidentId;
+      
+      if (isNewResidentFlow && assignmentId) {
+        const createdResident = await createResidentFromPending(assignmentId);
+        if (createdResident && (createdResident._id || createdResident.id)) {
+          actualResidentId = createdResident._id || createdResident.id;
+        }
+      }
+
+      // Create bed assignment if room and bed are selected
+      if (selectedRoomId && assignedBedId && actualResidentId) {
+        try {
+          const bedAssignmentData = {
+            resident_id: actualResidentId,
+            bed_id: assignedBedId,
+            assigned_by: user?.id || '',
+            status: 'pending' // Default status for new bed assignments
+          };
+          
+          console.log('Creating bed assignment:', bedAssignmentData);
+          await bedAssignmentsAPI.create(bedAssignmentData);
+          console.log('Bed assignment created successfully');
+        } catch (bedAssignmentError) {
+          console.error('Error creating bed assignment:', bedAssignmentError);
+          // Don't fail the entire process if bed assignment fails
+          // The care plan assignment is more critical
+        }
+      }
+
       setStep(8);
     } catch (error: any) {
     } finally {
@@ -703,20 +946,20 @@ export default function SelectPackagesPage() {
                   <p className="text-gray-500 mb-4">
                     Vui lòng chờ trong giây lát để hệ thống tải xong tất cả dữ liệu cần thiết.
                   </p>
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
-                    <div className="flex items-center gap-1">
-                      <div className={`w-2 h-2 rounded-full ${residents.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>Danh sách người thụ hưởng</span>
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${residents.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                        <span>Danh sách người thụ hưởng</span>
+                        </div>
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${carePlans.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                        <span>Gói dịch vụ</span>
                       </div>
-                    <div className="flex items-center gap-1">
-                      <div className={`w-2 h-2 rounded-full ${carePlans.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>Gói dịch vụ</span>
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${!loadingServiceStatus ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                        <span>Trạng thái dịch vụ</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <div className={`w-2 h-2 rounded-full ${!loadingAssignmentStatus ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>Trạng thái đăng ký</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             ) : (
@@ -764,25 +1007,17 @@ export default function SelectPackagesPage() {
                     <p className="text-sm text-indigo-600 m-0 font-semibold">
                       Hiển thị: {paginatedResidents.length} trong tổng số {filteredAndSortedResidents.length} người thụ hưởng
                           {(() => {
-                            if (loadingAssignmentStatus) {
-                              return ' (Đang kiểm tra trạng thái đăng ký...)';
+                            if (loadingServiceStatus) {
+                              return ' (Đang kiểm tra trạng thái dịch vụ...)';
                             }
                             
                         const unregisteredCount = filteredAndSortedResidents.filter(r => {
-                          const status = residentsWithAssignmentStatus[r._id || r.id];
-                          return status && !status.hasAssignment;
-                        }).length;
-                        const expiredCount = filteredAndSortedResidents.filter(r => {
-                          const status = residentsWithAssignmentStatus[r._id || r.id];
-                          return status && status.hasAssignment && status.isExpired;
+                          const serviceStatus = residentServiceStatus[r._id || r.id];
+                          return serviceStatus && !serviceStatus.hasActiveService && !serviceStatus.hasPendingService;
                         }).length;
 
-                        if (unregisteredCount > 0 && expiredCount > 0) {
-                          return ` (${unregisteredCount} chưa đăng ký gói dịch vụ, ${expiredCount} hết hạn gói dịch vụ)`;
-                        } else if (unregisteredCount > 0) {
+                        if (unregisteredCount > 0) {
                           return ` (${unregisteredCount} chưa đăng ký gói dịch vụ)`;
-                        } else if (expiredCount > 0) {
-                          return ` (${expiredCount} hết hạn gói dịch vụ)`;
                         }
                         return '';
                       })()}
@@ -792,11 +1027,11 @@ export default function SelectPackagesPage() {
 
                 <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl overflow-hidden shadow-md border border-white/20">
                   <div className="p-6">
-                        {loadingAssignmentStatus ? (
+                        {loadingServiceStatus ? (
                       <div className="text-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
                         <h3 className="text-lg font-semibold mb-2 text-gray-700">
-                          Đang kiểm tra trạng thái đăng ký...
+                          Đang kiểm tra trạng thái dịch vụ...
                         </h3>
                         <p className="m-0 text-sm text-gray-500">
                           Vui lòng chờ trong giây lát.
@@ -828,10 +1063,10 @@ export default function SelectPackagesPage() {
                           <>
                             <UserIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                             <h3 className="text-lg font-semibold mb-2 text-gray-700">
-                              Tất cả người thụ hưởng đã có dịch vụ hợp lệ
+                              Tất cả người thụ hưởng đã có dịch vụ
                             </h3>
                             <p className="m-0 text-sm text-gray-500">
-                              Không có người thụ hưởng nào chưa đăng ký hoặc có dịch vụ hết hạn.
+                              Không có người thụ hưởng nào chưa đăng ký dịch vụ hoặc đang chờ duyệt.
                             </p>
                           </>
                         )}
@@ -888,30 +1123,30 @@ export default function SelectPackagesPage() {
                                     <div className="font-semibold text-gray-900 text-base truncate">{r.full_name || r.name}</div>
                                         {(() => {
                                       const residentId = r._id || r.id;
-                                      const assignmentStatus = residentsWithAssignmentStatus[residentId];
+                                      const serviceStatus = residentServiceStatus[residentId];
 
                                           // Show status immediately when available
-                                          if (assignmentStatus) {
-                                      if (!assignmentStatus.hasAssignment) {
+                                          if (serviceStatus) {
+                                      if (!serviceStatus.hasActiveService && !serviceStatus.hasPendingService) {
                                         return (
                                           <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
                                             Chưa đăng ký gói dịch vụ
                                           </span>
                                         );
-                                      } else if (assignmentStatus.isExpired) {
+                                      } else if (serviceStatus.hasPendingService) {
                                         return (
-                                          <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                                            Hết hạn gói dịch vụ
+                                          <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                                            Đang chờ duyệt
                                           </span>
                                         );
                                             } else {
-                                              // Has active assignment - should not be shown in final list
+                                              // Has active service - should not be shown in final list
                                               return null;
                                             }
                                           }
                                           
                                           // Show loading indicator while status is being fetched
-                                          if (loadingAssignmentStatus) {
+                                          if (loadingServiceStatus) {
                                             return (
                                               <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
                                                 Đang kiểm tra...
@@ -952,12 +1187,12 @@ export default function SelectPackagesPage() {
 
                                       {(() => {
                                     const residentId = r._id || r.id;
-                                    const assignmentStatus = residentsWithAssignmentStatus[residentId];
-                                    if (assignmentStatus?.hasAssignment && assignmentStatus?.isExpired && assignmentStatus?.endDate) {
+                                    const serviceStatus = residentServiceStatus[residentId];
+                                    if (serviceStatus?.hasPendingService) {
                                       return (
-                                        <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                                        <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
                                           <CalendarIcon className="w-3 h-3 flex-shrink-0" />
-                                          <span>Hết hạn: {new Date(assignmentStatus.endDate).toLocaleDateString('vi-VN')}</span>
+                                          <span>Đang chờ phê duyệt</span>
                                         </div>
                                       );
                                     }
@@ -1033,11 +1268,11 @@ export default function SelectPackagesPage() {
                 Hủy
               </button>
               <button
-                disabled={!residentId && !selectedResidentId}
+                disabled={!isNewResidentFlow && !residentId && !selectedResidentId}
                 onClick={() => setStep(2)}
                 className={`
                   px-6 py-3 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow-md
-                  ${(!residentId && !selectedResidentId)
+                  ${(!isNewResidentFlow && !residentId && !selectedResidentId)
                     ? 'bg-gray-400 text-white cursor-not-allowed'
                     : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'
                   }
@@ -1565,23 +1800,76 @@ export default function SelectPackagesPage() {
                 </label>
                 <select
                   value={roomType}
-                  onChange={e => setRoomType(e.target.value)}
+                  onChange={e => { setRoomType(e.target.value); setSelectedRoomId(''); setSelectedBedId(''); }}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base bg-white shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200"
                 >
                   <option value=''>-- Chọn loại phòng --</option>
                   {roomTypes.map(rt => (
                     <option key={rt._id} value={rt.room_type}>
-                      {rt.type_name || rt.room_type}
+                      {(rt.type_name || rt.room_type)} - {formatDisplayCurrency(rt.monthly_price || 0)}/tháng
                     </option>
                   ))}
                 </select>
               </div>
 
+              {/* Room-type list view */}
+              {roomTypes && roomTypes.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {roomTypes.map((rt: any, idx: number) => {
+                    const active = roomType === rt.room_type;
+                    return (
+                      <label
+                        key={rt._id}
+                        className={`group relative border rounded-xl p-4 cursor-pointer transition-all duration-200 block w-full ${
+                          active
+                            ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                            : `border-gray-200 hover:border-indigo-300 border-l-4 ${
+                                ['bg-white','bg-slate-50','bg-purple-50/40'][idx % 3]
+                              } ${
+                                ['border-l-indigo-200','border-l-rose-200','border-l-emerald-200'][idx % 3]
+                              }`
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="roomTypeList"
+                          checked={active}
+                          onChange={() => { setRoomType(rt.room_type); setSelectedRoomId(''); setSelectedBedId(''); }}
+                          className="sr-only"
+                        />
+                        <div className="flex items-center gap-3 w-full">
+                          {/* Info (left) */}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-semibold text-gray-900 truncate">{rt.type_name || rt.room_type}</div>
+                            {rt.description && (
+                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{rt.description}</p>
+                            )}
+                          </div>
+                          {/* Price (fixed width, right aligned) */}
+                          <div className="text-right flex-shrink-0 w-44">
+                            <div className="text-xs text-gray-500">Giá/tháng</div>
+                            <div className="font-bold text-indigo-600 whitespace-nowrap">{formatDisplayCurrency(rt.monthly_price || 0)}</div>
+                          </div>
+                          {/* Radio indicator */}
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 group-hover:border-indigo-300'}`}>
+                            {active && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
               {roomType && (
                 <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
                   {(() => {
                     const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
-                    const residentGender = selectedResident?.gender;
+                    const residentGender = (pendingResident?.gender) || selectedResident?.gender;
 
                     if (loadingRooms) {
                       return (
@@ -1609,13 +1897,11 @@ export default function SelectPackagesPage() {
                     const genderText = residentGender === 'male' ? 'nam' : residentGender === 'female' ? 'nữ' : 'tất cả';
 
                     return (
-                      <div>
+                      <div className="flex items-center justify-between gap-3">
                         <p className="text-sm text-indigo-600 m-0 font-medium">
-                          Đã chọn: <span className="font-semibold">{roomTypes.find(rt => rt.room_type === roomType)?.type_name || roomType}</span>
+                          Có <span className="font-semibold">{availableRooms.length}</span> phòng trống cho {genderText} với <span className="font-semibold">{totalAvailableBeds}</span> giường trống.
                         </p>
-                        <p className="text-sm text-indigo-500 m-0 mt-1">
-                          Có {availableRooms.length} phòng trống cho {genderText} với {totalAvailableBeds} giường có sẵn
-                        </p>
+    
                       </div>
                     );
                   })()}
@@ -1724,22 +2010,19 @@ export default function SelectPackagesPage() {
                 >
                   <option value=''>-- Chọn phòng --</option>
                   {(() => {
-                    const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
-                    const residentGender = selectedResident?.gender;
-
                     return rooms.filter(r => {
                       if (r.room_type !== roomType || r.status !== 'available') {
                         return false;
                       }
 
-                      if (residentGender && r.gender && residentGender.toLowerCase() !== r.gender.toLowerCase()) {
+                      if (residentGenderForFilter && r.gender && residentGenderForFilter.toLowerCase() !== r.gender.toLowerCase()) {
                         return false;
                       }
 
-                      const availableBedsInRoom = getBedsForRoom(r._id, residentGender);
+                      const availableBedsInRoom = getBedsForRoom(r._id, residentGenderForFilter);
                       return availableBedsInRoom.length > 0;
                     }).map(room => {
-                      const availableBedsCount = getBedsForRoom(room._id, residentGender).length;
+                      const availableBedsCount = getBedsForRoom(room._id, residentGenderForFilter).length;
                       const genderText = room.gender === 'male' ? 'Nam' : room.gender === 'female' ? 'Nữ' : 'Khác';
                       return (
                         <option key={room._id} value={room._id}>
@@ -1752,20 +2035,16 @@ export default function SelectPackagesPage() {
               </div>
 
               {(() => {
-                const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
-                const residentGender = selectedResident?.gender;
-
                 const availableRooms = rooms.filter(r => {
                   if (r.room_type !== roomType || r.status !== 'available') {
                     return false;
                   }
 
-
-                  if (residentGender && r.gender && residentGender.toLowerCase() !== r.gender.toLowerCase()) {
+                  if (residentGenderForFilter && r.gender && residentGenderForFilter.toLowerCase() !== r.gender.toLowerCase()) {
                     return false;
                   }
 
-                  const availableBedsInRoom = getBedsForRoom(r._id, residentGender);
+                  const availableBedsInRoom = getBedsForRoom(r._id, residentGenderForFilter);
                   return availableBedsInRoom.length > 0;
                 });
 
@@ -1778,7 +2057,7 @@ export default function SelectPackagesPage() {
                 }
 
                 if (availableRooms.length === 0) {
-                  const genderText = residentGender === 'male' ? 'nam' : residentGender === 'female' ? 'nữ' : '';
+                  const genderText = residentGenderForFilter === 'male' ? 'nam' : residentGenderForFilter === 'female' ? 'nữ' : '';
                   return (
                     <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
                       <p className="text-sm text-yellow-700 m-0 font-medium">
@@ -1788,21 +2067,192 @@ export default function SelectPackagesPage() {
                   );
                 }
 
-                if (selectedRoomId) {
                   const selectedRoom = rooms.find(r => r._id === selectedRoomId);
-                  const availableBedsCount = getBedsForRoom(selectedRoomId, residentGender).length;
-                  const genderText = selectedRoom?.gender === 'male' ? 'Nam' : selectedRoom?.gender === 'female' ? 'Nữ' : 'Khác';
+                const availableBedsCountSelected = selectedRoom ? getBedsForRoom(selectedRoomId, residentGenderForFilter).length : 0;
+                const genderTextSelected = selectedRoom?.gender === 'male' ? 'Nam' : selectedRoom?.gender === 'female' ? 'Nữ' : 'Khác';
+
                   return (
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+                  <div>
+                    {selectedRoom && (
+                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mb-4">
                       <p className="text-sm text-indigo-600 m-0 font-medium">
-                        Đã chọn: <span className="font-semibold">Phòng {selectedRoom?.room_number} ({genderText})</span>
-                        <span className="text-indigo-500 ml-2">({availableBedsCount} giường trống)</span>
+                          Đã chọn: <span className="font-semibold">Phòng {selectedRoom?.room_number} ({genderTextSelected})</span>
+                          <span className="text-indigo-500 ml-2">({availableBedsCountSelected} giường trống)</span>
                       </p>
                     </div>
-                  );
-                }
+                    )}
 
-                return null;
+                    <div className="space-y-2">
+                      {availableRooms.map((room, idx: number) => {
+                        const availableBedsCount = getBedsForRoom(room._id, residentGenderForFilter).length;
+                        const roomTypeObj = roomTypes.find(rt => rt.room_type === room.room_type);
+                        const monthlyPrice = roomTypeObj?.monthly_price || 0;
+                        const genderBadge = room.gender === 'male' ? 'Nam' : room.gender === 'female' ? 'Nữ' : 'Khác';
+                        const active = selectedRoomId === room._id;
+                        return (
+                          <label
+                            key={room._id}
+                            className={`group relative border rounded-xl p-4 cursor-pointer transition-all duration-200 block w-full ${
+                              active
+                                ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                                : `border-gray-200 hover:border-indigo-300 border-l-4 ${
+                                    ['bg-white','bg-slate-50','bg-purple-50/40'][idx % 3]
+                                  } ${
+                                    ['border-l-indigo-200','border-l-rose-200','border-l-emerald-200'][idx % 3]
+                                  }`
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="roomList"
+                              checked={active}
+                              onChange={() => { setSelectedRoomId(room._id); setSelectedBedId(''); }}
+                              className="sr-only"
+                            />
+                            <div className="flex items-center gap-3 w-full">
+                              {/* Info (left) */}
+                              <div className="min-w-0 flex-1">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Phòng</div>
+                                    <div className="font-semibold text-gray-900 text-sm">{room.room_number}</div>
+                              </div>
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Phòng dành cho</div>
+                                    <div className="font-medium text-gray-900">{genderBadge}</div>
+                              </div>
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Tầng</div>
+                                    <div className="font-medium text-gray-900">{room.floor}</div>
+                            </div>
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Loại phòng</div>
+                                    <div className="font-medium text-gray-900 truncate">{roomTypeObj?.type_name || room.room_type}</div>
+                            </div>
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Giường trống</div>
+                                    <div className="font-semibold text-emerald-700">{availableBedsCount} giường</div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Price (fixed width, right aligned) */}
+                              <div className="text-right flex-shrink-0 w-44">
+                                <div className="text-xs text-gray-500">Giá/tháng</div>
+                                <div className="font-bold text-indigo-600 whitespace-nowrap">{formatDisplayCurrency(monthlyPrice)}</div>
+                              </div>
+                              {/* Radio indicator */}
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 group-hover:border-indigo-300'}`}>
+                                {active && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {selectedRoom && (() => {
+                      const typeObj = roomTypes.find(rt => rt.room_type === selectedRoom.room_type);
+                      const infoItems = [
+                        {
+                          label: "Số phòng",
+                          value: selectedRoom.room_number,
+                          icon: (
+                            <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <rect x="4" y="4" width="16" height="16" rx="2" />
+                              <path d="M9 9h6v6H9z" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          label: "Loại phòng",
+                          value: typeObj?.type_name || selectedRoom.room_type,
+                          icon: (
+                            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path d="M3 7h18M3 12h18M3 17h18" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          label: "Phòng dành cho",
+                          value: selectedRoom.gender === 'male' ? 'Nam' : selectedRoom.gender === 'female' ? 'Nữ' : 'Khác',
+                          icon: (
+                            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <circle cx="12" cy="8" r="4" />
+                              <path d="M6 20v-2a4 4 0 018 0v2" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          label: "Tầng",
+                          value: selectedRoom.floor,
+                          icon: (
+                            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <rect x="4" y="10" width="16" height="10" rx="2" />
+                              <path d="M12 2v8" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          label: "Số giường trống",
+                          value: `${selectedRoom.bed_count} giường`,
+                          icon: (
+                            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <rect x="3" y="10" width="18" height="7" rx="2" />
+                              <path d="M21 17v2M3 17v2" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          label: "Giá phòng",
+                          value: (
+                            <span className="font-bold text-indigo-600">
+                              {formatDisplayCurrency(typeObj?.monthly_price || 0)} <span className="font-normal text-gray-500 text-sm">/tháng</span>
+                            </span>
+                          ),
+                          icon: (
+                            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4" />
+                            </svg>
+                          ),
+                        },
+                      ];
+                      return (
+                        <div className="mt-8 bg-gradient-to-br from-white via-indigo-50 to-purple-50 rounded-2xl p-8 shadow-lg border border-indigo-100">
+                          <h2 className="text-xl font-bold text-indigo-700 mb-6">Chi tiết thông tin phòng</h2>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {infoItems.map((item, idx) => (
+                              <div key={idx} className="flex items-center gap-4 bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+                                <div className="flex-shrink-0">{item.icon}</div>
+                                <div>
+                                  <div className="text-xs text-gray-500 font-medium">{item.label}</div>
+                                  <div className={`text-base font-semibold text-gray-900 ${item.label === "Giá phòng" ? "font-bold" : ""}`}>
+                                    {item.value}
+                            </div>
+                            </div>
+                            </div>
+                            ))}
+                          </div>
+                          {typeObj?.description && (
+                            <div className="mt-8 bg-indigo-50 rounded-xl p-5 border border-indigo-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                  <path d="M13 16h-1v-4h-1m1-4h.01" />
+                                  <circle cx="12" cy="12" r="10" />
+                                </svg>
+                                <span className="text-sm text-indigo-700 font-semibold">Mô tả phòng</span>
+                              </div>
+                              <p className="text-gray-700 leading-relaxed text-sm">{typeObj.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
               })()}
             </div>
 
@@ -1815,11 +2265,16 @@ export default function SelectPackagesPage() {
                 Quay lại
               </button>
               {(() => {
+                const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
+                const residentGender = (pendingResident?.gender) || selectedResident?.gender;
                 const availableRooms = rooms.filter(r => {
                   if (r.room_type !== roomType || r.status !== 'available') {
                     return false;
                   }
-                  const availableBedsInRoom = getBedsForRoom(r._id);
+                  if (residentGender && r.gender && residentGender.toLowerCase() !== r.gender.toLowerCase()) {
+                    return false;
+                  }
+                  const availableBedsInRoom = getBedsForRoom(r._id, residentGender);
                   return availableBedsInRoom.length > 0;
                 });
 
@@ -1891,7 +2346,7 @@ export default function SelectPackagesPage() {
                   <option value=''>-- Chọn giường --</option>
                   {(() => {
                     const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
-                    const residentGender = selectedResident?.gender;
+                    const residentGender = (pendingResident?.gender) || selectedResident?.gender;
 
                     return getBedsForRoom(selectedRoomId, residentGender).map(bed => {
                       const selectedRoom = rooms.find(r => r._id === selectedRoomId);
@@ -1908,47 +2363,82 @@ export default function SelectPackagesPage() {
 
               {(() => {
                 const selectedResident = residents.find(r => r._id === (residentId || selectedResidentId));
-                const residentGender = selectedResident?.gender;
+                const residentGender = (pendingResident?.gender) || selectedResident?.gender;
 
-                if (selectedBedId) {
-                  let selectedBed = beds.find(b => b._id === selectedBedId);
-
-                  if (!selectedBed && selectedRoomId) {
+                const beds = getBedsForRoom(selectedRoomId, residentGender);
                     const selectedRoom = rooms.find(r => r._id === selectedRoomId);
-                    if (selectedRoom?.bed_info) {
-                      const bedNumber = selectedBedId.split('_bed_')[1];
-                      if (bedNumber) {
-                        selectedBed = {
-                          _id: selectedBedId,
-                          bed_number: parseInt(bedNumber),
-                          room_id: selectedRoomId,
-                          room_number: selectedRoom.room_number,
-                          status: 'available'
-                        };
-                      }
-                    }
-                  }
+                const roomNumber = selectedRoom?.room_number;
 
-                  const selectedRoom = rooms.find(r => r._id === selectedRoomId);
-                  const genderText = residentGender === 'male' ? 'Nam' : residentGender === 'female' ? 'Nữ' : '';
-
-                  if (selectedBed) {
                     return (
-                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
-                        <p className="text-sm text-indigo-600 m-0 font-medium">
-                          Đã chọn: <span className="font-semibold">{formatBedName(selectedBed, selectedRoom?.room_number)} ({genderText})</span>
-                        </p>
-                      </div>
-                    );
-                  } else {
-                  }
-                }
+                  <div>
+                    
 
+                    <div className="text-sm font-semibold text-gray-700 mb-2">Danh sách giường trống</div>
+                    <div className="space-y-2">
+                      {beds.map((b, idx: number) => {
+                        const isSelected = selectedBedId === b._id;
+                        const statusBadge = b.status === 'available'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : b.status === 'occupied'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-700';
+                        const createdAt = b.created_at ? new Date(b.created_at).toLocaleString('vi-VN') : '-';
+                        const updatedAt = b.updated_at ? new Date(b.updated_at).toLocaleString('vi-VN') : '-';
                 return (
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <p className="text-sm text-gray-600 m-0 font-medium">
-                      Vui lòng chọn giường
-                    </p>
+                          <label
+                            key={b._id}
+                            className={`group relative border rounded-xl p-4 cursor-pointer transition-all duration-200 block w-full ${
+                              isSelected
+                                ? 'border-emerald-500 bg-emerald-50 shadow-md'
+                                : `border-gray-200 hover:border-emerald-300 border-l-4 ${['bg-white','bg-slate-50','bg-green-50/40'][idx % 3]} ${['border-l-emerald-200','border-l-indigo-200','border-l-amber-200'][idx % 3]}`
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="bedList"
+                              checked={isSelected}
+                              onChange={() => setSelectedBedId(b._id)}
+                              className="sr-only"
+                            />
+
+                            <div className="flex items-center gap-3 w-full">
+                              <div className="min-w-0 flex-1">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-2">
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Giường</div>
+                                    <div className="font-semibold text-gray-900 text-sm">{formatBedName(b, roomNumber)}</div>
+                                  </div>
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Loại giường</div>
+                                    <div className="font-medium text-gray-900">{b.bed_type}</div>
+                                  </div>
+                                  <div className="text-xs">
+                                    <div className="text-gray-500">Trạng thái</div>
+                                    <div className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${statusBadge}`}>
+                                      {b.status === 'available'
+                                        ? 'Còn trống'
+                                        : b.status === 'occupied'
+                                          ? 'Đã có người'
+                                          : b.status === 'maintenance'
+                                            ? 'Bảo trì'
+                                            : 'Không rõ'}
+                                    </div>
+                                  </div>
+                                 
+                                </div>
+                              </div>
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 group-hover:border-emerald-300'}`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })()}
@@ -2018,7 +2508,67 @@ export default function SelectPackagesPage() {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">Thời gian đăng ký:</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <label className="relative cursor-pointer">
+                      <input
+                        type="radio"
+                        name="registrationPeriod"
+                        value="1"
+                        checked={registrationPeriod === '1'}
+                        onChange={(e) => setRegistrationPeriod(e.target.value)}
+                        className="sr-only"
+                      />
+                      <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${registrationPeriod === '1'
+                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${registrationPeriod === '1'
+                            ? 'border-indigo-500 bg-indigo-500'
+                            : 'border-gray-300'
+                            }`}>
+                            {registrationPeriod === '1' && (
+                              <div className="w-2 h-2 bg-white rounded-full"></div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">1 tháng</div>
+                            <div className="text-sm text-gray-500">Đăng ký ngắn hạn</div>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+
+                    <label className="relative cursor-pointer">
+                      <input
+                        type="radio"
+                        name="registrationPeriod"
+                        value="3"
+                        checked={registrationPeriod === '3'}
+                        onChange={(e) => setRegistrationPeriod(e.target.value)}
+                        className="sr-only"
+                      />
+                      <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${registrationPeriod === '3'
+                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${registrationPeriod === '3'
+                            ? 'border-indigo-500 bg-indigo-500'
+                            : 'border-gray-300'
+                            }`}>
+                            {registrationPeriod === '3' && (
+                              <div className="w-2 h-2 bg-white rounded-full"></div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">3 tháng</div>
+                            <div className="text-sm text-gray-500">Đăng ký quý</div>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+
                     <label className="relative cursor-pointer">
                       <input
                         type="radio"
@@ -2078,6 +2628,36 @@ export default function SelectPackagesPage() {
                         </div>
                       </div>
                     </label>
+
+                    <label className="relative cursor-pointer">
+                      <input
+                        type="radio"
+                        name="registrationPeriod"
+                        value="custom"
+                        checked={registrationPeriod === 'custom'}
+                        onChange={(e) => setRegistrationPeriod(e.target.value)}
+                        className="sr-only"
+                      />
+                      <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${registrationPeriod === 'custom'
+                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${registrationPeriod === 'custom'
+                            ? 'border-indigo-500 bg-indigo-500'
+                            : 'border-gray-300'
+                            }`}>
+                            {registrationPeriod === 'custom' && (
+                              <div className="w-2 h-2 bg-white rounded-full"></div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">Tùy chỉnh</div>
+                            <div className="text-sm text-gray-500">Chọn thời gian riêng</div>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
@@ -2087,7 +2667,7 @@ export default function SelectPackagesPage() {
                     selected={startDate ? new Date(startDate) : null}
                     onChange={(date) => setStartDate(date ? date.toISOString().split('T')[0] : '')}
                     dateFormat="dd/MM/yyyy"
-                    minDate={new Date()}
+                    minDate={startDate ? new Date(startDate) : new Date()}
                     placeholderText="Chọn ngày bắt đầu"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
@@ -2095,23 +2675,41 @@ export default function SelectPackagesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Ngày kết thúc:</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={endDate ? new Date(endDate).toLocaleDateString('vi-VN') : ''}
-                      readOnly
-                      className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
-                      placeholder="Sẽ tự động tính dựa trên ngày bắt đầu"
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
+                  {registrationPeriod === 'custom' ? (
+                    <div>
+                      <DatePicker
+                        selected={endDate ? new Date(endDate) : null}
+                        onChange={(date) => setEndDate(date ? date.toISOString().split('T')[0] : '')}
+                        dateFormat="dd/MM/yyyy"
+                        minDate={startDate ? new Date(startDate) : new Date()}
+                        placeholderText="Chọn ngày kết thúc"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Chọn ngày kết thúc cho thời gian đăng ký tùy chỉnh
+                      </p>
                     </div>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Tự động tính: {registrationPeriod} tháng từ ngày bắt đầu
-                  </p>
+                  ) : (
+                    <div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={endDate ? new Date(endDate).toLocaleDateString('vi-VN') : ''}
+                          readOnly
+                          className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                          placeholder="Sẽ tự động tính dựa trên ngày bắt đầu"
+                        />
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Tự động tính: {registrationPeriod} tháng từ ngày bắt đầu
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2134,11 +2732,11 @@ export default function SelectPackagesPage() {
                 Quay lại
               </button>
               <button
-                disabled={!startDate}
+                disabled={!startDate || (registrationPeriod === 'custom' && !endDate)}
                 onClick={() => setStep(7)}
                 className={`
                   px-6 py-3 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow-md
-                  ${!startDate
+                  ${(!startDate || (registrationPeriod === 'custom' && !endDate))
                     ? 'bg-gray-400 text-white cursor-not-allowed'
                     : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'
                   }
@@ -2236,7 +2834,10 @@ export default function SelectPackagesPage() {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500 font-medium">Người thụ hưởng</div>
-                      <div className="font-semibold text-gray-900">{residents.find(r => r._id === (residentId || selectedResidentId))?.full_name || residents.find(r => r._id === (residentId || selectedResidentId))?.name || 'Chưa chọn'}</div>
+                      <div className="font-semibold text-gray-900">{isNewResidentFlow
+                        ? (pendingResident?.full_name || 'Chưa chọn')
+                        : (residents.find(r => r._id === (residentId || selectedResidentId))?.full_name || residents.find(r => r._id === (residentId || selectedResidentId))?.name || 'Chưa chọn')}
+                      </div>
                     </div>
                   </div>
 
@@ -2366,8 +2967,10 @@ export default function SelectPackagesPage() {
                       <div className="flex-1">
                         <div className="text-sm text-gray-500 font-medium">Thời gian đăng ký</div>
                         <div className="font-semibold text-gray-900">
-                          {registrationPeriod} tháng
-                          {showTimeDetails ? '' : ` (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`}
+                          {registrationPeriod === 'custom' 
+                            ? `Tùy chỉnh (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`
+                            : `${registrationPeriod} tháng${showTimeDetails ? '' : ` (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`}`
+                          }
                         </div>
                       </div>
                       <button
@@ -2402,6 +3005,35 @@ export default function SelectPackagesPage() {
                             <div className="font-medium text-gray-900">{endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
                           </div>
                         </div>
+
+                        {registrationPeriod === 'custom' && startDate && endDate && (
+                          <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                            <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-bold text-blue-700">
+                              TG
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-xs text-gray-500 font-medium">Thời gian đăng ký</div>
+                              <div className="font-medium text-gray-900">
+                                {(() => {
+                                  const start = new Date(startDate);
+                                  const end = new Date(endDate);
+                                  const diffTime = Math.abs(end.getTime() - start.getTime());
+                                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                  const months = Math.floor(diffDays / 30);
+                                  const days = diffDays % 30;
+                                  
+                                  if (months > 0 && days > 0) {
+                                    return `${months} tháng ${days} ngày`;
+                                  } else if (months > 0) {
+                                    return `${months} tháng`;
+                                  } else {
+                                    return `${days} ngày`;
+                                  }
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

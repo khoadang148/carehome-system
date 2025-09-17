@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -29,23 +30,78 @@ export default function ResidentsPage() {
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [residentsData, setResidentsData] = useState<any[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState<number | null>(null);
-  const [carePlanOptions, setCarePlanOptions] = useState<any[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<{ [residentId: string]: string }>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
-  const [activeTab, setActiveTab] = useState<'assigned' | 'unassigned' | 'discharged'>('assigned');
+  const [activeTab, setActiveTab] = useState<'admitted' | 'accepted' | 'discharged'>('admitted');
 
 
   const [showDischargeModal, setShowDischargeModal] = useState(false);
   const [residentToDischarge, setResidentToDischarge] = useState<any>(null);
   const [discharging, setDischarging] = useState(false);
+  const [dischargeReason, setDischargeReason] = useState('');
 
+  // SWR fetcher function
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
 
+  // Fetch residents data with SWR
+  const { data: residentsResponse, error: residentsError, mutate: mutateResidents } = useSWR(
+    user ? '/api/residents' : null,
+    () => residentAPI.getAll(),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 5000,
+    }
+  );
 
+  // Fetch care plans data with SWR
+  const { data: carePlansData, error: carePlansError } = useSWR(
+    user ? '/api/care-plans' : null,
+    () => carePlansAPI.getAll(),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 10000,
+    }
+  );
+
+  // Process residents data
+  const residentsData = React.useMemo(() => {
+    if (!residentsResponse) return [];
+    
+    let apiData: any[] = [];
+    if (Array.isArray(residentsResponse)) {
+      apiData = residentsResponse;
+    } else {
+      try {
+        apiData = (residentsResponse as any).data || [];
+      } catch (error) {
+        apiData = [];
+      }
+    }
+
+    return apiData.map((r: any) => ({
+      id: r._id,
+      name: r.full_name || '',
+      age: r.date_of_birth ? (new Date().getFullYear() - new Date(r.date_of_birth).getFullYear()) : '',
+      careLevel: r.care_level || '',
+      emergencyContact: r.emergency_contact?.name || '',
+      contactPhone: r.emergency_contact?.phone || '',
+      avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
+      gender: (r.gender || '').toLowerCase(),
+      status: r.status || 'active',
+      discharge_date: r.discharge_date || null,
+    }));
+  }, [residentsResponse]);
+
+  // Process care plans data
+  const carePlanOptions = React.useMemo(() => {
+    return Array.isArray(carePlansData) ? carePlansData : [];
+  }, [carePlansData]);
 
   useEffect(() => {
     if (!user) {
@@ -59,109 +115,91 @@ export default function ResidentsPage() {
     }
   }, [user, router]);
 
+  // Load room numbers for residents (optimized with useMemo)
+  React.useEffect(() => {
+    if (!residentsData.length) return;
 
+    const loadRoomNumbers = async () => {
+      const roomNumbersMap: { [residentId: string]: string } = {};
+      
+      // Process all residents in parallel
+      const promises = residentsData.map(async (resident: any) => {
+        try {
+          const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+          const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
 
-
-  useEffect(() => {
-    const fetchResidents = async () => {
-      try {
-        const apiData = await residentAPI.getAll();
-
-        const mapped = apiData.map((r: any) => ({
-          id: r._id,
-          name: r.full_name || '',
-          age: r.date_of_birth ? (new Date().getFullYear() - new Date(r.date_of_birth).getFullYear()) : '',
-          careLevel: r.care_level || '',
-          emergencyContact: r.emergency_contact?.name || '',
-          contactPhone: r.emergency_contact?.phone || '',
-          avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
-          gender: (r.gender || '').toLowerCase(),
-          status: r.status || 'active',
-          discharge_date: r.discharge_date || null,
-        }));
-        setResidentsData(mapped);
-        mapped.forEach(async (resident: any) => {
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-            const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-
-            if (bedAssignment?.bed_id?.room_id) {
-              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: bedAssignment.bed_id.room_id.room_number }));
-              } else {
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
-                  setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
-                } else {
-                  setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
-                }
-              }
+          if (bedAssignment?.bed_id?.room_id) {
+            if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+              roomNumbersMap[resident.id] = bedAssignment.bed_id.room_id.room_number;
             } else {
-              const assignments = await carePlansAPI.getByResidentId(resident.id);
-              const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-              const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              if (roomIdString) {
-                const room = await roomsAPI.getById(roomIdString);
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: room?.room_number || 'Chưa hoàn tất đăng kí' }));
+              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                roomNumbersMap[resident.id] = room?.room_number || 'Chưa hoàn tất đăng kí';
               } else {
-                setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+                roomNumbersMap[resident.id] = 'Chưa hoàn tất đăng kí';
               }
             }
-          } catch (error) {
-            setRoomNumbers(prev => ({ ...prev, [resident.id]: 'Chưa hoàn tất đăng kí' }));
+          } else {
+            const assignments = await carePlansAPI.getByResidentId(resident.id);
+            const assignment = Array.isArray(assignments) ? assignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
+            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
+            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
+            if (roomIdString) {
+              const room = await roomsAPI.getById(roomIdString);
+              roomNumbersMap[resident.id] = room?.room_number || 'Chưa hoàn tất đăng kí';
+            } else {
+              roomNumbersMap[resident.id] = 'Chưa hoàn tất đăng kí';
+            }
           }
-        });
-      } catch (err) {
-        setResidentsData([]);
-      }
+        } catch (error) {
+          roomNumbersMap[resident.id] = 'Chưa hoàn tất đăng kí';
+        }
+      });
+
+      await Promise.all(promises);
+      setRoomNumbers(roomNumbersMap);
     };
-    fetchResidents();
-  }, []);
 
-  useEffect(() => {
-    const fetchCarePlans = async () => {
-      try {
-        const data = await carePlansAPI.getAll();
-        setCarePlanOptions(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setCarePlanOptions([]);
-      }
-    };
-    fetchCarePlans();
-  }, []);
+    loadRoomNumbers();
+  }, [residentsData]);
 
 
+
+  // Loading and error states
+  const isLoading = !residentsResponse && !residentsError;
+  const hasError = residentsError;
 
   const filteredResidents = residentsData.filter((resident) => {
-    const searchValue = (searchTerm || '').toString();
-    const residentName = (resident.name || '').toString();
-    const residentRoom = (roomNumbers[resident.id] || '').toString();
-    return residentName.toLowerCase().includes(searchValue.toLowerCase()) ||
-      residentRoom.toLowerCase().includes(searchValue.toLowerCase());
+    const searchValue = (searchTerm || '').toString().trim();
+    
+    // If no search term, show all residents
+    if (!searchValue) {
+      return true;
+    }
+    
+    const residentName = (resident.name || '').toString().toLowerCase();
+    const residentRoom = (roomNumbers[resident.id] || '').toString().toLowerCase();
+    
+    return residentName.includes(searchValue.toLowerCase()) ||
+      residentRoom.includes(searchValue.toLowerCase());
   });
 
+  const admittedResidents = filteredResidents.filter(resident => resident.status === 'admitted');
+  const acceptedResidents = filteredResidents.filter(resident => resident.status === 'accepted');
   const dischargedResidents = filteredResidents.filter(resident => resident.status === 'discharged');
-  const activeResidents = filteredResidents.filter(resident => resident.status !== 'discharged');
-  const residentsWithRooms = activeResidents.filter(resident =>
-    roomNumbers[resident.id] && roomNumbers[resident.id] !== 'Chưa hoàn tất đăng kí'
-  );
 
-  const residentsWithoutRooms = activeResidents.filter(resident =>
-    !roomNumbers[resident.id] || roomNumbers[resident.id] === 'Chưa hoàn tất đăng kí'
-  );
-
-  const handleViewResident = (residentId: number) => {
+  const handleViewResident = (residentId: string | number) => {
+    console.log('Viewing resident:', residentId);
     router.push(`/admin/residents/${residentId}`);
   };
 
-  const handleEditResident = (residentId: number) => {
+  const handleEditResident = (residentId: string | number) => {
     router.push(`/admin/residents/${residentId}/edit`);
   };
 
-  const handleDeleteClick = (id: number) => {
-    setResidentToDelete(id);
+  const handleDeleteClick = (id: string | number) => {
+    setResidentToDelete(Number(id));
     setShowDeleteModal(true);
   };
 
@@ -170,8 +208,8 @@ export default function ResidentsPage() {
       try {
         await residentAPI.delete(residentToDelete.toString());
 
-        const updatedResidents = residentsData.filter(resident => resident.id !== residentToDelete);
-        setResidentsData(updatedResidents);
+        // Refresh data using SWR mutate
+        mutateResidents();
 
         setShowDeleteModal(false);
         setResidentToDelete(null);
@@ -197,11 +235,21 @@ export default function ResidentsPage() {
 
   const handleDischargeClick = (resident: any) => {
     setResidentToDischarge(resident);
+    setDischargeReason('');
     setShowDischargeModal(true);
   };
 
   const confirmDischarge = async () => {
     if (!residentToDischarge) return;
+
+
+    if (!dischargeReason.trim()) {
+      setSuccessMessage('Vui lòng nhập lý do xuất viện.');
+      setModalType('error');
+      setShowSuccessModal(true);
+      return;
+    }
+
     setDischarging(true);
     try {
       try {
@@ -229,14 +277,17 @@ export default function ResidentsPage() {
 
       await residentAPI.update(residentToDischarge.id, {
         status: 'discharged',
-        discharge_date: new Date().toISOString()
+        discharge_date: new Date().toISOString(),
+        discharge_reason: dischargeReason.trim()
       });
 
       setRoomNumbers(prev => ({ ...prev, [residentToDischarge.id]: 'Đã xuất viện' }));
-      setResidentsData(prev => prev.map(r => r.id === residentToDischarge.id ? { ...r, status: 'discharged' } : r));
+      // Refresh data using SWR mutate
+      mutateResidents();
 
       setShowDischargeModal(false);
       setResidentToDischarge(null);
+      setDischargeReason('');
 
       setSuccessMessage('Đã cập nhật trạng thái: Xuất viện thành công. Người cao tuổi đã được xóa khỏi phòng và giường.');
       setModalType('success');
@@ -244,6 +295,7 @@ export default function ResidentsPage() {
     } catch (error: any) {
       setShowDischargeModal(false);
       setResidentToDischarge(null);
+      setDischargeReason('');
       setSuccessMessage('Có lỗi xảy ra khi cập nhật trạng thái xuất viện: ' + (error.message || 'Lỗi không xác định'));
       setModalType('error');
       setShowSuccessModal(true);
@@ -255,6 +307,7 @@ export default function ResidentsPage() {
   const cancelDischarge = () => {
     setShowDischargeModal(false);
     setResidentToDischarge(null);
+    setDischargeReason('');
   };
 
   const renderResidentsTable = (residents: any[], showRoomColumn: boolean = true) => (
@@ -436,8 +489,79 @@ export default function ResidentsPage() {
                       justifyContent: 'center',
                       gap: '0.5rem'
                     }}>
+                      {resident.status === 'accepted' && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Update resident status to admitted using attendance endpoint
+                              await residentAPI.markAttendance(resident.id.toString());
+
+                              // Activate bed assignment if exists
+                              try {
+                                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+                                const pendingBedAssignment = Array.isArray(bedAssignments) ?
+                                  bedAssignments.find((ba: any) => ba.status === 'pending' || ba.status === 'approved') : null;
+                                if (pendingBedAssignment?._id) {
+                                  await bedAssignmentsAPI.activateAssignment(pendingBedAssignment._id);
+                                }
+                              } catch (bedError) {
+                                console.error('Error activating bed assignment:', bedError);
+                              }
+
+                              // Activate care plan assignment if exists
+                              try {
+                                const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(resident.id);
+                                const pendingCarePlan = Array.isArray(carePlanAssignments) ?
+                                  carePlanAssignments.find((cpa: any) => cpa.status === 'pending' || cpa.status === 'approved') : null;
+                                if (pendingCarePlan?._id) {
+                                  await carePlanAssignmentsAPI.activateAssignment(pendingCarePlan._id);
+                                }
+                              } catch (carePlanError) {
+                                console.error('Error activating care plan assignment:', carePlanError);
+                              }
+
+                              // Refresh data using SWR mutate
+                              mutateResidents();
+                              setSuccessMessage('Đã xác nhận nhập viện và kích hoạt phòng, dịch vụ thành công.');
+                              setModalType('success');
+                              setShowSuccessModal(true);
+                            } catch (e) {
+                              setSuccessMessage('Xác nhận nhập viện thất bại. Vui lòng thử lại.');
+                              setModalType('error');
+                              setShowSuccessModal(true);
+                            }
+                          }}
+                          title="Xác nhận đã nhập viện"
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '0.375rem',
+                            border: 'none',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#10b981',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#10b981';
+                            e.currentTarget.style.color = 'white';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                            e.currentTarget.style.color = '#10b981';
+                          }}
+                        >
+                          <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleViewResident(resident.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Button clicked, resident.id:', resident.id);
+                          handleViewResident(resident.id);
+                        }}
                         title="Xem thông tin chi tiết người cao tuổi"
                         style={{
                           padding: '0.5rem',
@@ -446,7 +570,10 @@ export default function ResidentsPage() {
                           background: 'rgba(59, 130, 246, 0.1)',
                           color: '#3b82f6',
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease'
+                          transition: 'all 0.2s ease',
+                          pointerEvents: 'auto',
+                          zIndex: 10,
+                          position: 'relative'
                         }}
                         onMouseOver={(e) => {
                           e.currentTarget.style.background = '#3b82f6';
@@ -482,7 +609,7 @@ export default function ResidentsPage() {
                       >
                         <PencilIcon style={{ width: '1rem', height: '1rem' }} />
                       </button>
-                      {user?.role === 'admin' && resident.status === 'active' && (
+                      {user?.role === 'admin' && resident.status === 'admitted' && (
                         <button
                           onClick={() => handleDischargeClick(resident)}
                           title="Xuất viện người cao tuổi"
@@ -536,10 +663,10 @@ export default function ResidentsPage() {
             margin: '0 0 0.5rem 0',
             color: '#374151'
           }}>
-            {activeTab === 'assigned' ? 'Không có người cao tuổi nào đã được phân phòng' : 'Không có người cao tuổi nào chưa được phân phòng'}
+            {activeTab === 'admitted' ? 'Không có người cao tuổi nào đang nằm viện' : activeTab === 'accepted' ? 'Không có người cao tuổi nào ' : 'Không có người cao tuổi nào đã xuất viện'}
           </h3>
           <p style={{ margin: 0, fontSize: '0.875rem' }}>
-            {activeTab === 'assigned' ? 'Tất cả người cao tuổi đều chưa được phân phòng' : 'Tất cả người cao tuổi đều đã được phân phòng'}
+            {activeTab === 'admitted' ? 'Danh sách đang nằm viện trống' : activeTab === 'accepted' ? 'Danh sách trống' : 'Danh sách đã xuất viện trống'}
           </p>
         </div>
       )}
@@ -622,14 +749,7 @@ export default function ResidentsPage() {
                   }}>
                     Danh sách người cao tuổi
                   </h1>
-                  <p style={{
-                    fontSize: '1rem',
-                    color: '#64748b',
-                    margin: '0.25rem 0 0 0',
-                    fontWeight: 500
-                  }}>
-                    Tổng số: {residentsData.length} người cao tuổi
-                  </p>
+
                 </div>
               </div>
             </div>
@@ -698,7 +818,7 @@ export default function ResidentsPage() {
                   margin: 0,
                   fontWeight: 600
                 }}>
-                  Hiển thị: {activeTab === 'assigned' ? residentsWithRooms.length : activeTab === 'unassigned' ? residentsWithoutRooms.length : dischargedResidents.length} người cao tuổi
+                  Hiển thị: {activeTab === 'admitted' ? admittedResidents.length : activeTab === 'accepted' ? acceptedResidents.length : dischargedResidents.length} người cao tuổi
                 </p>
               </div>
             </div>
@@ -720,7 +840,7 @@ export default function ResidentsPage() {
               marginBottom: '1rem'
             }}>
               <button
-                onClick={() => setActiveTab('assigned')}
+                onClick={() => setActiveTab('admitted')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -728,20 +848,20 @@ export default function ResidentsPage() {
                   padding: '0.75rem 1.5rem',
                   borderRadius: '0.5rem',
                   border: 'none',
-                  background: activeTab === 'assigned' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
-                  color: activeTab === 'assigned' ? 'white' : '#6b7280',
+                  background: activeTab === 'admitted' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                  color: activeTab === 'admitted' ? 'white' : '#6b7280',
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   transition: 'all 0.2s ease',
-                  boxShadow: activeTab === 'assigned' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
+                  boxShadow: activeTab === 'admitted' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
                 }}
               >
                 <HomeIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                Đã phân phòng ({residentsWithRooms.length} người)
+                Đang nằm viện ({admittedResidents.length} người)
               </button>
               <button
-                onClick={() => setActiveTab('unassigned')}
+                onClick={() => setActiveTab('accepted')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -749,17 +869,17 @@ export default function ResidentsPage() {
                   padding: '0.75rem 1.5rem',
                   borderRadius: '0.5rem',
                   border: 'none',
-                  background: activeTab === 'unassigned' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
-                  color: activeTab === 'unassigned' ? 'white' : '#6b7280',
+                  background: activeTab === 'accepted' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                  color: activeTab === 'accepted' ? 'white' : '#6b7280',
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   transition: 'all 0.2s ease',
-                  boxShadow: activeTab === 'unassigned' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                  boxShadow: activeTab === 'accepted' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
                 }}
               >
                 <ExclamationTriangleIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                Chưa phân phòng ({residentsWithoutRooms.length} người)
+                Chưa nhập viện ({acceptedResidents.length} người)
               </button>
               <button
                 onClick={() => setActiveTab('discharged')}
@@ -786,7 +906,95 @@ export default function ResidentsPage() {
 
           </div>
 
-          {activeTab === 'assigned' ? renderResidentsTable(residentsWithRooms, true) : activeTab === 'unassigned' ? renderResidentsTable(residentsWithoutRooms, false) : renderResidentsTable(dischargedResidents, false)}
+          {isLoading ? (
+            <div style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1rem',
+              padding: '3rem',
+              textAlign: 'center',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{
+                display: 'inline-block',
+                width: '2rem',
+                height: '2rem',
+                border: '3px solid #e5e7eb',
+                borderTop: '3px solid #667eea',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginBottom: '1rem'
+              }}></div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                margin: '0 0 0.5rem 0',
+                color: '#374151'
+              }}>
+                Đang tải dữ liệu...
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                Vui lòng chờ trong giây lát
+              </p>
+            </div>
+          ) : hasError ? (
+            <div style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '1rem',
+              padding: '3rem',
+              textAlign: 'center',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                margin: '0 auto 1rem',
+                color: '#ef4444'
+              }}>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                margin: '0 0 0.5rem 0',
+                color: '#374151'
+              }}>
+                Lỗi tải dữ liệu
+              </h3>
+              <p style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
+                Không thể tải danh sách người cao tuổi
+              </p>
+              <button
+                onClick={() => mutateResidents()}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                }}
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : (
+            activeTab === 'admitted' ? renderResidentsTable(admittedResidents, true) : 
+            activeTab === 'accepted' ? renderResidentsTable(acceptedResidents, false) : 
+            renderResidentsTable(dischargedResidents, false)
+          )}
 
         </div>
 
@@ -890,6 +1098,56 @@ export default function ResidentsPage() {
               }}>
                 Bạn có chắc chắn muốn xuất viện <strong>{residentToDischarge.name}</strong>?
               </p>
+
+              <div style={{
+                background: 'rgba(102, 126, 234, 0.05)',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                margin: '0 0 1rem 0',
+                border: '1px solid rgba(102, 126, 234, 0.1)'
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Lý do xuất viện <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  value={dischargeReason}
+                  onChange={(e) => setDischargeReason(e.target.value)}
+                  placeholder="Nhập lý do xuất viện..."
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '0.75rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#667eea';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                  }}
+                />
+                {!dischargeReason.trim() && (
+                  <p style={{
+                    fontSize: '0.75rem',
+                    color: '#ef4444',
+                    margin: '0.25rem 0 0 0'
+                  }}>
+                    Vui lòng nhập lý do xuất viện
+                  </p>
+                )}
+              </div>
               <div style={{
                 background: 'rgba(168, 85, 247, 0.1)',
                 borderRadius: '0.5rem',
@@ -954,26 +1212,26 @@ export default function ResidentsPage() {
                 </button>
                 <button
                   onClick={confirmDischarge}
-                  disabled={discharging}
+                  disabled={discharging || !dischargeReason.trim()}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: discharging ? '#9ca3af' : 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                    background: (discharging || !dischargeReason.trim()) ? '#9ca3af' : 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    cursor: discharging ? 'not-allowed' : 'pointer',
+                    cursor: (discharging || !dischargeReason.trim()) ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease',
-                    opacity: discharging ? 0.6 : 1
+                    opacity: (discharging || !dischargeReason.trim()) ? 0.6 : 1
                   }}
                   onMouseOver={(e) => {
-                    if (!discharging) {
+                    if (!discharging && dischargeReason.trim()) {
                       e.currentTarget.style.background = 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)';
                     }
                   }}
                   onMouseOut={(e) => {
-                    if (!discharging) {
+                    if (!discharging && dischargeReason.trim()) {
                       e.currentTarget.style.background = 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)';
                     }
                   }}

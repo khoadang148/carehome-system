@@ -33,16 +33,36 @@ export default function StaffPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    const msg = clientStorage.getItem('login_success');
-    if (msg) {
-      const timer = setTimeout(() => {
+    const checkLoginSuccess = () => {
+      const msg = clientStorage.getItem('login_success');
+      if (msg) {
         setSuccessMessage(msg);
         setShowSuccessModal(true);
         clientStorage.removeItem('login_success');
-      }, 500);
+      }
+    };
 
-      return () => clearTimeout(timer);
-    }
+    // Kiểm tra ngay lập tức
+    checkLoginSuccess();
+
+    // Lắng nghe sự kiện storage change (khi đăng nhập từ tab khác)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'login_success' && e.newValue) {
+        setSuccessMessage(e.newValue);
+        setShowSuccessModal(true);
+        clientStorage.removeItem('login_success');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Kiểm tra định kỳ (fallback cho trường hợp storage event không hoạt động)
+    const interval = setInterval(checkLoginSuccess, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleLoadResidents = () => {

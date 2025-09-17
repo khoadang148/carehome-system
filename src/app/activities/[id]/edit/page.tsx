@@ -11,7 +11,7 @@ import {
   CheckCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
-import { activitiesAPI } from '@/lib/api';
+import { activitiesAPI, staffAssignmentsAPI, roomsAPI, bedAssignmentsAPI, residentAPI } from '@/lib/api';
 import { format, parseISO } from 'date-fns';
 
 const convertToDisplayDate = (dateString: string): string => {
@@ -68,6 +68,8 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
   const [activityId, setActivityId] = useState<string>('');
   const [originalData, setOriginalData] = useState<ActivityFormData | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [residentOptions, setResidentOptions] = useState<{ id: string; name: string; room?: string }[]>([]);
+  const [loadingResidents, setLoadingResidents] = useState<boolean>(false);
 
   useEffect(() => {
     const getActivityId = async () => {
@@ -111,6 +113,22 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
           reset(initialData);
           setOriginalData(initialData);
           setHasChanges(false);
+
+          // Load residents assigned to the staff responsible for this activity
+          const staffIdFromActivity = apiActivity?.staff_id || apiActivity?.staff?._id || '';
+          if (staffIdFromActivity) {
+            try {
+              setLoadingResidents(true);
+              const list = await loadResidentsByStaff(staffIdFromActivity);
+              setResidentOptions(list);
+            } catch (e) {
+              setResidentOptions([]);
+            } finally {
+              setLoadingResidents(false);
+            }
+          } else {
+            setResidentOptions([]);
+          }
         } else {
           router.push('/activities');
         }
@@ -219,6 +237,87 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper: load residents assigned to a specific staff by room-based assignments
+  const loadResidentsByStaff = async (staffId: string): Promise<{ id: string; name: string; room?: string }[]> => {
+    // Fetch assignments for given staff
+    const assignmentsData = await staffAssignmentsAPI.getAll({ staff_id: staffId });
+    const assignments = Array.isArray(assignmentsData) ? assignmentsData : [];
+
+    // Determine if room-based by checking presence of room_id
+    const isRoomBased = assignments.some((a: any) => a && (a.room_id || (a.room && (a.room._id || a.room.id))));
+
+    const isAssignmentActive = (a: any) => {
+      if (!a) return false;
+      if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+      if (!a.end_date) return true;
+      const end = new Date(a.end_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return end >= today;
+    };
+
+    const activeAssignments = assignments.filter((a: any) => isAssignmentActive(a));
+    const roomIdToResidents: Record<string, { id: string; name: string }[]> = {};
+    const residentMap: Record<string, { id: string; name: string; room?: string }> = {};
+
+    if (isRoomBased) {
+      // Collect unique room ids
+      const uniqueRoomIds: string[] = [];
+      for (const assignment of activeAssignments) {
+        const room = assignment.room_id || assignment.room;
+        const roomId = typeof room === 'object' && room?._id ? room._id : room;
+        if (roomId && !uniqueRoomIds.includes(roomId)) uniqueRoomIds.push(roomId);
+      }
+
+      // Try to use residents embedded in assignments; if missing, fallback via bedAssignments
+      const bedAll = await bedAssignmentsAPI.getAll();
+      const bedList: any[] = Array.isArray(bedAll) ? bedAll : [];
+
+      for (const assignment of activeAssignments) {
+        const room = assignment.room_id || assignment.room;
+        const roomId = typeof room === 'object' && room?._id ? room._id : room;
+        if (!roomId) continue;
+
+        let residents = Array.isArray(assignment.residents) ? assignment.residents : [];
+        if (!residents.length) {
+          // Fallback: derive from bed assignments
+          const derived = bedList.filter((b: any) => {
+            const bidRoom = b?.bed_id?.room_id || b?.assigned_room_id;
+            const bidRoomId = typeof bidRoom === 'object' && bidRoom?._id ? bidRoom._id : bidRoom;
+            return bidRoomId === roomId;
+          }).map((b: any) => b?.resident_id).filter(Boolean);
+          residents = derived;
+        }
+
+        for (const res of residents) {
+          const resId = typeof res === 'object' && res?._id ? res._id : res;
+          if (!resId) continue;
+          try {
+            const detail = await residentAPI.getById(resId);
+            residentMap[resId] = { id: resId, name: detail?.full_name || detail?.name || '', room: String(roomId) };
+          } catch {
+            if (!residentMap[resId]) residentMap[resId] = { id: resId, name: '', room: String(roomId) };
+          }
+        }
+      }
+    } else {
+      // Old shape: assignment.resident_id
+      for (const assignment of activeAssignments) {
+        const res = assignment.resident_id;
+        const resId = typeof res === 'object' && res?._id ? res._id : res;
+        if (!resId) continue;
+        try {
+          const detail = await residentAPI.getById(resId);
+          residentMap[resId] = { id: resId, name: detail?.full_name || detail?.name || '' };
+        } catch {
+          if (!residentMap[resId]) residentMap[resId] = { id: resId, name: '' };
+        }
+      }
+    }
+
+    return Object.values(residentMap);
   };
 
   const currentLocation = activity?.location || '';
@@ -458,6 +557,29 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
               )}
             </div>
           </form>
+        </div>
+      </div>
+
+      {/* Assigned residents (read-only) for the staff responsible */}
+      <div className="max-w-7xl mx-auto px-6 pb-8 relative z-10">
+        <div className="bg-white rounded-3xl p-6 shadow border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-gray-800 m-0">
+              Người cao tuổi thuộc nhân viên phụ trách
+            </h3>
+            {loadingResidents && <span className="text-sm text-gray-500">Đang tải…</span>}
+          </div>
+          {residentOptions.length === 0 && !loadingResidents ? (
+            <p className="text-sm text-gray-500 m-0">Không có dữ liệu phân công.</p>
+          ) : (
+            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 m-0 p-0 list-none">
+              {residentOptions.map((r) => (
+                <li key={r.id} className="text-sm text-gray-700">
+                  {r.name || '---'}{r.room ? ` · Phòng: ${r.room}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

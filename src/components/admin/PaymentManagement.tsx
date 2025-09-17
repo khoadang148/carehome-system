@@ -109,45 +109,62 @@ export default function PaymentManagement() {
       console.log('✅ Bills loaded:', bills?.length || 0);
       console.log('📋 Sample bill:', bills?.[0]);
       
-      const residents = await residentAPI.getAll();
+      const residentsRaw = await residentAPI.getAll();
+      const residents = Array.isArray(residentsRaw)
+        ? residentsRaw
+        : (residentsRaw && Array.isArray((residentsRaw as any).data))
+          ? (residentsRaw as any).data
+          : [];
       console.log('✅ Residents loaded:', residents?.length || 0);
       console.log('👤 Sample resident:', residents?.[0]);
       
-      const residentsMap = new Map();
-      residents.forEach((r: any) => {
-        const id = r._id || r.id;
-        const name = r.full_name || r.name || r.fullName || r.resident_name || 'Không xác định';
-        residentsMap.set(id, name);
+      // Filter residents by allowed statuses, and build map and allowed id set
+      const allowedStatuses = new Set(['admitted','active','discharged','deceased','accepted']);
+      const residentsMap = new Map<string, string>();
+      const allowedResidentIds = new Set<string>();
+      (residents as any[]).forEach((r: any) => {
+        const status = String(r?.status || '').toLowerCase();
+        if (!allowedStatuses.has(status)) return;
+        const id: string = (r._id || r.id || '').toString();
+        if (!id) return;
+        const name: string | undefined = r.full_name || r.name || r.fullName || r.resident_name;
+        if (name) residentsMap.set(id, name);
+        allowedResidentIds.add(id);
       });
       
       console.log('✅ Residents mapped:', residentsMap.size);
       console.log('🗺️ Sample mapping:', Array.from(residentsMap.entries()).slice(0, 3));
       
-      const transactions: PaymentTransaction[] = bills.map((bill: any) => {
-        let residentId = bill.resident_id || bill.residentId || bill.resident;
-        
+      const transactions: PaymentTransaction[] = [];
+      (bills as any[]).forEach((bill: any) => {
+        let residentId: any = bill.resident_id || bill.residentId || bill.resident;
+        let residentObj: any = null;
         if (typeof residentId === 'object' && residentId !== null) {
+          residentObj = residentId;
           residentId = residentId._id || residentId.id || residentId;
         }
-        
-        const residentName = residentsMap.get(residentId) || 'Không xác định';
-        
-        console.log(`🔍 Bill ${bill._id}: residentId=${residentId}, mappedName=${residentName}`);
-        
-        return {
+        residentId = String(residentId || '');
+
+        // Skip bills if resident is not allowed or not identifiable
+        if (!residentId || (!allowedResidentIds.has(residentId) && !allowedStatuses.has(String(residentObj?.status || '').toLowerCase()))) {
+          return;
+        }
+
+        const residentName = residentsMap.get(residentId) || residentObj?.full_name || residentObj?.name || residentObj?.fullName;
+        if (!residentName) return;
+
+        transactions.push({
           id: bill._id,
-          orderCode: bill.order_code || `BILL${bill._id.slice(-6)}`,
+          orderCode: bill.order_code || `BILL${String(bill._id || '').slice(-6)}`,
           amount: bill.amount,
-          status: bill.status === 'paid' ? 'completed' : 
-                  bill.status === 'pending' ? 'pending' : 
-                  bill.status === 'cancelled' ? 'cancelled' : 'failed',
+          status: bill.status === 'paid' ? 'completed' : bill.status === 'pending' ? 'pending' : bill.status === 'cancelled' ? 'cancelled' : 'failed',
           description: bill.title || bill.notes || 'Thanh toán dịch vụ chăm sóc',
           createdAt: bill.created_at,
           completedAt: bill.paid_date,
-          residentName: residentName,
+          residentName,
           billId: bill._id,
-          dueDate: bill.due_date || bill.dueDate
-        };
+          dueDate: bill.due_date || bill.dueDate,
+        });
       });
 
       setTransactions(transactions);
@@ -173,13 +190,15 @@ export default function PaymentManagement() {
 
     if (filters.month > 0) {
       filtered = filtered.filter(t => {
-        const date = new Date(t.createdAt);
-        return date.getFullYear() === filters.year && date.getMonth() + 1 === filters.month;
+        // Sử dụng dueDate thay vì createdAt để filter theo tháng
+        const dueDate = t.dueDate ? new Date(t.dueDate) : new Date(t.createdAt);
+        return dueDate.getFullYear() === filters.year && dueDate.getMonth() + 1 === filters.month;
       });
     } else {
       filtered = filtered.filter(t => {
-        const date = new Date(t.createdAt);
-        return date.getFullYear() === filters.year;
+        // Sử dụng dueDate thay vì createdAt để filter theo năm
+        const dueDate = t.dueDate ? new Date(t.dueDate) : new Date(t.createdAt);
+        return dueDate.getFullYear() === filters.year;
       });
     }
 

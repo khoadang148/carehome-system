@@ -113,7 +113,7 @@ export default function AdminVitalSignsPage() {
         const completedResidents = residentsWithRooms.filter((resident: any) => {
           const status = resident.status || resident.resident_status;
           const isDeleted = Boolean(resident.deleted || resident.isDeleted);
-          return resident.hasRoom && status === 'active' && !isDeleted;
+          return resident.hasRoom && status === 'admitted' && !isDeleted;
         });
 
         const mappedResidents = completedResidents.map((resident: any) => {

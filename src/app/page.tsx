@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from 'react';
-import { useAuth } from '@/lib/contexts/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/contexts/auth-context';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function Home() {

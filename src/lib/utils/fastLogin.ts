@@ -51,10 +51,13 @@ export const fastLogin = {
     // 1. Khởi tạo session ngay lập tức
     fastLogin.initializeSession(token, userData);
     
-    // 2. Redirect ngay lập tức
+    // 2. Lưu thông báo thành công để hiển thị modal
+    clientStorage.setItem('login_success', userData.name || userData.email || 'bạn');
+    
+    // 3. Redirect ngay lập tức
     fastLogin.redirectImmediately(router, role);
     
-    // 3. Preload trong background
+    // 4. Preload trong background
     fastLogin.preloadInBackground(router, role);
   }
 }; 

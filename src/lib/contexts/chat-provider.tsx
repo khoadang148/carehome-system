@@ -47,6 +47,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const assignments = await staffAssignmentsAPI.getByResident(residentId);
       
+      if (!assignments || !Array.isArray(assignments)) {
+        return null;
+      }
+      
       // Ưu tiên tìm staff assignment đang active
       const activeAssignment = assignments.find((assignment: any) => 
         assignment.status === 'active' && 
@@ -55,8 +59,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       if (activeAssignment) {
         return {
-          staffId: activeAssignment.staff_id,
-          staffName: activeAssignment.staff_name || 'Nhân viên'
+          staffId: activeAssignment.staff_id?._id || activeAssignment.staff_id,
+          staffName: activeAssignment.staff_name || activeAssignment.staff_id?.full_name || 'Nhân viên'
         };
       }
       
@@ -71,13 +75,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       if (recentAssignment) {
         return {
-          staffId: recentAssignment.staff_id,
-          staffName: recentAssignment.staff_name || 'Nhân viên (trước đây)'
+          staffId: recentAssignment.staff_id?._id || recentAssignment.staff_id,
+          staffName: recentAssignment.staff_name || recentAssignment.staff_id?.full_name || 'Nhân viên (trước đây)'
         };
       }
       
       return null;
     } catch (error) {
+      console.warn('Error getting staff for resident:', error);
       return null;
     }
   };

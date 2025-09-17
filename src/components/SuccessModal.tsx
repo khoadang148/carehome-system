@@ -6,10 +6,12 @@ export default function SuccessModal({
   open,
   onClose,
   name,
+  title,
 }: {
   open: boolean;
   onClose: () => void;
   name?: string;
+  title?: string;
 }) {
   useEffect(() => {
     if (open) {
@@ -40,7 +42,7 @@ export default function SuccessModal({
         </div>
         
         <h2 className="success-title">
-          Đăng nhập thành công! 🎉
+          {title || 'Đăng nhập thành công! 🎉'}
         </h2>
         
         <div className="success-message">

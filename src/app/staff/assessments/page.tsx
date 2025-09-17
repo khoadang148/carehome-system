@@ -60,78 +60,96 @@ export default function CareNotesPage() {
     try {
       const assignmentsData = await staffAssignmentsAPI.getMyAssignments();
       const assignments = Array.isArray(assignmentsData) ? assignmentsData : [];
-      const activeAssignments = assignments.filter((assignment: any) => assignment.status === 'active');
 
-      const residentsWithNotes = await Promise.all(activeAssignments.map(async (assignment: any) => {
-        const resident = assignment.resident_id;
+      const isAssignmentActive = (a: any) => {
+        if (!a) return false;
+        if (a.status && String(a.status).toLowerCase() === 'expired') return false;
+        if (!a.end_date) return true;
+        const end = new Date(a.end_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return end >= today;
+      };
 
-        let age = '';
-        if (resident.date_of_birth) {
-          const dob = new Date(resident.date_of_birth);
-          const now = new Date();
-          age = (now.getFullYear() - dob.getFullYear()).toString();
-          const m = now.getMonth() - dob.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
-            age = (parseInt(age) - 1).toString();
+      const isRoomBased = assignments.some((a: any) => a && (a.room_id || a.residents));
+
+      let residentRows: any[] = [];
+      if (isRoomBased) {
+        const activeRoomAssignments = assignments.filter((a: any) => isAssignmentActive(a));
+        for (const assignment of activeRoomAssignments) {
+          const room = assignment.room_id;
+          const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
+          let residentsList: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+          if ((!residentsList || residentsList.length === 0) && roomId) {
+            try {
+              const bedAssignments = await bedAssignmentsAPI.getAll();
+              if (Array.isArray(bedAssignments)) {
+                residentsList = bedAssignments
+                  .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                  .map((ba: any) => ba.resident_id)
+                  .filter(Boolean);
+              }
+            } catch {}
           }
-        }
-
-        let room_number = '';
-        if (resident.room_number) {
-          room_number = resident.room_number;
-        } else {
-          try {
-            const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id);
-            const bedAssignment = Array.isArray(bedAssignments) ?
-              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
-
-            if (bedAssignment?.bed_id?.room_id) {
-              if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-                room_number = bedAssignment.bed_id.room_id.room_number;
-              } else {
-                const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-                if (roomId) {
-                  const room = await roomsAPI.getById(roomId);
-                  room_number = room?.room_number || '';
+          for (const res of residentsList) {
+            residentRows.push({ id: res?._id, name: res?.full_name || '', dob: res?.date_of_birth, care_level: res?.care_level, avatar: res?.avatar, roomId });
                 }
               }
             } else {
-              const carePlanAssignments = await carePlansAPI.getByResidentId(resident._id);
-              const carePlanAssignment = Array.isArray(carePlanAssignments) ?
-                carePlanAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-
-              if (carePlanAssignment?.bed_id?.room_id) {
-                const roomData = carePlanAssignment.bed_id.room_id;
-                if (typeof roomData === 'object' && roomData?.room_number) {
-                  room_number = roomData.room_number;
-                } else {
-                  const roomId = typeof roomData === 'object' && roomData?._id ? roomData._id : roomData;
-                  if (roomId) {
-                    const room = await roomsAPI.getById(roomId);
-                    room_number = room?.room_number || '';
-                  }
-                }
-              } else if (carePlanAssignment?.assigned_room_id) {
-                const roomId = carePlanAssignment.assigned_room_id;
-                const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-                if (roomIdString) {
-                  const room = await roomsAPI.getById(roomIdString);
-                  room_number = room?.room_number || '';
-                }
-              }
-            }
-          } catch { }
+        const activeAssignments = assignments.filter((assignment: any) => isAssignmentActive(assignment));
+        for (const assignment of activeAssignments) {
+          const res = assignment.resident_id || {};
+          residentRows.push({ id: res?._id || res?.id, name: res?.full_name || '', dob: res?.date_of_birth, care_level: res?.care_level, avatar: res?.avatar });
         }
+      }
 
-        return {
-          id: resident._id || resident.id,
-          full_name: resident.full_name || resident.name || resident.fullName || '',
-          room_number,
-          age: age || '',
-          careLevel: resident.care_level || resident.careLevel || '',
-          date_of_birth: resident.date_of_birth || resident.dateOfBirth || '',
-          avatar: resident.avatar || '',
-        };
+      // Enrich residents and compute age + avatar
+      const enriched = await Promise.all(residentRows.map(async (r) => {
+        try {
+          const detail = await userAPI ? (await import('@/lib/api')).residentAPI.getById(r.id) : null;
+          const d = detail || {} as any;
+          const dobStr = d.date_of_birth || r.dob || '';
+          let age = '';
+          if (dobStr) {
+            const dob = new Date(dobStr);
+            const now = new Date();
+            age = String(now.getFullYear() - dob.getFullYear() - ((now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) ? 1 : 0));
+          }
+          return {
+            id: r.id,
+            full_name: d.full_name || r.name || '',
+            age,
+            careLevel: d.care_level || r.care_level || '',
+            date_of_birth: dobStr,
+            avatar: d.avatar || r.avatar || '',
+            room_number: '',
+            roomId: r.roomId,
+          } as any;
+        } catch {
+          return {
+            id: r.id,
+            full_name: r.name || '',
+            age: '',
+            careLevel: r.care_level || '',
+            date_of_birth: r.dob || '',
+            avatar: r.avatar || '',
+            room_number: '',
+            roomId: r.roomId,
+          } as any;
+        }
+      }));
+
+      // Resolve room numbers
+      const uniqueRoomIds = Array.from(new Set(enriched.map((e: any) => e.roomId).filter(Boolean)));
+      const ridToNumber: Record<string, string> = {};
+      const fetchedRooms = await Promise.all(uniqueRoomIds.map(async (rid) => {
+        try { return [rid, await roomsAPI.getById(rid as any)] as const; } catch { return [rid, null] as const; }
+      }));
+      fetchedRooms.forEach(([rid, room]) => { if (room?.room_number) ridToNumber[rid as any] = room.room_number; });
+
+      const residentsWithNotes = enriched.map((r: any) => ({
+        ...r,
+        room_number: r.roomId ? (ridToNumber[r.roomId] || '') : r.room_number || '',
       }));
 
       setResidents(residentsWithNotes);

@@ -20,8 +20,14 @@ export default function PhotoDetailPage() {
 
   useEffect(() => {
     if (!user) {
-      setLoading(false);
-      setError("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
+      router.replace('/login');
+      return;
+    }
+
+    if (user.role !== 'family') {
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
       return;
     }
 

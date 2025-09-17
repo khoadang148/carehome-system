@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { DocumentPlusIcon, MagnifyingGlassIcon, FunnelIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
-import { carePlansAPI, residentAPI } from '@/lib/api';
+import { DocumentPlusIcon, MagnifyingGlassIcon, FunnelIcon, ArrowsUpDownIcon, ClockIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { carePlansAPI, residentAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 export default function ServicesPage() {
@@ -16,6 +16,9 @@ export default function ServicesPage() {
   const [carePlansError, setCarePlansError] = useState<string | null>(null);
 
   const [relatives, setRelatives] = useState<any[]>([]);
+  const [residentServiceStatus, setResidentServiceStatus] = useState<{[key: string]: any}>({});
+  const [loadingServiceStatus, setLoadingServiceStatus] = useState(false);
+  const [hasUnregisteredResidents, setHasUnregisteredResidents] = useState(false);
 
   // Filtering and sorting state
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,12 +60,14 @@ export default function ServicesPage() {
 
   useEffect(() => {
     if (!user) {
-      router.push('/login');
+      router.replace('/login');
       return;
     }
 
     if (user?.role !== 'family') {
-      router.push('/');
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
       return;
     }
   }, [user, router]);
@@ -86,7 +91,56 @@ export default function ServicesPage() {
     if (!user?.id) return;
     residentAPI.getByFamilyMemberId(user.id)
       .then((data) => {
-        setRelatives(Array.isArray(data) ? data : []);
+        const residentsData = Array.isArray(data) ? data : [];
+        setRelatives(residentsData);
+        
+        // Kiểm tra trạng thái dịch vụ cho từng resident
+        if (residentsData.length > 0) {
+          setLoadingServiceStatus(true);
+          const statusPromises = residentsData.map(async (resident: any) => {
+            try {
+              const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id);
+              return {
+                residentId: resident._id,
+                residentStatus: resident.status,
+                assignments: Array.isArray(assignments) ? assignments : [],
+                hasActiveService: assignments.some((a: any) => a.status === 'active' || a.status === 'approved'),
+                hasPendingService: assignments.some((a: any) => a.status === 'pending'),
+                hasRejectedService: assignments.some((a: any) => a.status === 'rejected')
+              };
+            } catch (error) {
+              return {
+                residentId: resident._id,
+                residentStatus: resident.status,
+                assignments: [],
+                hasActiveService: false,
+                hasPendingService: false,
+                hasRejectedService: false
+              };
+            }
+          });
+          
+          Promise.all(statusPromises).then((statuses) => {
+            const statusMap: {[key: string]: any} = {};
+            let hasUnregistered = false;
+            
+            statuses.forEach(status => {
+              statusMap[status.residentId] = status;
+              
+              // Chỉ kiểm tra resident đã được duyệt (không phải pending)
+              if (status.residentStatus && status.residentStatus !== 'pending') {
+                // Nếu resident đã được duyệt nhưng chưa có dịch vụ active và không đang chờ duyệt
+                if (!status.hasActiveService && !status.hasPendingService) {
+                  hasUnregistered = true;
+                }
+              }
+            });
+            
+            setResidentServiceStatus(statusMap);
+            setHasUnregisteredResidents(hasUnregistered);
+            setLoadingServiceStatus(false);
+          });
+        }
       })
       .catch(() => setRelatives([]));
   }, [user]);
@@ -113,33 +167,111 @@ export default function ServicesPage() {
               Điều Khoản & Quy Định
             </button>
 
-            <button
-              onClick={() => {
-                if (relatives.length > 0) {
-                  router.push(`/family/services/${relatives[0]._id}`);
+            {/* Hiển thị nút phù hợp dựa trên trạng thái dịch vụ của resident */}
+            {relatives.length > 0 && !loadingServiceStatus && (
+              (() => {
+                // Kiểm tra có resident nào chưa đăng ký dịch vụ không
+                if (hasUnregisteredResidents) {
+                  return (
+                    <button
+                      onClick={() => router.push('/services/purchase')}
+                      className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white border-2 border-green-400 rounded-full text-base font-semibold cursor-pointer transition-all duration-300 backdrop-blur-md shadow-lg hover:from-green-600 hover:to-green-700 hover:-translate-y-0.5 hover:shadow-xl"
+                    >
+                      <DocumentPlusIcon className="w-5 h-5" />
+                      Đăng ký dịch vụ
+                    </button>
+                  );
                 }
-              }}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-white/20 text-white border-2 border-white/30 rounded-full text-base font-semibold cursor-pointer transition-all duration-300 backdrop-blur-md shadow-lg hover:bg-white/25 hover:-translate-y-0.5 hover:shadow-xl"
-            >
-              Xem gói dịch vụ đã đăng ký
-            </button>
+                
+                // Kiểm tra có resident nào đang chờ duyệt không
+                const hasPendingResidents = Object.values(residentServiceStatus).some((status: any) => 
+                  status.hasPendingService && status.residentStatus !== 'pending'
+                );
+                
+                if (hasPendingResidents) {
+                  return (
+                    <div className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white border-2 border-yellow-400 rounded-full text-base font-semibold cursor-default transition-all duration-300 backdrop-blur-md shadow-lg">
+                      <ClockIcon className="w-5 h-5" />
+                      Đang chờ duyệt dịch vụ
+                    </div>
+                  );
+                }
+                
+                // Tất cả resident đều đã có dịch vụ - hiển thị nút xem dịch vụ đã đăng ký
+                const firstResident = relatives[0];
+                return (
+              <button
+                    onClick={() => router.push(`/family/services/${firstResident._id}`)}
+                    className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400 rounded-full text-base font-semibold cursor-pointer transition-all duration-300 backdrop-blur-md shadow-lg hover:from-blue-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
+                  >
+                    <CheckCircleIcon className="w-5 h-5" />
+                Gói dịch vụ đã đăng ký
+              </button>
+                );
+              })()
+            )}
+
+            {/* Loading state */}
+            {loadingServiceStatus && (
+              <div className="inline-flex items-center gap-3 px-8 py-4 bg-white/20 text-white border-2 border-white/30 rounded-full text-base font-semibold cursor-default transition-all duration-300 backdrop-blur-md shadow-lg">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Đang kiểm tra trạng thái...
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-8 py-16 -mt-8">
-        {user?.role === 'family' && (
+        {user?.role === 'family' && relatives.length > 0 && !loadingServiceStatus && (
+          (() => {
+            // Kiểm tra có resident nào chưa đăng ký dịch vụ không
+            if (hasUnregisteredResidents) {
+              return (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-500 rounded-xl p-6 mb-8 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <DocumentPlusIcon className="w-5 h-5 text-green-500" />
+                    <span className="font-semibold text-green-900">Có thể đăng ký dịch vụ</span>
+                  </div>
+                  <p className="text-green-900 text-sm leading-relaxed">
+                    Bạn có người thân chưa đăng ký gói dịch vụ nào. Sử dụng nút "Đăng ký dịch vụ" để bắt đầu quá trình đăng ký cho người thân.
+                  </p>
+                </div>
+              );
+            }
+            
+            // Kiểm tra có resident nào đang chờ duyệt không
+            const hasPendingResidents = Object.values(residentServiceStatus).some((status: any) => 
+              status.hasPendingService && status.residentStatus !== 'pending'
+            );
+            
+            if (hasPendingResidents) {
+              return (
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-500 rounded-xl p-6 mb-8 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <ClockIcon className="w-5 h-5 text-yellow-500" />
+                    <span className="font-semibold text-yellow-900">Đang chờ duyệt</span>
+                  </div>
+                  <p className="text-yellow-900 text-sm leading-relaxed">
+                    Đơn đăng ký dịch vụ của bạn đang được xem xét. Chúng tôi sẽ thông báo kết quả trong thời gian sớm nhất. Bạn có thể xem thông tin các gói dịch vụ khác trong khi chờ đợi.
+                  </p>
+                </div>
+              );
+            }
+            
+            // Tất cả resident đều đã có dịch vụ
+            return (
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-500 rounded-xl p-6 mb-8 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-semibold text-blue-900">Thông báo</span>
+                  <CheckCircleIcon className="w-5 h-5 text-blue-500" />
+                  <span className="font-semibold text-blue-900">Dịch vụ đang hoạt động</span>
             </div>
             <p className="text-blue-900 text-sm leading-relaxed">
-              Bạn có thể xem thông tin các gói dịch vụ hiện có. Để đăng ký gói dịch vụ mới, vui lòng liên hệ nhân viên chăm sóc hoặc sử dụng nút "Xem gói dịch vụ đã đăng ký" để kiểm tra tình trạng hiện tại.
+                  Tất cả người thân của bạn đã có gói dịch vụ đang hoạt động. Sử dụng nút "Gói dịch vụ đã đăng ký" để xem chi tiết hoặc liên hệ nhân viên chăm sóc để được hỗ trợ.
             </p>
           </div>
+            );
+          })()
         )}
 
         {/* Filtering and Sorting Section */}

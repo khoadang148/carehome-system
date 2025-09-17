@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { messagesAPI, userAPI, residentAPI, staffAssignmentsAPI } from '@/lib/api';
+import { messagesAPI, userAPI, residentAPI, staffAssignmentsAPI, bedAssignmentsAPI } from '@/lib/api';
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
@@ -72,20 +72,20 @@ export default function MessagesPage() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const filteredConversations = React.useMemo(() => {
-    if (!selectedResidentId || !staffAssignments[selectedResidentId]) {
-      return conversations;
-    }
+    console.log('Filtering conversations:', {
+      selectedResidentId,
+      conversations: conversations.length,
+      searchTerm
+    });
 
-    const assignedStaffIds = staffAssignments[selectedResidentId].map(
-      (assignment: any) => assignment.staff_id?._id || assignment.staff_id
-    );
-
-    return conversations.filter(conversation =>
-      assignedStaffIds.includes(conversation.partner._id)
-    ).filter(conversation =>
+    // Chỉ lọc theo search term vì conversations đã được tạo từ staff assignments
+    const filtered = conversations.filter(conversation =>
       conversation.partner.full_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [conversations, selectedResidentId, staffAssignments, searchTerm]);
+
+    console.log('Filtered conversations:', filtered.length);
+    return filtered;
+  }, [conversations, searchTerm]);
 
   const fetchStaffDetails = async (staffId: string) => {
     if (staffDetails[staffId]) return;
@@ -109,19 +109,6 @@ export default function MessagesPage() {
     } catch (error) { }
   };
 
-  const fetchStaffAssignments = async (residentId: string) => {
-    if (staffAssignments[residentId]) return;
-
-    try {
-      const assignments = await staffAssignmentsAPI.getByResident(residentId);
-      const activeAssignments = assignments.filter((assignment: any) =>
-        assignment.status === 'active' &&
-        (!assignment.end_date || new Date(assignment.end_date) > new Date())
-      );
-
-      setStaffAssignments(prev => ({ ...prev, [residentId]: activeAssignments }));
-    } catch (error) { }
-  };
 
   useEffect(() => {
     if (user) {
@@ -144,23 +131,104 @@ export default function MessagesPage() {
   }, [selectedResidentId, selectedConversation, previousResidentId]);
 
   useEffect(() => {
-    const fetchConversations = async () => {
+    const fetchStaffAssignments = async () => {
       if (!selectedResidentId) return;
 
       try {
         setIsLoading(true);
-        const response = await messagesAPI.getConversations();
-        setConversations(response.conversations || response || []);
-        fetchStaffAssignments(selectedResidentId);
-      } catch (error) { } finally {
+        console.log('Fetching staff assignments for resident:', selectedResidentId);
+        
+        // Lấy thông tin phòng của resident trước
+        const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedResidentId);
+        console.log('Bed assignments:', bedAssignments);
+        
+        const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find(a => a.bed_id?.room_id) : null;
+        const roomId = bedAssignment?.bed_id?.room_id?._id || bedAssignment?.bed_id?.room_id;
+        console.log('Room ID:', roomId);
+
+        // Sử dụng endpoint by-resident để lấy staff chăm sóc resident
+        const staffData = await staffAssignmentsAPI.getByResident(selectedResidentId);
+        console.log('Staff data from API:', staffData);
+        
+        // Endpoint by-resident trả về array của objects có cấu trúc { staff: {...}, assignment: {...} }
+        if (Array.isArray(staffData) && staffData.length > 0) {
+          // Xử lý dữ liệu từ API response và tạo conversations
+          const processedStaff = staffData.map((item: any) => {
+            const staff = item.staff || item; // Fallback nếu không có nested structure
+            const assignment = item.assignment || {};
+            
+            return {
+              staff_id: {
+                _id: staff.id || staff._id,
+                id: staff.id || staff._id,
+                full_name: staff.full_name,
+                fullName: staff.full_name,
+                email: staff.email,
+                phone: staff.phone,
+                position: staff.position || 'Nhân viên chăm sóc',
+                avatar: staff.avatar,
+                role: staff.role
+              },
+              ...assignment
+            };
+          });
+
+          console.log('Processed staff:', processedStaff);
+          setStaffAssignments(prev => ({ ...prev, [selectedResidentId]: processedStaff }));
+
+          // Tạo conversations từ staff assignments
+          const conversationsFromStaff = processedStaff.map((assignment: any) => {
+            const staff = assignment.staff_id;
+            const residentName = residents.find(r => r._id === selectedResidentId)?.full_name || 'Resident';
+            return {
+              _id: `conversation-${staff._id}-${selectedResidentId}`, // Bao gồm cả staff và resident ID
+              partner: {
+                _id: staff._id,
+                full_name: staff.full_name,
+                email: staff.email,
+                avatar: staff.avatar,
+                role: staff.role,
+                position: staff.position
+              },
+              lastMessage: {
+                _id: `last-${staff._id}-${selectedResidentId}`,
+                content: 'Chưa có tin nhắn nào',
+                timestamp: new Date(),
+                sender_id: staff._id
+              },
+              unreadCount: 0,
+              resident_id: selectedResidentId,
+              resident_name: residentName,
+              // Thêm thông tin để phân biệt conversation
+              conversationTitle: `${staff.full_name} - ${residentName}`
+            };
+          });
+
+          console.log('Created conversations from staff:', conversationsFromStaff);
+          console.log('Each conversation is unique per resident-staff pair:', conversationsFromStaff.map(c => ({
+            conversationId: c._id,
+            staffName: c.partner.full_name,
+            residentName: c.resident_name,
+            residentId: c.resident_id
+          })));
+          setConversations(conversationsFromStaff);
+        } else {
+          console.log('No staff data found');
+          setStaffAssignments(prev => ({ ...prev, [selectedResidentId]: [] }));
+          setConversations([]);
+        }
+      } catch (error) {
+        console.error('Error fetching staff assignments:', error);
+        setConversations([]);
+      } finally {
         setIsLoading(false);
       }
     };
 
     if (selectedResidentId) {
-      fetchConversations();
+      fetchStaffAssignments();
     }
-  }, [selectedResidentId]);
+  }, [selectedResidentId, residents]);
 
   useEffect(() => {
     if (conversations.length > 0) {
@@ -176,15 +244,22 @@ export default function MessagesPage() {
 
       try {
         setIsLoadingMessages(true);
-        const response = await messagesAPI.getConversation(selectedConversation.partner._id);
-        const raw = (response?.messages || response || []) as any[];
-        const rid = (selectedConversation as any).resident_id;
-        const filtered = (Array.isArray(raw) ? raw : []).filter((m: any) => {
-          const mrid = typeof m?.resident_id === 'object' ? m?.resident_id?._id : m?.resident_id;
-          return String(mrid || '') === String(rid || '');
-        });
-        setMessages(filtered);
-      } catch (error) { } finally {
+        console.log('Fetching messages for conversation with:', selectedConversation.partner._id);
+        
+        // Sử dụng endpoint conversation với partnerId và residentId
+        const response = await messagesAPI.getConversation(
+          selectedConversation.partner._id,
+          selectedConversation.resident_id
+        );
+        
+        console.log('Messages response:', response);
+        const messagesData = Array.isArray(response) ? response : [];
+        console.log('Messages data:', messagesData);
+        setMessages(messagesData);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        setMessages([]);
+      } finally {
         setIsLoadingMessages(false);
       }
     };
@@ -256,6 +331,10 @@ export default function MessagesPage() {
 
   const getAvatarUrl = (avatarPath: string | null | undefined) => {
     if (!avatarPath || avatarPath.trim() === '' || avatarPath === 'null' || avatarPath === 'undefined') {
+      // Sử dụng đường dẫn tuyệt đối để tránh bị rewrite
+      if (typeof window !== 'undefined') {
+        return `${window.location.origin}/default-avatar.svg`;
+      }
       return '/default-avatar.svg';
     }
 
@@ -263,13 +342,29 @@ export default function MessagesPage() {
       return avatarPath;
     }
 
+    // Nếu avatarPath đã chứa đường dẫn đầy đủ, sử dụng trực tiếp
+    if (avatarPath.includes('/uploads/')) {
+      const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '');
+      // Nếu đã có /api/ thì không thêm nữa
+      if (cleanPath.startsWith('/api/')) {
+        return cleanPath;
+      }
+      // Nếu chưa có /api/ thì thêm vào
+      return `/api${cleanPath}`;
+    }
+
+    // Fallback: sử dụng userAPI.getAvatarUrl
     const cleanPath = avatarPath.replace(/\\/g, '/').replace(/"/g, '/');
     return userAPI.getAvatarUrl(cleanPath);
   };
 
   useEffect(() => {
-    if (user && user.role !== 'family') {
+    if (!user) {
       router.replace('/login');
+    } else if (user.role !== 'family') {
+      if (user.role === 'staff') router.replace('/staff');
+      else if (user.role === 'admin') router.replace('/admin');
+      else router.replace('/login');
     }
   }, [user, router]);
 
@@ -368,8 +463,8 @@ export default function MessagesPage() {
                     <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-3">
                       <UserCircleIcon className="w-8 h-8 text-slate-400" />
                     </div>
-                    <p className="text-base font-medium mb-1">Chưa chọn resident</p>
-                    <p className="text-sm text-slate-400">Vui lòng chọn resident để xem tin nhắn</p>
+                    <p className="text-base font-medium mb-1">Chưa chọn người cao tuổi</p>
+                    <p className="text-sm text-slate-400">Vui lòng chọn người cao tuổi để xem tin nhắn</p>
                   </div>
                 ) : filteredConversations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500">
@@ -377,7 +472,7 @@ export default function MessagesPage() {
                       <ChatBubbleLeftRightIcon className="w-8 h-8 text-purple-400" />
                     </div>
                     <p className="text-base font-medium mb-1">Chưa có cuộc trò chuyện</p>
-                    <p className="text-sm text-slate-400">Chưa có cuộc trò chuyện nào với staff của resident này</p>
+                    <p className="text-sm text-slate-400">Chưa có cuộc trò chuyện nào với nhân viên của người cao tuổi này</p>
                   </div>
                 ) : (
                   <div>
@@ -458,8 +553,8 @@ export default function MessagesPage() {
                   <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-4">
                     <UserCircleIcon className="w-10 h-10 text-slate-400" />
                   </div>
-                  <p className="text-lg font-bold mb-2 text-slate-700">Chưa chọn resident</p>
-                  <p className="text-sm text-slate-500">Vui lòng chọn resident để xem tin nhắn với staff</p>
+                  <p className="text-lg font-bold mb-2 text-slate-700">Chưa chọn người cao tuổi</p>
+                  <p className="text-sm text-slate-500">Vui lòng chọn người cao tuổi để xem tin nhắn với nhân viên</p>
                 </div>
               ) : selectedConversation ? (
                 <div className="flex flex-col h-full">
