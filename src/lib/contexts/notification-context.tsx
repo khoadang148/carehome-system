@@ -189,7 +189,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const newNotifications: Notification[] = [];
 
     // Check if current user is pending approval (for family users)
-    if (user.role === 'family' && user.status === 'pending') {
+    const userStatus = (user as any)?.status;
+    if (user.role === 'family' && userStatus === 'pending') {
       // Only create this notification if it doesn't already exist and hasn't been read
       const existingPendingNotification = notifications.find(n => 
         n.title === 'Tài khoản đang chờ phê duyệt' && 

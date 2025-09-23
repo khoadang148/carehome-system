@@ -156,13 +156,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const pollUnreadCounts = async () => {
       try {
         const response = await messagesAPI.getUnreadCount();
-        const total = Number(
-          (response && (response.totalUnread ?? response.total ?? response.unreadCount)) || 0
-        );
+        const r: any = response || {};
+        const total = Number((r.totalUnread ?? r.total ?? r.unreadCount) || 0);
 
         let computedTotal = Number.isFinite(total) ? total : 0;
-        if (!computedTotal && response && typeof response === 'object') {
-          const possibleMaps = [response.unreadCounts, response.perConversations, response.byResident];
+        if (!computedTotal && r && typeof r === 'object') {
+          const possibleMaps = [r.unreadCounts, r.perConversations, r.byResident];
           for (const m of possibleMaps) {
             if (m && typeof m === 'object') {
               computedTotal = Object.values(m as Record<string, number>).reduce((s, v) => s + Number(v || 0), 0);
