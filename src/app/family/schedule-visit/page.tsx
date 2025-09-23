@@ -55,8 +55,8 @@ export default function ScheduleVisitPage() {
       residentAPI.getByFamilyMemberId(user.id)
         .then((data) => {
           const arr = Array.isArray(data) ? data : [data];
-          const activeResidents = arr && arr.filter(r => r && r._id && r.status === 'active');
-          setResidents(activeResidents);
+          const admittedResidents = arr && arr.filter(r => r && r._id && r.status === 'admitted');
+          setResidents(admittedResidents);
         })
         .catch(() => setResidents([]))
         .finally(() => setLoadingResidents(false));
@@ -128,7 +128,7 @@ export default function ScheduleVisitPage() {
       return;
     }
     if (!residents.length) {
-      setError('Không có người thân nào đang ở viện để đặt lịch thăm. Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện.');
+      setError('Không có người thân nào đang ở viện để đặt lịch thăm.');
       setShowErrorModal(true);
       return;
     }
@@ -235,7 +235,7 @@ export default function ScheduleVisitPage() {
             <>
               {residents.length === 0 && !loadingResidents && (
                 <div className="text-red-500 font-semibold mb-4">
-                  Không có người thân nào đang ở viện để đặt lịch thăm. Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện. Vui lòng liên hệ nhân viên nếu cần hỗ trợ thêm.
+                  Không có người thân nào đang ở viện để đặt lịch thăm. Vui lòng liên hệ nhân viên nếu cần hỗ trợ thêm.
                 </div>
               )}
               <div className="grid gap-6 mb-6">
@@ -384,7 +384,7 @@ export default function ScheduleVisitPage() {
                 </div>
               </div>
               <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 mb-8 text-emerald-600 font-medium text-base">
-                <span className="font-bold text-emerald-500 mr-2">Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Chỉ có thể đặt lịch thăm cho người thân chưa xuất viện. Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
+                <span className="font-bold text-emerald-500 mr-2">Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Chỉ có thể đặt lịch thăm cho người thân có trạng thái "admitted" (đã nhập viện). Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
               </div>
               <div className="flex justify-end gap-4">
                 <button

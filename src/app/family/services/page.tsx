@@ -18,7 +18,6 @@ export default function ServicesPage() {
   const [relatives, setRelatives] = useState<any[]>([]);
   const [residentServiceStatus, setResidentServiceStatus] = useState<{[key: string]: any}>({});
   const [loadingServiceStatus, setLoadingServiceStatus] = useState(false);
-  const [hasUnregisteredResidents, setHasUnregisteredResidents] = useState(false);
 
   // Filtering and sorting state
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,22 +121,12 @@ export default function ServicesPage() {
           
           Promise.all(statusPromises).then((statuses) => {
             const statusMap: {[key: string]: any} = {};
-            let hasUnregistered = false;
             
             statuses.forEach(status => {
               statusMap[status.residentId] = status;
-              
-              // Chỉ kiểm tra resident đã được duyệt (không phải pending)
-              if (status.residentStatus && status.residentStatus !== 'pending') {
-                // Nếu resident đã được duyệt nhưng chưa có dịch vụ active và không đang chờ duyệt
-                if (!status.hasActiveService && !status.hasPendingService) {
-                  hasUnregistered = true;
-                }
-              }
             });
             
             setResidentServiceStatus(statusMap);
-            setHasUnregisteredResidents(hasUnregistered);
             setLoadingServiceStatus(false);
           });
         }
@@ -170,19 +159,6 @@ export default function ServicesPage() {
             {/* Hiển thị nút phù hợp dựa trên trạng thái dịch vụ của resident */}
             {relatives.length > 0 && !loadingServiceStatus && (
               (() => {
-                // Kiểm tra có resident nào chưa đăng ký dịch vụ không
-                if (hasUnregisteredResidents) {
-                  return (
-                    <button
-                      onClick={() => router.push('/services/purchase')}
-                      className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white border-2 border-green-400 rounded-full text-base font-semibold cursor-pointer transition-all duration-300 backdrop-blur-md shadow-lg hover:from-green-600 hover:to-green-700 hover:-translate-y-0.5 hover:shadow-xl"
-                    >
-                      <DocumentPlusIcon className="w-5 h-5" />
-                      Đăng ký dịch vụ
-                    </button>
-                  );
-                }
-                
                 // Kiểm tra có resident nào đang chờ duyệt không
                 const hasPendingResidents = Object.values(residentServiceStatus).some((status: any) => 
                   status.hasPendingService && status.residentStatus !== 'pending'
@@ -225,21 +201,6 @@ export default function ServicesPage() {
       <div className="max-w-7xl mx-auto px-8 py-16 -mt-8">
         {user?.role === 'family' && relatives.length > 0 && !loadingServiceStatus && (
           (() => {
-            // Kiểm tra có resident nào chưa đăng ký dịch vụ không
-            if (hasUnregisteredResidents) {
-              return (
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-500 rounded-xl p-6 mb-8 text-center">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <DocumentPlusIcon className="w-5 h-5 text-green-500" />
-                    <span className="font-semibold text-green-900">Có thể đăng ký dịch vụ</span>
-                  </div>
-                  <p className="text-green-900 text-sm leading-relaxed">
-                    Bạn có người thân chưa đăng ký gói dịch vụ nào. Sử dụng nút "Đăng ký dịch vụ" để bắt đầu quá trình đăng ký cho người thân.
-                  </p>
-                </div>
-              );
-            }
-            
             // Kiểm tra có resident nào đang chờ duyệt không
             const hasPendingResidents = Object.values(residentServiceStatus).some((status: any) => 
               status.hasPendingService && status.residentStatus !== 'pending'

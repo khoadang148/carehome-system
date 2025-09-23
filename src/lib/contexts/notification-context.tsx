@@ -11,7 +11,8 @@ import {
   visitsAPI,
   staffAssignmentsAPI,
   bedAssignmentsAPI,
-  residentAPI
+  residentAPI,
+  userAPI
 } from '@/lib/api';
 
 export interface Notification {
@@ -21,6 +22,7 @@ export interface Notification {
   message: string;
   timestamp: Date;
   read: boolean;
+  readAt?: Date; // Track when the notification was marked as read
   category: 'hóa đơn' | 'health' | 'care' | 'activity' | 'visit' | 'assignment' | 'system';
   actionUrl?: string;
   metadata?: any;
@@ -36,6 +38,7 @@ interface NotificationContextType {
   clearAll: () => void;
   loading: boolean;
   refreshNotifications: () => Promise<void>;
+  hideReadNotification: (id: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -86,14 +89,41 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
+      prev.map(n => {
+        if (n.id === id) {
+          // If this is a stored notification, remove it from localStorage
+          if (n.metadata?.storedNotificationId) {
+            try {
+              const storedNotifications = JSON.parse(localStorage.getItem('familyNotifications') || '[]');
+              const updatedNotifications = storedNotifications.filter((stored: any) => stored.id !== n.metadata.storedNotificationId);
+              localStorage.setItem('familyNotifications', JSON.stringify(updatedNotifications));
+            } catch (error) {
+              console.error('Error removing stored notification:', error);
+            }
+          }
+          return { ...n, read: true, readAt: new Date() };
+        }
+        return n;
+      })
     );
   }, []);
 
+  // Hide read notifications after a delay to prevent them from reappearing
+  const hideReadNotification = useCallback((id: string) => {
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 1000); // Hide after 1 second
+  }, []);
+
   const markAllAsRead = useCallback(() => {
+    const now = new Date();
     setNotifications(prev => 
-      prev.map(n => ({ ...n, read: true }))
+      prev.map(n => ({ ...n, read: true, readAt: now }))
     );
+    // Hide all read notifications after a delay
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => !n.read));
+    }, 1000);
   }, []);
 
   const addNotification = useCallback((
@@ -158,11 +188,51 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const newNotifications: Notification[] = [];
 
+    // Check if current user is pending approval (for family users)
+    if (user.role === 'family' && user.status === 'pending') {
+      // Only create this notification if it doesn't already exist and hasn't been read
+      const existingPendingNotification = notifications.find(n => 
+        n.title === 'Tài khoản đang chờ phê duyệt' && 
+        n.category === 'system' && 
+        n.metadata?.userId === user.id
+      );
+      
+      if (!existingPendingNotification) {
+        newNotifications.push(createNotification(
+          'warning',
+          'Tài khoản đang chờ phê duyệt',
+          'Tài khoản của bạn đang chờ quản trị viên phê duyệt. Vui lòng kiên nhẫn chờ đợi.',
+          'system',
+          undefined,
+          { userId: user.id, role: 'family', status: 'pending' }
+        ));
+      }
+    }
+
     const isForbidden = (err: any) => err?.response?.status === 403;
 
     try {
       switch (user.role) {
         case 'family':
+          // Load notifications from localStorage first
+          try {
+            const storedNotifications = JSON.parse(localStorage.getItem('familyNotifications') || '[]');
+            const userNotifications = storedNotifications.filter((n: any) => n.userId === user.id);
+            
+            userNotifications.forEach((storedNotif: any) => {
+              newNotifications.push(createNotification(
+                storedNotif.type,
+                storedNotif.title,
+                storedNotif.message,
+                storedNotif.category,
+                undefined,
+                { familyId: user.id, storedNotificationId: storedNotif.id }
+              ));
+            });
+          } catch (error) {
+            console.error('Error loading stored notifications:', error);
+          }
+
           // Resolve resident IDs linked to this family member to avoid 403 on global endpoints
           let residentIds: string[] = [];
           try {
@@ -185,44 +255,64 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               return billFamilyId === user.id;
             });
             
-                         // Check for unpaid bills
-             const unpaidBills = userBills.filter((bill: any) => bill.status === 'pending');
-             if (unpaidBills.length > 0) {
-               const totalUnpaidAmount = unpaidBills.reduce((sum: number, bill: any) => 
-                 sum + (bill.amount || 0), 0
-               );
-               
-               newNotifications.push(createNotification(
-                 'warning',
-                 'Hóa đơn cần thanh toán',
-                 `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán với tổng số tiền ${formatDisplayCurrency(totalUnpaidAmount)}. Vui lòng kiểm tra và thanh toán sớm.`,
-                 'hóa đơn',
-                 '/family/finance',
-                 { bills: unpaidBills, totalAmount: totalUnpaidAmount, familyId: user.id }
-               ));
-             }
-             
-             // Check for recently paid bills (within last 24 hours)
-             const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-             const recentlyPaidBills = userBills.filter((bill: any) => 
-               bill.status === 'paid' && 
-               new Date(bill.updated_at || bill.paid_at || bill.created_at) > oneDayAgo
-             );
-             
-             if (recentlyPaidBills.length > 0) {
-               const totalAmount = recentlyPaidBills.reduce((sum: number, bill: any) => 
-                 sum + (bill.amount || 0), 0
-               );
-               
-               newNotifications.push(createNotification(
-                 'success',
-                 'Thanh toán thành công',
-                 `Bạn đã thanh toán thành công ${recentlyPaidBills.length} hóa đơn với tổng số tiền ${formatDisplayCurrency(totalAmount)}.`,
-                 'hóa đơn',
-                 '/family/finance',
-                 { bills: recentlyPaidBills, totalAmount, familyId: user.id }
-               ));
-             }
+            // Check for unpaid bills - only notify if not already read
+            const unpaidBills = userBills.filter((bill: any) => bill.status === 'pending');
+            if (unpaidBills.length > 0) {
+              const totalUnpaidAmount = unpaidBills.reduce((sum: number, bill: any) => 
+                sum + (bill.amount || 0), 0
+              );
+              
+              // Check if this notification already exists and hasn't been read
+              const existingUnpaidNotification = notifications.find(n => 
+                n.title === 'Hóa đơn cần thanh toán' && 
+                n.category === 'hóa đơn' && 
+                n.metadata?.familyId === user.id &&
+                !n.read
+              );
+              
+              if (!existingUnpaidNotification) {
+                newNotifications.push(createNotification(
+                  'warning',
+                  'Hóa đơn cần thanh toán',
+                  `Bạn có ${unpaidBills.length} hóa đơn chưa thanh toán với tổng số tiền ${formatDisplayCurrency(totalUnpaidAmount)}. Vui lòng kiểm tra và thanh toán sớm.`,
+                  'hóa đơn',
+                  '/family/finance',
+                  { bills: unpaidBills, totalAmount: totalUnpaidAmount, familyId: user.id }
+                ));
+              }
+            }
+            
+            // Check for recently paid bills (within last 24 hours) - only notify if not already read
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const recentlyPaidBills = userBills.filter((bill: any) => 
+              bill.status === 'paid' && 
+              new Date(bill.updated_at || bill.paid_at || bill.created_at) > oneDayAgo
+            );
+            
+            if (recentlyPaidBills.length > 0) {
+              const totalAmount = recentlyPaidBills.reduce((sum: number, bill: any) => 
+                sum + (bill.amount || 0), 0
+              );
+              
+              // Check if this notification already exists and hasn't been read
+              const existingPaidNotification = notifications.find(n => 
+                n.title === 'Thanh toán thành công' && 
+                n.category === 'hóa đơn' && 
+                n.metadata?.familyId === user.id &&
+                !n.read
+              );
+              
+              if (!existingPaidNotification) {
+                newNotifications.push(createNotification(
+                  'success',
+                  'Thanh toán thành công',
+                  `Bạn đã thanh toán thành công ${recentlyPaidBills.length} hóa đơn với tổng số tiền ${formatDisplayCurrency(totalAmount)}.`,
+                  'hóa đơn',
+                  '/family/finance',
+                  { bills: recentlyPaidBills, totalAmount, familyId: user.id }
+                ));
+              }
+            }
           } catch (error) {
             if (!isForbidden(error)) console.warn('Error fetching bills:', error);
           }
@@ -247,14 +337,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               );
 
               if (recentCareNotes.length > 0) {
-                newNotifications.push(createNotification(
-                  'info',
-                  'Ghi chú chăm sóc mới',
-                  `Có ${recentCareNotes.length} ghi chú chăm sóc mới cho người thân của bạn.`,
-                  'care',
-                  '/family',
-                  { careNotes: recentCareNotes, familyId: user.id, residentIds }
-                ));
+                // Check if this notification already exists and hasn't been read
+                const existingCareNotesNotification = notifications.find(n => 
+                  n.title === 'Ghi chú chăm sóc mới' && 
+                  n.category === 'care' && 
+                  n.metadata?.familyId === user.id &&
+                  !n.read
+                );
+                
+                if (!existingCareNotesNotification) {
+                  newNotifications.push(createNotification(
+                    'info',
+                    'Ghi chú chăm sóc mới',
+                    `Có ${recentCareNotes.length} ghi chú chăm sóc mới cho người thân của bạn.`,
+                    'care',
+                    '/family',
+                    { careNotes: recentCareNotes, familyId: user.id, residentIds }
+                  ));
+                }
               }
             }
           } catch (error) {
@@ -293,9 +393,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           //   if (!isForbidden(error)) console.error('Error fetching vital signs:', error);
           // }
 
-          // Visits upcoming for this family member - ensure proper filtering
+          // Visits upcoming for this family member - use correct endpoint
           try {
-            const visits = await visitsAPI.getAll({ family_member_id: user.id });
+            const visits = await visitsAPI.getByFamily(user.id);
             const now = new Date();
             const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
             const upcomingVisits = visits.filter((visit: any) => {
@@ -303,14 +403,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               return visitDate > now && visitDate <= oneWeekFromNow && visit.status === 'confirmed';
             });
             if (upcomingVisits.length > 0) {
-              newNotifications.push(createNotification(
-                'info',
-                'Lịch thăm sắp tới',
-                `Bạn có ${upcomingVisits.length} lịch thăm trong tuần tới.`,
-                'visit',
-                '/family/schedule-visit/history',
-                { visits: upcomingVisits, familyId: user.id }
-              ));
+              // Check if this notification already exists and hasn't been read
+              const existingVisitNotification = notifications.find(n => 
+                n.title === 'Lịch thăm sắp tới' && 
+                n.category === 'visit' && 
+                n.metadata?.familyId === user.id &&
+                !n.read
+              );
+              
+              if (!existingVisitNotification) {
+                newNotifications.push(createNotification(
+                  'info',
+                  'Lịch thăm sắp tới',
+                  `Bạn có ${upcomingVisits.length} lịch thăm trong tuần tới.`,
+                  'visit',
+                  '/family/schedule-visit/history',
+                  { visits: upcomingVisits, familyId: user.id }
+                ));
+              }
             }
           } catch (error) {
             if (!isForbidden(error)) console.warn('Error fetching visits:', error);
@@ -436,23 +546,29 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           break;
 
         case 'admin':
-          // Check for pending bills
+          // Check for very recent successful payments (within last 30 minutes only)
           try {
             const allBills = await billsAPI.getAll();
-            const pendingBills = allBills.filter((bill: any) => bill.status === 'pending');
+            const veryRecentPaidBills = allBills.filter((bill: any) => {
+              if (bill.status !== 'paid') return false;
+              const paymentDate = new Date(bill.updated_at || bill.paid_at || bill.created_at);
+              const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+              return paymentDate > thirtyMinutesAgo;
+            });
 
-            if (pendingBills.length > 0) {
+            if (veryRecentPaidBills.length > 0) {
+              const totalAmount = veryRecentPaidBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
               newNotifications.push(createNotification(
-                'warning',
-                'Hóa đơn chờ xử lý',
-                `Có ${pendingBills.length} hóa đơn đang chờ xử lý.`,
+                'success',
+                'Thanh toán thành công',
+                `Có ${veryRecentPaidBills.length} giao dịch thanh toán thành công với tổng số tiền ${formatDisplayCurrency(totalAmount)}.`,
                 'hóa đơn',
                 '/admin/financial-reports',
-                { bills: pendingBills, adminId: user.id, role: 'admin' }
+                { bills: veryRecentPaidBills, totalAmount, adminId: user.id, role: 'admin' }
               ));
             }
           } catch (error) {
-            console.warn('Error fetching pending bills:', error);
+            console.warn('Error fetching recent payments:', error);
           }
 
           // Check for new residents
@@ -475,8 +591,43 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 { residents: newResidents, adminId: user.id, role: 'admin' }
               ));
             }
+
+            // Check for very recent new residents (within last hour)
+            const veryRecentResidents = recentResidents.filter((resident: any) => {
+              const admissionDate = new Date(resident.admission_date || resident.created_at);
+              const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+              return admissionDate > oneHourAgo;
+            });
+
+            if (veryRecentResidents.length > 0) {
+              newNotifications.push(createNotification(
+                'info',
+                'Người cao tuổi mới được thêm',
+                `Có ${veryRecentResidents.length} người cao tuổi mới vừa được thêm vào hệ thống.`,
+                'system',
+                '/admin/residents',
+                { residents: veryRecentResidents, adminId: user.id, role: 'admin' }
+              ));
+            }
           } catch (error) {
             console.warn('Error fetching new residents:', error);
+          }
+
+          // Check for pending user approvals
+          try {
+            const pendingUsers = await userAPI.getByRoleWithStatus("family", "pending");
+            if (Array.isArray(pendingUsers) && pendingUsers.length > 0) {
+              newNotifications.push(createNotification(
+                'warning',
+                'Yêu cầu phê duyệt tài khoản',
+                `Có ${pendingUsers.length} yêu cầu phê duyệt tài khoản người dùng mới cần xử lý.`,
+                'system',
+                '/admin/approvals',
+                { users: pendingUsers, adminId: user.id, role: 'admin' }
+              ));
+            }
+          } catch (error) {
+            console.warn('Error fetching pending users:', error);
           }
 
           // Check for bed assignments
@@ -592,6 +743,25 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => clearInterval(interval);
   }, [user, refreshNotifications]);
 
+  // Auto-hide read notifications after 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNotifications(prev => {
+        const now = new Date();
+        return prev.filter(n => {
+          if (n.read && n.readAt) {
+            const timeSinceRead = now.getTime() - n.readAt.getTime();
+            // Hide read notifications after 30 seconds
+            return timeSinceRead < 30000;
+          }
+          return true;
+        });
+      });
+    }, 10000); // Check every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Initial load
   useEffect(() => {
     if (user) {
@@ -608,7 +778,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     removeNotification,
     clearAll,
     loading,
-    refreshNotifications
+    refreshNotifications,
+    hideReadNotification
   }), [
     notifications,
     unreadCount,
@@ -618,7 +789,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     removeNotification,
     clearAll,
     loading,
-    refreshNotifications
+    refreshNotifications,
+    hideReadNotification
   ]);
 
   return (

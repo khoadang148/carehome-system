@@ -737,6 +737,28 @@ export default function SelectPackagesPage() {
     return bed.bed_number || `Giường ${bed._id}`;
   };
 
+  const formatBedType = (bedType: string) => {
+    if (!bedType) return '';
+    
+    const typeMap: { [key: string]: string } = {
+      'standard': 'Tiêu chuẩn',
+      'electric': 'Điều khiển điện',
+      'hospital': 'Bệnh viện',
+      'reclining': 'Nằm ngả',
+      'adjustable': 'Điều chỉnh được',
+      'single': 'Đơn',
+      'double': 'Đôi',
+      'twin': 'Đôi nhỏ',
+      'queen': 'Queen',
+      'king': 'King'
+    };
+    
+    const vietnameseType = typeMap[bedType.toLowerCase()] || bedType;
+    
+    // Viết hoa chữ cái đầu
+    return vietnameseType.charAt(0).toUpperCase() + vietnameseType.slice(1);
+  };
+
   const toggleSupplementary = (id: string) => {
     setSupplementaryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
@@ -855,7 +877,12 @@ export default function SelectPackagesPage() {
         }
       }
 
-      setStep(8);
+      // Redirect to payment (family bill creation) after successful registration
+      if (actualResidentId) {
+        router.replace(`/family/finance/bills/new?residentId=${actualResidentId}`);
+      } else {
+        setStep(8);
+      }
     } catch (error: any) {
     } finally {
       setIsSubmitting(false);
@@ -2410,7 +2437,7 @@ export default function SelectPackagesPage() {
                                   </div>
                                   <div className="text-xs">
                                     <div className="text-gray-500">Loại giường</div>
-                                    <div className="font-medium text-gray-900">{b.bed_type}</div>
+                                    <div className="font-medium text-gray-900">{formatBedType(b.bed_type)}</div>
                                   </div>
                                   <div className="text-xs">
                                     <div className="text-gray-500">Trạng thái</div>
@@ -2508,66 +2535,8 @@ export default function SelectPackagesPage() {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">Thời gian đăng ký:</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <label className="relative cursor-pointer">
-                      <input
-                        type="radio"
-                        name="registrationPeriod"
-                        value="1"
-                        checked={registrationPeriod === '1'}
-                        onChange={(e) => setRegistrationPeriod(e.target.value)}
-                        className="sr-only"
-                      />
-                      <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${registrationPeriod === '1'
-                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${registrationPeriod === '1'
-                            ? 'border-indigo-500 bg-indigo-500'
-                            : 'border-gray-300'
-                            }`}>
-                            {registrationPeriod === '1' && (
-                              <div className="w-2 h-2 bg-white rounded-full"></div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900">1 tháng</div>
-                            <div className="text-sm text-gray-500">Đăng ký ngắn hạn</div>
-                          </div>
-                        </div>
-                      </div>
-                    </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                    <label className="relative cursor-pointer">
-                      <input
-                        type="radio"
-                        name="registrationPeriod"
-                        value="3"
-                        checked={registrationPeriod === '3'}
-                        onChange={(e) => setRegistrationPeriod(e.target.value)}
-                        className="sr-only"
-                      />
-                      <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${registrationPeriod === '3'
-                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${registrationPeriod === '3'
-                            ? 'border-indigo-500 bg-indigo-500'
-                            : 'border-gray-300'
-                            }`}>
-                            {registrationPeriod === '3' && (
-                              <div className="w-2 h-2 bg-white rounded-full"></div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900">3 tháng</div>
-                            <div className="text-sm text-gray-500">Đăng ký quý</div>
-                          </div>
-                        </div>
-                      </div>
-                    </label>
 
                     <label className="relative cursor-pointer">
                       <input
@@ -2629,35 +2598,6 @@ export default function SelectPackagesPage() {
                       </div>
                     </label>
 
-                    <label className="relative cursor-pointer">
-                      <input
-                        type="radio"
-                        name="registrationPeriod"
-                        value="custom"
-                        checked={registrationPeriod === 'custom'}
-                        onChange={(e) => setRegistrationPeriod(e.target.value)}
-                        className="sr-only"
-                      />
-                      <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${registrationPeriod === 'custom'
-                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${registrationPeriod === 'custom'
-                            ? 'border-indigo-500 bg-indigo-500'
-                            : 'border-gray-300'
-                            }`}>
-                            {registrationPeriod === 'custom' && (
-                              <div className="w-2 h-2 bg-white rounded-full"></div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900">Tùy chỉnh</div>
-                            <div className="text-sm text-gray-500">Chọn thời gian riêng</div>
-                          </div>
-                        </div>
-                      </div>
-                    </label>
                   </div>
                 </div>
 
@@ -2675,7 +2615,7 @@ export default function SelectPackagesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Ngày kết thúc:</label>
-                  {registrationPeriod === 'custom' ? (
+                  {false ? (
                     <div>
                       <DatePicker
                         selected={endDate ? new Date(endDate) : null}
@@ -2732,11 +2672,11 @@ export default function SelectPackagesPage() {
                 Quay lại
               </button>
               <button
-                disabled={!startDate || (registrationPeriod === 'custom' && !endDate)}
+                disabled={!startDate}
                 onClick={() => setStep(7)}
                 className={`
                   px-6 py-3 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow-md
-                  ${(!startDate || (registrationPeriod === 'custom' && !endDate))
+                  ${!startDate
                     ? 'bg-gray-400 text-white cursor-not-allowed'
                     : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'
                   }
@@ -2967,10 +2907,7 @@ export default function SelectPackagesPage() {
                       <div className="flex-1">
                         <div className="text-sm text-gray-500 font-medium">Thời gian đăng ký</div>
                         <div className="font-semibold text-gray-900">
-                          {registrationPeriod === 'custom' 
-                            ? `Tùy chỉnh (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`
-                            : `${registrationPeriod} tháng${showTimeDetails ? '' : ` (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`}`
-                          }
+                          {`${registrationPeriod} tháng${showTimeDetails ? '' : ` (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`}`}
                         </div>
                       </div>
                       <button
@@ -3006,7 +2943,7 @@ export default function SelectPackagesPage() {
                           </div>
                         </div>
 
-                        {registrationPeriod === 'custom' && startDate && endDate && (
+                        {false && startDate && endDate && (
                           <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
                             <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-bold text-blue-700">
                               TG

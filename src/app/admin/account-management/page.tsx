@@ -16,7 +16,6 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   FunnelIcon,
-  UserPlusIcon,
   ClockIcon,
   UserCircleIcon,
   HomeIcon
@@ -34,7 +33,7 @@ interface User {
   phone: string;
   username: string;
   role: 'admin' | 'staff' | 'family';
-  status: 'active' | 'inactive' | 'suspended';
+  status: 'active' | 'inactive' | 'suspended' | 'deleted' | 'pending';
   is_super_admin?: boolean;
   notes?: string;
   created_at?: string;
@@ -85,7 +84,7 @@ export default function AccountManagementPage() {
   const [filterRole, setFilterRole] = useState('Tất cả');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  // const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -116,7 +115,7 @@ export default function AccountManagementPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    const hasModalOpen = showCreateModal || showEditModal || showDetailModal || showDeleteModal;
+    const hasModalOpen = /* showCreateModal || */ showEditModal || showDetailModal || showDeleteModal;
 
     if (hasModalOpen) {
       document.body.classList.add('hide-header');
@@ -130,7 +129,7 @@ export default function AccountManagementPage() {
       document.body.classList.remove('hide-header');
       document.body.style.overflow = 'unset';
     };
-  }, [showCreateModal, showEditModal, showDetailModal, showDeleteModal]);
+  }, [/*showCreateModal,*/ showEditModal, showDetailModal, showDeleteModal]);
 
   useEffect(() => {
     async function fetchAccounts() {
@@ -157,31 +156,7 @@ export default function AccountManagementPage() {
     }
   }, [showDetailModal]);
 
-  const handleCreate = () => {
-    setFormData(activeTab === 'staff' ? {
-      selectedStaffId: '',
-      name: '',
-      email: '',
-      role: '',
-      department: '',
-      password: '',
-      permissions: []
-    } : {
-      selectedGuardianId: '',
-      username: '',
-      email: '',
-      fullName: '',
-      phone: '',
-      relationship: '',
-      residentId: '',
-      residentName: '',
-      password: '',
-      emergencyContact: '',
-      address: '',
-      notes: ''
-    });
-    setShowCreateModal(true);
-  };
+  // Create account removed
 
   const handleEdit = (account: User) => {
     setSelectedAccount(account);
@@ -231,23 +206,20 @@ export default function AccountManagementPage() {
     setLoadingData(true);
     try {
       if (activeTab === 'staff') {
-        if (showCreateModal) {
-        } else if (showEditModal && selectedAccount) {
+        if (showEditModal && selectedAccount) {
           await userAPI.update(String(selectedAccount._id), formData);
           toast.success(`Đã cập nhật tài khoản ${formData.name || formData.full_name} thành công!`);
           const data = await userAPI.getAll();
           setStaffUsers(data.filter((u: any) => u.role === 'admin' || u.role === 'staff'));
         }
       } else {
-        if (showCreateModal) {
-        } else if (showEditModal && selectedAccount) {
+        if (showEditModal && selectedAccount) {
           await userAPI.update(String(selectedAccount._id), formData);
           toast.success(`Đã cập nhật tài khoản ${formData.fullName} thành công!`);
           const data = await userAPI.getAll();
           setFamilyAccounts(data.filter((u: any) => u.role === 'family'));
         }
       }
-      setShowCreateModal(false);
       setShowEditModal(false);
       setFormData({});
     } catch (err) {
@@ -277,6 +249,8 @@ export default function AccountManagementPage() {
       case 'active': return 'Hoạt động';
       case 'inactive': return 'Không hoạt động';
       case 'suspended': return 'Tạm khóa';
+      case 'deleted': return 'Đã xóa';
+      case 'pending': return 'Chờ duyệt';
       default: return status;
     }
   };
@@ -322,8 +296,10 @@ export default function AccountManagementPage() {
           padding: '1.25rem 2rem',
           marginBottom: '1.25rem',
           gap: '1.5rem',
-          transition: 'box-shadow 0.2s',
+          transition: 'box-shadow 0.2s, transform 0.15s',
         }}
+        onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
+        onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
       >
 
         <div
@@ -398,19 +374,25 @@ export default function AccountManagementPage() {
               display: 'inline-block',
               padding: '0.25rem 0.75rem',
               borderRadius: '999px',
-              background: user.status === 'active' ? '#dcfce7' : user.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
-              color: user.status === 'active' ? '#16a34a' : user.status === 'inactive' ? '#64748b' : '#b45309',
+              background:
+                user.status === 'active' ? '#dcfce7' :
+                user.status === 'inactive' ? '#f3f4f6' :
+                user.status === 'suspended' ? '#fef9c3' :
+                user.status === 'deleted' ? '#fee2e2' :
+                user.status === 'pending' ? '#dbeafe' : '#f3f4f6',
+              color:
+                user.status === 'active' ? '#16a34a' :
+                user.status === 'inactive' ? '#64748b' :
+                user.status === 'suspended' ? '#b45309' :
+                user.status === 'deleted' ? '#dc2626' :
+                user.status === 'pending' ? '#1d4ed8' : '#64748b',
               fontWeight: 600,
               fontSize: '0.85rem',
               marginBottom: 8,
             }}
           >
             <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Trạng thái:</span>
-            {user.status === 'active'
-              ? 'Hoạt động'
-              : user.status === 'inactive'
-                ? 'Không hoạt động'
-                : 'Tạm khóa'}
+            {getStatusDisplay(user.status)}
           </span>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -454,8 +436,10 @@ export default function AccountManagementPage() {
           padding: '1.25rem 2rem',
           marginBottom: '1.25rem',
           gap: '1.5rem',
-          transition: 'box-shadow 0.2s',
+          transition: 'box-shadow 0.2s, transform 0.15s',
         }}
+        onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
+        onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
       >
 
         <div
@@ -525,19 +509,25 @@ export default function AccountManagementPage() {
               display: 'inline-block',
               padding: '0.25rem 0.75rem',
               borderRadius: '999px',
-              background: account.status === 'active' ? '#dcfce7' : account.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
-              color: account.status === 'active' ? '#16a34a' : account.status === 'inactive' ? '#64748b' : '#b45309',
+              background:
+                account.status === 'active' ? '#dcfce7' :
+                account.status === 'inactive' ? '#f3f4f6' :
+                account.status === 'suspended' ? '#fef9c3' :
+                account.status === 'deleted' ? '#fee2e2' :
+                account.status === 'pending' ? '#dbeafe' : '#f3f4f6',
+              color:
+                account.status === 'active' ? '#16a34a' :
+                account.status === 'inactive' ? '#64748b' :
+                account.status === 'suspended' ? '#b45309' :
+                account.status === 'deleted' ? '#dc2626' :
+                account.status === 'pending' ? '#1d4ed8' : '#64748b',
               fontWeight: 600,
               fontSize: '0.85rem',
               marginBottom: 8,
             }}
           >
             <span style={{ color: '#64748b', fontWeight: 500, marginRight: 4 }}>Trạng thái:</span>
-            {account.status === 'active'
-              ? 'Hoạt động'
-              : account.status === 'inactive'
-                ? 'Không hoạt động'
-                : 'Tạm khóa'}
+            {getStatusDisplay(account.status)}
           </span>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -691,6 +681,7 @@ export default function AccountManagementPage() {
                   Gia đình
                 </TabButton>
               </div>
+              {/* Create button removed */}
             </div>
           </div>
         </div>
@@ -705,7 +696,7 @@ export default function AccountManagementPage() {
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
           border: '1px solid #f1f5f9'
         }}>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
               <label style={{
                 display: 'block',
@@ -735,7 +726,7 @@ export default function AccountManagementPage() {
                   style={{
                     width: '100%',
                     paddingLeft: '2.75rem',
-                    paddingRight: '1rem',
+                    paddingRight: '2.5rem',
                     paddingTop: '0.875rem',
                     paddingBottom: '0.875rem',
                     border: '2px solid #e5e7eb',
@@ -746,10 +737,83 @@ export default function AccountManagementPage() {
                     transition: 'border-color 0.3s ease'
                   }}
                 />
+                {searchTerm && (
+                  <button
+                    aria-label="Xóa tìm kiếm"
+                    onClick={() => setSearchTerm('')}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <XCircleIcon style={{ width: '1.125rem', height: '1.125rem', color: '#9ca3af' }} />
+                  </button>
+                )}
               </div>
             </div>
-
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '280px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                fontWeight: 600
+              }}>
+                Trạng thái
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {[
+                { key: 'all', label: 'Tất cả' },
+                { key: 'active', label: 'Hoạt động' },
+                { key: 'pending', label: 'Chờ duyệt' },
+                { key: 'suspended', label: 'Tạm khóa' }
+              ].map(s => (
+                <button
+                  key={s.key}
+                  aria-pressed={statusFilter === s.key}
+                  onClick={() => setStatusFilter(s.key)}
+                  style={{
+                    padding: '0.5rem 0.9rem',
+                    borderRadius: '999px',
+                    border: `1px solid ${statusFilter === s.key ? '#8b5cf6' : '#e5e7eb'}`,
+                    background: statusFilter === s.key
+                      ? 'linear-gradient(180deg, rgba(139,92,246,0.14) 0%, rgba(139,92,246,0.08) 100%)'
+                      : '#f8fafc',
+                    color: statusFilter === s.key ? '#6d28d9' : '#374151',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    boxShadow: statusFilter === s.key
+                      ? 'inset 0 0 0 1px rgba(109,40,217,0.12), 0 1px 2px rgba(0,0,0,0.04)'
+                      : '0 1px 1px rgba(0,0,0,0.02)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={e => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    if (statusFilter === s.key) {
+                      el.style.filter = 'brightness(0.98)';
+                    } else {
+                      el.style.background = '#f1f5f9';
+                    }
+                  }}
+                  onMouseOut={e => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.filter = 'none';
+                    el.style.background = statusFilter === s.key
+                      ? 'linear-gradient(180deg, rgba(139,92,246,0.14) 0%, rgba(139,92,246,0.08) 100%)'
+                      : '#f8fafc';
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -761,8 +825,27 @@ export default function AccountManagementPage() {
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
         }}>
           {loadingData ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+            <div>
+              {[...Array(4)].map((_, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#fff',
+                  borderRadius: '1rem',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  border: '1px solid #e5e7eb',
+                  padding: '1.25rem 2rem',
+                  marginBottom: '1.25rem',
+                  gap: '1.5rem'
+                }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f3f4f6' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ height: 16, width: '40%', background: '#e5e7eb', borderRadius: 8, marginBottom: 8 }} />
+                    <div style={{ height: 12, width: '60%', background: '#e5e7eb', borderRadius: 8 }} />
+                  </div>
+                  <div style={{ width: 120, height: 28, background: '#e5e7eb', borderRadius: 999 }} />
+                </div>
+              ))}
             </div>
           ) : (
             <>
@@ -778,16 +861,20 @@ export default function AccountManagementPage() {
                     gap: '0.5rem'
                   }}>
                     <ShieldCheckIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                    Tài khoản nhân viên ({staffUsers.filter(user =>
-                      (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
-                    ).length} tài khoản)
+                    Tài khoản nhân viên ({staffUsers.filter(user => {
+                      const matchesSearch = (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                        (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
+                      const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+                      return matchesSearch && matchesStatus;
+                    }).length} tài khoản)
                   </div>
                   {staffUsers
-                    .filter(user =>
-                      (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
-                    )
+                    .filter(user => {
+                      const matchesSearch = (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                        (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
+                      const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+                      return matchesSearch && matchesStatus;
+                    })
                     .map((user, idx) => <StaffListItem key={user._id ? String(user._id) : `staff-${idx}`} user={user} />)
                   }
                 </div>
@@ -803,18 +890,22 @@ export default function AccountManagementPage() {
                     gap: '0.5rem'
                   }}>
                     <UserIcon style={{ width: '1.25rem', height: '1.25rem', color: '#8b5cf6' }} />
-                    Tài khoản gia đình ({familyAccounts.filter(account =>
-                      (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
-                    ).length} tài khoản)
+                    Tài khoản gia đình ({familyAccounts.filter(account => {
+                      const matchesSearch = (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                        (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                        (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
+                      const matchesStatus = statusFilter === 'all' || account.status === statusFilter;
+                      return matchesSearch && matchesStatus;
+                    }).length} tài khoản)
                   </div>
                   {familyAccounts
-                    .filter(account =>
-                      (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
-                    )
+                    .filter(account => {
+                      const matchesSearch = (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                        (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                        (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
+                      const matchesStatus = statusFilter === 'all' || account.status === statusFilter;
+                      return matchesSearch && matchesStatus;
+                    })
                     .map((account, idx) => <FamilyListItem key={account._id ? String(account._id) : `family-${idx}`} account={account} />)
                   }
                 </div>
@@ -824,15 +915,19 @@ export default function AccountManagementPage() {
         </div>
 
 
-        {((activeTab === 'staff' && staffUsers.filter(user =>
-          (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
-        ).length === 0) ||
-          (activeTab === 'family' && familyAccounts.filter(account =>
-            (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()))
-          ).length === 0)) && searchTerm && (
+        {((activeTab === 'staff' && staffUsers.filter(user => {
+          const matchesSearch = (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
+          const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+          return matchesSearch && matchesStatus;
+        }).length === 0) ||
+          (activeTab === 'family' && familyAccounts.filter(account => {
+            const matchesSearch = (account.full_name && account.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+              (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+              (account.email && account.email.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchesStatus = statusFilter === 'all' || account.status === statusFilter;
+            return matchesSearch && matchesStatus;
+          }).length === 0)) && (searchTerm || statusFilter !== 'all') && (
             <div style={{
               background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
               borderRadius: '1rem',
@@ -862,13 +957,18 @@ export default function AccountManagementPage() {
                 Không tìm thấy kết quả
               </h3>
               <p style={{ color: '#6b7280', margin: 0 }}>
-                Không có {activeTab === 'staff' ? 'nhân viên' : 'tài khoản gia đình'} nào phù hợp với từ khóa "{searchTerm}".
+                {searchTerm && statusFilter !== 'all' 
+                  ? `Không có ${activeTab === 'staff' ? 'nhân viên' : 'tài khoản gia đình'} nào phù hợp với từ khóa "${searchTerm}" và trạng thái "${getStatusDisplay(statusFilter)}".`
+                  : searchTerm 
+                    ? `Không có ${activeTab === 'staff' ? 'nhân viên' : 'tài khoản gia đình'} nào phù hợp với từ khóa "${searchTerm}".`
+                    : `Không có ${activeTab === 'staff' ? 'nhân viên' : 'tài khoản gia đình'} nào có trạng thái "${getStatusDisplay(statusFilter)}".`
+                }
               </p>
             </div>
           )}
       </div>
 
-      {showCreateModal && <CreateAccountModal />}
+      {/* CreateAccountModal removed */}
       {showEditModal && <EditAccountModal />}
       {showDeleteModal && <DeleteConfirmModal />}
       {showResetPasswordModal && (
@@ -1398,64 +1498,8 @@ export default function AccountManagementPage() {
             gap: '1rem',
             marginTop: '-1rem'
           }}>
-            <button
-              onClick={() => setShowCreateModal(false)}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                border: '1px solid #e2e8f0',
-                background: 'white',
-                color: '#475569',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.background = '#f8fafc';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.background = 'white';
-              }}
-            >
-              Hủy
-            </button>
-            <button
-              onClick={saveAccount}
-              disabled={activeTab === 'staff' ? !formData.selectedStaffId : !formData.selectedGuardianId}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                border: 'none',
-                background: (activeTab === 'staff' ? formData.selectedStaffId : formData.selectedGuardianId)
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : '#9ca3af',
-                color: 'white',
-                cursor: (activeTab === 'staff' ? formData.selectedStaffId : formData.selectedGuardianId) ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                opacity: (activeTab === 'staff' ? formData.selectedStaffId : formData.selectedGuardianId) ? 1 : 0.7
-              }}
-              onMouseOver={(e) => {
-                if (activeTab === 'staff' ? formData.selectedStaffId : formData.selectedGuardianId) {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (activeTab === 'staff' ? formData.selectedStaffId : formData.selectedGuardianId) {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                }
-              }}
-            >
-              <UserPlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
-              Tạo tài khoản
-            </button>
+            {/* Create modal controls removed */}
+            {/* Create action removed */}
           </div>
         </div>
       </div>
@@ -1732,6 +1776,9 @@ export default function AccountManagementPage() {
                   >
                     <option value="active">Hoạt động</option>
                     <option value="inactive">Không hoạt động</option>
+                    <option value="suspended">Tạm khóa</option>
+                    <option value="pending">Chờ duyệt</option>
+                    <option value="deleted">Đã xóa</option>
                   </select>
                 </div>
               </>
@@ -1952,6 +1999,8 @@ export default function AccountManagementPage() {
                     <option value="active">Hoạt động</option>
                     <option value="inactive">Không hoạt động</option>
                     <option value="suspended">Tạm khóa</option>
+                    <option value="pending">Chờ duyệt</option>
+                    <option value="deleted">Đã xóa</option>
                   </select>
                 </div>
               </>
@@ -2125,16 +2174,22 @@ export default function AccountManagementPage() {
               display: 'inline-block',
               padding: '0.25rem 0.75rem',
               borderRadius: '999px',
-              background: selectedAccount.status === 'active' ? '#dcfce7' : selectedAccount.status === 'inactive' ? '#f3f4f6' : '#fef9c3',
-              color: selectedAccount.status === 'active' ? '#16a34a' : selectedAccount.status === 'inactive' ? '#64748b' : '#b45309',
+              background:
+                selectedAccount.status === 'active' ? '#dcfce7' :
+                selectedAccount.status === 'inactive' ? '#f3f4f6' :
+                selectedAccount.status === 'suspended' ? '#fef9c3' :
+                selectedAccount.status === 'deleted' ? '#fee2e2' :
+                selectedAccount.status === 'pending' ? '#dbeafe' : '#f3f4f6',
+              color:
+                selectedAccount.status === 'active' ? '#16a34a' :
+                selectedAccount.status === 'inactive' ? '#64748b' :
+                selectedAccount.status === 'suspended' ? '#b45309' :
+                selectedAccount.status === 'deleted' ? '#dc2626' :
+                selectedAccount.status === 'pending' ? '#1d4ed8' : '#64748b',
               fontWeight: 600,
               fontSize: '0.95rem',
             }}>
-              {selectedAccount.status === 'active'
-                ? 'Hoạt động'
-                : selectedAccount.status === 'inactive'
-                  ? 'Không hoạt động'
-                  : 'Tạm khóa'}
+              {getStatusDisplay(selectedAccount.status)}
             </span>
           </div>
 
@@ -2288,8 +2343,16 @@ export default function AccountManagementPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
                   <div style={{ color: '#64748b', fontWeight: 500, fontSize: '0.95rem' }}>Trạng thái:</div>
-                  <div style={{ color: selectedAccount.status === 'active' ? '#16a34a' : selectedAccount.status === 'inactive' ? '#64748b' : '#b45309', fontWeight: 700 }}>
-                    {selectedAccount.status === 'active' ? 'Hoạt động' : selectedAccount.status === 'inactive' ? 'Không hoạt động' : 'Tạm khóa'}
+                  <div style={{
+                    color:
+                      selectedAccount.status === 'active' ? '#16a34a' :
+                      selectedAccount.status === 'inactive' ? '#64748b' :
+                      selectedAccount.status === 'suspended' ? '#b45309' :
+                      selectedAccount.status === 'deleted' ? '#dc2626' :
+                      selectedAccount.status === 'pending' ? '#1d4ed8' : '#64748b',
+                    fontWeight: 700
+                  }}>
+                    {getStatusDisplay(selectedAccount.status)}
                   </div>
                 </div>
 

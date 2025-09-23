@@ -448,52 +448,6 @@ export default function PaymentManagement() {
             </p>
           </div>
           
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1.5rem'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1.25rem 1.75rem',
-              background: 'rgba(255, 255, 255, 0.25)',
-              borderRadius: '1rem',
-              backdropFilter: 'blur(15px)',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(255, 255, 255, 0.1) inset',
-              transform: 'scale(1.02)'
-            }}>
-              <div style={{
-                padding: '0.75rem',
-                background: 'rgba(16, 185, 129, 0.3)',
-                borderRadius: '0.75rem',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
-              }}>
-                <CurrencyDollarIcon style={{ width: '1.75rem', height: '1.75rem', color: '#d1fae5' }} />
-              </div>
-              <div>
-                <div style={{ 
-                  fontSize: '1.625rem', 
-                  fontWeight: 800, 
-                  color: 'white',
-                  lineHeight: 1,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  {formatCurrency(stats.totalRevenue)}
-                </div>
-                <div style={{ 
-                  fontSize: '0.9rem', 
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  fontWeight: 600,
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
-                }}>
-                  Tổng doanh thu
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

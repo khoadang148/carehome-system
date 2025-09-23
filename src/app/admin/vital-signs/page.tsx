@@ -75,8 +75,9 @@ export default function AdminVitalSignsPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const residentsData = await residentAPI.getAll();
-        const allResidents = Array.isArray(residentsData) ? residentsData : [];
+        // Sử dụng endpoint /residents/admitted để lấy danh sách người cao tuổi đã nhập viện
+        const admittedResidentsData = await residentAPI.getAdmitted();
+        const allResidents = Array.isArray(admittedResidentsData) ? admittedResidentsData : [];
 
         const assignmentsData = await staffAssignmentsAPI.getAll();
         const allAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
@@ -100,7 +101,7 @@ export default function AdminVitalSignsPage() {
                 roomNumber,
                 hasRoom: roomNumber !== 'Chưa hoàn tất đăng kí'
               };
-            } catch {
+            } catch (error) {
               return {
                 ...resident,
                 roomNumber: 'Chưa hoàn tất đăng kí',
@@ -110,11 +111,8 @@ export default function AdminVitalSignsPage() {
           })
         );
 
-        const completedResidents = residentsWithRooms.filter((resident: any) => {
-          const status = resident.status || resident.resident_status;
-          const isDeleted = Boolean(resident.deleted || resident.isDeleted);
-          return resident.hasRoom && status === 'admitted' && !isDeleted;
-        });
+        // Vì đã lấy từ /residents/admitted nên không cần filter thêm
+        const completedResidents = residentsWithRooms;
 
         const mappedResidents = completedResidents.map((resident: any) => {
           const activeAssignment = allAssignments.find((assignment: any) =>
@@ -132,6 +130,16 @@ export default function AdminVitalSignsPage() {
           };
         });
 
+        console.log('=== ADMITTED RESIDENTS DATA ===');
+        console.log('Admitted residents count:', allResidents.length);
+        console.log('Admitted residents:', allResidents.map(r => ({ id: r._id, name: r.full_name, status: r.status || r.resident_status })));
+        console.log('Mapped residents:', mappedResidents);
+        
+        // Lưu admitted residents vào sessionStorage để có thể truy cập sau
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('admittedResidents', JSON.stringify(allResidents));
+        }
+        
         setResidents(mappedResidents);
         setStaffAssignments(allAssignments);
 
@@ -142,6 +150,7 @@ export default function AdminVitalSignsPage() {
         setRoomNumbers(roomNumbersMap);
 
       } catch (err) {
+        console.error('Error fetching admitted residents:', err);
         setResidents([]);
         setStaffAssignments([]);
       } finally {
@@ -157,10 +166,15 @@ export default function AdminVitalSignsPage() {
   useEffect(() => {
     const fetchVitalSigns = async () => {
       try {
+        console.log('=== FETCHING VITAL SIGNS ===');
         const data = await vitalSignsAPI.getAll();
+        console.log('Raw vital signs data:', data);
         const vitalSignsData = Array.isArray(data) ? data : [];
+        console.log('Processed vital signs data:', vitalSignsData);
+        console.log('Vital signs count:', vitalSignsData.length);
         setVitalSigns(vitalSignsData);
       } catch (err) {
+        console.error('Error fetching vital signs:', err);
         setVitalSigns([]);
       }
     };
@@ -170,36 +184,81 @@ export default function AdminVitalSignsPage() {
     }
   }, [user]);
 
-  const transformVitalSignsForDisplay = (vitalSignsData: any[]) => {
-    return vitalSignsData.map(vs => {
-      const resident = residents.find(r => r.id === vs.resident_id);
-      const dateTime = vs.date_time || vs.date;
+  const transformVitalSignsForDisplay = async (vitalSignsData: any[]) => {
+    const transformedData = await Promise.all(
+      vitalSignsData.map(async (vs) => {
+        const residentIdStr = String(vs.resident_id);
+        
+        // Tìm trong residents đã load trước
+        let resident = residents.find(r => String(r.id) === residentIdStr);
+        let residentName = 'Đang tải...';
+        let residentAvatar = null;
+        let roomNumber = 'Chưa xác định';
+        
+        if (resident) {
+          residentName = resident.name;
+          residentAvatar = resident.avatar;
+          roomNumber = roomNumbers[vs.resident_id] || 'Chưa phân phòng';
+        } else {
+          // Nếu không tìm thấy, gọi API để lấy thông tin resident
+          try {
+            console.log('Fetching resident info for ID:', residentIdStr);
+            const residentData = await residentAPI.getById(residentIdStr);
+            if (residentData) {
+              residentName = residentData.full_name || 'Người cao tuổi';
+              residentAvatar = residentData.avatar;
+              roomNumber = 'Chưa xác định';
+            }
+          } catch (error) {
+            console.log('Error fetching resident:', error);
+            residentName = 'Người cao tuổi không tồn tại';
+          }
+        }
+        
+        console.log('Mapping vital sign:', {
+          vitalSignId: vs._id,
+          residentId: vs.resident_id,
+          residentName,
+          roomNumber
+        });
+        
+        const dateTime = vs.date_time || vs.date;
 
-      return {
-        id: vs._id,
-        residentId: vs.resident_id,
-        residentName: resident?.name || 'người cao tuổi không tồn tại',
-        residentAvatar: resident?.avatar,
-        assignmentStatus: resident?.assignmentStatus || 'unknown',
-        date: formatDateDDMMYYYYWithTimezone(dateTime),
-        time: formatTimeWithTimezone(dateTime),
-        bloodPressure: vs.blood_pressure || vs.bloodPressure,
-        heartRate: vs.heart_rate || vs.heartRate,
-        temperature: vs.temperature,
-        oxygenSaturation: vs.oxygen_level || vs.oxygen_saturation || vs.oxygenSaturation,
-        respiratoryRate: vs.respiratory_rate || vs.respiratoryRate,
-        weight: vs.weight,
-        notes: vs.notes,
-        recordedBy: vs.recorded_by || vs.recordedBy || null,
-      };
-    });
+        return {
+          id: vs._id,
+          residentId: vs.resident_id,
+          residentName,
+          residentAvatar,
+          assignmentStatus: resident?.assignmentStatus || 'unknown',
+          date: formatDateDDMMYYYYWithTimezone(dateTime),
+          time: formatTimeWithTimezone(dateTime),
+          bloodPressure: vs.blood_pressure || vs.bloodPressure,
+          heartRate: vs.heart_rate || vs.heartRate,
+          temperature: vs.temperature,
+          oxygenSaturation: vs.oxygen_level || vs.oxygen_saturation || vs.oxygenSaturation,
+          respiratoryRate: vs.respiratory_rate || vs.respiratoryRate,
+          weight: vs.weight,
+          notes: vs.notes,
+          recordedBy: vs.recorded_by || vs.recordedBy || null,
+          roomNumber,
+        };
+      })
+    );
+    
+    return transformedData;
   };
 
-  const getFilteredVitalSigns = (residentId?: string, dateFilter?: string) => {
+  const getFilteredVitalSigns = async (residentId?: string, dateFilter?: string) => {
+    console.log('=== FILTERING VITAL SIGNS ===');
+    console.log('Total vital signs:', vitalSigns.length);
+    console.log('Total residents:', residents.length);
+    
     let filtered = vitalSigns;
+    console.log('After initial filter:', filtered.length);
 
     if (residentId) {
       filtered = filtered.filter(vs => vs.resident_id === residentId);
+      console.log('After resident filter:', filtered.length);
     }
 
     if (dateFilter) {
@@ -210,10 +269,11 @@ export default function AdminVitalSignsPage() {
         const formattedDate = getDateYYYYMMDDWithTimezone(dateTime);
         return formattedDate === dateFilter;
       });
+      console.log('After date filter:', filtered.length);
     }
 
-    const activeResidentIds = new Set(residents.map(r => r.id));
-    filtered = filtered.filter(vs => activeResidentIds.has(vs.resident_id));
+    // Không lọc theo residents nữa, hiển thị tất cả vital signs
+    console.log('Showing all vital signs without resident filtering');
 
     filtered.sort((a, b) => {
       const dateA = new Date(a.date_time || a.date);
@@ -221,10 +281,23 @@ export default function AdminVitalSignsPage() {
       return dateB.getTime() - dateA.getTime();
     });
 
-    return transformVitalSignsForDisplay(filtered);
+    const result = await transformVitalSignsForDisplay(filtered);
+    console.log('Final result count:', result.length);
+    return result;
   };
 
-  const filteredVitalSigns = getFilteredVitalSigns(selectedResident || undefined, selectedDate || undefined);
+  const [filteredVitalSigns, setFilteredVitalSigns] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadFilteredVitalSigns = async () => {
+      const result = await getFilteredVitalSigns(selectedResident || undefined, selectedDate || undefined);
+      setFilteredVitalSigns(result);
+    };
+    
+    if (vitalSigns.length > 0) {
+      loadFilteredVitalSigns();
+    }
+  }, [vitalSigns, selectedResident, selectedDate, residents]);
 
   const totalPages = Math.ceil(filteredVitalSigns.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -308,46 +381,49 @@ export default function AdminVitalSignsPage() {
     <>
       <ToastContainer />
 
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto p-6">
-
-          <div className="bg-white rounded-2xl p-8 mb-8 shadow-lg border border-gray-200">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Header Section */}
+          <div className="bg-gradient-to-br from-white via-white to-red-50 rounded-2xl p-6 mb-6 shadow-lg border border-white/50 backdrop-blur-sm">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => router.push('/admin')}
-                  className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                  className="group p-3 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
                   title="Quay lại"
                 >
                   <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                 </button>
-                <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center shadow-lg">
-                  <HeartIconSolid className="w-8 h-8 text-white" />
+                
+                <div className="w-14 h-14 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/25">
+                  <HeartIconSolid className="w-7 h-7 text-white" />
                 </div>
+                
                 <div>
-                  <h1 className="text-4xl font-bold text-red-600 mb-2">
-                    Quản Lý Chỉ Số Sức Khỏe
+                  <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 mb-2 tracking-tight">
+                    Chỉ Số Sức Khỏe
                   </h1>
-                  <p className="text-lg text-gray-600 font-medium">
+                  <p className="text-base text-slate-600 font-semibold flex items-center gap-2">
+                    <ChartBarIcon className="w-4 h-4 text-red-500" />
                     Theo dõi và quản lý chỉ số sức khỏe của người cao tuổi
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="bg-red-50 px-6 py-4 rounded-2xl border border-red-200">
+                <div className="bg-gradient-to-br from-red-50 to-pink-50 px-6 py-4 rounded-xl border border-red-200/50 shadow-md">
                   <div className="text-center">
-                    <div className="text-sm text-red-600 font-medium mb-1">
+                    <div className="text-xs text-red-600 font-bold mb-1 uppercase tracking-wide">
                       Tổng chỉ số
                     </div>
-                    <div className="text-3xl font-bold text-red-700">
+                    <div className="text-2xl font-black text-red-700 mb-1">
                       {filteredVitalSigns.length}
                     </div>
-                    <div className="text-sm text-red-600 font-medium mb-1">
+                    <div className="text-xs text-red-600 font-semibold">
                       bản ghi
                     </div>
                     {totalPages > 1 && (
-                      <div className="text-xs text-red-500 mt-1">
+                      <div className="text-xs text-red-500 mt-1 font-medium">
                         Trang {currentPage}/{totalPages}
                       </div>
                     )}
@@ -359,17 +435,31 @@ export default function AdminVitalSignsPage() {
 
 
 
-          <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-end">
+          {/* Filter Section */}
+          <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl p-6 mb-6 shadow-lg border border-white/50 backdrop-blur-sm">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-slate-700 to-red-700 mb-2 flex items-center gap-2">
+                <div className="w-6 h-6 bg-gradient-to-br from-red-500 to-pink-600 rounded-lg flex items-center justify-center shadow-md">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </div>
+                Tìm kiếm và lọc
+              </h2>
+              <p className="text-sm text-slate-600 font-medium">Lọc chỉ số sức khỏe theo người cao tuổi và ngày</p>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-end">
               <div>
-                <label className="block text-sm font-semibold text-red-600 mb-3">
+                <label className="block text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
+                  <UserIcon className="w-4 h-4" />
                   Lọc theo người cao tuổi
                 </label>
-                <div className="relative">
+                <div className="relative group">
                   <select
                     value={selectedResident || ''}
                     onChange={(e) => setSelectedResident(e.target.value || null)}
-                    className="w-full p-4 border border-gray-300 rounded-xl text-base outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm appearance-none"
+                    className="w-full p-3 border-2 border-slate-200 rounded-xl text-sm outline-none bg-white transition-all duration-300 focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-md hover:shadow-lg font-medium text-slate-700 group-hover:border-red-300 appearance-none"
                   >
                     <option value="">Tất cả người cao tuổi</option>
                     {residents.map(resident => (
@@ -378,18 +468,20 @@ export default function AdminVitalSignsPage() {
                       </option>
                     ))}
                   </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-red-600 mb-3">
+                <label className="block text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" />
                   Lọc theo ngày
                 </label>
-                <div className="relative date-picker-container">
+                <div className="relative date-picker-container group">
                   <input
                     type="date"
                     value={selectedDate}
@@ -418,46 +510,55 @@ export default function AdminVitalSignsPage() {
                         setSelectedDate('');
                       }
                     }}
-                    className="w-full p-4 border border-gray-300 rounded-xl text-base outline-none bg-white transition-all focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-sm text-gray-700 pr-12 relative"
+                    className="w-full p-3 border-2 border-slate-200 rounded-xl text-sm outline-none bg-white transition-all duration-300 focus:border-red-500 focus:ring-4 focus:ring-red-100 shadow-md hover:shadow-lg font-medium text-slate-700 pr-10 relative group-hover:border-red-300"
                     style={{ zIndex: 0 }}
                   />
 
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                    <CalendarIcon className="w-5 h-5 text-gray-400" />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <CalendarIcon className="w-4 h-4 text-slate-400 group-hover:text-red-500 transition-colors" />
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
-            <div className="p-6 border-b border-gray-100 bg-gray-50">
+          {/* Data Table Section */}
+          <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl overflow-hidden shadow-lg border border-white/50 backdrop-blur-sm">
+            <div className="p-6 border-b border-slate-200/50 bg-gradient-to-r from-slate-50 to-red-50/30">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-red-600 mb-2">
-                    Danh sách chỉ số sức khỏe
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredVitalSigns.length)} trong tổng số {filteredVitalSigns.length} bản ghi
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
+                    <HeartIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-slate-700 to-red-700 mb-1">
+                      Danh sách chỉ số sức khỏe
+                    </h2>
+                    <p className="text-sm text-slate-600 font-medium flex items-center gap-2">
+                      <ClockIcon className="w-4 h-4" />
+                      Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredVitalSigns.length)} trong tổng số {filteredVitalSigns.length} bản ghi
+                    </p>
+                  </div>
                 </div>
                 {totalPages > 1 && (
-                  <div className="text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
-                    Trang {currentPage} / {totalPages}
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 px-3 py-2 rounded-lg border border-red-200/50 shadow-sm">
+                    <p className="text-red-700 font-bold text-sm">
+                      Trang {currentPage} / {totalPages}
+                    </p>
                   </div>
                 )}
               </div>
             </div>
 
             {filteredVitalSigns.length === 0 ? (
-              <div className="p-16 text-center bg-white">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <HeartIcon className="w-10 h-10 text-gray-400" />
+              <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-red-50/30 rounded-2xl shadow-lg border border-white/50 backdrop-blur-sm">
+                <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
+                  <HeartIcon className="w-10 h-10 text-red-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-700 mb-3">
+                <h3 className="text-xl font-bold text-slate-700 mb-3">
                   Chưa có chỉ số sức khỏe nào
                 </h3>
-                <p className="text-gray-500 leading-relaxed max-w-md mx-auto">
+                <p className="text-slate-500 leading-relaxed max-w-md mx-auto text-sm">
                   Thêm chỉ số sức khỏe đầu tiên để theo dõi sức khỏe người cao tuổi một cách hiệu quả
                 </p>
               </div>
@@ -466,38 +567,32 @@ export default function AdminVitalSignsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1200px]">
                     <thead>
-                      <tr className="bg-red-600">
-                        <th className="px-6 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[200px]">
-                          <div className="flex items-center gap-2">
-
-                            Người cao tuổi
-                          </div>
+                      <tr className="bg-gradient-to-r from-red-600 via-pink-600 to-rose-600">
+                        <th className="px-4 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[200px]">
+                          Người cao tuổi
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
-                          <div className="flex items-center gap-2">
-
-                            Ngày giờ
-                          </div>
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
+                          Ngày giờ
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[100px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[100px]">
                           Huyết áp
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[90px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[90px]">
                           Nhịp tim
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[90px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[90px]">
                           Nhiệt độ
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[80px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[80px]">
                           SpO2
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[110px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[110px]">
                           Nhịp thở
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[90px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[90px]">
                           Cân nặng
                         </th>
-                        <th className="px-4 py-4 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
                           Ghi chú
                         </th>
                       </tr>
@@ -506,12 +601,12 @@ export default function AdminVitalSignsPage() {
                       {currentVitalSigns.map((vs, index) => (
                         <tr
                           key={vs.id}
-                          className={`border-b border-gray-100 transition-all duration-200 hover:bg-red-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                          className={`border-b border-slate-200/50 transition-all duration-300 hover:bg-gradient-to-r hover:from-red-50/50 hover:to-pink-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
                             }`}
                         >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-lg bg-transparent">
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-md bg-gradient-to-br from-red-100 to-pink-100">
                                 <img
                                   src={vs.residentAvatar ? userAPI.getAvatarUrl(vs.residentAvatar) : '/default-avatar.svg'}
                                   alt={ensureString(vs.residentName)}
@@ -522,68 +617,74 @@ export default function AdminVitalSignsPage() {
                                 />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="font-semibold text-gray-900 truncate text-base">
+                                <div className="font-bold text-slate-800 truncate text-sm">
                                   {ensureString(vs.residentName)}
                                 </div>
-                                <div className="text-xs text-gray-500 truncate">
+                                <div className="text-xs text-slate-500 truncate flex items-center gap-1">
+                                  <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                  </svg>
                                   Phòng: {roomNumbers[vs.residentId] || 'Chưa phân phòng'}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-700 whitespace-nowrap">
-                            <div className="font-semibold text-gray-900">{vs.date || 'Invalid Date'}</div>
-                            <div className="text-gray-500 text-xs">{vs.time || ''}</div>
+                          <td className="px-3 py-4 text-sm text-slate-700 whitespace-nowrap">
+                            <div className="font-bold text-slate-800 text-sm">{vs.date || 'Invalid Date'}</div>
+                            <div className="text-slate-500 text-xs flex items-center gap-1">
+                              <ClockIcon className="w-3 h-3" />
+                              {vs.time || ''}
+                            </div>
                           </td>
-                          <td className="px-4 py-4 text-sm">
-                            <span className="text-red-600 font-bold px-3 py-2 bg-red-50 rounded-lg border border-red-200 whitespace-nowrap text-sm shadow-sm">
+                          <td className="px-3 py-4 text-sm">
+                            <span className="text-red-700 font-bold px-3 py-1 bg-gradient-to-r from-red-100 to-red-200 rounded-lg border border-red-300 whitespace-nowrap text-xs shadow-sm">
                               {vs.bloodPressure}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-sm">
-                            <span className="text-green-600 font-bold px-3 py-2 bg-green-50 rounded-lg border border-green-200 whitespace-nowrap text-sm shadow-sm">
+                          <td className="px-3 py-4 text-sm">
+                            <span className="text-green-700 font-bold px-3 py-1 bg-gradient-to-r from-green-100 to-green-200 rounded-lg border border-green-300 whitespace-nowrap text-xs shadow-sm">
                               {vs.heartRate} bpm
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-sm">
-                            <span className="text-orange-600 font-bold px-3 py-2 bg-orange-50 rounded-lg border border-orange-200 whitespace-nowrap text-sm shadow-sm">
+                          <td className="px-3 py-4 text-sm">
+                            <span className="text-orange-700 font-bold px-3 py-1 bg-gradient-to-r from-orange-100 to-orange-200 rounded-lg border border-orange-300 whitespace-nowrap text-xs shadow-sm">
                               {vs.temperature}°C
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-sm">
-                            <span className="text-blue-600 font-bold px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 whitespace-nowrap text-sm shadow-sm">
+                          <td className="px-3 py-4 text-sm">
+                            <span className="text-blue-700 font-bold px-3 py-1 bg-gradient-to-r from-blue-100 to-blue-200 rounded-lg border border-blue-300 whitespace-nowrap text-xs shadow-sm">
                               {vs.oxygenSaturation}%
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-sm">
+                          <td className="px-3 py-4 text-sm">
                             {vs.respiratoryRate ? (
-                              <span className="text-purple-600 font-bold px-3 py-2 bg-purple-50 rounded-lg border border-purple-200 whitespace-nowrap text-sm shadow-sm">
+                              <span className="text-purple-700 font-bold px-3 py-1 bg-gradient-to-r from-purple-100 to-purple-200 rounded-lg border border-purple-300 whitespace-nowrap text-xs shadow-sm">
                                 {vs.respiratoryRate} lần/phút
                               </span>
                             ) : (
-                              <span className="text-gray-500 italic text-sm whitespace-nowrap px-3 py-2 bg-gray-50 rounded-lg">
+                              <span className="text-slate-500 italic text-xs whitespace-nowrap px-3 py-1 bg-gradient-to-r from-slate-100 to-slate-200 rounded-lg border border-slate-300">
                                 Chưa ghi nhận
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-4 text-sm">
+                          <td className="px-3 py-4 text-sm">
                             {vs.weight ? (
-                              <span className="text-green-600 font-bold px-3 py-2 bg-green-50 rounded-lg border border-green-200 whitespace-nowrap text-sm shadow-sm">
+                              <span className="text-emerald-700 font-bold px-3 py-1 bg-gradient-to-r from-emerald-100 to-emerald-200 rounded-lg border border-emerald-300 whitespace-nowrap text-xs shadow-sm">
                                 {vs.weight} kg
                               </span>
                             ) : (
-                              <span className="text-gray-500 italic text-sm whitespace-nowrap px-3 py-2 bg-gray-50 rounded-lg">
+                              <span className="text-slate-500 italic text-xs whitespace-nowrap px-3 py-1 bg-gradient-to-r from-slate-100 to-slate-200 rounded-lg border border-slate-300">
                                 Chưa ghi nhận
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-4 text-sm">
+                          <td className="px-3 py-4 text-sm">
                             {vs.notes ? (
-                              <span className="text-gray-700 font-medium text-sm">
+                              <span className="text-slate-700 font-medium text-xs bg-gradient-to-r from-slate-100 to-slate-200 px-2 py-1 rounded-lg border border-slate-300">
                                 {vs.notes}
                               </span>
                             ) : (
-                              <span className="text-gray-500 italic text-sm">
+                              <span className="text-slate-500 italic text-xs">
                                 Không có ghi chú
                               </span>
                             )}
@@ -595,9 +696,9 @@ export default function AdminVitalSignsPage() {
                 </div>
 
                 {totalPages > 1 && (
-                  <div className="px-6 py-6 border-t border-gray-200 bg-gray-50">
+                  <div className="px-6 py-4 border-t border-slate-200/50 bg-gradient-to-r from-slate-50 to-red-50/30">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-slate-600 font-medium">
                         Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredVitalSigns.length)} trong tổng số {filteredVitalSigns.length} bản ghi
                       </div>
 
@@ -605,9 +706,9 @@ export default function AdminVitalSignsPage() {
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
-                          className="p-3 rounded-xl border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                          className="p-2 rounded-lg border-2 border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-sm hover:shadow-md"
                         >
-                          <ChevronLeftIcon className="w-5 h-5" />
+                          <ChevronLeftIcon className="w-4 h-4" />
                         </button>
 
                         <div className="flex items-center gap-1">
@@ -616,11 +717,11 @@ export default function AdminVitalSignsPage() {
                               key={index}
                               onClick={() => typeof page === 'number' && setCurrentPage(page)}
                               disabled={page === '...'}
-                              className={`px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${page === currentPage
-                                  ? 'bg-red-500 text-white shadow-lg'
+                              className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 shadow-sm hover:shadow-md ${page === currentPage
+                                  ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-md'
                                   : page === '...'
-                                    ? 'text-gray-400 cursor-default'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300'
+                                    ? 'text-slate-400 cursor-default'
+                                    : 'bg-white text-slate-700 border-2 border-slate-300 hover:bg-red-50 hover:border-red-300'
                                 }`}
                             >
                               {page}
@@ -631,9 +732,9 @@ export default function AdminVitalSignsPage() {
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
-                          className="p-3 rounded-xl border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                          className="p-2 rounded-lg border-2 border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-sm hover:shadow-md"
                         >
-                          <ChevronRightIcon className="w-5 h-5" />
+                          <ChevronRightIcon className="w-4 h-4" />
                         </button>
                       </div>
                     </div>

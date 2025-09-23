@@ -348,6 +348,44 @@ export const authAPI = {
     }
   },
 
+  registerWithCccd: async (userData: any, cccdData?: { cccd_id: string; cccd_front?: File | null; cccd_back?: File | null }) => {
+    try {
+      // Create FormData to send all data including CCCD files in one request
+      const formData = new FormData();
+      
+      // Add user data fields
+      formData.append('full_name', userData.full_name);
+      formData.append('email', userData.email);
+      formData.append('password', userData.password);
+      formData.append('confirmPassword', userData.confirmPassword);
+      formData.append('phone', userData.phone);
+      if (userData.address) {
+        formData.append('address', userData.address);
+      }
+      
+      // Add CCCD data if provided
+      if (cccdData) {
+        formData.append('cccd_id', cccdData.cccd_id);
+        if (cccdData.cccd_front) {
+          formData.append('cccd_front', cccdData.cccd_front);
+        }
+        if (cccdData.cccd_back) {
+          formData.append('cccd_back', cccdData.cccd_back);
+        }
+      }
+      
+      // Send registration request with multipart/form-data
+      const registerResponse = await apiClient.post(endpoints.auth.register, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      
+      return registerResponse.data;
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Registration');
+      throw new Error(errorMessage);
+    }
+  },
+
   refresh: async () => {
     try {
       const response = await apiClient.post(endpoints.auth.refresh);
@@ -564,7 +602,7 @@ export const userAPI = {
   },
   getAvatarUrlById: (id: string) => {
     if (!id) return '';
-    return `${API_BASE_URL}/users/${id}/avatar`;
+    return `${STATIC_BASE_URL}/users/${id}/avatar`;
   },
   activate: async (id: string) => {
     try {
@@ -626,6 +664,38 @@ export const residentAPI = {
     }
   },
 
+  // Fast lists by status
+  getAdmitted: async () => {
+    try {
+      const data = await getWithCache<any[]>(`${endpoints.residents}/admitted`, undefined, 60_000);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [] as any[];
+    }
+  },
+  getActive: async () => {
+    try {
+      const data = await getWithCache<any[]>(`${endpoints.residents}/active`, undefined, 60_000);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [] as any[];
+    }
+  },
+
+  // Get admitted residents by room ID (backend: /residents/by-room/{roomId}/admitted)
+  getAdmittedByRoom: async (roomId: string) => {
+    try {
+      if (!roomId || !roomId.match(/^[0-9a-fA-F]{24}$/)) {
+        throw new Error(`Invalid room ID: ${roomId}`);
+      }
+      const data = await getWithCache<any[]>(`/residents/by-room/${roomId}/admitted`, undefined, 60_000);
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      // Gracefully degrade with empty list
+      return [] as any[];
+    }
+  },
+
   // Mark resident attendance -> transition to admitted
   markAttendance: async (id: string) => {
     try {
@@ -638,9 +708,16 @@ export const residentAPI = {
 
   getById: async (id: string) => {
     try {
+      if (!id || id === 'null' || id === 'undefined') {
+        throw new Error(`Invalid resident ID: ${id}`);
+      }
       const response = await apiClient.get(`${endpoints.residents}/${id}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle 404 errors gracefully
+      if (error.response?.status === 404) {
+        throw new Error(`Resident with ID ${id} not found`);
+      }
       throw error;
     }
   },
@@ -1873,7 +1950,13 @@ export const photosAPI = {
   },
   getPhotoUrl: (file_path: string) => {
     if (!file_path) return '';
-    const cleanPath = file_path.replace(/\\/g, '/').replace(/"/g, '');
+    const cleanPath = file_path.replace(/\\/g, '/').replace(/"/g, '').replace(/^\/+/, '');
+    if (cleanPath.startsWith('http')) return cleanPath;
+    // In development we proxy through Next.js: /api -> backend
+    if (API_BASE_URL.startsWith('/')) {
+      return `${API_BASE_URL}/${cleanPath}`;
+    }
+    // In production use static host
     return `${STATIC_BASE_URL}/${cleanPath}`;
   },
 
@@ -1900,6 +1983,17 @@ export const visitsAPI = {
     try {
       const response = await apiClient.get(endpoints.visits, { 
         params: { ...params, populate: 'family_member_id' } 
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getByFamily: async (familyMemberId: string) => {
+    try {
+      const response = await apiClient.get(`${endpoints.visits}/family`, {
+        params: { family_member_id: familyMemberId }
       });
       return response.data;
     } catch (error) {
@@ -2338,6 +2432,98 @@ export const paymentAPI = {
 export { apiClient };
 export { API_BASE_URL };
 
+export const serviceRequestsAPI = {
+  create: async (data: {
+    resident_id: string;
+    family_member_id: string;
+    request_type: 'care_plan_change' | 'service_date_change' | 'room_change';
+    target_service_package_id?: string;
+    target_room_id?: string;
+    target_bed_id?: string;
+    new_start_date?: string;
+    new_end_date?: string;
+    note?: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    medicalNote?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/service-requests', data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getAll: async (status?: string) => {
+    try {
+      const params = status ? { status } : {};
+      const response = await apiClient.get('/service-requests', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getPending: async () => {
+    try {
+      const response = await apiClient.get('/service-requests?status=pending');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  approve: async (id: string) => {
+    try {
+      const response = await apiClient.patch(`/service-requests/${id}/approve`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  reject: async (id: string, reason?: string) => {
+    try {
+      const response = await apiClient.patch(`/service-requests/${id}/reject`, { reason });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getById: async (id: string) => {
+    try {
+      const response = await apiClient.get(`/service-requests/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getMyRequests: async () => {
+    try {
+      const response = await apiClient.get('/service-requests/my');
+      return response.data;
+    } catch (error) {
+      return [];
+    }
+  },
+
+  getByFamilyMember: async (familyMemberId: string) => {
+    try {
+      const response = await apiClient.get('/service-requests/my');
+      return response.data;
+    } catch (error) {
+      return [];
+    }
+  }
+};
+
+// Cache cho unread count để tránh gọi API quá thường xuyên
+let unreadCountCache: { count: number; timestamp: number } | null = null;
+const CACHE_DURATION = 5000; // 5 giây
+
 export const messagesAPI = {
   sendMessage: async (messageData: {
     receiver_id: string;
@@ -2373,6 +2559,12 @@ export const messagesAPI = {
   },
 
   getUnreadCount: async () => {
+    // Kiểm tra cache trước
+    const now = Date.now();
+    if (unreadCountCache && (now - unreadCountCache.timestamp) < CACHE_DURATION) {
+      return { unreadCount: unreadCountCache.count };
+    }
+
     try {
       const response = await retryRequest(
         () =>
@@ -2380,15 +2572,28 @@ export const messagesAPI = {
             apiClient.get('/messages/unread-count', {
               headers: { 'Cache-Control': 'no-cache' },
             }),
-            10000,
+            10000, // Giảm timeout xuống 10s
             'messagesAPI.getUnreadCount'
           ),
-        2,
+        1, // Chỉ retry 1 lần
         1000
       );
-      return response.data as any;
+      
+      const count = response.data?.unreadCount || 0;
+      // Cập nhật cache
+      unreadCountCache = { count, timestamp: now };
+      
+      return { unreadCount: count };
     } catch (error) {
-      throw error;
+      console.warn('Failed to fetch unread count, using cached value or default:', error instanceof Error ? error.message : String(error));
+      
+      // Nếu có cache cũ, sử dụng nó
+      if (unreadCountCache) {
+        return { unreadCount: unreadCountCache.count };
+      }
+      
+      // Trả về giá trị mặc định
+      return { unreadCount: 0 };
     }
   },
 

@@ -118,76 +118,31 @@ export default function NewStaffAssignmentPage() {
     const roomResidentsMap: { [roomId: string]: any[] } = {};
 
     try {
-      // Initialize room residents map
+      // Initialize map
       rooms.forEach(room => {
         roomResidentsMap[room._id] = [];
       });
 
-      // Get bed assignments to determine which residents are in which rooms (prefer SWR cache)
-      const bedAssignments = Array.isArray(swrBedAssignments)
-        ? swrBedAssignments
-        : await bedAssignmentsAPI.getAll();
-      console.log('Bed assignments:', bedAssignments);
-      console.log('Residents:', residents);
-      console.log('Rooms:', rooms);
-      
-      if (Array.isArray(bedAssignments)) {
-        // Cache to avoid refetching the same resident repeatedly
-        const residentStatusCache: Record<string, string> = {};
-
-        // Group residents by room based on active bed assignments (mirror room management page behavior)
-        for (const assignment of bedAssignments) {
-          console.log('Processing assignment:', assignment);
-          // Only consider active assignments (no unassigned_date)
-          if (assignment && assignment.resident_id && assignment.bed_id && !assignment.unassigned_date) {
-            const roomId = assignment.bed_id.room_id?._id || assignment.bed_id.room_id;
-
-            // Prefer full resident object from residents list; fallback to populated resident on assignment
-            const residentIdStr = (assignment.resident_id as any)?._id || assignment.resident_id;
-            const residentFromList = residents.find(r => r._id === residentIdStr);
-            const resident = residentFromList || assignment.resident_id;
-
-            let status = String(
-              (residentFromList as any)?.status ??
-              (residentFromList as any)?.resident_status ??
-              (assignment.resident_id as any)?.status ??
-              (assignment.resident_id as any)?.resident_status ??
-              ''
-            ).toLowerCase();
-
-            // Fallback: fetch latest status if missing/not admitted and not cached
-            if (roomId && resident && status !== 'admitted') {
-              try {
-                if (!residentStatusCache[residentIdStr]) {
-                  const latest = await (residentAPI as any).getById?.(residentIdStr);
-                  residentStatusCache[residentIdStr] = String(latest?.status || latest?.resident_status || '').toLowerCase();
-                }
-                status = residentStatusCache[residentIdStr] || status;
-              } catch {}
-            }
-
-            console.log('Resolved resident:', resident, 'Final Status:', status, 'Room ID:', roomId);
-
-            // Only include rooms that have at least one resident with status 'admitted'
-            if (roomId && resident && status === 'admitted') {
-              // Avoid duplicates per room
-              const existingResident = roomResidentsMap[roomId]?.find(r => r._id === resident._id);
-              if (!existingResident) {
-                if (!roomResidentsMap[roomId]) {
-                  roomResidentsMap[roomId] = [];
-                }
-                roomResidentsMap[roomId].push(resident);
-              }
-            }
+      // Fetch admitted residents per room via dedicated endpoint with limited concurrency
+      const concurrency = 5;
+      for (let i = 0; i < rooms.length; i += concurrency) {
+        const batch = rooms.slice(i, i + concurrency);
+        const results = await Promise.all(batch.map(async (room) => {
+          try {
+            const admitted = await (residentAPI as any).getAdmittedByRoom?.(room._id);
+            return { roomId: room._id, admitted: Array.isArray(admitted) ? admitted : [] };
+          } catch {
+            return { roomId: room._id, admitted: [] };
           }
-        }
+        }));
+        results.forEach(({ roomId, admitted }) => {
+          roomResidentsMap[roomId] = admitted;
+        });
       }
 
-      console.log('Final room residents map:', roomResidentsMap);
       setRoomResidents(roomResidentsMap);
     } catch (error) {
       console.error('Error loading room residents:', error);
-      // Fallback: initialize empty map
       rooms.forEach(room => {
         roomResidentsMap[room._id] = [];
       });
@@ -1136,8 +1091,8 @@ export default function NewStaffAssignmentPage() {
                                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                                       </div>
                                       <span className="text-green-800">{resident.full_name}</span>
-                              </div>
-                            ))}
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             ) : (

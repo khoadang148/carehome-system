@@ -17,6 +17,7 @@ import {
 import { residentAPI, userAPI } from '@/lib/api';
 import { convertDDMMYYYYToISO } from '@/lib/utils/validation';
 import { handleAPIError } from '@/lib/utils/api-error-handler';
+import { useNotifications } from '@/lib/contexts/notification-context';
 
 type Medication = {
   medication_name: string;
@@ -148,6 +149,7 @@ function validateDate(dateStr: string, fieldName: string = 'Ngày') {
 
 export default function AddResidentPage() {
   const router = useRouter();
+  const { addNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -499,6 +501,14 @@ export default function AddResidentPage() {
       const residentResponse = await residentAPI.create(payload);
 
       if (residentResponse.status === 201) {
+        // Add notification for admin about new resident
+        addNotification({
+          type: 'success',
+          title: 'Người cao tuổi mới được thêm',
+          message: `Người cao tuổi ${data.full_name} đã được thêm vào hệ thống thành công.`,
+          category: 'system',
+          actionUrl: '/admin/residents'
+        });
       }
 
       if (data.family_account_type === 'new') {

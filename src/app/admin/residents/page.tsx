@@ -17,7 +17,7 @@ import {
   HomeIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, bedAssignmentsAPI, carePlanAssignmentsAPI, API_BASE_URL } from '@/lib/api';
+import { residentAPI, bedAssignmentsAPI, carePlanAssignmentsAPI, API_BASE_URL, billsAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -43,19 +43,27 @@ export default function ResidentsPage() {
   const [residentToDischarge, setResidentToDischarge] = useState<any>(null);
   const [discharging, setDischarging] = useState(false);
   const [dischargeReason, setDischargeReason] = useState('');
+  const [unpaidBills, setUnpaidBills] = useState<{ [residentId: string]: any[] }>({});
 
   // SWR fetcher function
   const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-  // Fetch residents data with SWR
-  const { data: residentsResponse, error: residentsError, mutate: mutateResidents } = useSWR(
-    user ? '/api/residents' : null,
+  // Fetch residents data per tab for speed
+  const { data: admittedRes, error: admittedErr, mutate: mutateAdmitted } = useSWR(
+    user ? 'residents:admitted' : null,
+    () => residentAPI.getAdmitted(),
+    { revalidateOnFocus: false, dedupingInterval: 5000 }
+  );
+  const { data: activeRes, error: activeErr, mutate: mutateActive } = useSWR(
+    user ? 'residents:active' : null,
+    () => residentAPI.getActive(),
+    { revalidateOnFocus: false, dedupingInterval: 5000 }
+  );
+  // For discharged, fallback to full list then filter (endpoint not provided)
+  const { data: allRes, error: allErr, mutate: mutateAll } = useSWR(
+    user ? 'residents:all' : null,
     () => residentAPI.getAll(),
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
-    }
+    { revalidateOnFocus: false, dedupingInterval: 10000 }
   );
 
   // Fetch care plans data with SWR
@@ -71,14 +79,15 @@ export default function ResidentsPage() {
 
   // Process residents data
   const residentsData = React.useMemo(() => {
-    if (!residentsResponse) return [];
+    const source = activeTab === 'admitted' ? admittedRes : activeTab === 'accepted' ? activeRes : allRes;
+    if (!source) return [];
     
     let apiData: any[] = [];
-    if (Array.isArray(residentsResponse)) {
-      apiData = residentsResponse;
+    if (Array.isArray(source)) {
+      apiData = source;
     } else {
       try {
-        apiData = (residentsResponse as any).data || [];
+        apiData = (source as any).data || [];
       } catch (error) {
         apiData = [];
       }
@@ -93,15 +102,45 @@ export default function ResidentsPage() {
       contactPhone: r.emergency_contact?.phone || '',
       avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
       gender: (r.gender || '').toLowerCase(),
-      status: r.status || 'active',
+      status: (r.status || 'active').toLowerCase(),
       discharge_date: r.discharge_date || null,
+      admission_date: r.admission_date || null,
     }));
-  }, [residentsResponse]);
+  }, [admittedRes, activeRes, allRes, activeTab]);
 
   // Process care plans data
   const carePlanOptions = React.useMemo(() => {
     return Array.isArray(carePlansData) ? carePlansData : [];
   }, [carePlansData]);
+
+  // Đếm số lượng cho từng tab (không phụ thuộc tab đang chọn)
+  const admittedCount = React.useMemo(() => {
+    if (Array.isArray(admittedRes)) return admittedRes.length;
+    try {
+      return Array.isArray((admittedRes as any)?.data) ? (admittedRes as any).data.length : 0;
+    } catch {
+      return 0;
+    }
+  }, [admittedRes]);
+
+  const activeCount = React.useMemo(() => {
+    if (Array.isArray(activeRes)) return activeRes.length;
+    try {
+      return Array.isArray((activeRes as any)?.data) ? (activeRes as any).data.length : 0;
+    } catch {
+      return 0;
+    }
+  }, [activeRes]);
+
+  const dischargedCount = React.useMemo(() => {
+    const src = Array.isArray(allRes)
+      ? allRes
+      : Array.isArray((allRes as any)?.data)
+        ? (allRes as any).data
+        : [];
+    if (!Array.isArray(src)) return 0;
+    return src.filter((r: any) => String(r?.status || r?.resident_status || '').toLowerCase() === 'discharged').length;
+  }, [allRes]);
 
   useEffect(() => {
     if (!user) {
@@ -166,9 +205,10 @@ export default function ResidentsPage() {
 
 
 
+
   // Loading and error states
-  const isLoading = !residentsResponse && !residentsError;
-  const hasError = residentsError;
+  const isLoading = (!admittedRes && !admittedErr) || (!activeRes && !activeErr) || (!allRes && !allErr);
+  const hasError = admittedErr || activeErr || allErr;
 
   const filteredResidents = residentsData.filter((resident) => {
     const searchValue = (searchTerm || '').toString().trim();
@@ -185,9 +225,38 @@ export default function ResidentsPage() {
       residentRoom.includes(searchValue.toLowerCase());
   });
 
-  const admittedResidents = filteredResidents.filter(resident => resident.status === 'admitted');
-  const acceptedResidents = filteredResidents.filter(resident => resident.status === 'accepted');
-  const dischargedResidents = filteredResidents.filter(resident => resident.status === 'discharged');
+  const admittedResidents = filteredResidents.filter(resident => (resident.status || '').toLowerCase() === 'admitted');
+  const acceptedResidents = filteredResidents.filter(resident => {
+    const s = (resident.status || '').toLowerCase();
+    return s === 'accepted' || s === 'active';
+  });
+  const dischargedResidents = filteredResidents.filter(resident => (resident.status || '').toLowerCase() === 'discharged');
+
+  // Load unpaid bills for residents in "accepted" status
+  React.useEffect(() => {
+    if (activeTab !== 'accepted' || !acceptedResidents.length) return;
+
+    const loadUnpaidBills = async () => {
+      const unpaidBillsMap: { [residentId: string]: any[] } = {};
+      
+      const promises = acceptedResidents.map(async (resident: any) => {
+        try {
+          const bills = await billsAPI.getByResidentId(resident.id);
+          const unpaidBillsList = Array.isArray(bills) ? bills.filter((bill: any) => bill.status === 'pending') : [];
+          if (unpaidBillsList.length > 0) {
+            unpaidBillsMap[resident.id] = unpaidBillsList;
+          }
+        } catch (error) {
+          console.error(`Error loading bills for resident ${resident.id}:`, error);
+        }
+      });
+
+      await Promise.all(promises);
+      setUnpaidBills(unpaidBillsMap);
+    };
+
+    loadUnpaidBills();
+  }, [activeTab, acceptedResidents]);
 
   const handleViewResident = (residentId: string | number) => {
     console.log('Viewing resident:', residentId);
@@ -209,7 +278,9 @@ export default function ResidentsPage() {
         await residentAPI.delete(residentToDelete.toString());
 
         // Refresh data using SWR mutate
-        mutateResidents();
+        if (activeTab === 'admitted') await mutateAdmitted();
+        if (activeTab === 'accepted') await mutateActive();
+        if (activeTab === 'discharged') await mutateAll();
 
         setShowDeleteModal(false);
         setResidentToDelete(null);
@@ -283,7 +354,9 @@ export default function ResidentsPage() {
 
       setRoomNumbers(prev => ({ ...prev, [residentToDischarge.id]: 'Đã xuất viện' }));
       // Refresh data using SWR mutate
-      mutateResidents();
+      if (activeTab === 'admitted') await mutateAdmitted();
+      if (activeTab === 'accepted') await mutateActive();
+      if (activeTab === 'discharged') await mutateAll();
 
       setShowDischargeModal(false);
       setResidentToDischarge(null);
@@ -471,6 +544,20 @@ export default function ResidentsPage() {
                     }}>
                       {resident.contactPhone}
                     </p>
+                    {activeTab === 'accepted' && unpaidBills[resident.id] && unpaidBills[resident.id].length > 0 && (
+                      <div style={{
+                        marginTop: '0.5rem',
+                        padding: '0.25rem 0.5rem',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.75rem',
+                        color: '#dc2626',
+                        fontWeight: 500
+                      }}>
+                         Chưa thanh toán {unpaidBills[resident.id].length} hóa đơn
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td style={{ padding: '1rem' }}>
@@ -489,71 +576,117 @@ export default function ResidentsPage() {
                       justifyContent: 'center',
                       gap: '0.5rem'
                     }}>
-                      {resident.status === 'accepted' && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              // Update resident status to admitted using attendance endpoint
-                              await residentAPI.markAttendance(resident.id.toString());
+                      {(resident.status === 'accepted' || resident.status === 'active') && (
+                        (() => {
+                          // Check if admission date has arrived
+                          const admissionDate = resident.admission_date;
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0); // Reset time to start of day
+                          
+                          // Check if resident has unpaid bills
+                          const hasUnpaidBills = unpaidBills[resident.id] && unpaidBills[resident.id].length > 0;
+                          
+                          const canAdmit = (!admissionDate || new Date(admissionDate) <= today) && !hasUnpaidBills;
+                          
+                          return canAdmit ? (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  // Update resident status to admitted using attendance endpoint
+                                  await residentAPI.markAttendance(resident.id.toString());
 
-                              // Activate bed assignment if exists
-                              try {
-                                const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-                                const pendingBedAssignment = Array.isArray(bedAssignments) ?
-                                  bedAssignments.find((ba: any) => ba.status === 'pending' || ba.status === 'approved') : null;
-                                if (pendingBedAssignment?._id) {
-                                  await bedAssignmentsAPI.activateAssignment(pendingBedAssignment._id);
+                                  // Activate bed assignment if exists
+                                  try {
+                                    const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
+                                    const pendingBedAssignment = Array.isArray(bedAssignments) ?
+                                      bedAssignments.find((ba: any) => ba.status === 'pending' || ba.status === 'approved') : null;
+                                    if (pendingBedAssignment?._id) {
+                                      await bedAssignmentsAPI.activateAssignment(pendingBedAssignment._id);
+                                    }
+                                  } catch (bedError) {
+                                    console.error('Error activating bed assignment:', bedError);
+                                  }
+
+                                  // Activate care plan assignment if exists
+                                  try {
+                                    const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(resident.id);
+                                    const pendingCarePlan = Array.isArray(carePlanAssignments) ?
+                                      carePlanAssignments.find((cpa: any) => cpa.status === 'pending' || cpa.status === 'approved') : null;
+                                    if (pendingCarePlan?._id) {
+                                      await carePlanAssignmentsAPI.activateAssignment(pendingCarePlan._id);
+                                    }
+                                  } catch (carePlanError) {
+                                    console.error('Error activating care plan assignment:', carePlanError);
+                                  }
+
+                                  // Refresh data using SWR mutate
+                                  if (activeTab === 'admitted') await mutateAdmitted();
+                                  if (activeTab === 'accepted') await mutateActive();
+                                  if (activeTab === 'discharged') await mutateAll();
+                                  setSuccessMessage('Đã xác nhận nhập viện và kích hoạt phòng, dịch vụ thành công.');
+                                  setModalType('success');
+                                  setShowSuccessModal(true);
+                                } catch (e) {
+                                  setSuccessMessage('Xác nhận nhập viện thất bại. Vui lòng thử lại.');
+                                  setModalType('error');
+                                  setShowSuccessModal(true);
                                 }
-                              } catch (bedError) {
-                                console.error('Error activating bed assignment:', bedError);
+                              }}
+                              title="Xác nhận đã nhập viện"
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.375rem',
+                                border: 'none',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                color: '#10b981',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = '#10b981';
+                                e.currentTarget.style.color = 'white';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                                e.currentTarget.style.color = '#10b981';
+                              }}
+                            >
+                              <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <div
+                              title={
+                                hasUnpaidBills 
+                                  ? `Chưa thanh toán ${unpaidBills[resident.id].length} hóa đơn` 
+                                  : `Ngày nhập viện: ${admissionDate ? new Date(admissionDate).toLocaleDateString('vi-VN') : 'Chưa xác định'}`
                               }
-
-                              // Activate care plan assignment if exists
-                              try {
-                                const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(resident.id);
-                                const pendingCarePlan = Array.isArray(carePlanAssignments) ?
-                                  carePlanAssignments.find((cpa: any) => cpa.status === 'pending' || cpa.status === 'approved') : null;
-                                if (pendingCarePlan?._id) {
-                                  await carePlanAssignmentsAPI.activateAssignment(pendingCarePlan._id);
-                                }
-                              } catch (carePlanError) {
-                                console.error('Error activating care plan assignment:', carePlanError);
-                              }
-
-                              // Refresh data using SWR mutate
-                              mutateResidents();
-                              setSuccessMessage('Đã xác nhận nhập viện và kích hoạt phòng, dịch vụ thành công.');
-                              setModalType('success');
-                              setShowSuccessModal(true);
-                            } catch (e) {
-                              setSuccessMessage('Xác nhận nhập viện thất bại. Vui lòng thử lại.');
-                              setModalType('error');
-                              setShowSuccessModal(true);
-                            }
-                          }}
-                          title="Xác nhận đã nhập viện"
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '0.375rem',
-                            border: 'none',
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            color: '#10b981',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#10b981';
-                            e.currentTarget.style.color = 'white';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                            e.currentTarget.style.color = '#10b981';
-                          }}
-                        >
-                          <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </button>
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.375rem',
+                                border: 'none',
+                                background: hasUnpaidBills ? 'rgba(239, 68, 68, 0.1)' : 'rgba(156, 163, 175, 0.1)',
+                                color: hasUnpaidBills ? '#ef4444' : '#9ca3af',
+                                cursor: 'not-allowed',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              {hasUnpaidBills ? (
+                                <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                              ) : (
+                                <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              )}
+                            </div>
+                          );
+                        })()
                       )}
                       <button
                         onClick={(e) => {
@@ -858,7 +991,7 @@ export default function ResidentsPage() {
                 }}
               >
                 <HomeIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                Đang nằm viện ({admittedResidents.length} người)
+                Đang nằm viện ({admittedCount} người)
               </button>
               <button
                 onClick={() => setActiveTab('accepted')}
@@ -879,7 +1012,7 @@ export default function ResidentsPage() {
                 }}
               >
                 <ExclamationTriangleIcon style={{ width: '1.125rem', height: '1.125rem' }} />
-                Chưa nhập viện ({acceptedResidents.length} người)
+                Chưa nhập viện ({activeCount} người)
               </button>
               <button
                 onClick={() => setActiveTab('discharged')}
@@ -899,10 +1032,58 @@ export default function ResidentsPage() {
                   boxShadow: activeTab === 'discharged' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : 'none'
                 }}
               >
-                Đã xuất viện ({dischargedResidents.length} người)
+                Đã xuất viện ({dischargedCount} người)
               </button>
             </div>
 
+            {/* Thông báo cho tab "Chưa nhập viện" */}
+            {activeTab === 'accepted' && Object.keys(unpaidBills).length > 0 && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.05)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <div style={{
+                    width: '2rem',
+                    height: '2rem',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg style={{ width: '1rem', height: '1rem', color: '#dc2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    color: '#dc2626',
+                    margin: 0
+                  }}>
+                    Thông báo thanh toán
+                  </h3>
+                </div>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: 0,
+                  lineHeight: '1.5'
+                }}>
+                  Có {Object.keys(unpaidBills).length} người cao tuổi chưa thanh toán hóa đơn. 
+                  Vui lòng liên hệ gia đình để hoàn tất thanh toán trước khi xác nhận nhập viện.
+                </p>
+              </div>
+            )}
 
           </div>
 
@@ -968,7 +1149,11 @@ export default function ResidentsPage() {
                 Không thể tải danh sách người cao tuổi
               </p>
               <button
-                onClick={() => mutateResidents()}
+                onClick={() => {
+                  if (activeTab === 'admitted') return mutateAdmitted();
+                  if (activeTab === 'accepted') return mutateActive();
+                  return mutateAll();
+                }}
                 style={{
                   padding: '0.75rem 1.5rem',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -992,7 +1177,7 @@ export default function ResidentsPage() {
             </div>
           ) : (
             activeTab === 'admitted' ? renderResidentsTable(admittedResidents, true) : 
-            activeTab === 'accepted' ? renderResidentsTable(acceptedResidents, false) : 
+            activeTab === 'accepted' ? renderResidentsTable(acceptedResidents, true) : 
             renderResidentsTable(dischargedResidents, false)
           )}
 

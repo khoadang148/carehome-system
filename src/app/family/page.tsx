@@ -36,7 +36,8 @@ import {
   activityParticipationsAPI,
   activitiesAPI,
   staffAssignmentsAPI,
-  bedAssignmentsAPI
+  bedAssignmentsAPI,
+  billsAPI
 } from '@/lib/api';
 import { useVitalSigns as useVitalSignsSWR, useBedAssignments as useBedAssignmentsSWR, useRoom as useRoomSWR, useStaffAssignments as useStaffAssignmentsSWR } from '@/hooks/useSWRData';
 import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
@@ -165,6 +166,8 @@ function FamilyPortalPageContent() {
   const [tabsLoaded, setTabsLoaded] = useState<{ [key: number]: boolean }>({ 0: false });
   const [tabLoading, setTabLoading] = useState<{ [key: number]: boolean }>({});
   const activeResidentIdRef = useRef<string>('');
+  const [unpaidBills, setUnpaidBills] = useState<any[]>([]);
+  const [billsLoading, setBillsLoading] = useState(false);
 
   useEffect(() => {
     // Only sync vitals when the Vital Signs tab is active to avoid frequent
@@ -261,7 +264,37 @@ function FamilyPortalPageContent() {
     setVitalSignsHistory([]);
     setTabsLoaded({ 0: false });
     setTabLoading(prev => ({ ...prev, 0: true }));
+    setUnpaidBills([]);
   }, [selectedResidentId]);
+
+  const selectedResident = residents.find(r => r._id === selectedResidentId);
+
+  // Load unpaid bills for active residents
+  useEffect(() => {
+    if (!selectedResidentId || !selectedResident) return;
+    
+    // Only load bills for residents with 'active' status
+    if (selectedResident.status !== 'active') {
+      setUnpaidBills([]);
+      return;
+    }
+
+    const loadUnpaidBills = async () => {
+      setBillsLoading(true);
+      try {
+        const bills = await billsAPI.getByResidentId(selectedResidentId);
+        const unpaidBillsList = Array.isArray(bills) ? bills.filter((bill: any) => bill.status === 'pending') : [];
+        setUnpaidBills(unpaidBillsList);
+      } catch (error) {
+        console.error('Error loading bills:', error);
+        setUnpaidBills([]);
+      } finally {
+        setBillsLoading(false);
+      }
+    };
+
+    loadUnpaidBills();
+  }, [selectedResidentId, selectedResident]);
 
   useEffect(() => {
     if (!selectedResidentId || !pageReady) return;
@@ -547,8 +580,6 @@ function FamilyPortalPageContent() {
         }
       });
   }, [selectedActivityDate]);
-
-  const selectedResident = residents.find(r => r._id === selectedResidentId);
 
   const staffInCharge: string[] = selectedResident && selectedResident.careNotes ? Array.from(new Set(
     selectedResident.careNotes.map((note: any) => {
@@ -1035,7 +1066,7 @@ function FamilyPortalPageContent() {
                   {(() => {
                     switch (selectedResident?.status) {
                       case 'active':
-                        return 'Hoàn tất đăng ký';
+                        return 'Hoàn tất thông tin đăng ký';
                       case 'admitted':
                         return 'Đang nằm viện';
                       case 'discharged':
@@ -1060,6 +1091,43 @@ function FamilyPortalPageContent() {
                   Ngày nhập viện: {selectedResident?.admission_date ? formatDob(selectedResident.admission_date) : 'Chưa hoàn tất đăng kí'}
                 </div>
               </div>
+
+              {/* Thông báo hóa đơn chưa thanh toán cho resident active */}
+              {selectedResident?.status === 'active' && unpaidBills.length > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-red-800">
+                          Có {unpaidBills.length} hóa đơn chưa thanh toán
+                        </h3>
+                        <p className="text-sm text-red-600">
+                          Tổng số tiền: {(unpaidBills.reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0) * 10000).toLocaleString('vi-VN')} VNĐ
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => router.push('/family/finance')}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      Thanh toán
+                    </button>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-red-200">
+                    <p className="text-sm text-red-700 font-medium">
+                      <span className="font-bold">Lý do:</span> Cần thanh toán để hoàn tất quá trình nhập viện và kích hoạt các dịch vụ chăm sóc.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col gap-6 w-full">
 

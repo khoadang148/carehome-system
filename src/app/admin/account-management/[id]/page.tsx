@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { userAPI, residentAPI } from '@/lib/api';
+import { userAPI, residentAPI, photosAPI, API_BASE_URL } from '@/lib/api';
 import {
   ArrowLeftIcon,
   UserIcon,
@@ -25,7 +25,7 @@ interface User {
   phone: string;
   username: string;
   role: 'admin' | 'staff' | 'family';
-  status: 'active' | 'inactive' | 'suspended';
+  status: 'active' | 'inactive' | 'suspended' | 'deleted' | 'pending';
   position?: string;
   qualification?: string;
   join_date?: string;
@@ -128,6 +128,14 @@ export default function AccountDetailsPage() {
     return userAPI.getAvatarUrlById(account._id);
   };
 
+  const getFileUrl = (path?: string | null) => {
+    if (!path || typeof path !== 'string') return '';
+    const clean = path.replace(/\\/g, '/').replace(/\"/g, '').replace(/"/g, '');
+    if (clean.startsWith('http')) return clean;
+    // Use same URL construction as approval page
+    return `${API_BASE_URL}/${clean}`;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -136,6 +144,10 @@ export default function AccountDetailsPage() {
         return 'bg-gray-100 text-gray-800';
       case 'suspended':
         return 'bg-yellow-100 text-yellow-800';
+      case 'deleted':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -149,8 +161,35 @@ export default function AccountDetailsPage() {
         return 'Không hoạt động';
       case 'suspended':
         return 'Tạm khóa';
+      case 'deleted':
+        return 'Đã xóa';
+      case 'pending':
+        return 'Chờ duyệt';
       default:
         return 'Không xác định';
+    }
+  };
+
+  const getResidentStatusStyle = (status: string) => {
+    switch (status) {
+      case 'admitted':
+        return { dot: 'bg-blue-500', text: 'text-blue-600', label: 'Đã nhập viện' };
+      case 'active':
+        return { dot: 'bg-green-500', text: 'text-green-600', label: 'Hoàn tất đăng ký' };
+      case 'cancelled':
+        return { dot: 'bg-gray-400', text: 'text-gray-600', label: 'Đã hủy' };
+      case 'discharged':
+        return { dot: 'bg-gray-500', text: 'text-gray-700', label: 'Đã xuất viện' };
+      case 'deceased':
+        return { dot: 'bg-red-600', text: 'text-red-600', label: 'Đã qua đời' };
+      case 'accepted':
+        return { dot: 'bg-emerald-500', text: 'text-emerald-600', label: 'Đã chấp nhận' };
+      case 'rejected':
+        return { dot: 'bg-rose-500', text: 'text-rose-600', label: 'Bị từ chối' };
+      case 'pending':
+        return { dot: 'bg-amber-500', text: 'text-amber-600', label: 'Chờ duyệt' };
+      default:
+        return { dot: 'bg-gray-400', text: 'text-gray-600', label: status };
     }
   };
 
@@ -203,7 +242,10 @@ export default function AccountDetailsPage() {
                 </div>
                 <div className={`absolute -bottom-2 -right-2 w-6 h-6 rounded-full border-2 border-white ${
                   account.status === 'active' ? 'bg-green-500' : 
-                  account.status === 'inactive' ? 'bg-gray-500' : 'bg-yellow-500'
+                  account.status === 'inactive' ? 'bg-gray-500' : 
+                  account.status === 'suspended' ? 'bg-yellow-500' :
+                  account.status === 'deleted' ? 'bg-red-500' :
+                  account.status === 'pending' ? 'bg-blue-500' : 'bg-gray-500'
                 }`}></div>
               </div>
 
@@ -223,11 +265,7 @@ export default function AccountDetailsPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircleIcon className="w-4 h-4" />
                     <span className="text-sm font-medium">Trạng thái:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      account.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(account.status)}`}>
                       {getStatusText(account.status)}
                     </span>
                   </div>
@@ -249,6 +287,7 @@ export default function AccountDetailsPage() {
                 </h3>
 
                 <div className="space-y-4">
+                  
                   <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                     <UserIcon className="w-5 h-5 text-gray-400" />
                     <div>
@@ -270,14 +309,6 @@ export default function AccountDetailsPage() {
                     <div>
                       <p className="text-sm text-gray-500">Số điện thoại</p>
                       <p className="font-semibold text-gray-900">{account.phone || '—'}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
-                    <IdentificationIcon className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm text-gray-500">Tên đăng nhập</p>
-                      <p className="font-semibold text-gray-900">{account.username}</p>
                     </div>
                   </div>
                 </div>
@@ -324,13 +355,111 @@ export default function AccountDetailsPage() {
                   )}
 
                   {isFamily && (
-                    <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
-                      <MapPinIcon className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm text-gray-500">Địa chỉ</p>
-                        <p className="font-semibold text-gray-900">{account.address || '—'}</p>
+                    <>
+                      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                        <MapPinIcon className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Địa chỉ</p>
+                          <p className="font-semibold text-gray-900">{account.address || '—'}</p>
+                        </div>
                       </div>
-                    </div>
+
+                      {(account as any).cccd_id && (
+                        <div className="p-4 bg-white rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <p className="text-sm font-bold text-green-700 uppercase tracking-wide">Giấy tờ tùy thân (CCCD)</p>
+                          </div>
+                          
+                          <div className="mb-4">
+                            <p className="text-xs text-gray-500 mb-1">Số CCCD</p>
+                            <p className="font-semibold text-gray-900 text-lg">{(account as any).cccd_id}</p>
+                          </div>
+
+                          <div className="flex gap-4 flex-wrap">
+                            {(() => {
+                              const frontUrl = getFileUrl((account as any).cccd_front);
+                              return frontUrl ? (
+                                <div className="flex flex-col items-center gap-2">
+                                  <div className="text-xs font-bold text-green-600 uppercase tracking-wide text-center">
+                                    Ảnh mặt trước
+                                  </div>
+                                  <a 
+                                    href={frontUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="block w-40 h-28 overflow-hidden rounded-lg border-2 border-green-500 bg-white shadow-lg hover:shadow-xl transition-shadow"
+                                  >
+                                    <img
+                                      src={frontUrl}
+                                      alt="CCCD mặt trước"
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const placeholder = document.createElement('div');
+                                        placeholder.innerHTML = `
+                                          <div class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xs text-gray-500">
+                                            <div class="text-center">
+                                              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-1 opacity-50">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                <polyline points="21,15 16,10 5,21"/>
+                                              </svg>
+                                              <div>Không thể tải ảnh</div>
+                                            </div>
+                                          </div>
+                                        `;
+                                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                                      }}
+                                    />
+                                  </a>
+                                </div>
+                              ) : null;
+                            })()}
+
+                            {(() => {
+                              const backUrl = getFileUrl((account as any).cccd_back);
+                              return backUrl ? (
+                                <div className="flex flex-col items-center gap-2">
+                                  <div className="text-xs font-bold text-green-600 uppercase tracking-wide text-center">
+                                    Ảnh mặt sau
+                                  </div>
+                                  <a 
+                                    href={backUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="block w-40 h-28 overflow-hidden rounded-lg border-2 border-green-500 bg-white shadow-lg hover:shadow-xl transition-shadow"
+                                  >
+                                    <img
+                                      src={backUrl}
+                                      alt="CCCD mặt sau"
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const placeholder = document.createElement('div');
+                                        placeholder.innerHTML = `
+                                          <div class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xs text-gray-500">
+                                            <div class="text-center">
+                                              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-1 opacity-50">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                <polyline points="21,15 16,10 5,21"/>
+                                              </svg>
+                                              <div>Không thể tải ảnh</div>
+                                            </div>
+                                          </div>
+                                        `;
+                                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                                      }}
+                                    />
+                                  </a>
+                                </div>
+                              ) : null;
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
@@ -384,12 +513,15 @@ export default function AccountDetailsPage() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Trạng thái</p>
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${resident.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                              <span className={`text-sm font-medium ${resident.status === 'active' ? 'text-green-600' : 'text-gray-600'}`}>
-                                {resident.status === 'active' ? 'Đang nằm viện' : 'Đã xuất viện'}
-                              </span>
-                            </div>
+                            {(() => {
+                              const s = getResidentStatusStyle(resident.status);
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${s.dot}`}></div>
+                                  <span className={`text-sm font-medium ${s.text}`}>{s.label}</span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -413,4 +545,4 @@ export default function AccountDetailsPage() {
   );
 }
 
-
+ 

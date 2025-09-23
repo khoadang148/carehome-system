@@ -275,10 +275,10 @@ export default function VisitHistoryPage() {
 
   const { data: visitHistory, loading: visitsLoading } = useOptimizedData(
     'visit-history',
-    () => visitsAPI.getAll(),
+    () => user?.id ? visitsAPI.getByFamily(user.id) : Promise.resolve([]),
     {
       ttl: 2 * 60 * 1000,
-      prefetch: true,
+      prefetch: !!user?.id,
       prefetchDelay: 200
     }
   );

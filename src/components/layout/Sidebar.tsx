@@ -68,6 +68,7 @@ const menuGroups: MenuGroup[] = [
       //{ name: 'Trợ lý thông minh', href: '/admin/ai-recommendations', icon: SparklesIcon, roles: ['admin'], color: '#8b5cf6' },
       { name: 'Thông tin', href: '/family', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
       { name: 'Phòng & Giường', href: '/family/room', icon: BuildingOffice2Icon, roles: ['family'], color: '#6366f1' },
+      //{ name: 'Yêu cầu đổi phòng', href: '/family/room-change-request', icon: HomeIcon, roles: ['family'], color: '#f97316' },
       { name: 'Lịch thăm', href: '/family/schedule-visit', icon: CalendarIcon, roles: ['family'], color: '#6366f1', requiresResident: true },
       { name: 'Ảnh', href: '/family/photos', icon: PhotoIcon, roles: ['family'], color: '#6366f1', requiresResident: true },
       { name: 'Dịch vụ', href: '/services', icon: CubeIcon, roles: ['staff', 'admin'], color: '#6366f1' },
@@ -85,7 +86,7 @@ const menuGroups: MenuGroup[] = [
     title: "Hệ thống",
     items: [
       { name: 'Quản lý người dùng', href: '/admin/account-management', icon: ShieldCheckIcon, roles: ['admin'], color: '#6d28d9' },
-      { name: 'Đăng ký người cao tuổi', href: '/family/residents/new', icon: UserGroupIcon, roles: ['family'], color: '#ec4899' },
+      { name: 'Đăng ký người cao tuổi', href: '/family/residents/new', icon: UserGroupIcon, roles: ['family'], color: '#ec4899', requiresResident: true },
       
     ]
   }

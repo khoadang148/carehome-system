@@ -2,11 +2,21 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
+import { useNotifications } from "@/lib/contexts/notification-context";
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
+  const { addNotification } = useNotifications();
   
   useEffect(() => {
+    // Add notification for payment success
+    addNotification({
+      type: 'success',
+      title: 'Thanh toán thành công',
+      message: 'Giao dịch thanh toán đã được xử lý thành công.',
+      category: 'hóa đơn',
+      actionUrl: '/family/finance'
+    });
     // Đảm bảo trang luôn ở giữa màn hình
     document.body.style.overflow = 'hidden';
     document.body.style.margin = '0';

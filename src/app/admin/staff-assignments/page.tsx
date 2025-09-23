@@ -61,9 +61,11 @@ export default function StaffAssignmentsPage() {
   });
 
   const [simpleEditForm, setSimpleEditForm] = useState({
+    staff_id: '',
     end_date: '',
   });
   const [originalEndDate, setOriginalEndDate] = useState<string>('');
+  const [originalStaffId, setOriginalStaffId] = useState<string>('');
 
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -219,7 +221,6 @@ export default function StaffAssignmentsPage() {
       
       if (updatedAssignment) {
         setAssignments(prev => prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a));
-        toast.success('Cập nhật phân công thành công');
       }
 
       setShowEditModal(false);
@@ -249,6 +250,13 @@ export default function StaffAssignmentsPage() {
 
     setValidationErrors({});
 
+    // Validate staff selection
+    const staffError = Validator.required(simpleEditForm.staff_id, 'Nhân viên');
+    if (staffError) {
+      setValidationErrors({ staff_id: staffError.message });
+      return;
+    }
+
     const endDateError = Validator.required(simpleEditForm.end_date, 'Ngày kết thúc');
     if (endDateError) {
       setValidationErrors({ end_date: endDateError.message });
@@ -277,23 +285,24 @@ export default function StaffAssignmentsPage() {
     setSubmitting(true);
     try {
       const updatedAssignment = await (staffAssignmentsAPI as any).update?.(selectedAssignment._id, {
+        staff_id: simpleEditForm.staff_id,
         end_date: simpleEditForm.end_date || undefined,
       });
       
       if (updatedAssignment) {
         setAssignments(prev => prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a));
-        toast.success('Cập nhật ngày kết thúc thành công');
       }
 
       setShowEditModal(false);
-      setSimpleEditForm({ end_date: '' });
+      setSimpleEditForm({ staff_id: '', end_date: '' });
       setOriginalEndDate('');
+      setOriginalStaffId('');
       setSelectedAssignment(null);
       setValidationErrors({});
 
       setSuccessData({
         type: 'update',
-        message: 'Cập nhật ngày kết thúc thành công!',
+        message: 'Cập nhật phân công thành công!',
         assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
@@ -303,7 +312,7 @@ export default function StaffAssignmentsPage() {
         forceReloadData();
       }, 1000);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Không thể cập nhật ngày kết thúc. Vui lòng thử lại.';
+      const errorMessage = err.response?.data?.message || 'Không thể cập nhật phân công. Vui lòng thử lại.';
       toast.error(errorMessage);
     } finally {
       setSubmitting(false);
@@ -315,8 +324,12 @@ export default function StaffAssignmentsPage() {
 
     setSubmitting(true);
     try {
-      // For now, just show success message and reload data
-      // TODO: Implement delete action in Redux slice
+      // Call the delete API
+      await (staffAssignmentsAPI as any).delete?.(selectedAssignment._id);
+      
+      // Remove the assignment from local state
+      setAssignments(prev => prev.filter(a => a._id !== selectedAssignment._id));
+      
       setShowDeleteModal(false);
 
       setSuccessData({
@@ -404,7 +417,8 @@ export default function StaffAssignmentsPage() {
 
   // Check if there are changes in the simple edit form
   const hasSimpleEditChanges = () => {
-    return simpleEditForm.end_date !== originalEndDate;
+    return simpleEditForm.staff_id !== originalStaffId || 
+           simpleEditForm.end_date !== originalEndDate;
   };
 
   const openEditModal = (assignment: any) => {
@@ -422,10 +436,13 @@ export default function StaffAssignmentsPage() {
   const openSimpleEditModal = (assignment: any) => {
     setSelectedAssignment(assignment);
     const assignmentEndDate = assignment.end_date ? new Date(assignment.end_date).toISOString().split('T')[0] : '';
+    const assignmentStaffId = assignment.staff_id?._id || assignment.staff_id;
     setSimpleEditForm({
+      staff_id: assignmentStaffId,
       end_date: assignmentEndDate,
     });
     setOriginalEndDate(assignmentEndDate);
+    setOriginalStaffId(assignmentStaffId);
     setShowEditModal(true);
   };
 
@@ -673,7 +690,7 @@ export default function StaffAssignmentsPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '5rem' }}>
                 <div style={{
                   position: 'relative',
                   minWidth: '300px'
@@ -751,50 +768,6 @@ export default function StaffAssignmentsPage() {
                   </div>
                 </div>
 
-                <button
-                  onClick={forceReloadData}
-                  disabled={loadingData}
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '1rem',
-                    padding: '0.875rem 1.25rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: loadingData ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
-                    opacity: loadingData ? 0.6 : 1,
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                  onMouseOver={e => {
-                    if (!loadingData) {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
-                      e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                      e.currentTarget.style.boxShadow = '0 12px 35px rgba(59, 130, 246, 0.4)';
-                    }
-                  }}
-                  onMouseOut={e => {
-                    if (!loadingData) {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.3)';
-                    }
-                  }}
-                  title="Làm mới dữ liệu"
-                >
-                  <ArrowPathIcon style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
-                    animation: loadingData ? 'spin 1s linear infinite' : 'none'
-                  }} />
-                  {loadingData ? 'Đang tải...' : 'Làm mới'}
-                </button>
 
                 <Link
                   href="/admin/staff-assignments/new"
@@ -1882,16 +1855,71 @@ export default function StaffAssignmentsPage() {
                     </div>
                   )}
 
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4">
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Ngày kết thúc <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
+                  <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4">
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Nhân viên <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <select
+                        value={simpleEditForm.staff_id}
+                        onChange={(e) => setSimpleEditForm({ ...simpleEditForm, staff_id: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          border: '2px solid #e5e7eb',
+                          fontSize: '0.875rem',
+                          background: 'white',
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <option value="">Chọn nhân viên</option>
+                        {staffs.map((staff) => (
+                          <option key={staff._id} value={staff._id}>
+                            {staff.full_name} ({staff.email})
+                          </option>
+                        ))}
+                      </select>
+                      {validationErrors.staff_id && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginTop: '0.5rem',
+                          padding: '0.5rem 0.75rem',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '0.375rem',
+                          color: '#dc2626'
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', flexShrink: 0 }}>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                          </svg>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                            {validationErrors.staff_id}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4">
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Ngày kết thúc <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
                     <div style={{
                       position: 'relative',
                       display: 'flex',
@@ -2022,7 +2050,7 @@ export default function StaffAssignmentsPage() {
                         </span>
                       </div>
                     )}
-
+                    </div>
                   </div>
 
                   <div style={{
@@ -2034,8 +2062,9 @@ export default function StaffAssignmentsPage() {
                     <button
                       onClick={() => {
                         setShowEditModal(false);
-                        setSimpleEditForm({ end_date: '' });
+                        setSimpleEditForm({ staff_id: '', end_date: '' });
                         setOriginalEndDate('');
+                        setOriginalStaffId('');
                         setSelectedAssignment(null);
                         setShowDatePicker(false);
                         setValidationErrors({});
@@ -2085,9 +2114,9 @@ export default function StaffAssignmentsPage() {
                             }}></div>
                             Đang cập nhật...
                           </div>
-                        ) : (
-                          selectedAssignment && isExpired(selectedAssignment.end_date) ? 'Gia hạn phân công' : 'Cập nhật ngày kết thúc'
-                        )}
+                         ) : (
+                           selectedAssignment && isExpired(selectedAssignment.end_date) ? 'Gia hạn phân công' : 'Cập nhật phân công'
+                         )}
                       </button>
                     )}
                   </div>

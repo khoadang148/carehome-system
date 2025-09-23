@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { useNotifications } from '@/lib/contexts/notification-context';
 import SuccessModal from '@/components/SuccessModal';
 import { residentAPI, userAPI, API_BASE_URL } from '@/lib/api';
 import { convertDDMMYYYYToISO } from '@/lib/utils/validation';
@@ -91,6 +92,7 @@ function validateDate(dateStr: string, fieldName: string = 'Ngày') {
 export default function FamilyNewResidentPage() {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
+  const { addNotification } = useNotifications();
 
   const buildFileUrl = (file_path?: string) => {
     if (!file_path) return '';
@@ -508,6 +510,15 @@ export default function FamilyNewResidentPage() {
         // Family role phải gọi /residents/my-resident, admin/staff mới dùng /residents
         const created = await residentAPI.createMy(formData);
         if (created && (created._id || created.id)) {
+          // Add notification for admin about new resident
+          addNotification({
+            type: 'info',
+            title: 'Người cao tuổi mới được thêm',
+            message: `Người cao tuổi ${data.full_name} vừa được thêm vào hệ thống bởi ${(user as any)?.full_name || (user as any)?.username || 'người dùng'}.`,
+            category: 'system',
+            actionUrl: '/admin/residents'
+          });
+          
           setCreatedResidentId(created._id || created.id);
           setCreatedResidentName(data.full_name);
           setSuccessOpen(true);
@@ -523,61 +534,60 @@ export default function FamilyNewResidentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(102,126,234,0.08)_0%,transparent_50%),radial-gradient(circle_at_75%_75%,rgba(139,92,246,0.08)_0%,transparent_50%)] pointer-events-none" />
-
-      <div className="relative z-10 p-8 max-w-5xl mx-auto">
-        <div className="flex items-center mb-8 bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg">
-          <Link href="/family" className="mr-4 text-indigo-500 flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-50 transition-all duration-200 hover:bg-indigo-100">
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 flex items-center justify-center shadow-lg">
-                <UserIcon className="w-5 h-5 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
+      <div className="max-w-6xl mx-auto p-8">
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-white/20 p-8 mb-8 shadow-lg">
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/family" 
+              className="text-indigo-500 flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-50 hover:bg-indigo-100 transition-colors duration-200 border-none cursor-pointer shadow-md"
+            >
+              <ArrowLeftIcon className="h-5 w-5" />
+            </Link>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <UserIcon className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-3xl font-bold m-0 bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent tracking-tight">
-                Đăng ký người thân mới
-              </h1>
+              <div>
+                <h1 className="text-3xl font-bold m-0 bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent tracking-tight">
+                  Đăng ký người cao tuổi mới
+                </h1>
+                <p className="text-slate-600 m-0 text-sm font-medium">
+                  Điền thông tin để tạo hồ sơ người cao tuổi.
+                </p>
+              </div>
             </div>
-            <p className="text-slate-600 m-0 text-sm font-medium">
-              Điền thông tin để tạo hồ sơ người thân. Tài khoản gia đình đã có sẵn.
-            </p>
           </div>
         </div>
 
-        <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden border border-white/60">
+        <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl overflow-hidden shadow-lg border border-white/20">
           {/* Progress Stepper */}
           <div className="px-8 pt-8 pb-4 bg-gradient-to-b from-white/80 to-white/30">
             <div className="flex items-center justify-between max-w-3xl mx-auto">
               <div className="flex-1 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow">1</div>
+                <div className="w-14 h-14 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center justify-center text-lg font-bold shadow-lg shadow-indigo-500/30">1</div>
                 <div className="text-sm font-semibold text-slate-800">Thông tin người cao tuổi</div>
               </div>
               <div className="flex-1 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full mx-4" />
               <div className="flex-1 flex items-center gap-3 opacity-70">
-                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-bold">2</div>
+                <div className="w-14 h-14 rounded-full bg-white text-gray-400 border-2 border-gray-200 flex items-center justify-center text-lg font-bold">2</div>
                 <div className="text-sm font-semibold text-slate-600">Liên hệ khẩn cấp</div>
               </div>
               <div className="flex-1 h-1 bg-slate-200 rounded-full mx-4" />
               <div className="flex-1 flex items-center gap-3 opacity-70">
-                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-bold">3</div>
+                <div className="w-14 h-14 rounded-full bg-white text-gray-400 border-2 border-gray-200 flex items-center justify-center text-lg font-bold">3</div>
                 <div className="text-sm font-semibold text-slate-600">Đăng ký dịch vụ</div>
               </div>
             </div>
           </div>
           <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="bg-gradient-to-br from-green-400 via-green-500 to-green-700 p-6 text-white">
-              
-            </div>
-
             <div className="p-8">
               {/* Section: Thông tin người cao tuổi (match staff style) */}
               <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-xl text-white mb-6 flex items-center gap-2 shadow">
                 <UserIcon className="w-5 h-5" />
                 <h3 className="m-0 text-base font-semibold">Thông tin người cao tuổi</h3>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8 shadow-sm">
+              <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-white/20 p-6 mb-8 shadow-md">
                 <label className="block text-sm font-semibold text-gray-700 mb-4">Ảnh đại diện</label>
                 <div className="flex items-center justify-center gap-8 p-8 bg-gradient-to-br from-slate-50 to-slate-200 rounded-2xl border-2 border-dashed border-slate-300">
                   <div className="w-24 h-24 rounded-xl overflow-hidden border-3 border-gray-200 bg-gray-50 flex items-center justify-center shadow-lg">
@@ -736,30 +746,30 @@ export default function FamilyNewResidentPage() {
                     <div className="text-sm text-gray-500 italic mb-3">Chưa có thuốc nào, bấm “Thêm thuốc” để bổ sung.</div>
                   )}
                   {(watch('current_medications') || []).map((medication, index) => (
-                    <div key={index} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div key={index} className="flex items-center gap-4 mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <input
                         type="text"
                         placeholder="Tên thuốc"
                         value={medication.medication_name}
                         onChange={(e) => updateMedication(index, 'medication_name', e.target.value)}
-                        className="col-span-2 md:col-span-1 p-3 border border-gray-300 rounded-lg text-sm outline-none transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        className="flex-1 p-3 border border-gray-300 rounded-lg text-sm outline-none transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                       />
                       <input
                         type="text"
                         placeholder="Liều lượng"
                         value={medication.dosage}
                         onChange={(e) => updateMedication(index, 'dosage', e.target.value)}
-                        className="col-span-2 md:col-span-1 p-3 border border-gray-300 rounded-lg text-sm outline-none transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        className="flex-1 p-3 border border-gray-300 rounded-lg text-sm outline-none transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                       />
                       <input
                         type="text"
                         placeholder="Tần suất"
                         value={medication.frequency}
                         onChange={(e) => updateMedication(index, 'frequency', e.target.value)}
-                        className="col-span-2 md:col-span-1 p-3 border border-gray-300 rounded-lg text-sm outline-none transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        className="flex-1 p-3 border border-gray-300 rounded-lg text-sm outline-none transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                       />
                       {(watch('current_medications') || []).length > 0 && (
-                        <button type="button" onClick={() => removeMedication(index)} className="p-2 bg-red-500 text-white rounded-lg transition-colors duration-200 hover:bg-red-600">
+                        <button type="button" onClick={() => removeMedication(index)} className="p-2 bg-red-500 text-white rounded-lg transition-colors duration-200 hover:bg-red-600 flex items-center justify-center">
                           <XMarkIcon className="w-4 h-4" />
                         </button>
                       )}
@@ -802,7 +812,7 @@ export default function FamilyNewResidentPage() {
                 <PhoneIcon className="w-5 h-5" />
                 <h3 className="m-0 text-base font-semibold">Thông tin liên hệ khẩn cấp</h3>
               </div>
-              <div className="bg-white rounded-xl border border-amber-200 p-6 mb-8 shadow-md grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-white/20 p-6 mb-8 shadow-md grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 <div className="md:col-span-2 flex items-center justify-between p-4 rounded-lg bg-amber-50 border border-amber-200">
                   <div className="text-sm">
@@ -1027,15 +1037,15 @@ export default function FamilyNewResidentPage() {
               </div>
 
              
-              {/* Sticky Action Bar */}
-              <div className="sticky bottom-0 left-0 right-0 mt-10 -mx-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-6">
-                <div className="flex justify-end gap-4 p-4 border-t border-gray-200 bg-white/80 backdrop-blur rounded-b-2xl">
+              {/* Action Bar */}
+              <div className="mt-10 pt-6 border-t border-gray-200">
+                <div className="flex justify-end gap-4">
                   <Link href="/family" className="px-6 py-3 border-2 border-gray-200 rounded-lg text-sm font-semibold text-gray-700 no-underline bg-white transition-colors duration-200 hover:bg-gray-50 hover:border-gray-300 inline-flex items-center gap-2">
-                  Hủy bỏ
-                </Link>
+                    Hủy bỏ
+                  </Link>
                   <button type="submit" className="px-6 py-3 border-0 rounded-lg text-sm font-semibold text-white transition-all duration-200 flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-md hover:shadow-lg">
                     Tiếp tục đăng ký dịch vụ
-                </button>
+                  </button>
                 </div>
               </div>
             </div>

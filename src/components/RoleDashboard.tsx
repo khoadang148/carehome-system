@@ -74,7 +74,7 @@ const ROLE_DASHBOARDS = {
         description: 'Phê duyệt tài khoản và thông tin người cao tuổi',
         icon: UserPlusIcon,
         href: '/admin/approvals',
-        gradient: 'linear-gradient(135deg,rgb(206, 227, 16) 0%,rgb(245, 224, 44) 100%)',
+        gradient: 'linear-gradient(135deg,rgb(251, 244, 36) 0%, #fde68a 100%)',
       }
      
     ]
@@ -83,7 +83,7 @@ const ROLE_DASHBOARDS = {
     title: 'Hệ thống quản lý chăm sóc của Nhân viên chăm sóc',
     description: ' Công cụ điều hành cho đội ngũ y tế!',
     cards: [
-      /*{
+      {
         title: 'Thêm người cao tuổi',
         description: 'Thêm người cao tuổi và tạo tài khoản ',
         icon: UserPlusIcon,
@@ -96,7 +96,7 @@ const ROLE_DASHBOARDS = {
         icon: ClipboardDocumentListIcon,
         href: '/services/purchase',
         gradient: 'linear-gradient(135deg,rgb(26, 169, 36) 0%,rgb(38, 220, 150) 100%)',
-      },*/
+      },
 
       {
         title: 'Lịch Thăm',

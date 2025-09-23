@@ -17,7 +17,7 @@ import {
   HomeIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { residentAPI, bedAssignmentsAPI, API_BASE_URL } from '@/lib/api';
+import { residentAPI, bedAssignmentsAPI, API_BASE_URL, billsAPI } from '@/lib/api';
 import { carePlansAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -36,20 +36,28 @@ export default function ResidentsPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
-  const [activeTab, setActiveTab] = useState<'admitted' | 'active' | 'discharged'>('admitted');
+  const [activeTab, setActiveTab] = useState<'admitted' | 'accepted' | 'discharged'>('admitted');
+  const [unpaidBills, setUnpaidBills] = useState<{ [residentId: string]: any[] }>({});
 
   // SWR fetcher function
   const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-  // Fetch residents data with SWR
-  const { data: residentsResponse, error: residentsError, mutate: mutateResidents } = useSWR(
-    user ? '/api/residents' : null,
+  // Fetch residents data per tab for speed
+  const { data: admittedRes, error: admittedErr, mutate: mutateAdmitted } = useSWR(
+    user ? 'residents:admitted' : null,
+    () => residentAPI.getAdmitted(),
+    { revalidateOnFocus: false, dedupingInterval: 5000 }
+  );
+  const { data: activeRes, error: activeErr, mutate: mutateActive } = useSWR(
+    user ? 'residents:active' : null,
+    () => residentAPI.getActive(),
+    { revalidateOnFocus: false, dedupingInterval: 5000 }
+  );
+  // For discharged, fallback to full list then filter (endpoint not provided)
+  const { data: allRes, error: allErr, mutate: mutateAll } = useSWR(
+    user ? 'residents:all' : null,
     () => residentAPI.getAll(),
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
-    }
+    { revalidateOnFocus: false, dedupingInterval: 10000 }
   );
 
   // Fetch care plans data with SWR
@@ -65,14 +73,15 @@ export default function ResidentsPage() {
 
   // Process residents data
   const residentsData = React.useMemo(() => {
-    if (!residentsResponse) return [];
+    const source = activeTab === 'admitted' ? admittedRes : activeTab === 'accepted' ? activeRes : allRes;
+    if (!source) return [];
     
     let apiData: any[] = [];
-    if (Array.isArray(residentsResponse)) {
-      apiData = residentsResponse;
+    if (Array.isArray(source)) {
+      apiData = source;
     } else {
       try {
-        apiData = (residentsResponse as any).data || [];
+        apiData = (source as any).data || [];
       } catch (error) {
         apiData = [];
       }
@@ -87,15 +96,44 @@ export default function ResidentsPage() {
       contactPhone: r.emergency_contact?.phone || '',
       avatar: r.avatar ? `${API_BASE_URL}/${r.avatar}` : null,
       gender: (r.gender || '').toLowerCase(),
-      status: r.status || 'active',
+      status: (r.status || 'active').toLowerCase(),
       discharge_date: r.discharge_date || null,
     }));
-  }, [residentsResponse]);
+  }, [admittedRes, activeRes, allRes, activeTab]);
 
   // Process care plans data
   const carePlanOptions = React.useMemo(() => {
     return Array.isArray(carePlansData) ? carePlansData : [];
   }, [carePlansData]);
+
+  // Đếm số lượng cho từng tab (không phụ thuộc tab đang chọn)
+  const admittedCount = React.useMemo(() => {
+    if (Array.isArray(admittedRes)) return admittedRes.length;
+    try {
+      return Array.isArray((admittedRes as any)?.data) ? (admittedRes as any).data.length : 0;
+    } catch {
+      return 0;
+    }
+  }, [admittedRes]);
+
+  const activeCount = React.useMemo(() => {
+    if (Array.isArray(activeRes)) return activeRes.length;
+    try {
+      return Array.isArray((activeRes as any)?.data) ? (activeRes as any).data.length : 0;
+    } catch {
+      return 0;
+    }
+  }, [activeRes]);
+
+  const dischargedCount = React.useMemo(() => {
+    const src = Array.isArray(allRes)
+      ? allRes
+      : Array.isArray((allRes as any)?.data)
+        ? (allRes as any).data
+        : [];
+    if (!Array.isArray(src)) return 0;
+    return src.filter((r: any) => String(r?.status || r?.resident_status || '').toLowerCase() === 'discharged').length;
+  }, [allRes]);
   
 
   
@@ -163,8 +201,8 @@ export default function ResidentsPage() {
 
   
   // Loading and error states
-  const isLoading = !residentsResponse && !residentsError;
-  const hasError = residentsError;
+  const isLoading = (!admittedRes && !admittedErr) || (!activeRes && !activeErr) || (!allRes && !allErr);
+  const hasError = admittedErr || activeErr || allErr;
 
   const filteredResidents = residentsData.filter((resident) => {
     const searchValue = (searchTerm || '').toString().trim();
@@ -181,17 +219,38 @@ export default function ResidentsPage() {
       residentRoom.includes(searchValue.toLowerCase());
   });
 
-  const residentsAdmitted = filteredResidents.filter(resident => 
-    resident.status === 'admitted'
-  );
-  
-  const residentsActive = filteredResidents.filter(resident => 
-    resident.status === 'active'
-  );
+  const admittedResidents = filteredResidents.filter(resident => (resident.status || '').toLowerCase() === 'admitted');
+  const acceptedResidents = filteredResidents.filter(resident => {
+    const s = (resident.status || '').toLowerCase();
+    return s === 'accepted' || s === 'active';
+  });
+  const dischargedResidents = filteredResidents.filter(resident => (resident.status || '').toLowerCase() === 'discharged');
 
-  const residentsDischarged = filteredResidents.filter(resident => 
-    resident.status === 'discharged'
-  );
+  // Load unpaid bills for residents in "accepted" status
+  React.useEffect(() => {
+    if (activeTab !== 'accepted' || !acceptedResidents.length) return;
+
+    const loadUnpaidBills = async () => {
+      const unpaidBillsMap: { [residentId: string]: any[] } = {};
+      
+      const promises = acceptedResidents.map(async (resident: any) => {
+        try {
+          const bills = await billsAPI.getByResidentId(resident.id);
+          const unpaidBillsList = Array.isArray(bills) ? bills.filter((bill: any) => bill.status === 'pending') : [];
+          if (unpaidBillsList.length > 0) {
+            unpaidBillsMap[resident.id] = unpaidBillsList;
+          }
+        } catch (error) {
+          console.error(`Error loading bills for resident ${resident.id}:`, error);
+        }
+      });
+
+      await Promise.all(promises);
+      setUnpaidBills(unpaidBillsMap);
+    };
+
+    loadUnpaidBills();
+  }, [activeTab, acceptedResidents]);
   
   const handleViewResident = (residentId: number) => {
     router.push(`/staff/residents/${residentId}`);
@@ -212,7 +271,9 @@ export default function ResidentsPage() {
         await residentAPI.delete(residentToDelete.toString());
 
         // Refresh data using SWR mutate
-        mutateResidents();
+        if (activeTab === 'admitted') await mutateAdmitted();
+        if (activeTab === 'accepted') await mutateActive();
+        if (activeTab === 'discharged') await mutateAll();
 
         setShowDeleteModal(false);
         setResidentToDelete(null);
@@ -422,6 +483,20 @@ export default function ResidentsPage() {
                         }}>
                           {resident.contactPhone}
                         </p>
+                        {activeTab === 'accepted' && unpaidBills[resident.id] && unpaidBills[resident.id].length > 0 && (
+                          <div style={{
+                            marginTop: '0.5rem',
+                            padding: '0.25rem 0.5rem',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.75rem',
+                            color: '#dc2626',
+                            fontWeight: 500
+                          }}>
+                            Chưa thanh toán {unpaidBills[resident.id].length} hóa đơn
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td style={{padding: '1rem'}}>
@@ -481,14 +556,14 @@ export default function ResidentsPage() {
                 margin: '0 0 0.5rem 0',
                 color: '#374151'
               }}>
-            {activeTab === 'admitted' ? 'Không có người cao tuổi nào đã được phân phòng' : 
-             activeTab === 'active' ? 'Không có người cao tuổi nào chưa được phân phòng' :
+            {activeTab === 'admitted' ? 'Không có người cao tuổi nào đang nằm viện' : 
+             activeTab === 'accepted' ? 'Không có người cao tuổi nào chưa nhập viện' :
              'Không có người cao tuổi nào đã xuất viện'}
               </h3>
               <p style={{margin: 0, fontSize: '0.875rem'}}>
-            {activeTab === 'admitted' ? 'Tất cả người cao tuổi đều chưa được phân phòng' : 
-             activeTab === 'active' ? 'Tất cả người cao tuổi đều đã được phân phòng' :
-             'Tất cả người cao tuổi đều đang ở viện'}
+            {activeTab === 'admitted' ? 'Danh sách đang nằm viện trống' : 
+             activeTab === 'accepted' ? 'Danh sách chưa nhập viện trống' :
+             'Danh sách đã xuất viện trống'}
               </p>
             </div>
           )}
@@ -583,7 +658,7 @@ export default function ResidentsPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {residentsData.length} người cao tuổi
+                  Tổng số: {admittedCount + activeCount + dischargedCount} người cao tuổi
                 </p>
               </div>
             </div>
@@ -686,9 +761,9 @@ export default function ResidentsPage() {
                 margin: 0,
                 fontWeight: 600
               }}>
-                Hiển thị: {activeTab === 'admitted' ? residentsAdmitted.length : 
-                           activeTab === 'active' ? residentsActive.length :
-                           residentsDischarged.length} người cao tuổi
+                Hiển thị: {activeTab === 'admitted' ? admittedCount : 
+                           activeTab === 'accepted' ? activeCount :
+                           dischargedCount} người cao tuổi
               </p>
             </div>
           </div>
@@ -728,10 +803,10 @@ export default function ResidentsPage() {
               }}
             >
               <HomeIcon style={{width: '1.125rem', height: '1.125rem'}} />
-              Đã phân phòng ({residentsAdmitted.length} người)
+              Đang nằm viện ({admittedCount} người)
             </button>
             <button
-              onClick={() => setActiveTab('active')}
+              onClick={() => setActiveTab('accepted')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -739,17 +814,17 @@ export default function ResidentsPage() {
                 padding: '0.75rem 1.5rem',
                 borderRadius: '0.5rem',
                 border: 'none',
-                background: activeTab === 'active' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
-                color: activeTab === 'active' ? 'white' : '#6b7280',
+                background: activeTab === 'accepted' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                color: activeTab === 'accepted' ? 'white' : '#6b7280',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '0.875rem',
                 transition: 'all 0.2s ease',
-                boxShadow: activeTab === 'active' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                boxShadow: activeTab === 'accepted' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
               }}
             >
               <ExclamationTriangleIcon style={{width: '1.125rem', height: '1.125rem'}} />
-              Chưa phân phòng ({residentsActive.length} người)
+              Chưa nhập viện ({activeCount} người)
             </button>
             <button
               onClick={() => setActiveTab('discharged')}
@@ -772,10 +847,58 @@ export default function ResidentsPage() {
               <svg style={{width: '1.125rem', height: '1.125rem'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Đã xuất viện ({residentsDischarged.length} người)
+              Đã xuất viện ({dischargedCount} người)
             </button>
           </div>
 
+          {/* Thông báo cho tab "Chưa nhập viện" */}
+          {activeTab === 'accepted' && Object.keys(unpaidBills).length > 0 && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.05)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: '0.75rem',
+              padding: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                marginBottom: '0.5rem'
+              }}>
+                <div style={{
+                  width: '2rem',
+                  height: '2rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg style={{ width: '1rem', height: '1rem', color: '#dc2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  color: '#dc2626',
+                  margin: 0
+                }}>
+                  Thông báo thanh toán
+                </h3>
+              </div>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: '1.5'
+              }}>
+                Có {Object.keys(unpaidBills).length} người cao tuổi chưa thanh toán hóa đơn. 
+                Vui lòng liên hệ gia đình để hoàn tất thanh toán trước khi xác nhận nhập viện.
+              </p>
+            </div>
+          )}
 
         </div>
 
@@ -841,7 +964,11 @@ export default function ResidentsPage() {
               Không thể tải danh sách người cao tuổi
             </p>
             <button
-              onClick={() => mutateResidents()}
+              onClick={() => {
+                if (activeTab === 'admitted') return mutateAdmitted();
+                if (activeTab === 'accepted') return mutateActive();
+                return mutateAll();
+              }}
               style={{
                 padding: '0.75rem 1.5rem',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -864,9 +991,9 @@ export default function ResidentsPage() {
             </button>
           </div>
         ) : (
-          activeTab === 'admitted' ? renderResidentsTable(residentsAdmitted, true, false) : 
-          activeTab === 'active' ? renderResidentsTable(residentsActive, false, false) :
-          renderResidentsTable(residentsDischarged, false, true)
+          activeTab === 'admitted' ? renderResidentsTable(admittedResidents, true, false) : 
+          activeTab === 'accepted' ? renderResidentsTable(acceptedResidents, true, false) :
+          renderResidentsTable(dischargedResidents, false, true)
         )}
 
       </div>

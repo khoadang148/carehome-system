@@ -2,10 +2,10 @@
 
 import { useState, useMemo, useCallback, memo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  BellIcon, 
-  CheckCircleIcon, 
-  ExclamationTriangleIcon, 
+import {
+  BellIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
   InformationCircleIcon,
   TrashIcon,
   FunnelIcon,
@@ -17,11 +17,11 @@ import {
 import { useNotifications, Notification } from '@/lib/contexts/notification-context';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
-const NotificationCard = memo(({ 
-  notification, 
-  onMarkAsRead, 
-  onRemove, 
-  onNavigate 
+const NotificationCard = memo(({
+  notification,
+  onMarkAsRead,
+  onRemove,
+  onNavigate
 }: {
   notification: Notification;
   onMarkAsRead: (id: string) => void;
@@ -78,16 +78,16 @@ const NotificationCard = memo(({
   const formatTimeAgo = (timestamp: Date) => {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - timestamp.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Vừa xong';
     if (diffInMinutes < 60) return `${diffInMinutes} phút trước`;
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours} giờ trước`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays} ngày trước`;
-    
+
     return timestamp.toLocaleDateString('vi-VN');
   };
 
@@ -100,11 +100,10 @@ const NotificationCard = memo(({
 
   return (
     <div
-      className={`relative rounded-2xl overflow-hidden bg-slate-50 shadow-lg group transition-all duration-200 hover:shadow-xl hover:-translate-y-1 ${
-        notification.read 
-          ? 'border-2 border-slate-200' 
+      className={`relative rounded-2xl overflow-hidden bg-slate-50 shadow-lg group transition-all duration-500 hover:shadow-xl hover:-translate-y-1 ${notification.read
+          ? 'border-2 border-slate-200 opacity-60'
           : 'border-2 border-blue-300 shadow-md'
-      }`}
+        }`}
     >
       <div className="p-6">
         <div className="flex items-start gap-4">
@@ -118,20 +117,19 @@ const NotificationCard = memo(({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <h3 className={`text-lg font-bold ${
-                    notification.read ? 'text-slate-700' : 'text-slate-900'
-                  }`}>
+                  <h3 className={`text-lg font-bold ${notification.read ? 'text-slate-700' : 'text-slate-900'
+                    }`}>
                     {notification.title}
                   </h3>
                   {!notification.read && (
                     <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                   )}
                 </div>
-                
+
                 <p className="text-slate-600 mb-3 leading-relaxed text-sm">
                   {notification.message}
                 </p>
-                
+
                 <div className="flex items-center gap-4">
                   <span className="text-xs text-slate-500 font-medium">
                     {formatTimeAgo(notification.timestamp)}
@@ -156,7 +154,7 @@ const NotificationCard = memo(({
                     <EyeIcon className="w-3 h-3" />
                   </button>
                 )}
-                
+
                 {!notification.read && (
                   <button
                     onClick={(e) => {
@@ -169,7 +167,7 @@ const NotificationCard = memo(({
                     <CheckCircleIcon className="w-3 h-3" />
                   </button>
                 )}
-                
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -191,12 +189,12 @@ const NotificationCard = memo(({
 
 NotificationCard.displayName = 'NotificationCard';
 
-const Pagination = ({ 
-  currentPage, 
-  totalPages, 
-  onPageChange, 
-  totalItems, 
-  itemsPerPage 
+const Pagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  totalItems,
+  itemsPerPage
 }: {
   currentPage: number;
   totalPages: number;
@@ -210,7 +208,7 @@ const Pagination = ({
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     const maxVisiblePages = 5;
-    
+
     if (totalPages <= maxVisiblePages) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
@@ -238,7 +236,7 @@ const Pagination = ({
         pages.push(totalPages);
       }
     }
-    
+
     return pages;
   };
 
@@ -247,7 +245,7 @@ const Pagination = ({
       <div className="text-sm text-slate-600">
         Hiển thị {startItem}-{endItem} trong tổng số {totalItems} thông báo
       </div>
-      
+
       <div className="flex items-center gap-2">
         <button
           onClick={() => onPageChange(currentPage - 1)}
@@ -256,24 +254,23 @@ const Pagination = ({
         >
           <ChevronLeftIcon className="w-4 h-4" />
         </button>
-        
+
         {getPageNumbers().map((page, index) => (
           <button
             key={index}
             onClick={() => typeof page === 'number' && onPageChange(page)}
             disabled={page === '...'}
-            className={`px-3 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
-              page === currentPage
+            className={`px-3 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${page === currentPage
                 ? 'bg-blue-500 text-white border-blue-500'
                 : page === '...'
-                ? 'border-transparent text-slate-400 cursor-default'
-                : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-            }`}
+                  ? 'border-transparent text-slate-400 cursor-default'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+              }`}
           >
             {page}
           </button>
         ))}
-        
+
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
@@ -288,16 +285,17 @@ const Pagination = ({
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { 
-    notifications, 
-    unreadCount, 
-    markAsRead, 
-    markAllAsRead, 
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
     removeNotification,
     clearAll,
-    loading 
+    loading,
+    hideReadNotification
   } = useNotifications();
-  
+
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,11 +303,18 @@ export default function NotificationsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const filteredNotifications = useMemo(() => {
-    let filtered = notifications;
+    // Filter out read notifications that are older than 30 seconds
+    const now = new Date();
+    let filtered = notifications.filter(n => {
+      if (n.read && n.readAt) {
+        const timeSinceRead = now.getTime() - n.readAt.getTime();
+        return timeSinceRead < 30000; // Show read notifications for 30 seconds
+      }
+      return true;
+    });
 
-    
     if (searchTerm) {
-      filtered = filtered.filter(n => 
+      filtered = filtered.filter(n =>
         n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         n.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
         n.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -320,6 +325,14 @@ export default function NotificationsPage() {
       filtered = filtered.filter(n => !n.read);
     } else if (filter === 'read') {
       filtered = filtered.filter(n => n.read);
+    } else if (filter === 'all') {
+      // For 'all' filter, show both read and unread, but prioritize unread
+      filtered = filtered.sort((a, b) => {
+        if (a.read !== b.read) {
+          return a.read ? 1 : -1; // Unread first
+        }
+        return b.timestamp.getTime() - a.timestamp.getTime();
+      });
     }
 
     if (categoryFilter !== 'all') {
@@ -353,7 +366,9 @@ export default function NotificationsPage() {
 
   const handleMarkAsRead = useCallback((id: string) => {
     markAsRead(id);
-  }, [markAsRead]);
+    // Hide the notification after marking as read
+    hideReadNotification(id);
+  }, [markAsRead, hideReadNotification]);
 
   const handleRemove = useCallback((id: string) => {
     removeNotification(id);
@@ -385,14 +400,14 @@ export default function NotificationsPage() {
         <div className="flex items-center justify-between gap-10 flex-wrap">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-6">
-              
-            <button
-              onClick={() => router.push('/')}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
+
+              <button
+                onClick={() => router.push('/')}
+                className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                title="Quay lại"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
               <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
                 <BellIcon className="w-8 h-8 text-white" />
               </div>
@@ -416,7 +431,7 @@ export default function NotificationsPage() {
                 Đánh dấu tất cả đã đọc
               </button>
             )}
-            
+
             <button
               onClick={handleClearAll}
               className="px-6 py-3 text-base font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-2xl transition-all duration-200 border-2 border-red-200 hover:border-red-300"
@@ -435,8 +450,8 @@ export default function NotificationsPage() {
             <div className="relative">
               <span className="absolute left-6 top-1/2 transform -translate-y-1/2 text-slate-300 text-2xl pointer-events-none z-10">
                 <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
               </span>
               <input
@@ -465,11 +480,10 @@ export default function NotificationsPage() {
                   <button
                     key={key}
                     onClick={() => setFilter(key as any)}
-                    className={`px-2 py-1 text-xs font-semibold rounded-lg transition-all duration-200 border-2 ${
-                      filter === key
+                    className={`px-2 py-1 text-xs font-semibold rounded-lg transition-all duration-200 border-2 ${filter === key
                         ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 border-gray-200'
-                    }`}
+                      }`}
                   >
                     {label} ({count})
                   </button>
@@ -528,8 +542,8 @@ export default function NotificationsPage() {
               {filter === 'all' ? 'Không có thông báo' : 'Không có thông báo phù hợp'}
             </h3>
             <p className="text-slate-500 text-lg">
-              {filter === 'all' 
-                ? 'Tất cả thông báo sẽ xuất hiện ở đây' 
+              {filter === 'all'
+                ? 'Tất cả thông báo sẽ xuất hiện ở đây'
                 : 'Thử thay đổi bộ lọc để xem thông báo khác'
               }
             </p>
@@ -547,7 +561,7 @@ export default function NotificationsPage() {
                 />
               ))}
             </div>
-            
+
             {totalPages > 1 && (
               <Pagination
                 currentPage={currentPage}
