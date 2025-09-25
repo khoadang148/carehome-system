@@ -1952,12 +1952,17 @@ export const photosAPI = {
     if (!file_path) return '';
     const cleanPath = file_path.replace(/\\/g, '/').replace(/"/g, '').replace(/^\/+/, '');
     if (cleanPath.startsWith('http')) return cleanPath;
+    
+    // Backend serves static files at /uploads/ prefix
+    // Remove uploads/ from path if it exists to avoid double prefix
+    const pathWithoutUploads = cleanPath.replace(/^uploads\//, '');
+    
     // In development we proxy through Next.js: /api -> backend
     if (API_BASE_URL.startsWith('/')) {
-      return `${API_BASE_URL}/${cleanPath}`;
+      return `${API_BASE_URL}/uploads/${pathWithoutUploads}`;
     }
-    // In production use static host
-    return `${STATIC_BASE_URL}/${cleanPath}`;
+    // In production use static host with uploads prefix
+    return `${STATIC_BASE_URL}/uploads/${pathWithoutUploads}`;
   },
 
   getByResidentId: async (residentId: string) => {

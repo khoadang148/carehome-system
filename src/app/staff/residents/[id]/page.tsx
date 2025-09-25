@@ -117,8 +117,10 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         try {
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
-              bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+            // API đã sort assigned_date desc; lấy bản ghi mới nhất để hiển thị
+            const bedAssignment = Array.isArray(bedAssignments) && bedAssignments.length > 0
+              ? bedAssignments[0]
+              : null;
             
             if (bedAssignment?.bed_id?.room_id) {
               if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
@@ -154,8 +156,10 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
         try {
           try {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-            const bedAssignment = Array.isArray(bedAssignments) ? 
-              bedAssignments.find((a: any) => a.bed_id) : null;
+            // Lấy assignment mới nhất
+            const bedAssignment = Array.isArray(bedAssignments) && bedAssignments.length > 0
+              ? bedAssignments[0]
+              : null;
             
             if (bedAssignment?.bed_id) {
               if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {

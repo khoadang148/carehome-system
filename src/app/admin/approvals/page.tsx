@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from 'swr';
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useNotifications } from "@/lib/contexts/notification-context";
 import { userAPI, serviceRequestsAPI, bedAssignmentsAPI, bedsAPI, roomsAPI } from "@/lib/api";
@@ -40,11 +41,8 @@ export default function ApprovalsPage() {
   const { addNotification } = useNotifications();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('users');
-  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
-  const [pendingRoomChangeRequests, setPendingRoomChangeRequests] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [refreshFlag, setRefreshFlag] = useState(0);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successTitle, setSuccessTitle] = useState<string | undefined>(undefined);
   const [successName, setSuccessName] = useState<string | undefined>(undefined);
@@ -54,9 +52,62 @@ export default function ApprovalsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [beds, setBeds] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [bedAssignments, setBedAssignments] = useState<any[]>([]);
+
+  // SWR hooks for data fetching with caching
+  const { data: pendingUsers = [], error: usersError, mutate: mutateUsers } = useSWR(
+    user ? '/admin/pending-users' : null,
+    () => userAPI.getByRoleWithStatus("family", "pending"),
+    {
+      refreshInterval: 30000, // Refresh every 30 seconds
+      revalidateOnFocus: true,
+      dedupingInterval: 10000, // Dedupe requests within 10 seconds
+    }
+  );
+
+  const { data: allServiceRequests = [], error: requestsError, mutate: mutateRequests } = useSWR(
+    user ? '/admin/service-requests' : null,
+    () => serviceRequestsAPI.getAll(),
+    {
+      refreshInterval: 30000,
+      revalidateOnFocus: true,
+      dedupingInterval: 10000,
+    }
+  );
+
+  const { data: beds = [], error: bedsError } = useSWR(
+    user ? '/admin/beds' : null,
+    () => bedsAPI.getAll(),
+    {
+      refreshInterval: 60000, // Beds change less frequently
+      revalidateOnFocus: false,
+    }
+  );
+
+  const { data: rooms = [], error: roomsError } = useSWR(
+    user ? '/admin/rooms' : null,
+    () => roomsAPI.getAll(),
+    {
+      refreshInterval: 60000,
+      revalidateOnFocus: false,
+    }
+  );
+
+  const { data: bedAssignments = [], error: assignmentsError } = useSWR(
+    user ? '/admin/bed-assignments' : null,
+    () => bedAssignmentsAPI.getAll(),
+    {
+      refreshInterval: 30000,
+      revalidateOnFocus: true,
+      dedupingInterval: 10000,
+    }
+  );
+
+  // Filter pending service requests
+  const pendingRoomChangeRequests = useMemo(() => {
+    return Array.isArray(allServiceRequests) 
+      ? allServiceRequests.filter((req: any) => req.status === 'pending')
+      : [];
+  }, [allServiceRequests]);
 
   const getStatusLabel = (status?: string) => {
     switch ((status || '').toLowerCase()) {
@@ -153,38 +204,12 @@ export default function ApprovalsPage() {
     }
   }, [user, loading, router]);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [users, allServiceRequests, bedsData, roomsData, bedAssignmentsData] = await Promise.all([
-          userAPI.getByRoleWithStatus("family", "pending"),
-          serviceRequestsAPI.getAll(),
-          bedsAPI.getAll(),
-          roomsAPI.getAll(),
-          bedAssignmentsAPI.getAll()
-        ]);
-        setPendingUsers(Array.isArray(users) ? users : []);
-        // Filter only pending service requests
-        const pendingServiceRequests = Array.isArray(allServiceRequests) 
-          ? allServiceRequests.filter((req: any) => req.status === 'pending')
-          : [];
-        setPendingRoomChangeRequests(pendingServiceRequests);
-        setBeds(Array.isArray(bedsData) ? bedsData : []);
-        setRooms(Array.isArray(roomsData) ? roomsData : []);
-        setBedAssignments(Array.isArray(bedAssignmentsData) ? bedAssignmentsData : []);
-        
-        // Debug log
-        console.log('Debug - All service requests:', allServiceRequests);
-        console.log('Debug - Pending service requests:', pendingServiceRequests);
-        console.log('Debug - Bed assignments:', bedAssignmentsData);
-        console.log('Debug - Beds:', bedsData);
-        console.log('Debug - Rooms:', roomsData);
-      } catch (error) {
-        console.error('Error loading pending data:', error);
-      }
-    };
-    load();
-  }, [refreshFlag]);
+  // Loading states
+  const isLoading = !pendingUsers && !usersError;
+  const isRequestsLoading = !allServiceRequests && !requestsError;
+  const isBedsLoading = !beds && !bedsError;
+  const isRoomsLoading = !rooms && !roomsError;
+  const isAssignmentsLoading = !bedAssignments && !assignmentsError;
 
   const filtered = useMemo(() => {
     const currentData = activeTab === 'users' ? pendingUsers : pendingRoomChangeRequests;
@@ -200,18 +225,19 @@ export default function ApprovalsPage() {
     } else {
       // Group similar service requests
       const groupedRequests = currentData.reduce((acc: any, request: any) => {
-        // Create a key based on request type, family member, resident, and key details
-        let key = '';
+        // Heuristic grouping: group by type + family + resident + createdAt (minute bucket)
+        const fam = request.family_member_id?._id || request.family_member_id;
+        const res = request.resident_id?._id || request.resident_id;
+        const created = request.createdAt || request.created_at || request.updatedAt || '';
+        const bucket = created ? new Date(created).toISOString().slice(0, 16) : '';
+
+        let key = `${request.request_type}_${fam}_${res}_${bucket}`;
+
+        // For room changes, also include target room/bed if provided to avoid mixing truly separate ops
         if (request.request_type === 'room_change') {
-          key = `room_change_${request.family_member_id?._id || request.family_member_id}_${request.resident_id?._id || request.resident_id}_${request.target_room_id?._id || request.target_room_id}_${request.target_bed_id?._id || request.target_bed_id}`;
-        } else if (request.request_type === 'service_date_change') {
-          key = `service_date_change_${request.family_member_id?._id || request.family_member_id}_${request.resident_id?._id || request.resident_id}_${request.new_end_date}`;
-        } else if (request.request_type === 'care_plan_change') {
-          key = `care_plan_change_${request.family_member_id?._id || request.family_member_id}_${request.resident_id?._id || request.resident_id}_${request.target_service_package_id?._id || request.target_service_package_id}`;
-        } else {
-          key = `${request.request_type}_${request._id}`;
+          key += `_${request.target_room_id?._id || request.target_room_id || ''}_${request.target_bed_id?._id || request.target_bed_id || ''}`;
         }
-        
+
         if (!acc[key]) {
           acc[key] = {
             ...request,
@@ -254,6 +280,12 @@ export default function ApprovalsPage() {
       await userAPI.approveUser(id);
       const u = pendingUsers.find((x: any) => x._id === id);
       
+      // Optimistically update the cache
+      mutateUsers((currentData: any) => {
+        if (!currentData) return currentData;
+        return currentData.filter((user: any) => user._id !== id);
+      }, false);
+      
       // Add notification for admin
       addNotification({
         type: 'success',
@@ -284,7 +316,6 @@ export default function ApprovalsPage() {
       setSuccessName(u?.full_name || u?.username || 'Tài khoản');
       setSuccessActionType('approve');
       setSuccessDetails('Tài khoản đã được phê duyệt thành công. Người dùng có thể đăng nhập và sử dụng hệ thống.');
-      setRefreshFlag((x) => x + 1);
       setSuccessOpen(true);
     } finally {
       setBusyId(null);
@@ -306,6 +337,12 @@ export default function ApprovalsPage() {
       
       await userAPI.deactivateUser(rejectingId, rejectReason || undefined);
       const u = pendingUsers.find((x: any) => x._id === rejectingId);
+      
+      // Optimistically update the cache
+      mutateUsers((currentData: any) => {
+        if (!currentData) return currentData;
+        return currentData.filter((user: any) => user._id !== rejectingId);
+      }, false);
       
       // Add notification for admin
       addNotification({
@@ -337,7 +374,6 @@ export default function ApprovalsPage() {
       setSuccessName(u?.full_name || u?.username || 'Tài khoản');
       setSuccessActionType('reject');
       setSuccessDetails(rejectReason ? `Lý do từ chối: ${rejectReason}` : 'Tài khoản đã bị từ chối.');
-      setRefreshFlag((x) => x + 1);
       setSuccessOpen(true);
     } finally {
       setBusyId(null);
@@ -352,15 +388,67 @@ export default function ApprovalsPage() {
       
       // Find the grouped request
       const groupedRequest = filtered.find((x: any) => x._id === id);
+      if (!groupedRequest) {
+        addNotification({
+          type: 'warning',
+          title: 'Không tìm thấy yêu cầu',
+          message: 'Không thể xác định nhóm yêu cầu để phê duyệt.',
+          category: 'system',
+          actionUrl: '/admin/approvals'
+        });
+        return;
+      }
       const requestsToApprove = groupedRequest?.groupedRequests || [groupedRequest];
+
+      // Pre-validate required fields expected by BE (e.g., selected_room_type)
+      for (const req of requestsToApprove) {
+        if (req?.request_type === 'care_plan_change' && !req?.selected_room_type) {
+          // Try to infer from current room to help admin understand
+          const residentId = req?.resident_id?._id || req?.resident_id;
+          let inferredRoomType: string | undefined;
+          try {
+            const { room } = getCurrentRoomAndBed(residentId);
+            inferredRoomType = room?.room_type;
+          } catch {}
+          addNotification({
+            type: 'warning',
+            title: 'Thiếu thông tin bắt buộc',
+            message: `Yêu cầu đổi gói dịch vụ thiếu selected_room_type.${inferredRoomType ? ` Gợi ý: loại phòng hiện tại là "${inferredRoomType}".` : ''} Vui lòng cập nhật yêu cầu hoặc yêu cầu người dùng gửi lại.`,
+            category: 'system',
+            actionUrl: '/admin/approvals'
+          });
+          setBusyId(null);
+          return;
+        }
+      }
       
-      // Approve all requests in the group
-      await Promise.all(requestsToApprove.map((request: any) => 
-        serviceRequestsAPI.approve(request._id)
-      ));
+      // Approve all requests in the group (sequential for clearer error handling)
+      for (const req of requestsToApprove) {
+        try {
+          await serviceRequestsAPI.approve(req._id);
+        } catch (err: any) {
+          const msg = err?.response?.data?.message || 'Không thể thực hiện thay đổi. Vui lòng kiểm tra dữ liệu yêu cầu.';
+          addNotification({
+            type: 'warning',
+            title: 'Phê duyệt thất bại',
+            message: `${msg} (ID: ${req?._id || ''})`,
+            category: 'system',
+            actionUrl: '/admin/approvals'
+          });
+          // Stop on first failure
+          return;
+        }
+      }
       
       const request = requestsToApprove[0];
       const count = requestsToApprove.length;
+      
+      // Optimistically update the cache
+      mutateRequests((currentData: any) => {
+        if (!currentData) return currentData;
+        const requestIds = requestsToApprove.map((r: any) => r._id);
+        return currentData.filter((req: any) => !requestIds.includes(req._id));
+      }, false);
       
       // Add notification for admin
       addNotification({
@@ -392,7 +480,6 @@ export default function ApprovalsPage() {
       setSuccessName(request?.resident_id?.full_name || 'Người dùng');
       setSuccessActionType('approve');
       setSuccessDetails(`Đã phê duyệt ${count} yêu cầu thành công.`);
-      setRefreshFlag((x) => x + 1);
       setSuccessOpen(true);
     } finally {
       setBusyId(null);
@@ -414,15 +501,44 @@ export default function ApprovalsPage() {
       
       // Find the grouped request
       const groupedRequest = filtered.find((x: any) => x._id === rejectingId);
+      if (!groupedRequest) {
+        addNotification({
+          type: 'warning',
+          title: 'Không tìm thấy yêu cầu',
+          message: 'Không thể xác định nhóm yêu cầu để từ chối.',
+          category: 'system',
+          actionUrl: '/admin/approvals'
+        });
+        return;
+      }
       const requestsToReject = groupedRequest?.groupedRequests || [groupedRequest];
       
-      // Reject all requests in the group
-      await Promise.all(requestsToReject.map((request: any) => 
-        serviceRequestsAPI.reject(request._id, rejectReason || undefined)
-      ));
+      // Reject all requests in the group (sequential)
+      for (const req of requestsToReject) {
+        try {
+          await serviceRequestsAPI.reject(req._id, rejectReason || undefined);
+        } catch (err: any) {
+          const msg = err?.response?.data?.message || 'Không thể từ chối yêu cầu.';
+          addNotification({
+            type: 'warning',
+            title: 'Từ chối thất bại',
+            message: `${msg} (ID: ${req?._id || ''})`,
+            category: 'system',
+            actionUrl: '/admin/approvals'
+          });
+          return;
+        }
+      }
       
       const request = requestsToReject[0];
       const count = requestsToReject.length;
+      
+      // Optimistically update the cache
+      mutateRequests((currentData: any) => {
+        if (!currentData) return currentData;
+        const requestIds = requestsToReject.map((r: any) => r._id);
+        return currentData.filter((req: any) => !requestIds.includes(req._id));
+      }, false);
       
       // Add notification for admin
       addNotification({
@@ -454,7 +570,6 @@ export default function ApprovalsPage() {
       setSuccessName(request?.resident_id?.full_name || 'Người dùng');
       setSuccessActionType('reject');
       setSuccessDetails(rejectReason ? `Đã từ chối ${count} yêu cầu. Lý do: ${rejectReason}` : `Đã từ chối ${count} yêu cầu.`);
-      setRefreshFlag((x) => x + 1);
       setSuccessOpen(true);
     } finally {
       setBusyId(null);
@@ -471,6 +586,47 @@ export default function ApprovalsPage() {
   };
 
   if (!user || user.role !== "admin") return null;
+
+  // Show loading state
+  if (isLoading || isRequestsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <ArrowPathIcon className="w-8 h-8 text-white animate-spin" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-700 mb-2">Đang tải dữ liệu...</h3>
+          <p className="text-slate-600 text-sm">Vui lòng chờ trong giây lát</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (usersError || requestsError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ExclamationTriangleIcon className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-700 mb-2">Lỗi tải dữ liệu</h3>
+          <p className="text-slate-600 text-sm mb-4">
+            Không thể tải danh sách phê duyệt. Vui lòng thử lại sau.
+          </p>
+          <button
+            onClick={() => {
+              mutateUsers();
+              mutateRequests();
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-lg font-semibold hover:from-violet-600 hover:to-indigo-700 transition-all duration-200"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -821,11 +977,30 @@ export default function ApprovalsPage() {
                                 </>
                               ) : item.request_type === 'service_date_change' ? (
                                 <>
-                                  <div>Ngày hết hạn mới: {item.new_end_date ? new Date(item.new_end_date).toLocaleDateString('vi-VN') : '---'}</div>
+                                  <div>
+                                    Ngày hết hạn mới: {
+                                      (() => {
+                                        const dates = (item.groupedRequests || [item])
+                                          .map((r: any) => r.new_end_date)
+                                          .filter(Boolean)
+                                          .map((d: string) => new Date(d).toLocaleDateString('vi-VN'));
+                                        return dates.length ? [...new Set(dates)].join(', ') : '---';
+                                      })()
+                                    }
+                                  </div>
                                 </>
                               ) : item.request_type === 'care_plan_change' ? (
                                 <>
-                                  <div>Gói mới: {item.target_service_package_id?.plan_name || '---'}</div>
+                                  <div>
+                                    Gói mới: {
+                                      (() => {
+                                        const names = (item.groupedRequests || [item])
+                                          .map((r: any) => r.target_service_package_id?.plan_name)
+                                          .filter(Boolean);
+                                        return names.length ? [...new Set(names)].join(', ') : (item.target_service_package_id?.plan_name || '---');
+                                      })()
+                                    }
+                                  </div>
                                 </>
                               ) : '---'}
                             </div>

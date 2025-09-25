@@ -59,6 +59,26 @@ export default function ChangeCarePlanPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
+  // Local date helpers to avoid timezone shifts
+  const formatLocalYMD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const parseYMDToDate = (ymd: string | undefined | null): Date | null => {
+    if (!ymd || typeof ymd !== 'string') return null;
+    const parts = ymd.split('-');
+    if (parts.length !== 3) return null;
+    const [y, m, d] = parts.map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  };
+  const formatYMDToDisplay = (ymd: string | undefined | null) => {
+    const dt = parseYMDToDate(ymd || '');
+    return dt ? dt.toLocaleDateString('vi-VN') : '';
+  };
+
   // Load care plans
   const { data: swrCarePlans } = useSWR("care-plans", () => carePlansAPI.getAll(), {
     revalidateOnFocus: false,
@@ -82,23 +102,27 @@ export default function ChangeCarePlanPage() {
     if (Array.isArray(swrRoomTypes)) setRoomTypes(swrRoomTypes);
   }, [swrRooms, swrRoomTypes]);
 
-  // Load existing room/bed and current assignment end date
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!residentId) return;
-        const bas = await bedAssignmentsAPI.getByResidentId(residentId);
-        const activeBA = Array.isArray(bas) ? bas.find((a: any) => a?.bed_id?.room_id && !a.unassigned_date) : null;
-        if (activeBA?.bed_id?.room_id) {
-          setExistingRoomInfo(typeof activeBA.bed_id.room_id === "object" ? activeBA.bed_id.room_id : null);
-          setExistingBedInfo(typeof activeBA.bed_id === "object" ? activeBA.bed_id : null);
-        }
+  // SWR: Resident detail
+  const { data: swrResident } = useSWR(
+    residentId ? ["resident-detail", residentId] : null,
+    () => residentAPI.getById?.(residentId),
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
 
-        // Fetch current assignment (care plans) to get end date
-        const resident = await residentAPI.getById?.(residentId);
-        const assignments = resident?.care_plan_assignments || resident?.assignments || [];
-        if (resident?.gender) setResidentGender(resident.gender);
-        if (resident?.full_name || resident?.name) setResidentName(resident.full_name || resident.name);
+  // SWR: Bed assignments for resident
+  const { data: swrBedAssignments } = useSWR(
+    residentId ? ["bed-assignments", residentId] : null,
+    () => bedAssignmentsAPI.getByResidentId(residentId),
+    { revalidateOnFocus: false, dedupingInterval: 30000 }
+  );
+
+  // Populate resident info and current end date from SWR
+  useEffect(() => {
+    try {
+      if (swrResident) {
+        const assignments = swrResident?.care_plan_assignments || swrResident?.assignments || [];
+        if (swrResident?.gender) setResidentGender(swrResident.gender);
+        if (swrResident?.full_name || swrResident?.name) setResidentName(swrResident.full_name || swrResident.name);
         let nearestEnd: Date | null = null;
         for (const a of assignments) {
           if (a?.end_date && (a.status === "active" || a.status === "approved" || a.status === "completed")) {
@@ -107,9 +131,21 @@ export default function ChangeCarePlanPage() {
           }
         }
         setCurrentEndDate(nearestEnd);
-      } catch {}
-    })();
-  }, [residentId]);
+      }
+    } catch {}
+  }, [swrResident]);
+
+  // Populate existing room/bed from SWR bed assignments
+  useEffect(() => {
+    try {
+      const bas = swrBedAssignments;
+      const activeBA = Array.isArray(bas) ? bas.find((a: any) => a?.bed_id?.room_id && !a.unassigned_date) : null;
+      if (activeBA?.bed_id?.room_id) {
+        setExistingRoomInfo(typeof activeBA.bed_id.room_id === "object" ? activeBA.bed_id.room_id : null);
+        setExistingBedInfo(typeof activeBA.bed_id === "object" ? activeBA.bed_id : null);
+      }
+    } catch {}
+  }, [swrBedAssignments]);
 
   // Fallback: if name is still empty, fetch by family member and find by residentId
   useEffect(() => {
@@ -126,17 +162,13 @@ export default function ChangeCarePlanPage() {
     })();
   }, [residentName, user?.id, residentId]);
 
-  // Fetch full user profile for emergencyContact
-  useEffect(() => {
-    (async () => {
-      try {
-        if (user?.id) {
-          const profile = await userAPI.getById(user.id);
-          setUserProfile(profile);
-        }
-      } catch {}
-    })();
-  }, [user?.id]);
+  // SWR: user profile for emergency contact
+  const { data: swrUserProfile } = useSWR(
+    user?.id ? ["user-profile", user.id] : null,
+    () => userAPI.getById(user!.id),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+  useEffect(() => { if (swrUserProfile) setUserProfile(swrUserProfile); }, [swrUserProfile]);
 
   const mainPlans = useMemo(() => carePlans.filter((p) => p?.category === "main" && p?.is_active !== false), [carePlans]);
   const supplementaryPlans = useMemo(() => carePlans.filter((p) => p?.category !== "main" && p?.is_active !== false), [carePlans]);
@@ -219,89 +251,87 @@ export default function ChangeCarePlanPage() {
     return 0;
   }, []);
 
-  // Fetch available beds when selecting a room (mirrors registration behavior)
+  // SWR: available beds by room
+  const { data: swrBeds, isLoading: swrBedsLoading } = useSWR(
+    selectedRoomId && !keepExistingRoomBed ? ["beds-by-room", selectedRoomId] : null,
+    () => bedsAPI.getByRoom?.(selectedRoomId, "available"),
+    { revalidateOnFocus: false, dedupingInterval: 20000 }
+  );
   useEffect(() => {
-    (async () => {
-      try {
-        if (!selectedRoomId || keepExistingRoomBed) {
-          setAvailableBeds([]);
-          setPendingBedIds([]);
-          return;
-        }
-        setLoadingBeds(true);
-        const beds = await bedsAPI.getByRoom?.(selectedRoomId, "available");
-        setAvailableBeds(Array.isArray(beds) ? beds : []);
-      } catch {
-        setAvailableBeds([]);
-      } finally {
-        setLoadingBeds(false);
-      }
-    })();
-  }, [selectedRoomId, keepExistingRoomBed]);
+    if (!selectedRoomId || keepExistingRoomBed) {
+      setAvailableBeds([]);
+      setPendingBedIds([]);
+      setLoadingBeds(false);
+      return;
+    }
+    setLoadingBeds(!!swrBedsLoading);
+    setAvailableBeds(Array.isArray(swrBeds) ? swrBeds : []);
+  }, [selectedRoomId, keepExistingRoomBed, swrBeds, swrBedsLoading]);
 
-  // Fetch pending service requests and hide beds that are being requested (to avoid conflicts)
-  useEffect(() => {
-    (async () => {
-      if (!selectedRoomId || keepExistingRoomBed) {
-        setPendingBedIds([]);
-        return;
-      }
+  // SWR: pending service requests, to hide beds being requested
+  const { data: swrServiceRequests } = useSWR(
+    !keepExistingRoomBed ? ["pending-service-requests"] : null,
+    async () => {
       try {
-        // Thử lấy tất cả (nếu role cho phép)
-        let list: any[] = [];
+        const all = await serviceRequestsAPI.getAll?.();
+        return Array.isArray(all) ? all : [];
+      } catch (_) {
         try {
-          const all = await serviceRequestsAPI.getAll?.();
-          list = Array.isArray(all) ? all : [];
-        } catch (_) {
-          // 403 -> thử lấy pending (nếu mở), nếu vẫn lỗi -> dùng my requests
-          try {
-            const pend = await serviceRequestsAPI.getPending?.();
-            list = Array.isArray(pend) ? pend : [];
-          } catch {
-            const mine = await serviceRequestsAPI.getMyRequests?.();
-            list = Array.isArray(mine) ? mine : [];
-          }
+          const pend = await serviceRequestsAPI.getPending?.();
+          return Array.isArray(pend) ? pend : [];
+        } catch {
+          const mine = await serviceRequestsAPI.getMyRequests?.();
+          return Array.isArray(mine) ? mine : [];
         }
-
-        const pending = list.filter((r: any) => r?.status === 'pending' && (r?.request_type === 'room_change' || r?.request_type === 'care_plan_change'));
-        const ids = pending
-          .filter((r: any) => r?.target_bed_id)
-          .map((r: any) => (typeof r.target_bed_id === 'object' ? r.target_bed_id?._id : r.target_bed_id))
-          .filter(Boolean);
-        setPendingBedIds(ids);
-      } catch {
-        setPendingBedIds([]);
       }
-    })();
-  }, [selectedRoomId, keepExistingRoomBed]);
+    },
+    { revalidateOnFocus: false, dedupingInterval: 20000 }
+  );
+  useEffect(() => {
+    if (!selectedRoomId || keepExistingRoomBed) {
+      setPendingBedIds([]);
+      return;
+    }
+    const list = Array.isArray(swrServiceRequests) ? swrServiceRequests : [];
+    const pending = list.filter((r: any) => r?.status === 'pending' && (r?.request_type === 'room_change' || r?.request_type === 'care_plan_change'));
+    const ids = pending
+      .filter((r: any) => r?.target_bed_id)
+      .map((r: any) => (typeof r.target_bed_id === 'object' ? r.target_bed_id?._id : r.target_bed_id))
+      .filter(Boolean);
+    setPendingBedIds(ids);
+  }, [selectedRoomId, keepExistingRoomBed, swrServiceRequests]);
 
   const selectedPlan = useMemo(() => mainPlans.find((p) => p._id === mainPlanId), [mainPlans, mainPlanId]);
 
-  // Auto compute endDate from startDate + duration (mirror purchase)
+  // Auto compute endDate from startDate + duration, then clamp to end of month (local)
   useEffect(() => {
     if (!startDate || !duration) {
       setEndDate("");
       return;
     }
     try {
-      const start = new Date(startDate);
-      const end = new Date(start);
-      end.setMonth(end.getMonth() + parseInt(String(duration), 10));
-      setEndDate(end.toISOString());
+      const start = parseYMDToDate(startDate);
+      if (!start) { setEndDate(""); return; }
+      const temp = new Date(start);
+      // Add duration months
+      temp.setMonth(temp.getMonth() + parseInt(String(duration), 10));
+      // Set to last day of that month
+      const endOfMonth = new Date(temp.getFullYear(), temp.getMonth() + 1, 0);
+      endOfMonth.setHours(0, 0, 0, 0);
+      setEndDate(formatLocalYMD(endOfMonth));
     } catch {
       setEndDate("");
     }
   }, [startDate, duration]);
 
-  // When entering step 6, auto-set start date to the next day after current end date
+  // When entering step 6, auto-set start date to exactly the old plan's end date (local YMD)
   useEffect(() => {
     if (step !== 6) return;
     if (startDate) return; // keep user's manual selection
     try {
       const base = currentEndDate ? new Date(currentEndDate) : new Date();
       base.setHours(0, 0, 0, 0);
-      base.setDate(base.getDate() + 1); // next day after old plans expire
-      setStartDate(base.toISOString());
+      setStartDate(formatLocalYMD(base));
     } catch {}
   }, [step, currentEndDate, startDate]);
 
@@ -309,9 +339,19 @@ export default function ChangeCarePlanPage() {
     if (!residentId || !mainPlanId || !duration) return;
     setIsSubmitting(true);
     try {
-      // Chuẩn hóa định dạng ngày yyyy-mm-dd để BE chắc chắn parse được
-      const startISO = startDate ? new Date(startDate).toISOString().split('T')[0] : undefined;
-      const endISO = endDate ? new Date(endDate).toISOString().split('T')[0] : undefined;
+      // Gửi dạng YYYY-MM-DD để tránh lệch timezone ở BE
+      const startISO = startDate || undefined;
+      const endISO = endDate || undefined;
+
+      // Determine room info to always send to BE (even when keeping old room/bed)
+      const selectedRoomObj = rooms.find((r:any) => r._id === selectedRoomId);
+      const payloadRoomId = keepExistingRoomBed ? (existingRoomInfo?._id || null) : (selectedRoomId || null);
+      const payloadBedId = keepExistingRoomBed ? (existingBedInfo?._id || null) : (selectedBedId || null);
+      const selectedRoomType = (() => {
+        if (keepExistingRoomBed) return existingRoomInfo?.room_type || undefined;
+        if (selectedRoomObj?.room_type) return selectedRoomObj.room_type;
+        return undefined;
+      })();
 
       const common: any = {
         request_type: "care_plan_change",
@@ -319,8 +359,9 @@ export default function ChangeCarePlanPage() {
         new_start_date: startISO,
         start_date: startISO,
         new_end_date: endISO,
-        target_room_id: !keepExistingRoomBed && selectedRoomId ? selectedRoomId : null,
-        target_bed_id: !keepExistingRoomBed && selectedBedId ? selectedBedId : null,
+        target_room_id: payloadRoomId,
+        target_bed_id: payloadBedId,
+        selected_room_type: selectedRoomType,
         emergencyContactName: userProfile?.full_name || user?.name || "",
         emergencyContactPhone: userProfile?.phone || (user as any)?.phone || "",
       };
@@ -334,6 +375,9 @@ export default function ChangeCarePlanPage() {
       console.log("keepExistingRoomBed:", keepExistingRoomBed);
       console.log("selectedRoomId:", selectedRoomId);
       console.log("selectedBedId:", selectedBedId);
+      console.log("payloadRoomId:", payloadRoomId);
+      console.log("payloadBedId:", payloadBedId);
+      console.log("selected_room_type:", selectedRoomType);
       console.log("common payload:", common);
 
       // Gửi 1 yêu cầu cho gói chính và 1 yêu cầu cho mỗi gói bổ sung
@@ -995,7 +1039,7 @@ export default function ChangeCarePlanPage() {
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 mb-6 shadow-lg border border-white/20 backdrop-blur-sm">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
               <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              Thời hạn gói mới
+              Thời gian sử dụng
             </h3>
 
             <div className="space-y-6">
@@ -1032,8 +1076,8 @@ export default function ChangeCarePlanPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ngày bắt đầu:</label>
                 <DatePicker
-                  selected={startDate ? new Date(startDate) : null}
-                  onChange={(date) => setStartDate(date ? date.toISOString() : '')}
+                  selected={parseYMDToDate(startDate)}
+                  onChange={(date) => setStartDate(date ? formatLocalYMD(date) : '')}
                   dateFormat="dd/MM/yyyy"
                   minDate={currentEndDate ? new Date(currentEndDate) : new Date()}
                   placeholderText="Chọn ngày bắt đầu"
@@ -1044,7 +1088,7 @@ export default function ChangeCarePlanPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ngày kết thúc mới:</label>
                 <div className="relative">
-                  <input type="text" value={endDate ? new Date(endDate).toLocaleDateString('vi-VN') : ''} readOnly className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed" placeholder="Sẽ tự động tính dựa trên thời hạn" />
+                  <input type="text" value={formatYMDToDisplay(endDate)} readOnly className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed" placeholder="Sẽ tự động tính dựa trên thời hạn" />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   </div>
@@ -1161,7 +1205,7 @@ export default function ChangeCarePlanPage() {
                     </div>
                     <div className="flex-1">
                       <div className="text-sm text-gray-500 font-medium">Thời gian</div>
-                      <div className="font-semibold text-gray-900">{`${duration || '0'} tháng${showTimeDetails ? '' : ` (${startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'} - ${endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'})`}`}</div>
+                      <div className="font-semibold text-gray-900">{`${duration || '0'} tháng${showTimeDetails ? '' : ` (${formatYMDToDisplay(startDate) || 'Chưa chọn'} - ${formatYMDToDisplay(endDate) || 'Chưa chọn'})`}`}</div>
                     </div>
                     <button onClick={() => setShowTimeDetails(!showTimeDetails)} className="text-green-600 hover:text-green-800 transition-colors">
                       <svg className={`w-5 h-5 transform transition-transform ${showTimeDetails ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -1174,14 +1218,14 @@ export default function ChangeCarePlanPage() {
                         <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-bold text-green-700">BĐ</div>
                         <div className="flex-1">
                           <div className="text-xs text-gray-500 font-medium">Ngày bắt đầu</div>
-                          <div className="font-medium text-gray-900">{startDate ? new Date(startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
+                          <div className="font-medium text-gray-900">{formatYMDToDisplay(startDate) || 'Chưa chọn'}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-100">
                         <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-bold text-green-700">KT</div>
                         <div className="flex-1">
                           <div className="text-xs text-gray-500 font-medium">Ngày kết thúc</div>
-                          <div className="font-medium text-gray-900">{endDate ? new Date(endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}</div>
+                          <div className="font-medium text-gray-900">{formatYMDToDisplay(endDate) || 'Chưa chọn'}</div>
                         </div>
                       </div>
                     </div>

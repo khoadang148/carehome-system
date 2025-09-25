@@ -75,10 +75,14 @@ export default function FamilyPhotosPage() {
           }
 
           let imageUrl = item.file_path ? photosAPI.getPhotoUrl(item.file_path) : "";
+          // Fallback URL for production
+          const fallbackUrl = item.file_path ? `https://sep490-be-xniz.onrender.com/uploads/${item.file_path.replace(/^uploads\//, '')}` : "";
+          
           const result = {
             ...item,
             id: item._id,
             url: imageUrl,
+            fallbackUrl: fallbackUrl,
             caption: item.caption || "",
             date: item.takenDate
               ? new Date(item.takenDate).toISOString().split("T")[0]
@@ -154,12 +158,24 @@ export default function FamilyPhotosPage() {
   const prevLightbox = () => setLightboxIndex(i => (i !== null && i > 0 ? i - 1 : i));
   const nextLightbox = () => setLightboxIndex(i => (i !== null && i < filteredPhotos.length - 1 ? i + 1 : i));
 
-  const downloadPhoto = async (url: string, name: string) => {
+  const downloadPhoto = async (url: string, name: string, fallbackUrl?: string) => {
     try {
       const accessToken = clientStorage.getItem("access_token");
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
       });
+      
+      // If main URL fails and we have fallback, try fallback
+      if (!response.ok && fallbackUrl) {
+        response = await fetch(fallbackUrl, {
+          headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
+        });
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+      
       const blob = await response.blob();
       const a = document.createElement("a");
       a.href = window.URL.createObjectURL(blob);
@@ -263,7 +279,14 @@ export default function FamilyPhotosPage() {
                       onClick={() => router.push(`/family/photos/${photo.id}`)}
                       className="w-full h-56 object-cover block bg-gray-100 rounded-2xl cursor-pointer transition-transform duration-200 group-hover:scale-105"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        const img = e.currentTarget as HTMLImageElement;
+                        // Try fallback URL first
+                        if (photo.fallbackUrl && img.src !== photo.fallbackUrl) {
+                          img.src = photo.fallbackUrl;
+                          return;
+                        }
+                        // If fallback also fails, show placeholder
+                        img.style.display = 'none';
                         const placeholder = document.createElement('div');
                         placeholder.innerHTML = `
                           <div class="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-gray-500 text-sm font-medium">
@@ -277,12 +300,12 @@ export default function FamilyPhotosPage() {
                             </div>
                           </div>
                         `;
-                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                        img.parentNode?.appendChild(placeholder.firstElementChild!);
                       }}
                     />
 
                     <button
-                      onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg")}
+                      onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg", photo.fallbackUrl)}
                       className="absolute top-3 right-3 bg-gradient-to-br from-white to-slate-50 border-2 border-red-500 rounded-lg text-red-500 p-2 cursor-pointer text-base font-medium shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-gradient-to-br hover:from-red-500 hover:to-red-600 hover:text-white hover:-translate-y-1 hover:scale-105 hover:shadow-xl"
                       title="Tải ảnh xuống"
                     >
@@ -326,6 +349,13 @@ export default function FamilyPhotosPage() {
             alt={filteredPhotos[lightboxIndex].caption}
             className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-white object-contain"
             onClick={e => e.stopPropagation()}
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              // Try fallback URL first
+              if (filteredPhotos[lightboxIndex].fallbackUrl && img.src !== filteredPhotos[lightboxIndex].fallbackUrl) {
+                img.src = filteredPhotos[lightboxIndex].fallbackUrl;
+              }
+            }}
           />
 
           <button
@@ -347,7 +377,7 @@ export default function FamilyPhotosPage() {
                 Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString("vi-VN")}
               </div>
               <button
-                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || "photo.jpg"); }}
+                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || "photo.jpg", filteredPhotos[lightboxIndex].fallbackUrl); }}
                 className="mt-5 bg-gradient-to-r from-red-500 to-orange-400 text-white border-none rounded-2xl py-3 px-8 font-bold text-lg cursor-pointer shadow-lg transition-all duration-200 hover:from-red-500 hover:to-orange-500"
                 title="Tải ảnh này"
               >

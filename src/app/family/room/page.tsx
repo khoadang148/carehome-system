@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { roomsAPI, bedsAPI, roomTypesAPI, serviceRequestsAPI, residentAPI, bedAssignmentsAPI } from "@/lib/api";
@@ -38,20 +39,49 @@ interface RoomType {
 export default function FamilyRoomPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [beds, setBeds] = useState<Bed[]>([]);
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  // SWR data sources
+  const { data: rooms = [], isLoading: roomsLoading } = useSWR<Room[]>(
+    'rooms:list',
+    () => roomsAPI.getAll(),
+    { revalidateOnFocus: true }
+  );
+  const { data: beds = [], isLoading: bedsLoading } = useSWR<Bed[]>(
+    'beds:list',
+    () => bedsAPI.getAll(),
+    { revalidateOnFocus: true }
+  );
+  const { data: roomTypes = [], isLoading: roomTypesLoading } = useSWR<RoomType[]>(
+    'roomTypes:list',
+    () => roomTypesAPI.getAll(),
+    { revalidateOnFocus: true }
+  );
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [bedsByRoom, setBedsByRoom] = useState<Record<string, Bed[]>>({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingRoomChangeRequest, setPendingRoomChangeRequest] = useState<any>(null);
   const [allResidentsHavePendingRequests, setAllResidentsHavePendingRequests] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [serviceRequestsData, setServiceRequestsData] = useState<any[]>([]);
-  const [residents, setResidents] = useState<any[]>([]);
+  const { data: serviceRequestsData = [], isLoading: serviceRequestsLoading, mutate: mutateServiceRequests } = useSWR<any[]>(
+    user?.id ? ['serviceRequests:mine', user.id] : null,
+    () => serviceRequestsAPI.getMyRequests(),
+    { revalidateOnFocus: true }
+  );
+  const { data: residents = [], isLoading: residentsLoading, mutate: mutateResidents } = useSWR<any[]>(
+    user?.id ? ['familyResidents', user.id] : null,
+    () => residentAPI.getByFamilyMemberId(user?.id || ''),
+    { revalidateOnFocus: true }
+  );
   const [bedAssignments, setBedAssignments] = useState<any[]>([]);
+
+  // Stable keys to avoid effect loops on changing array identities
+  const residentsIdsKey = Array.isArray(residents) ? residents.map((r: any) => r._id).join(',') : '';
+  const pendingRequestsKey = Array.isArray(serviceRequestsData)
+    ? serviceRequestsData
+        .filter((request: any) => request.request_type === 'room_change' && request.status === 'pending')
+        .map((r: any) => r._id || r.id)
+        .join(',')
+    : '';
 
   useEffect(() => {
     if (!user) {
@@ -67,98 +97,65 @@ export default function FamilyRoomPage() {
     }
   }, [user, router]);
 
+  // Compute pending request and pending state when data changes (guard against loops)
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        console.log('Loading family room data..');
-        
-        const [roomsData, bedsData, typesData, serviceRequestsData, residentsData] = await Promise.all([
-          roomsAPI.getAll(),
-          bedsAPI.getAll(),
-          roomTypesAPI.getAll(),
-          serviceRequestsAPI.getMyRequests(),
-          residentAPI.getByFamilyMemberId(user?.id || '')
-        ]);
-        
-        console.log('Family room data received:', { roomsData, serviceRequestsData });
-        
-        setRooms(roomsData || []);
-        setBeds(bedsData || []);
-        setRoomTypes(typesData || []);
-        setServiceRequestsData(serviceRequestsData || []);
-        setResidents(Array.isArray(residentsData) ? residentsData : []);
-        
-        // Load bed assignments for each resident individually (family users can only access their own residents' assignments)
-        if (Array.isArray(residentsData) && residentsData.length > 0) {
-          const assignmentsPromises = residentsData.map(resident => 
-            bedAssignmentsAPI.getByResidentId(resident._id)
-          );
-          const assignmentsResults = await Promise.all(assignmentsPromises);
-          const allAssignments = assignmentsResults.flat();
-          setBedAssignments(allAssignments);
-        } else {
-          setBedAssignments([]);
-        }
-        
-        // Check for pending room change request
-        const pendingRequest = (serviceRequestsData || []).find((request: any) => 
-          request.request_type === 'room_change' && request.status === 'pending'
-        );
-        setPendingRoomChangeRequest(pendingRequest || null);
+    const nextPending = (serviceRequestsData || []).find((request: any) =>
+      request.request_type === 'room_change' && request.status === 'pending'
+    ) || null;
+    setPendingRoomChangeRequest((prev: any) => {
+      const prevId = prev?._id || prev?.id || null;
+      const nextId = nextPending?._id || nextPending?.id || null;
+      return prevId !== nextId ? nextPending : prev;
+    });
 
-        // Check if all residents have pending room change requests
-        const residentsList = Array.isArray(residentsData) ? residentsData : [];
-        const pendingRequests = (serviceRequestsData || []).filter((request: any) => 
-          request.request_type === 'room_change' && request.status === 'pending'
+    const residentsList = Array.isArray(residents) ? residents : [];
+    const pendingRequests = (serviceRequestsData || []).filter((request: any) =>
+      request.request_type === 'room_change' && request.status === 'pending'
+    );
+    const nextAllHavePending = residentsList.length > 0
+      ? residentsList.every((resident: any) =>
+          new Set(pendingRequests.map((r: any) => r.resident_id?._id || r.resident_id)).has(resident._id)
+        )
+      : false;
+    setAllResidentsHavePendingRequests(prev => (prev !== nextAllHavePending ? nextAllHavePending : prev));
+  }, [residentsIdsKey, pendingRequestsKey]);
+
+  // Load bed assignments when residents list changes (avoid redundant updates)
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!Array.isArray(residents) || residents.length === 0) {
+        setBedAssignments(prev => (prev.length > 0 ? [] : prev));
+        return;
+      }
+      try {
+        const assignmentsPromises = residents.map((resident: any) =>
+          bedAssignmentsAPI.getByResidentId(resident._id)
         );
-        
-        if (residentsList.length > 0) {
-          const residentsWithPendingRequests = new Set(
-            pendingRequests.map((request: any) => request.resident_id?._id || request.resident_id)
-          );
-          const allHavePending = residentsList.every((resident: any) => 
-            residentsWithPendingRequests.has(resident._id)
-          );
-          setAllResidentsHavePendingRequests(allHavePending);
-        } else {
-          setAllResidentsHavePendingRequests(false);
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading family room data:', error);
-        setError("Không thể tải dữ liệu phòng/giường.");
-        setLoading(false);
+        const assignmentsResults = await Promise.all(assignmentsPromises);
+        const allAssignments = assignmentsResults.flat();
+        setBedAssignments(prev => (prev.length !== allAssignments.length ? allAssignments : prev));
+      } catch {
+        setBedAssignments(prev => (prev.length > 0 ? [] : prev));
       }
     };
 
-    if (user?.id) {
-      loadData();
-    }
-  }, [user?.id]);
+    loadAssignments();
+  }, [residentsIdsKey]);
 
   // Function to refresh service requests
   const refreshServiceRequests = async () => {
     setRefreshing(true);
     try {
       console.log('Refreshing service requests...');
-      const [serviceRequestsData, residentsData] = await Promise.all([
-        serviceRequestsAPI.getMyRequests(),
-        residentAPI.getByFamilyMemberId(user?.id || '')
+      const [newServiceRequests, newResidents] = await Promise.all([
+        mutateServiceRequests(),
+        mutateResidents()
       ]);
-      console.log('Refreshed service requests:', serviceRequestsData);
-      
-      const pendingRequest = (serviceRequestsData || []).find((request: any) => 
-        request.request_type === 'room_change' && request.status === 'pending'
-      );
-      setPendingRoomChangeRequest(pendingRequest || null);
-      setServiceRequestsData(serviceRequestsData || []);
-      setResidents(Array.isArray(residentsData) ? residentsData : []);
-      
-      // Load bed assignments for each resident individually
-      if (Array.isArray(residentsData) && residentsData.length > 0) {
-        const assignmentsPromises = residentsData.map(resident => 
+
+      const listResidents = Array.isArray(newResidents) ? newResidents : (residents || []);
+      // Reload bed assignments for each resident individually
+      if (Array.isArray(listResidents) && listResidents.length > 0) {
+        const assignmentsPromises = listResidents.map((resident: any) =>
           bedAssignmentsAPI.getByResidentId(resident._id)
         );
         const assignmentsResults = await Promise.all(assignmentsPromises);
@@ -166,24 +163,6 @@ export default function FamilyRoomPage() {
         setBedAssignments(allAssignments);
       } else {
         setBedAssignments([]);
-      }
-
-      // Check if all residents have pending room change requests
-      const residentsList = Array.isArray(residentsData) ? residentsData : [];
-      const pendingRequests = (serviceRequestsData || []).filter((request: any) => 
-        request.request_type === 'room_change' && request.status === 'pending'
-      );
-      
-      if (residentsList.length > 0) {
-        const residentsWithPendingRequests = new Set(
-          pendingRequests.map((request: any) => request.resident_id?._id || request.resident_id)
-        );
-        const allHavePending = residentsList.every((resident: any) => 
-          residentsWithPendingRequests.has(resident._id)
-        );
-        setAllResidentsHavePendingRequests(allHavePending);
-      } else {
-        setAllResidentsHavePendingRequests(false);
       }
     } catch (error) {
       console.error('Error refreshing service requests:', error);
@@ -206,7 +185,7 @@ export default function FamilyRoomPage() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
@@ -223,41 +202,41 @@ export default function FamilyRoomPage() {
   const getCurrentRoomAndBed = (residentId: string) => {
     // Tìm bed assignment active cho resident này
     const assignment = bedAssignments.find(ba => {
-      const baResidentId = typeof ba.resident_id === 'string' 
-        ? ba.resident_id 
+      const baResidentId = typeof ba.resident_id === 'string'
+        ? ba.resident_id
         : ba.resident_id?._id || ba.resident_id;
       return baResidentId === residentId && !ba.unassigned_date;
     });
-    
+
     if (!assignment) return { room: null, bed: null };
-    
+
     // Backend đã populate bed_id với room_id, nên ta có thể lấy trực tiếp
     if (assignment.bed_id && typeof assignment.bed_id === 'object') {
       const bed = assignment.bed_id;
       const room = bed.room_id && typeof bed.room_id === 'object' ? bed.room_id : null;
       return { room, bed };
     }
-    
+
     // Fallback: tìm trong beds array nếu assignment.bed_id chỉ là string
-    const bed = assignment.bed_id ? 
+    const bed = assignment.bed_id ?
       beds.find(b => {
-        const bedId = typeof assignment.bed_id === 'string' 
-          ? assignment.bed_id 
+        const bedId = typeof assignment.bed_id === 'string'
+          ? assignment.bed_id
           : assignment.bed_id?._id || assignment.bed_id;
         return b._id === bedId;
       }) : null;
-    
+
     if (!bed) return { room: null, bed: null };
-    
+
     // Lấy room từ bed
-    const room = bed.room_id ? 
+    const room = bed.room_id ?
       rooms.find(r => {
-        const bedRoomId = typeof bed.room_id === 'string' 
-          ? bed.room_id 
+        const bedRoomId = typeof bed.room_id === 'string'
+          ? bed.room_id
           : (bed.room_id as any)?._id || bed.room_id;
         return r._id === bedRoomId;
       }) : null;
-    
+
     return { room, bed };
   };
 
@@ -292,6 +271,7 @@ export default function FamilyRoomPage() {
 
   // Bỏ các biến thống kê không dùng
 
+  const loading = roomsLoading || bedsLoading || roomTypesLoading || serviceRequestsLoading || residentsLoading;
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
       <div className="text-center">
@@ -342,97 +322,97 @@ export default function FamilyRoomPage() {
 
         {/* Thông báo yêu cầu đổi phòng đang chờ duyệt */}
         {(() => {
-          const pendingRequests = serviceRequestsData.filter((request: any) => 
+          const pendingRequests = serviceRequestsData.filter((request: any) =>
             request.request_type === 'room_change' && request.status === 'pending'
           );
           return pendingRequests.length > 0;
         })() && (
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
-                <ClockIcon className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-bold text-amber-800 mb-1">
-                  Yêu cầu đổi phòng đang chờ duyệt
-                </h3>
-                <div className="space-y-2">
-                  {(() => {
-                    const pendingRequests = serviceRequestsData.filter((request: any) => 
-                      request.request_type === 'room_change' && request.status === 'pending'
-                    );
-                    return pendingRequests.map((request: any, index: number) => {
-                      const residentName = request.resident_id?.full_name || 
-                        (typeof request.resident_id === 'string' ? 
-                          residents.find(r => r._id === request.resident_id)?.full_name : 
-                          'Người cao tuổi'
-                        );
-                      
-                      const residentId = request.resident_id?._id || request.resident_id;
-                      const { room: currentRoom, bed: currentBed } = getCurrentRoomAndBed(residentId);
-                      
-                      return (
-                        <div key={index} className="text-xs text-amber-700">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
-                            <span className="text-amber-800 font-medium">Người cao tuổi:</span>
-                            <strong>{residentName}</strong>
-                          </div>
-                          <div className="ml-3 text-amber-600 space-y-1">
-                            <div className="flex items-center gap-1">
-                              <span>Phòng hiện tại:</span>
-                              <span className="font-medium">
-                                {currentRoom?.room_number || 'Chưa có'}
-                                {currentBed?.bed_number && ` - Giường ${currentBed.bed_number}`}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span>→ Phòng muốn chuyển:</span>
-                              <span className="font-medium">
-                                {(() => {
-                                  // Debug log để xem dữ liệu
-                                  console.log('Debug - request.target_room_id:', request.target_room_id);
-                                  console.log('Debug - request.target_bed_id:', request.target_bed_id);
-                                  
-                                  const roomNumber = request.target_room_id?.room_number || 
-                                    (typeof request.target_room_id === 'string' ? 
-                                      rooms.find(r => r._id === request.target_room_id)?.room_number : 
-                                      null);
-                                  
-                                  const bedNumber = request.target_bed_id?.bed_number || 
-                                    (typeof request.target_bed_id === 'string' ? 
-                                      beds.find(b => b._id === request.target_bed_id)?.bed_number : 
-                                      null);
-                                  
-                                  if (roomNumber) {
-                                    return bedNumber ? `${roomNumber} - Giường ${bedNumber}` : roomNumber;
-                                  }
-                                  return 'Chưa xác định';
-                                })()}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span>Ngày gửi yêu cầu:</span>
-                              <span className="font-medium">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</span>
-                            </div>
-                          </div>
-                  </div>
-                      );
-                    });
-                  })()}
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                  <ClockIcon className="w-4 h-4 text-white" />
                 </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-amber-800 mb-1">
+                    Yêu cầu đổi phòng đang chờ duyệt
+                  </h3>
+                  <div className="space-y-2">
+                    {(() => {
+                      const pendingRequests = serviceRequestsData.filter((request: any) =>
+                        request.request_type === 'room_change' && request.status === 'pending'
+                      );
+                      return pendingRequests.map((request: any, index: number) => {
+                        const residentName = request.resident_id?.full_name ||
+                          (typeof request.resident_id === 'string' ?
+                            residents.find(r => r._id === request.resident_id)?.full_name :
+                            'Người cao tuổi'
+                          );
+
+                        const residentId = request.resident_id?._id || request.resident_id;
+                        const { room: currentRoom, bed: currentBed } = getCurrentRoomAndBed(residentId);
+
+                        return (
+                          <div key={index} className="text-xs text-amber-700">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
+                              <span className="text-amber-800 font-medium">Người cao tuổi:</span>
+                              <strong>{residentName}</strong>
+                            </div>
+                            <div className="ml-3 text-amber-600 space-y-1">
+                              <div className="flex items-center gap-1">
+                                <span>Phòng hiện tại:</span>
+                                <span className="font-medium">
+                                  {currentRoom?.room_number || 'Chưa có'}
+                                  {currentBed?.bed_number && ` - Giường ${currentBed.bed_number}`}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span>→ Phòng muốn chuyển:</span>
+                                <span className="font-medium">
+                                  {(() => {
+                                    // Debug log để xem dữ liệu
+                                    console.log('Debug - request.target_room_id:', request.target_room_id);
+                                    console.log('Debug - request.target_bed_id:', request.target_bed_id);
+
+                                    const roomNumber = request.target_room_id?.room_number ||
+                                      (typeof request.target_room_id === 'string' ?
+                                        rooms.find(r => r._id === request.target_room_id)?.room_number :
+                                        null);
+
+                                    const bedNumber = request.target_bed_id?.bed_number ||
+                                      (typeof request.target_bed_id === 'string' ?
+                                        beds.find(b => b._id === request.target_bed_id)?.bed_number :
+                                        null);
+
+                                    if (roomNumber) {
+                                      return bedNumber ? `${roomNumber} - Giường ${bedNumber}` : roomNumber;
+                                    }
+                                    return 'Chưa xác định';
+                                  })()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span>Ngày gửi yêu cầu:</span>
+                                <span className="font-medium">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+                <button
+                  onClick={refreshServiceRequests}
+                  disabled={refreshing}
+                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-xs font-medium transition-colors duration-200 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ArrowPathIcon className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? '...' : 'Cập nhật'}
+                </button>
               </div>
-              <button
-                onClick={refreshServiceRequests}
-                disabled={refreshing}
-                className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-xs font-medium transition-colors duration-200 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ArrowPathIcon className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? '...' : 'Cập nhật'}
-              </button>
             </div>
-          </div>
-        )}
+          )}
 
 
         {/* Đã bỏ phần thống kê theo yêu cầu */}
@@ -499,10 +479,10 @@ export default function FamilyRoomPage() {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${room.gender === "male"
-                            ? "bg-blue-100 text-blue-800"
-                            : room.gender === "female"
-                              ? "bg-pink-100 text-pink-800"
-                              : "bg-gray-100 text-gray-800"
+                          ? "bg-blue-100 text-blue-800"
+                          : room.gender === "female"
+                            ? "bg-pink-100 text-pink-800"
+                            : "bg-gray-100 text-gray-800"
                           }`}>
                           {room.gender === "male" ? "Nam" : room.gender === "female" ? "Nữ" : "Hỗn hợp"}
                         </span>
@@ -512,8 +492,8 @@ export default function FamilyRoomPage() {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`px-4 py-2 rounded-full text-sm font-bold ${room.status === "available"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
                           }`}>
                           {room.status === "available" ? "Còn trống" : "Hết giường"}
                         </span>
@@ -521,8 +501,8 @@ export default function FamilyRoomPage() {
                       <td className="px-6 py-4 text-center">
                         <button
                           className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center gap-2 mx-auto ${selectedRoomId === room._id
-                              ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30"
-                              : "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                            ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30"
+                            : "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                             }`}
                           onClick={() => setSelectedRoomId(selectedRoomId === room._id ? null : room._id)}
                         >
@@ -640,13 +620,13 @@ export default function FamilyRoomPage() {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className={`px-4 py-2 rounded-full text-sm font-bold ${bed.status === "occupied"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-green-100 text-green-800"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-green-100 text-green-800"
                               }`}>
                               {bed.status === "occupied" ? "Đang sử dụng" : "Còn trống"}
                             </span>
                           </td>
-                          
+
                         </tr>
                       ))}
                     </tbody>
@@ -675,27 +655,27 @@ export default function FamilyRoomPage() {
 
         {/* Call to Action Section - Only show if not all residents have pending requests */}
         {!allResidentsHavePendingRequests && (
-        <div className="mt-8 bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 rounded-2xl p-8 shadow-lg border border-orange-200">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25">
-              <HomeIcon className="w-8 h-8 text-white" />
+          <div className="mt-8 bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 rounded-2xl p-8 shadow-lg border border-orange-200">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25">
+                <HomeIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-4">
+                Muốn đổi phòng cho người cao tuổi?
+              </h3>
+              <p className="text-slate-600 mb-6 max-w-2xl mx-auto leading-relaxed">
+                Nếu bạn muốn đổi phòng cho người cao tuổi, hãy gửi yêu cầu đổi phòng.
+                Chúng tôi sẽ xem xét và thông báo kết quả trong thời gian sớm nhất.
+              </p>
+              <button
+                onClick={() => router.push('/family/room-change-request')}
+                className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-red-700 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300 flex items-center gap-3 mx-auto hover:-translate-y-1"
+              >
+                <HomeIcon className="w-6 h-6" />
+                Đổi phòng/giường
+              </button>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-4">
-              Muốn đổi phòng cho người cao tuổi?
-            </h3>
-            <p className="text-slate-600 mb-6 max-w-2xl mx-auto leading-relaxed">
-              Nếu bạn muốn đổi phòng cho người cao tuổi, hãy gửi yêu cầu đổi phòng. 
-              Chúng tôi sẽ xem xét và thông báo kết quả trong thời gian sớm nhất.
-            </p>
-            <button
-              onClick={() => router.push('/family/room-change-request')}
-              className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-red-700 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300 flex items-center gap-3 mx-auto hover:-translate-y-1"
-            >
-              <HomeIcon className="w-6 h-6" />
-              Đổi phòng/giường
-            </button>
           </div>
-        </div>
         )}
       </div>
     </div>

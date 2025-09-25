@@ -1320,7 +1320,7 @@ function FamilyPortalPageContent() {
 
               </div>
             </div>
-            <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-xl border border-white/20 overflow-hidden w-full">
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-xl border border-white/20 w-full">
               <Tab.Group selectedIndex={activeTab} onChange={handleTabChange}>
                 <Tab.List className="flex bg-gradient-to-r from-slate-50 to-slate-200 border-b border-white/20">
                   <Tab className={({ selected }) =>

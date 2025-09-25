@@ -396,6 +396,52 @@ export default function ServiceDetailsPage() {
     });
   };
 
+  // Format a YYYY-MM-DD string as local date to avoid UTC shift in JS Date parsing
+  const formatLocalYMDToDisplay = (ymd: string | undefined | null) => {
+    if (!ymd || typeof ymd !== 'string') return 'N/A';
+    const parts = ymd.split('-');
+    if (parts.length !== 3) return 'N/A';
+    const [yStr, mStr, dStr] = parts;
+    const y = Number(yStr);
+    const m = Number(mStr);
+    const d = Number(dStr);
+    if (!y || !m || !d) return 'N/A';
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('vi-VN');
+  };
+
+  // Resolve and format date from multiple possible field names and formats
+  const resolveRequestDate = (request: any, candidateFields: string[]) => {
+    if (!request) return 'N/A';
+    const raw = candidateFields.map((f) => request?.[f]).find((v) => !!v);
+    if (!raw) return 'N/A';
+    if (typeof raw === 'string') {
+      // If YYYY-MM-DD use local YMD formatter
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatLocalYMDToDisplay(raw);
+      // If ISO string, take date part to avoid timezone shifting
+      if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return formatLocalYMDToDisplay(raw.slice(0, 10));
+      const dt = new Date(raw);
+      if (!isNaN(dt.getTime())) return dt.toLocaleDateString('vi-VN');
+      return 'N/A';
+    }
+    return 'N/A';
+  };
+
+  // Given a date string (YYYY-MM-DD or ISO), return the last day of that month in local time
+  const endOfMonthFromDateString = (dateStr: string | undefined | null) => {
+    if (!dateStr || typeof dateStr !== 'string') return 'N/A';
+    const base = /^\d{4}-\d{2}-\d{2}T/.test(dateStr)
+      ? dateStr.slice(0, 10)
+      : dateStr;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(base)) return 'N/A';
+    const [yStr, mStr] = base.split('-');
+    const y = Number(yStr);
+    const m = Number(mStr);
+    if (!y || !m) return 'N/A';
+    const eom = new Date(y, m, 0);
+    return eom.toLocaleDateString('vi-VN');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'active':
@@ -496,7 +542,8 @@ export default function ServiceDetailsPage() {
         acc[key] = {
           ...request,
           count: 1,
-          planNames: [] // Array to store all plan names
+          planNames: [], // For care_plan_change
+          affectedPlans: [] // For service_date_change: [{name, oldEndDate}]
         };
       } else {
         acc[key].count += 1;
@@ -509,6 +556,19 @@ export default function ServiceDetailsPage() {
         if (planName && !acc[key].planNames.includes(planName)) {
           acc[key].planNames.push(planName);
         }
+      } else if (request.request_type === 'service_date_change') {
+        // Enrich with the current expiring/expired plans for this resident
+        const details = carePlanDetails
+          .map((cp: any) => ({
+            plan: cp,
+            assignment: getAssignmentForCarePlan(cp._id)
+          }))
+          .filter(({ assignment }) => assignment && (isCarePlanExpired(assignment) || isCarePlanExpiringSoon(assignment)))
+          .map(({ plan, assignment }) => ({
+            name: plan?.plan_name || 'Gói dịch vụ',
+            oldEndDate: assignment?.end_date || null
+          }));
+        acc[key].affectedPlans = details;
       }
       
       return acc;
@@ -609,119 +669,194 @@ export default function ServiceDetailsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Pending Request Notification */}
         {hasPendingServiceRequests() && (
-          <div className="mb-4 bg-blue-100 rounded-xl p-4 shadow-lg border border-blue-200">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md flex-shrink-0">
-                <ClockIcon className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-blue-800 mb-2">
-                  ⏳ Yêu cầu đang chờ duyệt
-                </h3>
-                <p className="text-blue-700 text-sm font-medium mb-3">
-                  Bạn đã gửi yêu cầu cho {selectedRelative?.full_name || selectedRelative?.name || 'người thân'}. 
-                  Yêu cầu đang được quản trị viên xem xét.
-                </p>
-                <div className="space-y-3">
-                   {getPendingServiceRequests().map((request: any, index: number) => (
-                     <div key={index} className="bg-white rounded-md p-3 border border-blue-200 shadow-sm">
-                       {/* Header với loại yêu cầu (compact) */}
-                       <div className="flex items-center justify-between mb-1.5">
-                         <div className="flex items-center gap-2">
-                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                             request.request_type === 'service_date_change'
-                               ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                               : 'bg-purple-100 text-purple-800 border border-purple-200'
-                           }`}>
-                             {request.request_type === 'service_date_change' ? 'Gia hạn gói dịch vụ' : 'Đổi gói dịch vụ'}
-                             {request.count > 1 && ` (${request.count} gói)`}
-                           </span>
-                         </div>
-                       </div>
+          <div className="mb-6 rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50 via-indigo-50 to-white shadow-[0_10px_30px_-12px_rgba(30,64,175,0.35)]">
+            <div className="px-5 py-4 sm:px-6 sm:py-5">
+              <div className="flex items-start gap-4">
+                <div className="relative flex-shrink-0">
+                  <div className="w-11 h-11 rounded-xl bg-white shadow-md ring-1 ring-blue-100 flex items-center justify-center">
+                    <ClockIcon className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow">
+                    {getPendingServiceRequests().length}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-extrabold tracking-tight text-blue-900">
+                        Yêu cầu của bạn đang được xem xét
+                      </h3>
+                      <p className="mt-0.5 text-xs sm:text-sm font-medium text-blue-800/90">
+                        Đang xử lý cho {selectedRelative?.full_name || selectedRelative?.name || 'người thân'}. Vui lòng chờ thông báo tiếp theo.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        Chờ duyệt
+                      </span>
+                    </div>
+                  </div>
 
-                       {/* Nội dung chi tiết (more compact grid) */}
-                       {request.request_type === 'care_plan_change' ? (
-                         <>
-                           <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
-                             {/* Gói mới */}
-                             <div className="col-span-12 md:col-span-5">
-                               <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Gói mới</div>
-                               <div className="flex flex-wrap gap-1.5">
-                                 {(() => {
-                                   const names: string[] = (() => {
-                                     if (request.planNames && request.planNames.length > 0) return request.planNames;
-                                     if (request.target_service_package_id?.plan_name) return [request.target_service_package_id.plan_name];
-                                     const id = typeof request.target_service_package_id === 'string' ? request.target_service_package_id : '';
-                                     return id && targetPlanNames[id] ? [targetPlanNames[id]] : ['N/A'];
-                                   })();
-                                   return names.map((n, i) => (
-                                     <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[11px] font-medium">
-                                       {n}
-                                     </span>
-                                   ));
-                                 })()}
-                               </div>
-                             </div>
+                  <div className="mt-4 space-y-3">
+                    {getPendingServiceRequests().map((request: any, index: number) => (
+                      <div
+                        key={index}
+                        className="group rounded-xl border border-blue-200/70 bg-white/90 p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[12px] sm:text-[13px] font-extrabold ${
+                                request.request_type === 'service_date_change' ? 'text-amber-700' : 'text-violet-700'
+                              }`}
+                            >
+                              {request.request_type === 'service_date_change' ? 'Gia hạn gói dịch vụ' : 'Đổi gói dịch vụ'}
+                              {request.count > 1 && ` (${request.count} gói)`}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-medium text-gray-500">
+                            Gửi ngày {request.createdAt ? new Date(request.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+                          </span>
+                        </div>
 
-                             {/* Phòng/Giường */}
-                             <div className="col-span-12 md:col-span-3 md:border-l md:border-blue-100 md:pl-2 min-w-0">
-                               <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Phòng/Giường</div>
-                               <div className="text-gray-900 font-medium truncate" title={(() => {
-                                 const roomNo = typeof request.target_room_id === 'object' ? request.target_room_id?.room_number : (typeof request.target_room_id === 'string' ? targetRoomsById[request.target_room_id]?.room_number : undefined);
-                                 const bedNo = typeof request.target_bed_id === 'object' ? request.target_bed_id?.bed_number : (typeof request.target_bed_id === 'string' ? targetBedsById[request.target_bed_id]?.bed_number : undefined);
-                                 if (roomNo || bedNo) return `Phòng ${roomNo || 'N/A'}${bedNo ? ` – Giường ${bedNo}` : ''}`;
-                                 return 'Giữ phòng/giường cũ';
-                               })()}>
-                                 {(() => {
-                                   const roomNo = typeof request.target_room_id === 'object' ? request.target_room_id?.room_number : (typeof request.target_room_id === 'string' ? targetRoomsById[request.target_room_id]?.room_number : undefined);
-                                   const bedNo = typeof request.target_bed_id === 'object' ? request.target_bed_id?.bed_number : (typeof request.target_bed_id === 'string' ? targetBedsById[request.target_bed_id]?.bed_number : undefined);
-                                   if (roomNo || bedNo) return `Phòng ${roomNo || 'N/A'}${bedNo ? ` – Giường ${bedNo}` : ''}`;
-                                   return 'Giữ phòng/giường cũ';
-                                 })()}
-                               </div>
-                             </div>
+                        <div className="mt-2 pt-2 border-t border-dashed border-blue-100">
+                          {request.request_type === 'care_plan_change' ? (
+                            <div className="grid grid-cols-12 gap-3 md:gap-4">
+                              <div className="col-span-12 md:col-span-5">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Gói mới</div>
+                                <div className="space-y-1.5">
+                                  {(() => {
+                                    const names: string[] = (() => {
+                                      if (request.planNames && request.planNames.length > 0) return request.planNames;
+                                      if (request.target_service_package_id?.plan_name) return [request.target_service_package_id.plan_name];
+                                      const id = typeof request.target_service_package_id === 'string' ? request.target_service_package_id : '';
+                                      return id && targetPlanNames[id] ? [targetPlanNames[id]] : ['N/A'];
+                                    })();
+                                    return names.map((n, i) => (
+                                      <div key={i} className="text-blue-700 text-sm font-medium">- {n}</div>
+                                    ));
+                                  })()}
+                                </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-3 md:border-l md:border-blue-100 md:pl-3 min-w-0">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Phòng/Giường</div>
+                                <div
+                                  className="text-gray-900 font-medium truncate"
+                                  title={(() => {
+                                    const targetRoom = typeof request.target_room_id === 'object' ? request.target_room_id?.room_number : (typeof request.target_room_id === 'string' ? targetRoomsById[request.target_room_id]?.room_number : undefined);
+                                    const targetBed = typeof request.target_bed_id === 'object' ? request.target_bed_id?.bed_number : (typeof request.target_bed_id === 'string' ? targetBedsById[request.target_bed_id]?.bed_number : undefined);
+                                    const currentRoom = roomNumber && !String(roomNumber).toLowerCase().includes('chưa') ? roomNumber : undefined;
+                                    const currentBed = bedNumber && !String(bedNumber).toLowerCase().includes('chưa') ? bedNumber : undefined;
+                                    const roomNo = targetRoom || currentRoom;
+                                    const bedNo = targetBed || currentBed;
+                                    if (roomNo || bedNo) return `Phòng ${roomNo || 'N/A'}${bedNo ? ` – Giường ${bedNo}` : ''}`;
+                                    return 'Giữ phòng/giường cũ';
+                                  })()}
+                                >
+                                  {(() => {
+                                    const targetRoom = typeof request.target_room_id === 'object' ? request.target_room_id?.room_number : (typeof request.target_room_id === 'string' ? targetRoomsById[request.target_room_id]?.room_number : undefined);
+                                    const targetBed = typeof request.target_bed_id === 'object' ? request.target_bed_id?.bed_number : (typeof request.target_bed_id === 'string' ? targetBedsById[request.target_bed_id]?.bed_number : undefined);
+                                    const currentRoom = roomNumber && !String(roomNumber).toLowerCase().includes('chưa') ? roomNumber : undefined;
+                                    const currentBed = bedNumber && !String(bedNumber).toLowerCase().includes('chưa') ? bedNumber : undefined;
+                                    const roomNo = targetRoom || currentRoom;
+                                    const bedNo = targetBed || currentBed;
+                                    if (roomNo || bedNo) return `Phòng ${roomNo || 'N/A'}${bedNo ? ` – Giường ${bedNo}` : ''}`;
+                                    return 'Giữ phòng/giường cũ';
+                                  })()}
+                                </div>
+                              </div>
+                              <div className="col-span-6 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày bắt đầu</div>
+                                <div className="text-gray-900 font-semibold">
+                                  {request.new_start_date ? new Date(request.new_start_date).toLocaleDateString('vi-VN') : 'N/A'}
+                                </div>
+                              </div>
+                              <div className="col-span-6 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày kết thúc</div>
+                                <div className="text-gray-900 font-semibold">
+                                  {request.new_end_date ? new Date(request.new_end_date).toLocaleDateString('vi-VN') : 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-12 gap-3 md:gap-4">
+                              <div className="col-span-12 md:col-span-5">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Gói áp dụng</div>
+                                <div className="space-y-1.5">
+                                  {(request.affectedPlans || []).length > 0 ? (
+                                    request.affectedPlans.map((p: any, i: number) => (
+                                      <div key={i} className="text-blue-700 text-sm font-medium">
+                                        - {p.name}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-[11px] text-gray-500">Các gói sắp hết hạn hiện tại</div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Thời gian gia hạn</div>
+                                <div className="text-gray-900 font-semibold">
+                                  {(() => {
+                                    try {
+                                      const newEnd = request?.new_end_date ? new Date(request.new_end_date) : null;
+                                      const oldDates = (request?.affectedPlans || [])
+                                        .map((p: any) => p?.oldEndDate)
+                                        .filter((d: any) => !!d)
+                                        .map((d: any) => new Date(d));
+                                      if (!newEnd || oldDates.length === 0) return 'N/A';
+                                      const minOld = new Date(Math.min.apply(null, oldDates.map((d: Date) => d.getTime())));
+                                      const diffDays = Math.max(0, Math.ceil((newEnd.getTime() - minOld.getTime()) / (1000 * 60 * 60 * 24)));
+                                      const months = Math.max(1, Math.round(diffDays / 30));
+                                      return `${months} tháng`;
+                                    } catch {
+                                      return 'N/A';
+                                    }
+                                  })()}
+                                </div>
+                              </div>
+                              <div className="col-span-6 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày bắt đầu</div>
+                                <div className="text-gray-900 font-semibold">
+                                  {resolveRequestDate(request, ['new_start_date', 'newStartDate', 'start_date', 'startDate'])}
+                                </div>
+                              </div>
+                              <div className="col-span-6 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
+                                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày hết hạn</div>
+                                <div className="text-gray-900 font-semibold">
+                                  {(() => {
+                                    const src =
+                                      request?.new_end_date ||
+                                      request?.newEndDate ||
+                                      request?.end_date ||
+                                      request?.endDate ||
+                                      request?.new_start_date ||
+                                      request?.newStartDate;
+                                    return endOfMonthFromDateString(src);
+                                  })()}
+                                </div>
+                              </div>
+                              {/* Ghi chú đã được yêu cầu bỏ */}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-                             {/* Bắt đầu */}
-                             <div className="col-span-6 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
-                               <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày bắt đầu</div>
-                               <div className="text-gray-900 font-semibold">
-                                 {request.new_start_date ? new Date(request.new_start_date).toLocaleDateString('vi-VN') : 'N/A'}
-                               </div>
-                             </div>
-
-                             {/* Kết thúc */}
-                             <div className="col-span-6 md:col-span-2 md:border-l md:border-blue-100 md:pl-3">
-                               <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày kết thúc</div>
-                               <div className="text-gray-900 font-semibold">
-                                 {request.new_end_date ? new Date(request.new_end_date).toLocaleDateString('vi-VN') : 'N/A'}
-                               </div>
-                             </div>
-                           </div>
-                           {/* Footer: Ngày gửi */}
-                           <div className="mt-2 text-right text-[11px] text-gray-500">
-                             <span>Ngày gửi: </span>
-                             <span className="font-medium text-gray-700">{request.createdAt ? new Date(request.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</span>
-                           </div>
-                         </>
-                       ) : (
-                         <>
-                           <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
-                             <div className="col-span-12 md:col-span-3">
-                               <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày hết hạn mới</div>
-                               <div className="text-gray-900 font-semibold">
-                                 {request.new_end_date ? new Date(request.new_end_date).toLocaleDateString('vi-VN') : 'N/A'}
-                               </div>
-                             </div>
-                           </div>
-                           {/* Footer: Ngày gửi */}
-                           <div className="mt-2 text-right text-[11px] text-gray-500">
-                             <span>Ngày gửi: </span>
-                             <span className="font-medium text-gray-700">{request.createdAt ? new Date(request.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</span>
-                           </div>
-                         </>
-                       )}
-                     </div>
-                  ))}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push('/family/services')}
+                        className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 shadow-sm"
+                      >
+                        <ArrowLeftIcon className="w-4 h-4" />
+                        Quay lại danh sách
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1259,6 +1394,14 @@ function BulkExtensionModal({
   const [submitting, setSubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const { user } = useAuth();
+  
+  // Format YYYY-MM-DD in local time to avoid timezone shift
+  const formatLocalYMD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
 
   // Get all expiring/expired care plans
   const expiringCarePlans = carePlanDetails.filter((carePlan: any) => {
@@ -1292,13 +1435,24 @@ function BulkExtensionModal({
         const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
         const currentEndDate = new Date(carePlanAssignment?.end_date || new Date());
         const extensionMonths = parseInt(extensionPeriod);
-        const newEndDate = new Date(currentEndDate.getTime() + (extensionMonths * 30 * 24 * 60 * 60 * 1000)); // Ước tính 30 ngày/tháng
+
+        // Theo yêu cầu: thời gian bắt đầu của gia hạn = ngày kết thúc gói cũ (local)
+        const newStartDate = formatLocalYMD(currentEndDate);
+
+        // Ngày hết hạn mới luôn là ngày cuối cùng của tháng đích sau khi cộng extensionMonths
+        const targetMonthEnd = new Date(
+          currentEndDate.getFullYear(),
+          currentEndDate.getMonth() + extensionMonths + 1,
+          0
+        );
+        const newEndDateStr = formatLocalYMD(targetMonthEnd);
         
         return serviceRequestsAPI.create({
           resident_id: residentId,
           family_member_id: user?.id || '',
           request_type: 'service_date_change',
-          new_end_date: newEndDate.toISOString().split('T')[0],
+          new_start_date: newStartDate,
+          new_end_date: newEndDateStr,
           note: `${note} (Gia hạn gói: ${carePlan.plan_name} thêm ${extensionPeriod} tháng)`,
           emergencyContactName: userProfile?.full_name || user?.name || '',
           emergencyContactPhone: userProfile?.phone || user?.phone || ''

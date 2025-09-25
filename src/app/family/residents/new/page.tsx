@@ -139,19 +139,10 @@ export default function FamilyNewResidentPage() {
   const [cccdBackFile, setCccdBackFile] = useState<File | null>(null);
   const [cccdFrontPreview, setCccdFrontPreview] = useState<string>('');
   const [cccdBackPreview, setCccdBackPreview] = useState<string>('');
-  const [userCccdFrontFile, setUserCccdFrontFile] = useState<File | null>(null);
-  const [userCccdBackFile, setUserCccdBackFile] = useState<File | null>(null);
 
   // Sử dụng thông tin tài khoản hiện tại hay nhập mới
   const [useExistingAccount, setUseExistingAccount] = useState<boolean>(false);
   const [accountProfile, setAccountProfile] = useState<any | null>(null);
-  const [accountCccdIdInput, setAccountCccdIdInput] = useState<string>('');
-  const [accountCccdFrontFile, setAccountCccdFrontFile] = useState<File | null>(null);
-  const [accountCccdBackFile, setAccountCccdBackFile] = useState<File | null>(null);
-  const [accountCccdFrontPreview, setAccountCccdFrontPreview] = useState<string>('');
-  const [accountCccdBackPreview, setAccountCccdBackPreview] = useState<string>('');
-  const [userCccdFrontPreview, setUserCccdFrontPreview] = useState<string>('');
-  const [userCccdBackPreview, setUserCccdBackPreview] = useState<string>('');
 
   // Success modal state
   const [successOpen, setSuccessOpen] = useState<boolean>(false);
@@ -164,7 +155,6 @@ export default function FamilyNewResidentPage() {
         if (!user?.id) return;
         const profile = await userAPI.getById(user.id);
         setAccountProfile(profile);
-        if (profile?.cccd_id) setAccountCccdIdInput(profile.cccd_id);
       } catch (e) {
         // ignore
       }
@@ -271,53 +261,7 @@ export default function FamilyNewResidentPage() {
     }
   };
 
-  const handleAccountCccdFrontChange = (file: File | null) => {
-    const f = handleLimitedImage(file, 'CCCD trước (tài khoản)');
-    setAccountCccdFrontFile(f);
-    if (f) {
-      const reader = new FileReader();
-      reader.onload = () => setAccountCccdFrontPreview(reader.result as string);
-      reader.readAsDataURL(f);
-    } else {
-      setAccountCccdFrontPreview('');
-    }
-  };
 
-  const handleAccountCccdBackChange = (file: File | null) => {
-    const f = handleLimitedImage(file, 'CCCD sau (tài khoản)');
-    setAccountCccdBackFile(f);
-    if (f) {
-      const reader = new FileReader();
-      reader.onload = () => setAccountCccdBackPreview(reader.result as string);
-      reader.readAsDataURL(f);
-    } else {
-      setAccountCccdBackPreview('');
-    }
-  };
-
-  const handleUserCccdFrontChange = (file: File | null) => {
-    const f = handleLimitedImage(file, 'CCCD trước (bạn)');
-    setUserCccdFrontFile(f);
-    if (f) {
-      const reader = new FileReader();
-      reader.onload = () => setUserCccdFrontPreview(reader.result as string);
-      reader.readAsDataURL(f);
-    } else {
-      setUserCccdFrontPreview('');
-    }
-  };
-
-  const handleUserCccdBackChange = (file: File | null) => {
-    const f = handleLimitedImage(file, 'CCCD sau (bạn)');
-    setUserCccdBackFile(f);
-    if (f) {
-      const reader = new FileReader();
-      reader.onload = () => setUserCccdBackPreview(reader.result as string);
-      reader.readAsDataURL(f);
-    } else {
-      setUserCccdBackPreview('');
-    }
-  };
 
   const fileToDataUrl = (file: File | null): Promise<string | null> => {
     return new Promise((resolve) => {
@@ -408,39 +352,7 @@ export default function FamilyNewResidentPage() {
         return;
       }
 
-      // Xử lý 2 trường hợp thông tin người liên hệ (family)
-      let finalUserCccdId = data.user_cccd_id;
-      if (useExistingAccount) {
-        const hasCccdId = !!accountProfile?.cccd_id || !!accountCccdIdInput;
-        const hasFrontImg = !!accountProfile?.cccd_front;
-        const hasBackImg = !!accountProfile?.cccd_back;
-
-        // Bắt buộc có CCCD ID (từ hồ sơ hoặc nhập mới)
-        if (!hasCccdId || !(accountProfile?.cccd_id || /^\d{12}$/.test(accountCccdIdInput))) {
-          toast.error('Vui lòng nhập CCCD của bạn (12 số) để tiếp tục');
-          return;
-        }
-
-        // Nếu hồ sơ thiếu ảnh -> yêu cầu tải ảnh, nhưng KHÔNG cập nhật tài khoản
-        const needFront = !hasFrontImg && !accountCccdFrontFile;
-        const needBack = !hasBackImg && !accountCccdBackFile;
-        if (needFront || needBack) {
-          toast.error('Vui lòng tải đủ ảnh CCCD (trước/sau) của bạn');
-          return;
-        }
-
-        finalUserCccdId = accountProfile?.cccd_id || accountCccdIdInput;
-      } else {
-        // Nhập mới đầy đủ: yêu cầu CCCD cho người liên hệ + ảnh
-      if (!data.user_cccd_id || !/^\d{12}$/.test(data.user_cccd_id)) {
-        toast.error('CCCD của bạn phải gồm đúng 12 chữ số');
-        return;
-      }
-        if (!userCccdFrontFile || !userCccdBackFile) {
-          toast.error('Vui lòng tải đủ ảnh CCCD (trước/sau) của bạn');
-          return;
-        }
-      }
+      // Không cần xử lý CCCD cho người liên hệ khẩn cấp
 
       // Ảnh CCCD resident bắt buộc
       if (!cccdFrontFile || !cccdBackFile) {
@@ -482,28 +394,6 @@ export default function FamilyNewResidentPage() {
         formData.append('admission_date', convertDDMMYYYYToISO(formatDateToDisplay(data.admission_date)));
       }
 
-      // Nếu dùng thông tin tài khoản hiện có: cập nhật thông tin CCCD của user (nếu có thay đổi/thiếu)
-      if (useExistingAccount) {
-        const shouldUpdateUser = (
-          (!!accountCccdIdInput && /^\d{12}$/.test(accountCccdIdInput) && accountProfile?.cccd_id !== accountCccdIdInput) ||
-          !accountProfile?.cccd_front ||
-          !accountProfile?.cccd_back ||
-          !!accountCccdFrontFile ||
-          !!accountCccdBackFile
-        );
-        if (shouldUpdateUser) {
-          try {
-            await userAPI.uploadMyCccd({
-              cccd_id: accountCccdIdInput || accountProfile?.cccd_id,
-              cccd_front: accountCccdFrontFile || undefined,
-              cccd_back: accountCccdBackFile || undefined,
-            });
-          } catch (e) {
-            toast.error('Cập nhật CCCD cho tài khoản thất bại');
-            return;
-          }
-        }
-      }
 
       // Gửi đăng ký resident ngay
       try {
@@ -816,8 +706,8 @@ export default function FamilyNewResidentPage() {
 
                 <div className="md:col-span-2 flex items-center justify-between p-4 rounded-lg bg-amber-50 border border-amber-200">
                   <div className="text-sm">
-                    <div className="font-semibold text-amber-900">Sử dụng thông tin tài khoản hiện tại</div>
-                    <div className="text-amber-800">Nếu thiếu CCCD, hệ thống sẽ yêu cầu bổ sung</div>
+                    <div className="font-semibold text-amber-900">Sử dụng thông tin tài khoản đăng nhập hiện tại</div>
+                   
                   </div>
                   <label className="inline-flex items-center cursor-pointer">
                     <input type="checkbox" checked={useExistingAccount} onChange={(e) => setUseExistingAccount(e.target.checked)} className="sr-only peer" />
@@ -901,139 +791,6 @@ export default function FamilyNewResidentPage() {
                   )}
                 </div>
 
-                {useExistingAccount ? (
-                  <>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">CCCD của bạn (12 số) <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        key="account-cccd-input"
-                        value={accountCccdIdInput}
-                        onChange={(e) => setAccountCccdIdInput(e.target.value)}
-                        className={`w-full p-3 border-2 rounded-lg text-sm outline-none transition-colors duration-200 ${(!accountCccdIdInput || !/^\d{12}$/.test(accountCccdIdInput)) ? 'border-red-200' : 'border-gray-200'} bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100`}
-                        placeholder="Nhập 12 chữ số"
-                      />
-                      {accountProfile?.cccd_id && (
-                        <p className="mt-1 text-xs text-emerald-600">Đã có CCCD trong hồ sơ</p>
-                      )}
-                    </div>
-                    {!accountProfile?.cccd_front && (
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Tải ảnh CCCD của bạn - Mặt trước</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleAccountCccdFrontChange(e.target.files?.[0] || null)} className="w-full p-3 border-2 border-gray-200 rounded-lg" />
-                        {accountCccdFrontPreview && (
-                          <div className="mt-3">
-                            <img src={accountCccdFrontPreview} alt="CCCD trước (tài khoản)" className="h-28 rounded-lg border border-gray-200 object-cover" />
-                          </div>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">Ảnh rõ nét, không lóa</p>
-                      </div>
-                    )}
-                    {!accountProfile?.cccd_back && (
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Tải ảnh CCCD của bạn - Mặt sau</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleAccountCccdBackChange(e.target.files?.[0] || null)} className="w-full p-3 border-2 border-gray-200 rounded-lg" />
-                        {accountCccdBackPreview && (
-                          <div className="mt-3">
-                            <img src={accountCccdBackPreview} alt="CCCD sau (tài khoản)" className="h-28 rounded-lg border border-gray-200 object-cover" />
-                          </div>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">Ảnh rõ nét, không lóa</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">CCCD của người liên hệ khẩn cấp (12 số) <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                        key="manual-cccd-input"
-                    className={`w-full p-3 border-2 rounded-lg text-sm outline-none transition-colors duration-200 ${errors.user_cccd_id ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'}`}
-                    placeholder="Nhập 12 chữ số"
-                        {...register('user_cccd_id', { required: !useExistingAccount ? 'CCCD của bạn là bắt buộc' : false as any, pattern: { value: /^\d{12}$/, message: 'Phải gồm đúng 12 chữ số' } })}
-                  />
-                  {errors.user_cccd_id && (<p className="mt-2 text-sm text-red-500 font-medium">{errors.user_cccd_id.message}</p>)}
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Ảnh CCCD của người liên hệ khẩn cấp - Mặt trước <span className="text-red-500">*</span></label>
-                  <input type="file" accept="image/*" onChange={(e) => handleUserCccdFrontChange(e.target.files?.[0] || null)} className="w-full p-3 border-2 border-gray-200 rounded-lg" />
-                  {userCccdFrontPreview && (
-                    <div className="mt-3">
-                      <img src={userCccdFrontPreview} alt="CCCD trước (bạn)" className="h-28 rounded-lg border border-gray-200 object-cover" />
-                    </div>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">Ảnh rõ nét, không lóa</p>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Ảnh CCCD của người liên hệ khẩn cấp - Mặt sau <span className="text-red-500">*</span></label>
-                  <input type="file" accept="image/*" onChange={(e) => handleUserCccdBackChange(e.target.files?.[0] || null)} className="w-full p-3 border-2 border-gray-200 rounded-lg" />
-                  {userCccdBackPreview && (
-                    <div className="mt-3">
-                      <img src={userCccdBackPreview} alt="CCCD sau (bạn)" className="h-28 rounded-lg border border-gray-200 object-cover" />
-                    </div>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">Ảnh rõ nét, không lóa</p>
-                </div>
-                  </>
-                )}
-                {useExistingAccount && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Ảnh CCCD của bạn</label>
-                    <div className="flex items-start gap-4">
-                      <div>
-                        <div className="text-xs text-gray-500 mb-1">Mặt trước</div>
-                        <div className="w-40 h-28 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center">
-                          {(() => {
-                            const { proxyUrl, remoteUrl } = buildFileUrls(accountProfile?.cccd_front);
-                            const src = proxyUrl || remoteUrl;
-                            if (src) {
-                              return (
-                                <a href={remoteUrl || src} target="_blank" rel="noreferrer">
-                                  <img
-                                    src={src}
-                                    onError={(e) => { if (remoteUrl) (e.currentTarget as HTMLImageElement).src = remoteUrl; }}
-                                    alt="CCCD trước (tài khoản)"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </a>
-                              );
-                            }
-                            if (accountCccdFrontPreview) {
-                              return <img src={accountCccdFrontPreview} alt="CCCD trước (tải lên)" className="w-full h-full object-cover" />;
-                            }
-                            return <div className="text-xs text-gray-400">Chưa có ảnh</div>;
-                          })()}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500 mb-1">Mặt sau</div>
-                        <div className="w-40 h-28 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center">
-                          {(() => {
-                            const { proxyUrl, remoteUrl } = buildFileUrls(accountProfile?.cccd_back);
-                            const src = proxyUrl || remoteUrl;
-                            if (src) {
-                              return (
-                                <a href={remoteUrl || src} target="_blank" rel="noreferrer">
-                                  <img
-                                    src={src}
-                                    onError={(e) => { if (remoteUrl) (e.currentTarget as HTMLImageElement).src = remoteUrl; }}
-                                    alt="CCCD sau (tài khoản)"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </a>
-                              );
-                            }
-                            if (accountCccdBackPreview) {
-                              return <img src={accountCccdBackPreview} alt="CCCD sau (tải lên)" className="w-full h-full object-cover" />;
-                            }
-                            return <div className="text-xs text-gray-400">Chưa có ảnh</div>;
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
              
