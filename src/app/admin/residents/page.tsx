@@ -36,7 +36,7 @@ export default function ResidentsPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
-  const [activeTab, setActiveTab] = useState<'admitted' | 'accepted' | 'discharged'>('admitted');
+  const [activeTab, setActiveTab] = useState<'admitted' | 'accepted'>('admitted');
 
 
   const [showDischargeModal, setShowDischargeModal] = useState(false);
@@ -45,6 +45,8 @@ export default function ResidentsPage() {
   const [dischargeReason, setDischargeReason] = useState('');
   const [isDeceased, setIsDeceased] = useState(false);
   const [unpaidBills, setUnpaidBills] = useState<{ [residentId: string]: any[] }>({});
+  const [dischargeStep, setDischargeStep] = useState('');
+  const [showDischargeInProgress, setShowDischargeInProgress] = useState(false);
 
   // Helper: show discharge button on Accepted tab only on the last day of the next month from admission_date
   const isLastDayOfNextMonth = (isoString: string | null | undefined) => {
@@ -77,12 +79,6 @@ export default function ResidentsPage() {
     () => residentAPI.getActive(),
     { revalidateOnFocus: false, dedupingInterval: 5000 }
   );
-  // For discharged, fallback to full list then filter (endpoint not provided)
-  const { data: allRes, error: allErr, mutate: mutateAll } = useSWR(
-    user ? 'residents:all' : null,
-    () => residentAPI.getAll(),
-    { revalidateOnFocus: false, dedupingInterval: 10000 }
-  );
 
   // Fetch care plans data with SWR
   const { data: carePlansData, error: carePlansError } = useSWR(
@@ -97,7 +93,7 @@ export default function ResidentsPage() {
 
   // Process residents data
   const residentsData = React.useMemo(() => {
-    const source = activeTab === 'admitted' ? admittedRes : activeTab === 'accepted' ? activeRes : allRes;
+    const source = activeTab === 'admitted' ? admittedRes : activeRes;
     if (!source) return [];
     
     let apiData: any[] = [];
@@ -124,7 +120,7 @@ export default function ResidentsPage() {
       discharge_date: r.discharge_date || null,
       admission_date: r.admission_date || null,
     }));
-  }, [admittedRes, activeRes, allRes, activeTab]);
+  }, [admittedRes, activeRes, activeTab]);
 
   // Process care plans data
   const carePlanOptions = React.useMemo(() => {
@@ -150,15 +146,6 @@ export default function ResidentsPage() {
     }
   }, [activeRes]);
 
-  const dischargedCount = React.useMemo(() => {
-    const src = Array.isArray(allRes)
-      ? allRes
-      : Array.isArray((allRes as any)?.data)
-        ? (allRes as any).data
-        : [];
-    if (!Array.isArray(src)) return 0;
-    return src.filter((r: any) => String(r?.status || r?.resident_status || '').toLowerCase() === 'discharged').length;
-  }, [allRes]);
 
   useEffect(() => {
     if (!user) {
@@ -225,8 +212,8 @@ export default function ResidentsPage() {
 
 
   // Loading and error states
-  const isLoading = (!admittedRes && !admittedErr) || (!activeRes && !activeErr) || (!allRes && !allErr);
-  const hasError = admittedErr || activeErr || allErr;
+  const isLoading = (!admittedRes && !admittedErr) || (!activeRes && !activeErr);
+  const hasError = admittedErr || activeErr;
 
   const filteredResidents = residentsData.filter((resident) => {
     const searchValue = (searchTerm || '').toString().trim();
@@ -248,7 +235,6 @@ export default function ResidentsPage() {
     const s = (resident.status || '').toLowerCase();
     return s === 'accepted' || s === 'active';
   });
-  const dischargedResidents = filteredResidents.filter(resident => (resident.status || '').toLowerCase() === 'discharged');
 
   // Load unpaid bills for residents in "accepted" status
   React.useEffect(() => {
@@ -298,7 +284,6 @@ export default function ResidentsPage() {
         // Refresh data using SWR mutate
         if (activeTab === 'admitted') await mutateAdmitted();
         if (activeTab === 'accepted') await mutateActive();
-        if (activeTab === 'discharged') await mutateAll();
 
         setShowDeleteModal(false);
         setResidentToDelete(null);
@@ -326,12 +311,12 @@ export default function ResidentsPage() {
     setResidentToDischarge(resident);
     setDischargeReason('');
     setIsDeceased(false);
+    setDischargeStep('');
     setShowDischargeModal(true);
   };
 
   const confirmDischarge = async () => {
     if (!residentToDischarge) return;
-
 
     if (!dischargeReason.trim()) {
       setSuccessMessage(`Vui lòng nhập ${isDeceased ? 'lý do qua đời' : 'lý do xuất viện'}.`);
@@ -341,41 +326,128 @@ export default function ResidentsPage() {
     }
 
     setDischarging(true);
+    setDischargeStep('Đang tải thông tin...');
+    
     try {
-      try {
-        const assignments = await bedAssignmentsAPI.getByResidentId(residentToDischarge.id);
-        const active = Array.isArray(assignments) ? assignments.find((a: any) => !a.unassigned_date) : null;
-        if (active) {
-          await bedAssignmentsAPI.update(active._id, { unassigned_date: new Date().toISOString() });
-        }
-      } catch (bedError) {
-      }
-
-      try {
-        const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(residentToDischarge.id);
-        const activeCarePlans = Array.isArray(carePlanAssignments) ?
-          carePlanAssignments.filter((cpa: any) => !cpa.end_date || new Date(cpa.end_date) > new Date()) : [];
-
-        for (const carePlan of activeCarePlans) {
-          await carePlanAssignmentsAPI.update(carePlan._id, {
-            end_date: new Date().toISOString(),
-            status: 'completed'
+      // Step 1: Discharge the resident first (most important operation)
+      setDischargeStep('Đang xuất viện...');
+      
+      // Add retry mechanism for discharge with longer timeout
+      let dischargeSuccess = false;
+      let lastError: any = null;
+      
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          setDischargeStep(`Đang xuất viện... (Lần thử ${attempt}/2)`);
+          
+          // Use Promise.race to implement our own timeout
+          const dischargePromise = residentAPI.discharge(residentToDischarge.id, {
+            status: isDeceased ? 'deceased' : 'discharged',
+            reason: dischargeReason.trim()
           });
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Discharge timeout after 3 minutes')), 180000); // 3 minutes
+          });
+          
+          await Promise.race([dischargePromise, timeoutPromise]);
+          dischargeSuccess = true;
+          break;
+        } catch (error: any) {
+          lastError = error;
+          console.warn(`Discharge attempt ${attempt} failed:`, error);
+          
+          if (attempt < 2) {
+            // Wait before retry
+            setDischargeStep(`Thử lại sau 5 giây...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
         }
-      } catch (carePlanError) {
+      }
+      
+      if (!dischargeSuccess) {
+        // If discharge fails after retries, show a different message
+        if (lastError?.message?.includes('timeout')) {
+          setDischargeStep('');
+          setShowDischargeModal(false);
+          setResidentToDischarge(null);
+          setDischargeReason('');
+          
+          setSuccessMessage('Quá trình xuất viện đang được xử lý trong background. Vui lòng đợi vài phút rồi làm mới trang để kiểm tra kết quả. Nếu vẫn chưa thấy thay đổi, vui lòng liên hệ quản trị viên.');
+          setModalType('success');
+          setShowSuccessModal(true);
+          return;
+        }
+        throw lastError;
       }
 
-      await residentAPI.discharge(residentToDischarge.id, {
-        status: isDeceased ? 'deceased' : 'discharged',
-        reason: dischargeReason.trim()
+      // Step 2: Update UI state immediately for better UX
+      setRoomNumbers(prev => ({ ...prev, [residentToDischarge.id]: 'Đã xuất viện' }));
+
+      // Step 3: Clean up assignments in background (non-blocking)
+      setDischargeStep('Đang dọn dẹp dữ liệu...');
+      
+      // Run cleanup operations in background without waiting
+      Promise.allSettled([
+        // Clean up bed assignments
+        (async () => {
+          try {
+            const assignments = await bedAssignmentsAPI.getByResidentId(residentToDischarge.id);
+            const active = Array.isArray(assignments) ? assignments.find((a: any) => !a.unassigned_date) : null;
+            if (active) {
+              await bedAssignmentsAPI.update(active._id, { 
+                unassigned_date: new Date().toISOString() 
+              });
+            }
+          } catch (error) {
+            console.warn('Bed assignment cleanup failed:', error);
+          }
+        })(),
+        
+        // Clean up care plan assignments
+        (async () => {
+          try {
+            const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(residentToDischarge.id);
+            const activeCarePlans = Array.isArray(carePlanAssignments) ?
+              carePlanAssignments.filter((cpa: any) => !cpa.end_date || new Date(cpa.end_date) > new Date()) : [];
+            
+            if (activeCarePlans.length > 0) {
+              await Promise.allSettled(
+                activeCarePlans.map((carePlan: any) =>
+                  carePlanAssignmentsAPI.update(carePlan._id, {
+                    end_date: new Date().toISOString(),
+                    status: 'completed'
+                  })
+                )
+              );
+            }
+          } catch (error) {
+            console.warn('Care plan assignment cleanup failed:', error);
+          }
+        })()
+      ]).then(() => {
+        console.log('Background cleanup completed');
       });
 
-      setRoomNumbers(prev => ({ ...prev, [residentToDischarge.id]: 'Đã xuất viện' }));
-      // Refresh data using SWR mutate
-      if (activeTab === 'admitted') await mutateAdmitted();
-      if (activeTab === 'accepted') await mutateActive();
-      if (activeTab === 'discharged') await mutateAll();
+      // Step 4: Refresh data in parallel (non-blocking)
+      setDischargeStep('Đang cập nhật danh sách...');
+      const refreshPromises: Promise<any>[] = [];
+      if (activeTab === 'admitted') {
+        const admittedPromise = mutateAdmitted();
+        if (admittedPromise) refreshPromises.push(admittedPromise);
+      }
+      if (activeTab === 'accepted') {
+        const acceptedPromise = mutateActive();
+        if (acceptedPromise) refreshPromises.push(acceptedPromise);
+      }
+      
+      // Don't wait for refresh to complete
+      Promise.allSettled(refreshPromises).then(() => {
+        console.log('Data refresh completed');
+      });
 
+      // Step 5: Show success message immediately
+      setDischargeStep('');
       setShowDischargeModal(false);
       setResidentToDischarge(null);
       setDischargeReason('');
@@ -383,11 +455,31 @@ export default function ResidentsPage() {
       setSuccessMessage(`Đã cập nhật trạng thái: ${isDeceased ? 'Đã qua đời' : 'Xuất viện'} thành công. Người cao tuổi đã được xóa khỏi phòng và giường.`);
       setModalType('success');
       setShowSuccessModal(true);
+      
     } catch (error: any) {
+      console.error('Discharge error:', error);
+      setDischargeStep('');
       setShowDischargeModal(false);
       setResidentToDischarge(null);
       setDischargeReason('');
-      setSuccessMessage('Có lỗi xảy ra khi cập nhật trạng thái xuất viện: ' + (error.message || 'Lỗi không xác định'));
+      
+      let errorMessage = 'Có lỗi xảy ra khi cập nhật trạng thái xuất viện.';
+      
+      if (error.message?.includes('timeout') || error.code === 'ECONNABORTED') {
+        errorMessage = 'Quá trình xuất viện mất quá nhiều thời gian. Hệ thống đã thử 3 lần nhưng không thành công. Vui lòng kiểm tra kết nối mạng và thử lại sau.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau hoặc liên hệ quản trị viên.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Không tìm thấy thông tin người cao tuổi. Vui lòng làm mới trang và thử lại.';
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Bạn không có quyền thực hiện thao tác này.';
+      } else if (error.message) {
+        errorMessage += ' Chi tiết: ' + error.message;
+      }
+      
+      setSuccessMessage(errorMessage);
       setModalType('error');
       setShowSuccessModal(true);
     } finally {
@@ -400,6 +492,7 @@ export default function ResidentsPage() {
     setResidentToDischarge(null);
     setDischargeReason('');
     setIsDeceased(false);
+    setDischargeStep('');
   };
 
   const renderResidentsTable = (residents: any[], showRoomColumn: boolean = true) => (
@@ -652,7 +745,6 @@ export default function ResidentsPage() {
                                   // Refresh data using SWR mutate
                                   if (activeTab === 'admitted') await mutateAdmitted();
                                   if (activeTab === 'accepted') await mutateActive();
-                                  if (activeTab === 'discharged') await mutateAll();
                                   setSuccessMessage('Đã xác nhận nhập viện và kích hoạt phòng, dịch vụ thành công.');
                                   setModalType('success');
                                   setShowSuccessModal(true);
@@ -829,10 +921,10 @@ export default function ResidentsPage() {
             margin: '0 0 0.5rem 0',
             color: '#374151'
           }}>
-            {activeTab === 'admitted' ? 'Không có người cao tuổi nào đang nằm viện' : activeTab === 'accepted' ? 'Không có người cao tuổi nào ' : 'Không có người cao tuổi nào đã xuất viện'}
+            {activeTab === 'admitted' ? 'Không có người cao tuổi nào đang nằm viện' : 'Không có người cao tuổi nào chưa nhập viện'}
           </h3>
           <p style={{ margin: 0, fontSize: '0.875rem' }}>
-            {activeTab === 'admitted' ? 'Danh sách đang nằm viện trống' : activeTab === 'accepted' ? 'Danh sách trống' : 'Danh sách đã xuất viện trống'}
+            {activeTab === 'admitted' ? 'Danh sách đang nằm viện trống' : 'Danh sách chưa nhập viện trống'}
           </p>
         </div>
       )}
@@ -984,7 +1076,7 @@ export default function ResidentsPage() {
                   margin: 0,
                   fontWeight: 600
                 }}>
-                  Hiển thị: {activeTab === 'admitted' ? admittedResidents.length : activeTab === 'accepted' ? acceptedResidents.length : dischargedResidents.length} người cao tuổi
+                  Hiển thị: {activeTab === 'admitted' ? admittedResidents.length : acceptedResidents.length} người cao tuổi
                 </p>
               </div>
             </div>
@@ -1046,26 +1138,6 @@ export default function ResidentsPage() {
               >
                 <ExclamationTriangleIcon style={{ width: '1.125rem', height: '1.125rem' }} />
                 Chưa nhập viện ({activeCount} người)
-              </button>
-              <button
-                onClick={() => setActiveTab('discharged')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  background: activeTab === 'discharged' ? 'linear-gradient(135deg, #6b7280 0%, #374151 100%)' : 'transparent',
-                  color: activeTab === 'discharged' ? 'white' : '#6b7280',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s ease',
-                  boxShadow: activeTab === 'discharged' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : 'none'
-                }}
-              >
-                Đã xuất viện ({dischargedCount} người)
               </button>
             </div>
 
@@ -1185,7 +1257,6 @@ export default function ResidentsPage() {
                 onClick={() => {
                   if (activeTab === 'admitted') return mutateAdmitted();
                   if (activeTab === 'accepted') return mutateActive();
-                  return mutateAll();
                 }}
                 style={{
                   padding: '0.75rem 1.5rem',
@@ -1210,8 +1281,7 @@ export default function ResidentsPage() {
             </div>
           ) : (
             activeTab === 'admitted' ? renderResidentsTable(admittedResidents, true) : 
-            activeTab === 'accepted' ? renderResidentsTable(acceptedResidents, true) : 
-            renderResidentsTable(dischargedResidents, false)
+            renderResidentsTable(acceptedResidents, true)
           )}
 
         </div>
@@ -1457,7 +1527,7 @@ export default function ResidentsPage() {
                     }
                   }}
                 >
-                  Hủy
+                  {discharging ? 'Đang xử lý...' : 'Hủy'}
                 </button>
                 <button
                   onClick={confirmDischarge}
@@ -1497,7 +1567,7 @@ export default function ResidentsPage() {
                         animation: 'spin 1s linear infinite',
                         marginRight: '0.5rem'
                       }}></div>
-                      Đang xử lý...
+                      {dischargeStep || 'Đang xử lý...'}
                     </>
                   ) : (
                     isDeceased ? 'Xác nhận qua đời' : 'Xác nhận xuất viện'

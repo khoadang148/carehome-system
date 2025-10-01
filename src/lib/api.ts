@@ -851,8 +851,53 @@ export const residentAPI = {
   // Discharge resident (discharged or deceased)
   discharge: async (id: string, dischargeData: { status: 'discharged' | 'deceased'; reason: string }) => {
     try {
-      const response = await apiClient.patch(`${endpoints.residents}/${id}/discharge`, dischargeData);
-      return response.data;
+      // Create a custom axios instance with longer timeout for discharge
+      const dischargeClient = axios.create({
+        baseURL: API_BASE_URL,
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: true,
+        timeout: 300000, // 5 minutes timeout for discharge (backend can be slow)
+      });
+
+      // Add request interceptor for auth
+      dischargeClient.interceptors.request.use(
+        (config) => {
+          const token = typeof window !== 'undefined' ? clientStorage.getItem('access_token') : null;
+          if (token && isTokenValid()) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+          return config;
+        },
+        (error) => Promise.reject(error)
+      );
+
+      // Add retry mechanism with exponential backoff
+      const maxRetries = 3;
+      let lastError: any = null;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await dischargeClient.patch(`${endpoints.residents}/${id}/discharge`, dischargeData);
+          return response.data;
+        } catch (error: any) {
+          lastError = error;
+          console.warn(`Discharge API attempt ${attempt} failed:`, error);
+          
+          // Don't retry on client errors (4xx)
+          if (error.response?.status >= 400 && error.response?.status < 500) {
+            throw error;
+          }
+          
+          // Retry on server errors or network issues
+          if (attempt < maxRetries) {
+            const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+            console.log(`Retrying discharge in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      throw lastError;
     } catch (error) {
       throw error;
     }
