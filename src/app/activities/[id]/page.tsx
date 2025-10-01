@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, use, useRef } from 'react';
 import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon, PencilIcon, SparklesIcon, ClipboardDocumentListIcon, UserGroupIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon, EyeIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon, UserPlusIcon } from '@heroicons/react/24/outline';
-import { useResidents } from '@/lib/contexts/residents-context';
+import useSWR from 'swr';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI, staffAPI, bedAssignmentsAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, userAPI, staffAssignmentsAPI, staffAPI, bedAssignmentsAPI, residentAPI, roomsAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
 import ConfirmModal from '@/components/ConfirmModal';
 import NotificationModal from '@/components/NotificationModal';
@@ -15,8 +15,59 @@ import NotificationModal from '@/components/NotificationModal';
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
-  const { residents, loading: residentsLoading, error: residentsError } = useResidents();
   const { user } = useAuth();
+  
+  // Fetch admitted residents data
+  const { data: residentsData, error: residentsError } = useSWR(
+    user ? 'residents:admitted' : null,
+    () => residentAPI.getAdmitted(),
+    { revalidateOnFocus: false, dedupingInterval: 10000 }
+  );
+  
+  // Process residents data to ensure it's an array
+  const residents = React.useMemo(() => {
+    if (!residentsData) return [];
+    return Array.isArray(residentsData) ? residentsData : [];
+  }, [residentsData]);
+
+  // Load room numbers for residents
+  useEffect(() => {
+    if (!residents.length) return;
+
+    const loadRoomNumbers = async () => {
+      const roomNumbersMap: { [residentId: string]: string } = {};
+      
+      const promises = residents.map(async (resident: any) => {
+        try {
+          const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident._id || resident.id);
+          const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+
+          if (bedAssignment?.bed_id?.room_id) {
+            if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
+              roomNumbersMap[resident._id || resident.id] = bedAssignment.bed_id.room_id.room_number;
+            } else {
+              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
+              if (roomId) {
+                const room = await roomsAPI.getById(roomId);
+                roomNumbersMap[resident._id || resident.id] = room?.room_number || 'Chưa xác định';
+              } else {
+                roomNumbersMap[resident._id || resident.id] = 'Chưa xác định';
+              }
+            }
+          } else {
+            roomNumbersMap[resident._id || resident.id] = 'Chưa xác định';
+          }
+        } catch (error) {
+          roomNumbersMap[resident._id || resident.id] = 'Chưa xác định';
+        }
+      });
+
+      await Promise.all(promises);
+      setRoomNumbers(roomNumbersMap);
+    };
+
+    loadRoomNumbers();
+  }, [residents]);
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +85,18 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const [assignedStaffList, setAssignedStaffList] = useState<any[]>([]);
   const [updatingData, setUpdatingData] = useState(false);
   const [newResidentsAdded, setNewResidentsAdded] = useState<number>(0);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const staffAssignedRef = useRef(false);
+  const [roomNumbers, setRoomNumbers] = useState<{ [residentId: string]: string }>({});
+
+  // Force update UI khi staff được gán - sử dụng useRef để tránh infinite loop
+  const prevAssignedStaffLength = useRef(0);
+  useEffect(() => {
+    if (assignedStaffList.length > 0 && assignedStaffList.length !== prevAssignedStaffLength.current) {
+      prevAssignedStaffLength.current = assignedStaffList.length;
+      setRefreshTrigger(prev => prev + 1);
+    }
+  }, [assignedStaffList.length]); // Chỉ theo dõi length thay vì toàn bộ array
 
   const [confirmModal, setConfirmModal] = useState({
     open: false,
@@ -114,9 +177,22 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         setLoading(true);
         setError(null);
         const activityId = id;
-        const apiActivity = await activitiesAPI.getById(activityId);
+        
+        // Parallel loading: fetch activity and participations simultaneously
+        const [apiActivity, participationsData] = await Promise.all([
+          activitiesAPI.getById(activityId),
+          activityParticipationsAPI.getByActivityId(activityId, new Date().toISOString().split('T')[0])
+        ]);
+        
         if (apiActivity) {
-          setActivity(mapActivityFromAPI(apiActivity));
+          const mappedActivity = mapActivityFromAPI(apiActivity);
+          setActivity(mappedActivity);
+          
+          // Set participations immediately if activity is found
+          if (participationsData) {
+            const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
+            setParticipations(cleanedParticipations);
+          }
         } else {
           setError('Không tìm thấy hoạt động');
         }
@@ -132,8 +208,9 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const fetchStaffList = async () => {
       try {
-        // 1) Load all active staff users
+        // Lấy danh sách tất cả staff đang hoạt động
         const users = await staffAPI.getAll();
+
         const allActiveStaff = users.filter((u: any) =>
           u.role === 'staff' &&
           u.status === 'active' &&
@@ -141,47 +218,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           u._id.length === 24
         );
 
-        // 2) Load staff assignments and keep only active ones
-        let assignments: any[] = [];
-        try {
-          assignments = await staffAssignmentsAPI.getAll();
-        } catch (e) {
-          assignments = [];
-        }
-
-        const isAssignmentActive = (a: any) => {
-          if (!a) return false;
-          if (a.status && String(a.status).toLowerCase() === 'expired') return false;
-          if (!a.end_date) return true;
-          const end = new Date(a.end_date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          return end >= today;
-        };
-
-        const activeAssignments = Array.isArray(assignments) ? assignments.filter(isAssignmentActive) : [];
-
-        // 3) Extract staff IDs from active assignments
-        const assignedStaffIds = new Set<string>();
-        for (const a of activeAssignments) {
-          const sid = (a as any)?.staff_id?._id || (a as any)?.staff_id || (a as any)?.staff;
-          if (typeof sid === 'string' && sid.length === 24) {
-            assignedStaffIds.add(sid);
-          }
-        }
-
-        // 4) Filter active staff to those who have assignments
-        const filteredStaff = allActiveStaff.filter((u: any) => assignedStaffIds.has(u._id));
-        const uniqueStaff = Array.from(new Map(filteredStaff.map((u: any) => [u._id, u])).values());
-
-        setStaffList(uniqueStaff.map((u: any) => ({
+        // Hiển thị tất cả staff đang hoạt động
+        setStaffList(allActiveStaff.map((u: any) => ({
           id: u._id,
           name: u.full_name,
           role: u.role,
           position: u.position || 'Nhân viên'
         })));
       } catch (error) {
-        
+        console.error('Error fetching staff list:', error);
       }
     };
     fetchStaffList();
@@ -207,11 +252,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       }
     });
 
-    for (const duplicate of duplicates) {
+    // Batch delete duplicates for better performance
+    if (duplicates.length > 0) {
       try {
-        await activityParticipationsAPI.delete(duplicate._id);
+        await Promise.all(duplicates.map(duplicate => 
+          activityParticipationsAPI.delete(duplicate._id).catch(() => {})
+        ));
       } catch (error) {
-        
+        console.error('Error cleaning up duplicates:', error);
       }
     }
 
@@ -223,6 +271,8 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       if (!activity?.id) return;
 
       try {
+        // Only fetch if we don't already have participations data
+        if (participations.length === 0) {
         const participationsData = await activityParticipationsAPI.getByActivityId(
           activity.id,
           activity.date
@@ -230,8 +280,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
         const cleanedParticipations = await cleanupDuplicateParticipations(participationsData);
         setParticipations(cleanedParticipations);
+        }
 
-        const currentActivityParticipations = participationsData.filter((p: any) => {
+        // Process existing participations data
+        const currentActivityParticipations = participations.filter((p: any) => {
           const participationActivityId = p.activity_id?._id || p.activity_id;
           return participationActivityId === activity.id;
         });
@@ -265,11 +317,17 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           }
         }
 
+        // Load staff từ database
         setAssignedStaffList(firstAssignedStaff ? [firstAssignedStaff] : []);
         setCurrentAssignedStaff(firstAssignedStaff);
+        
+        // Set ref nếu có staff được load từ database
+        if (firstAssignedStaff) {
+          staffAssignedRef.current = true;
+        }
 
         const initialEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
-        participationsData.forEach((participation: any) => {
+        participations.forEach((participation: any) => {
           const residentId = participation.resident_id?._id || participation.resident_id;
 
           let status: 'pending' | 'attended' | 'absent' = 'pending';
@@ -290,12 +348,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         });
         setEvaluations(initialEvaluations);
       } catch (error) {
-        
+        console.error('Error fetching participations:', error);
       }
     };
 
     fetchParticipations();
-  }, [activity?.id, refreshTrigger, staffList]);
+  }, [activity?.id, refreshTrigger, staffList, participations]);
 
   const mapActivityFromAPI = (apiActivity: any) => {
     try {
@@ -557,8 +615,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         }
       }
 
+      // Load staff từ database
       setAssignedStaffList(assignedStaff ? [assignedStaff] : []);
       setCurrentAssignedStaff(assignedStaff);
+      
+      // Set ref nếu có staff được load từ database
+      if (assignedStaff) {
+        staffAssignedRef.current = true;
+      }
 
       setEvaluationMode(false);
       setNotificationModal({
@@ -599,12 +663,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     evaluationDate: string;
   };
 
-  const allResidentsForDay: ActivityResident[] = participations
+  // Memoize expensive calculations
+  const allResidentsForDay: ActivityResident[] = React.useMemo(() => {
+    if (!activity?.id || !activityDate) return [];
+    
+    return participations
     .filter((p: any) => {
       const participationActivityId = p.activity_id?._id || p.activity_id;
       const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
-      const isMatch = participationActivityId === activity?.id && activityDate && participationDate === activityDate;
-      return isMatch;
+        return participationActivityId === activity.id && participationDate === activityDate;
     })
     .map((p: any) => {
       const residentId = p.resident_id?._id || p.resident_id;
@@ -622,8 +689,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         evaluationDate: p.date
       };
     });
+  }, [participations, activity?.id, activityDate, residents]);
 
-  const activityResidents: ActivityResident[] = Object.values(
+  const activityResidents: ActivityResident[] = React.useMemo(() => {
+    return Object.values(
     allResidentsForDay.reduce((acc, curr) => {
       const key = curr.id;
       if (!acc[key] || (!curr.participated)) {
@@ -632,8 +701,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       return acc;
     }, {} as { [residentId: string]: ActivityResident })
   );
+  }, [allResidentsForDay]);
 
-  const residentsFromEvaluations: ActivityResident[] = Object.entries(evaluations)
+  const residentsFromEvaluations: ActivityResident[] = React.useMemo(() => {
+    return Object.entries(evaluations)
     .filter(([residentId, evaluation]) => {
       const participation = participations.find((p: any) => {
         const pResidentId = p.resident_id?._id || p.resident_id;
@@ -667,11 +738,17 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         evaluationDate: participation?.date || activity?.date || ''
       };
     });
+  }, [evaluations, participations, activity?.id, activity?.date, residents]);
 
-  const filteredResidents: ActivityResident[] = residentsFromEvaluations.filter((resident: ActivityResident) =>
-    resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (resident.room?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  const filteredResidents: ActivityResident[] = React.useMemo(() => {
+    if (!searchTerm) return residentsFromEvaluations;
+    
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return residentsFromEvaluations.filter((resident: ActivityResident) =>
+      resident.name.toLowerCase().includes(lowerSearchTerm) ||
+      (resident.room?.toLowerCase() || '').includes(lowerSearchTerm)
+    );
+  }, [residentsFromEvaluations, searchTerm]);
 
   const joinedResidentIds = Array.from(new Set(
     participations
@@ -782,8 +859,14 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         }
       }
 
+      // Load staff từ database sau khi xóa
       setAssignedStaffList(removeStaffAssigned ? [removeStaffAssigned] : []);
       setCurrentAssignedStaff(removeStaffAssigned);
+      
+      // Reset ref nếu không còn staff
+      if (!removeStaffAssigned) {
+        staffAssignedRef.current = false;
+      }
 
       const updatedEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
       participationsData.forEach((participation: any) => {
@@ -827,6 +910,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
+
   const handleAssignStaff = async () => {
     console.log('🚀 HANDLE ASSIGN STAFF CALLED:', { selectedStaffId, activityId: activity?.id });
     if (!selectedStaffId || !activity?.id) return;
@@ -864,191 +948,79 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     setAssigningStaff(true);
     setUpdatingData(true);
     try {
-      console.log('📋 Starting staff assignment for staff:', selectedStaffId);
+      console.log('Starting staff assignment for staff:', selectedStaffId);
       
-      // Lấy danh sách staff assignments - sử dụng getMyAssignments nếu là staff hiện tại
-      let staffAssignments = [];
-      if (selectedStaffId === user?.id) {
-        // Nếu chọn chính staff hiện tại, dùng getMyAssignments
-        staffAssignments = await staffAssignmentsAPI.getMyAssignments();
-      } else {
-        // Nếu chọn staff khác, dùng getByStaff
-        staffAssignments = await staffAssignmentsAPI.getByStaff(selectedStaffId);
+      // Đơn giản hóa: Chỉ cập nhật thông tin staff trong state
+      // Không cần tạo participation mới, chỉ cần lưu thông tin staff
+      console.log('Assigning staff to activity:', selectedStaffId);
+      
+      // Tìm thông tin staff được chọn
+      const selectedStaff = staffList.find(staff => staff.id === selectedStaffId);
+      
+      if (!selectedStaff) {
+        setNotificationModal({
+          open: true,
+          title: 'Lỗi',
+          message: 'Không tìm thấy thông tin nhân viên được chọn.',
+          type: 'error'
+        });
+        return;
       }
       
-      console.log('📋 Staff assignments found:', staffAssignments.length);
-      console.log('📋 Raw assignments data:', staffAssignments);
-      
-      // Kiểm tra assignment còn hiệu lực (giống logic trong staff/residents page)
-      const isAssignmentActive = (a: any) => {
-        if (!a) return false;
-        if (a.status && String(a.status).toLowerCase() === 'expired') return false;
-        if (!a.end_date) return true;
-        const end = new Date(a.end_date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return end >= today;
-      };
-      
-      const validAssignments = staffAssignments.filter(isAssignmentActive);
-      console.log('📋 Valid assignments:', validAssignments.length);
-      
-      // Xử lý cả room-based và resident-based assignments
-      const assignedResidentIds: string[] = [];
-      
-      // Detect new room-based shape: item has room_id and residents array
-      const isRoomBased = validAssignments.some((a: any) => a && ((a as any).room_id || (a as any).residents));
-      
-      if (isRoomBased) {
-        console.log('🏠 Room-based assignments detected');
-        // Flatten residents from each assigned room
-        for (const assignment of validAssignments) {
-          const room = (assignment as any).room_id;
-          let residents: any[] = Array.isArray((assignment as any).residents) ? (assignment as any).residents : [];
-          
-          // Fallback: if BE doesn't include residents in assignment, derive from bed assignments by room
-          if ((!residents || residents.length === 0) && room) {
-            try {
-              const bedAssignments = await bedAssignmentsAPI.getAll();
-              if (Array.isArray(bedAssignments)) {
-                const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
-                residents = bedAssignments
-                  .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
-                  .map((ba: any) => ba.resident_id)
-                  .filter(Boolean);
-              }
-            } catch (error) {
-              console.error('Error fetching bed assignments:', error);
-            }
-          }
-          
-          for (const resident of residents) {
-            if (resident?._id) {
-              assignedResidentIds.push(resident._id);
-            }
-          }
-        }
-      } else {
-        console.log('👤 Resident-based assignments detected');
-        // Backward compatibility: resident-based assignments
-        for (const assignment of validAssignments) {
-          const resident = (assignment as any).resident_id;
-          if (resident?._id) {
-            assignedResidentIds.push(resident._id);
-          }
-        }
-      }
-      
-      console.log('👥 Valid resident IDs:', assignedResidentIds);
 
-      const currentActivityParticipations = participations.filter(p => {
+      // Kiểm tra có resident nào trong hoạt động không
+      const currentResidents = participations.filter(p => {
         const participationActivityId = p.activity_id?._id || p.activity_id;
         return participationActivityId === activity.id;
       });
 
-      const currentParticipantIds = currentActivityParticipations.map(p =>
-        p.resident_id?._id || p.resident_id
-      );
-
-      const newResidentIds = assignedResidentIds.filter((residentId: string) =>
-        !currentParticipantIds.includes(residentId)
-      );
-      console.log('➕ New resident IDs to add:', newResidentIds);
-
-      const currentParticipantCount = currentParticipantIds.length;
-      const totalAfterAdding = currentParticipantCount + newResidentIds.length;
-
-      if (totalAfterAdding > activity.capacity) {
-        const canAddCount = activity.capacity - currentParticipantCount;
+      if (currentResidents.length === 0) {
         setNotificationModal({
           open: true,
-          title: 'Cảnh báo',
-          message: `Hoạt động chỉ còn ${canAddCount} chỗ trống, nhưng staff này quản lý ${assignedResidentIds.length} người cao tuổi. Chỉ có thể thêm ${canAddCount} người cao tuổi đầu tiên.`,
+          title: 'Cần thêm người cao tuổi trước',
+          message: 'Vui lòng thêm ít nhất một người cao tuổi vào hoạt động trước khi phân công nhân viên hướng dẫn.',
           type: 'warning'
         });
-
-        newResidentIds.splice(canAddCount);
+        return;
       }
 
-      let addedCount = 0;
-      for (const residentId of newResidentIds) {
-        try {
-          // Validate resident ID format (should be 24 character hex string)
-          if (!residentId || typeof residentId !== 'string' || !residentId.match(/^[0-9a-fA-F]{24}$/)) {
-            console.error('❌ Invalid resident ID format:', residentId);
-            continue;
-          }
-          
-          const participationData = {
-            staff_id: selectedStaffId,
-            activity_id: activity.id,
-            resident_id: residentId,
-            date: activity.date + 'T00:00:00Z',
-            attendance_status: 'pending',
-            performance_notes: ''
-          };
-          
-          await activityParticipationsAPI.create(participationData);
-          addedCount++;
-          console.log('✅ Successfully added resident:', residentId);
+      // Lấy resident đầu tiên để tạo participation
+      const firstResident = currentResidents[0];
+      const residentId = firstResident.resident_id?._id || firstResident.resident_id;
 
-          setNewResidentsAdded(addedCount);
-        } catch (error) {
-          console.error('❌ Error adding resident:', residentId, error);
-        }
-      }
+      // Tạo participation record để lưu staff vào database
+      const participationData = {
+        staff_id: selectedStaffId,
+        activity_id: activity.id,
+        resident_id: residentId,
+        date: activity.date + 'T00:00:00Z',
+        attendance_status: 'pending',
+        performance_notes: 'Staff assignment'
+      };
+      
+      // Lưu vào database
+      await activityParticipationsAPI.create(participationData);
+      
+      // Cập nhật danh sách staff
+      setCurrentAssignedStaff(selectedStaff);
+      setAssignedStaffList([selectedStaff]);
+      
+      // Set ref để bảo vệ state khỏi bị reset
+      staffAssignedRef.current = true;
+      
+      // Force update UI
+      setForceUpdate(prev => prev + 1);
 
-      // Cập nhật staff cho các participation hiện tại
-      for (const participation of currentActivityParticipations) {
-        try {
-          await activityParticipationsAPI.update(participation._id, {
-            staff_id: selectedStaffId
-          });
-        } catch (error) {
-          console.error('❌ Error updating participation:', participation._id, error);
-        }
-      }
-
-      const assignedStaff = staffList.find(staff => staff.id === selectedStaffId);
-      setCurrentAssignedStaff(assignedStaff);
-
+      // Reload participations để cập nhật UI
       const participationsData = await activityParticipationsAPI.getByActivityId(
         activity.id,
         activity.date
       );
       setParticipations(participationsData);
+      
+      console.log(' Participations reloaded:', participationsData.length);
 
-      let thirdAssignedStaff: any = null;
-
-      for (const participation of participationsData) {
-        if (participation.staff_id) {
-          let staffId = participation.staff_id;
-          let staffName = 'Nhân viên chưa xác định';
-          let staffPosition = 'Nhân viên';
-
-          if (typeof participation.staff_id === 'object' && participation.staff_id._id) {
-            staffId = participation.staff_id._id;
-            staffName = participation.staff_id.full_name || staffName;
-            staffPosition = participation.staff_id.position || staffPosition;
-          } else {
-            const foundStaff = staffList.find(staff => staff.id === participation.staff_id);
-            if (foundStaff) {
-              staffName = foundStaff.name;
-              staffPosition = foundStaff.position;
-            }
-          }
-
-          thirdAssignedStaff = {
-            id: staffId,
-            name: staffName,
-            position: staffPosition
-          };
-          break;
-        }
-      }
-
-      setAssignedStaffList(thirdAssignedStaff ? [thirdAssignedStaff] : []);
-
+      // Update evaluations
       const updatedEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
       participationsData.forEach((participation: any) => {
         const residentId = participation.resident_id?._id || participation.resident_id;
@@ -1065,55 +1037,18 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       });
       setEvaluations(updatedEvaluations);
 
+      // Force re-render để đảm bảo UI được cập nhật
       setRefreshTrigger(prev => prev + 1);
-
-      setNewResidentsAdded(0);
 
       setAssignStaffModalOpen(false);
       setSelectedStaffId('');
 
-      // Force refresh the page data
-      setRefreshTrigger(prev => prev + 1);
-      
-      // Reload participations to get updated data
-      const updatedParticipations = await activityParticipationsAPI.getByActivityId(
-        activity.id,
-        activity.date
-      );
-      setParticipations(updatedParticipations);
-      
-      // Update evaluations with new data
-      const newEvaluations: { [key: string]: { status: 'pending' | 'attended' | 'absent', reason?: string } } = {};
-      updatedParticipations.forEach((participation: any) => {
-        const residentId = participation.resident_id?._id || participation.resident_id;
-        const status = participation.attendance_status === 'attended' ? 'attended' :
-          participation.attendance_status === 'absent' ? 'absent' : 'pending';
-        const reason = participation.performance_notes || '';
-
-        if (residentId) {
-          newEvaluations[residentId] = {
-            status,
-            reason
-          };
-        }
-      });
-      setEvaluations(newEvaluations);
-
-      if (addedCount > 0) {
-        setNotificationModal({
-          open: true,
-          title: 'Thành công',
-          message: `Phân công nhân viên hướng dẫn thành công! Đã tự động thêm ${addedCount} người cao tuổi vào hoạt động.`,
-          type: 'success'
-        });
-      } else {
         setNotificationModal({
           open: true,
           title: 'Thành công',
           message: 'Phân công nhân viên hướng dẫn thành công!',
           type: 'success'
         });
-      }
     } catch (error: any) {
       console.error('❌ Error in handleAssignStaff:', error);
       let errorMessage = 'Không thể phân công nhân viên hướng dẫn. Vui lòng thử lại.';
@@ -1136,7 +1071,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  if (loading || residentsLoading) {
+  if (loading || !residentsData) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -1167,13 +1102,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
             color: '#374151',
             marginBottom: '0.5rem'
           }}>
-            {loading ? 'Đang tải thông tin hoạt động...' : 'Đang tải danh sách người cao tuổi...'}
+            Đang tải dữ liệu...
           </h3>
           <p style={{
             fontSize: '0.875rem',
             color: '#6b7280'
           }}>
-            Vui lòng chờ trong giây lát
+            Tối ưu hóa tốc độ tải
           </p>
         </div>
       </div>
@@ -1742,7 +1677,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   }}>
                     <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>Sức chứa: {activity.capacity} người</div>
                     <div style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 500 }}>
-                      Đã đăng ký: {participationCount} người
+                      Số lượng tham gia: {participationCount} người
                       {participationCount >= activity.capacity ? (
                         <span style={{ color: '#ef4444', marginLeft: 8, fontWeight: 600 }}>
                           Đã đạt sức chứa tối đa!
@@ -1753,6 +1688,52 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                         </span>
                       )}
                     </div>
+                    {user?.role === 'admin' && !isActivityTimePassed() && participationCount < activity.capacity && (
+                      <div style={{ marginTop: '0.5rem', display: 'flex' }}>
+                        <Link
+                          href={`/activities/${activity.id}/add-residents`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.375rem',
+                            padding: '0.4rem 0.75rem',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 8px 0 rgba(16, 185, 129, 0.18)',
+                            width: 'fit-content',
+                            minWidth: 0,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <UserPlusIcon style={{ width: '1rem', height: '1rem' }} />
+                          Thêm người cao tuổi và nhân viên vào hoạt động
+                        </Link>
+                      </div>
+                    )}
+                    {user?.role === 'admin' && isActivityTimePassed() && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.75rem',
+                        background: '#f3f4f6',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        marginTop: '0.5rem'
+                      }}>
+                        <ClockIcon style={{ width: '1rem', height: '1rem' }} />
+                        Hoạt động đã qua thời gian - Không thể thêm người cao tuổi
+                      </div>
+                    )}
                   </div>
 
 
@@ -1774,20 +1755,15 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                         Nhân viên hướng dẫn:
                       </div>
                       {(() => {
-                        const canAssign = user?.role === 'admin' && assignedStaffList.length === 0 && !isActivityTimePassed();
-                        console.log('🔘 BUTTON CHECK:', {
-                          userRole: user?.role,
-                          assignedStaffListLength: assignedStaffList.length,
-                          isActivityTimePassed: isActivityTimePassed(),
-                          canAssign: canAssign
+                        const hasResidents = participations.some(p => {
+                          const participationActivityId = p.activity_id?._id || p.activity_id;
+                          return participationActivityId === activity.id;
                         });
+                        const canAssign = user?.role === 'admin' && assignedStaffList.length === 0 && !isActivityTimePassed() && hasResidents;
                         return canAssign;
                       })() && (
                         <button
-                          onClick={() => {
-                            console.log('🖱️ BUTTON CLICKED: Assign staff');
-                            setAssignStaffModalOpen(true);
-                          }}
+                          onClick={() => setAssignStaffModalOpen(true)}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1824,13 +1800,17 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                           Hoạt động đã qua thời gian - Không thể phân công hoặc thay đổi danh sách resident
                         </div>
                       )}
+                     
                     </div>
-                    <div style={{
+                    <div 
+                      key={`staff-display-${refreshTrigger}-${assignedStaffList.length}-${forceUpdate}`}
+                      style={{
                       background: '#f8fafc',
                       borderRadius: '0.5rem',
                       padding: '0.75rem',
                       border: '1px solid #e2e8f0'
-                    }}>
+                      }}
+                    >
                       {assignedStaffList.length > 0 ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
                           <div style={{
@@ -2377,6 +2357,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
 
 
+
       {/* Modal phân công nhân viên hướng dẫn */}
       <Dialog open={assignStaffModalOpen} onClose={() => setAssignStaffModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
@@ -2411,10 +2392,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 Hủy
               </button>
               <button
-                onClick={() => {
-                  console.log('🖱️ MODAL BUTTON CLICKED:', { selectedStaffId, assigningStaff, isActivityTimePassed: isActivityTimePassed() });
-                  handleAssignStaff();
-                }}
+                onClick={handleAssignStaff}
                 className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-semibold"
                 disabled={assigningStaff || !selectedStaffId || isActivityTimePassed()}
               >

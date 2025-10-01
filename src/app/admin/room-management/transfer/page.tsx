@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI, carePlanAssignmentsAPI } from "@/lib/api";
+import { useAuth } from '@/lib/contexts/auth-context';
 import { BuildingOfficeIcon, ArrowLeftIcon, ExclamationTriangleIcon, CheckCircleIcon, ArrowPathIcon, HomeIcon, MapPinIcon, UsersIcon } from '@heroicons/react/24/outline';
 import TransferSuccessModal from '@/components/TransferSuccessModal';
 
@@ -50,6 +51,7 @@ interface RoomType {
 export default function TransferPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
   const [bedAssignments, setBedAssignments] = useState<BedAssignment[]>([]);
@@ -111,10 +113,9 @@ export default function TransferPage() {
         setCurrentBed(currentBedData);
 
         const availableRoomsData = roomsData.filter((r: Room) => {
-          const isNotCurrentRoom = r._id !== roomId;
           const sameGender = r.gender === currentRoomData.gender;
           
-          // Kiểm tra xem phòng có giường trống hay không
+          // Kiểm tra xem phòng có giường trống hay không (cho phép chọn phòng hiện tại nhưng loại trừ chính giường hiện tại)
           const roomBeds = bedsData.filter(bed => {
             const bedRoomId = typeof bed.room_id === 'string'
               ? bed.room_id
@@ -145,9 +146,16 @@ export default function TransferPage() {
             return status;
           });
 
-          const hasAvailableBeds = bedsWithStatus.some(status => status === 'available');
+          const hasAvailableBeds = roomBeds.some(bed => {
+            const assignment = assignmentMap.get(bed._id);
+            const status = assignment && !assignment.unassigned_date ? 'occupied' : 'available';
+            // Nếu là phòng hiện tại thì loại trừ chính giường đang ở
+            const isCurrentRoom = r._id === roomId;
+            const isCurrentBed = isCurrentRoom && currentBedData && bed._id === currentBedData._id;
+            return status === 'available' && !isCurrentBed;
+          });
 
-          return isNotCurrentRoom && sameGender && hasAvailableBeds;
+          return sameGender && hasAvailableBeds;
         });
 
         setAvailableRooms(availableRoomsData);
@@ -228,7 +236,11 @@ export default function TransferPage() {
     if (!selectedRoom) return;
 
     const roomBeds = bedsOfRoom(roomId);
-    const availableBedsData = roomBeds.filter(bed => bed.status === 'available');
+    // Nếu chọn phòng hiện tại, loại trừ giường hiện tại khỏi danh sách trống
+    let availableBedsData = roomBeds.filter(bed => bed.status === 'available');
+    if (currentBed && currentRoom && roomId === currentRoom._id) {
+      availableBedsData = availableBedsData.filter(bed => bed._id !== currentBed._id);
+    }
 
     setSelectedNewRoom(roomId);
     setSelectedNewBed(null);
@@ -254,18 +266,36 @@ export default function TransferPage() {
     setTransferError(null);
 
     try {
+      // Không cho phép chuyển sang đúng giường hiện tại
+      if (currentRoom && currentBed && selectedNewRoom === currentRoom._id && selectedNewBed === currentBed._id) {
+        setTransferError("Vui lòng chọn một giường khác trong phòng hiện tại");
+        return;
+      }
+
+      if (!currentBed.assignment) {
+        throw new Error('Không tìm thấy thông tin phân giường hiện tại');
+      }
+
       if (currentBed.assignment) {
         await bedAssignmentsAPI.update(currentBed.assignment._id, {
-          unassigned_date: new Date().toISOString()
+          unassigned_date: new Date().toISOString(),
+          status: 'exchanged'
         });
       }
 
-      const newAssignment = await bedAssignmentsAPI.create({
+      const payload: any = {
         resident_id: currentBed.assignment.resident_id._id,
         bed_id: selectedNewBed,
         assigned_date: new Date().toISOString(),
-        assigned_by: currentBed.assignment.assigned_by._id
-      });
+        status: 'active'
+      };
+      // set assigned_by theo user hiện tại nếu có quyền (admin/staff); fallback dùng assigned_by cũ nếu tồn tại
+      if (user?.id) {
+        payload.assigned_by = user.id;
+      } else if (currentBed.assignment.assigned_by && currentBed.assignment.assigned_by._id) {
+        payload.assigned_by = currentBed.assignment.assigned_by._id;
+      }
+      const newAssignment = await bedAssignmentsAPI.create(payload);
 
       const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(currentBed.assignment.resident_id._id);
       if (carePlanAssignments.length > 0) {
@@ -382,21 +412,30 @@ export default function TransferPage() {
                     </div>
                     <div>
                       <p className="text-sm text-green-700 font-medium">Phòng hiện tại</p>
-                      <p className="text-lg font-bold text-green-900">
-                        {currentRoom?.room_number} - Tầng {currentRoom?.floor}
-                      </p>
+                      <div className="mt-1">
+                        <div className="text-xs text-slate-500 font-semibold">Số phòng</div>
+                        <p className="text-lg font-bold text-green-900">
+                          {currentRoom?.room_number} - Tầng {currentRoom?.floor}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${currentRoom?.gender === 'male'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-pink-100 text-pink-800'
-                      }`}>
-                      {currentRoom?.gender === 'male' ? 'Nam' : 'Nữ'}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      {getRoomType(currentRoom?.room_type)?.type_name}
-                    </span>
+                  <div className="space-y-1 mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-semibold">Phòng dành cho</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${currentRoom?.gender === 'male'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-pink-100 text-pink-800'
+                        }`}>
+                        {currentRoom?.gender === 'male' ? 'Nam' : 'Nữ'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-semibold">Loại phòng</span>
+                      <span className="text-sm text-gray-700 font-medium">
+                        {getRoomType(currentRoom?.room_type)?.type_name}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -407,15 +446,21 @@ export default function TransferPage() {
                     </div>
                     <div>
                       <p className="text-sm text-purple-700 font-medium">Giường hiện tại</p>
-                      <p className="text-lg font-bold text-purple-900">
-                        {currentBed?.bed_number}
-                      </p>
+                      <div className="mt-1">
+                        <div className="text-xs text-slate-500 font-semibold">Số giường</div>
+                        <p className="text-lg font-bold text-purple-900">
+                          {currentBed?.bed_number}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                    {currentBed?.bed_type === "standard" ? "Tiêu chuẩn" :
-                      currentBed?.bed_type === "electric" ? "Giường điện" : currentBed?.bed_type}
-                  </span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="text-xs text-slate-500 font-semibold">Loại giường</div>
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                      {currentBed?.bed_type === "standard" ? "Tiêu chuẩn" :
+                        currentBed?.bed_type === "electric" ? "Giường điện" : currentBed?.bed_type}
+                    </span>
+                  </div>
                 </div>
 
                 {selectedNewRoom && selectedNewBed && (
@@ -457,27 +502,65 @@ export default function TransferPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {availableRooms.map((room) => {
                     const type = getRoomType(room.room_type);
+                    const isCurrentRoom = currentRoom && room._id === currentRoom._id;
                     return (
                       <button
                         key={room._id}
                         onClick={() => handleRoomSelection(room._id)}
-                        className={`p-6 rounded-xl border-2 transition-all duration-200 text-left ${selectedNewRoom === room._id
-                            ? 'border-blue-500 bg-blue-50 shadow-lg'
-                            : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                        className={`p-5 rounded-xl border-2 transition-all duration-300 text-left relative overflow-hidden group ${selectedNewRoom === room._id
+                            ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-xl shadow-blue-200/50'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-gradient-to-br hover:from-gray-50 hover:to-blue-50 hover:shadow-lg'
                           }`}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-bold text-xl text-gray-900">{room.room_number}</span>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${room.gender === 'male'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-pink-100 text-pink-800'
-                            }`}>
-                            {room.gender === 'male' ? 'Nam' : 'Nữ'}
-                          </span>
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-100/30 to-transparent rounded-full -translate-y-10 translate-x-10" />
+                        <div className="relative z-10">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
+                                <HomeIcon className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xl text-gray-900">Phòng {room.room_number}</span>
+                                {isCurrentRoom && (
+                                  <span className="px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full text-xs font-semibold">Phòng hiện tại</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-600">👥</span>
+                              </div>
+                              <span className="font-medium">Phòng dành cho:</span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${room.gender === 'male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
+                                {room.gender === 'male' ? 'Nam' : 'Nữ'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-600">🏢</span>
+                              </div>
+                              <span className="font-medium">Tầng:</span> {room.floor}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-600">🛏️</span>
+                              </div>
+                              <span className="font-medium">Số giường:</span> {room.bed_count}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-600">🏠</span>
+                              </div>
+                              <span className="font-medium">Loại phòng:</span> {type?.type_name}
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-base text-gray-600 mb-1">Tầng {room.floor}</p>
-                        <p className="text-base text-gray-600 mb-1">{type?.type_name}</p>
-                        <p className="text-base font-medium text-gray-700">{room.bed_count} giường</p>
                       </button>
                     );
                   })}
@@ -506,21 +589,45 @@ export default function TransferPage() {
                       <button
                         key={bed._id}
                         onClick={() => handleBedSelection(bed._id)}
-                        className={`p-6 rounded-xl border-2 transition-all duration-200 text-left ${selectedNewBed === bed._id
-                            ? 'border-green-500 bg-green-50 shadow-lg'
-                            : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                        className={`p-5 rounded-xl border-2 transition-all duration-300 text-left relative overflow-hidden group ${selectedNewBed === bed._id
+                            ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 shadow-xl shadow-green-200/50'
+                            : 'border-gray-200 hover:border-green-300 hover:bg-gradient-to-br hover:from-gray-50 hover:to-green-50 hover:shadow-lg'
                           }`}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-bold text-xl text-gray-900">{bed.bed_number}</span>
-                          <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                            Còn trống
-                          </span>
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-green-100/30 to-transparent rounded-full -translate-y-8 translate-x-8" />
+                        <div className="relative z-10">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-md">
+                                <MapPinIcon className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <span className="font-bold text-xl text-gray-900 whitespace-nowrap">Giường {bed.bed_number}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-600">✔️</span>
+                              </div>
+                              <span className="font-medium">Trạng thái:</span>
+                              <span className="px-2.5 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-semibold">Còn trống</span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-gray-600">🛏️</span>
+                              </div>
+                              <span className="font-medium">Loại giường:</span>
+                              <span className="text-gray-700 font-medium">
+                                {bed.bed_type === "standard" ? "Tiêu chuẩn" :
+                                  bed.bed_type === "electric" ? "Giường điện" : bed.bed_type}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-base text-gray-600">
-                          {bed.bed_type === "standard" ? "Tiêu chuẩn" :
-                            bed.bed_type === "electric" ? "Giường điện" : bed.bed_type}
-                        </p>
                       </button>
                     ))}
                   </div>

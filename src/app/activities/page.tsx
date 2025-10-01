@@ -128,11 +128,13 @@ export default function ActivitiesPage() {
         setLoading(true);
         setError(null);
         const data = await activitiesAPI.getAll();
-        const mappedActivities = data.map(mapActivityFromAPI).filter(Boolean); // Filter out null values
+        console.log('Activities data received:', data);
+        const mappedActivities = Array.isArray(data) ? data.map(mapActivityFromAPI).filter(Boolean) : []; // Filter out null values
         setActivities(mappedActivities);
       } catch (err: any) {
         console.error('Error fetching activities:', err);
         setError('Không thể tải danh sách hoạt động. Vui lòng thử lại sau.');
+        setActivities([]); // Set empty array on error
       } finally {
         setLoading(false);
       }
@@ -557,7 +559,7 @@ export default function ActivitiesPage() {
                   WebkitTextFillColor: 'transparent',
                   letterSpacing: '-0.025em'
                 }}>
-                  Quản lý Chương trình sinh hoạt
+                  Quản lý hoạt động sinh hoạt
                 </h1>
                 <p style={{
                   fontSize: '1rem',
@@ -565,7 +567,7 @@ export default function ActivitiesPage() {
                   margin: '0.25rem 0 0 0',
                   fontWeight: 500
                 }}>
-                  Tổng số: {filteredActivities.length} chương trình
+                  Tổng số: {filteredActivities.length} hoạt động
                 </p>
                 {viewMode === 'calendar' && (
                   <p style={{

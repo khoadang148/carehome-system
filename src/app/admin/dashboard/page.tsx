@@ -158,25 +158,9 @@ export default function AdminDashboardPage() {
                   Bảng Thống Kê
                 </h1>
                 <p className="text-base text-slate-600 font-semibold flex items-center gap-2">
-                  <ChartBarIcon className="w-4 h-4 text-blue-500" />
+                  
                   Quản lý viện dưỡng lão - Thanh toán & Nhân sự
                 </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 px-4 py-3 rounded-xl border border-blue-200/50 shadow-lg">
-                <div className="text-center">
-                  <div className="text-xs text-blue-600 font-bold mb-1 uppercase tracking-wide">
-                    Tổng quan
-                  </div>
-                  <div className="text-lg font-black text-blue-700 mb-1">
-                    Dashboard
-                  </div>
-                  <div className="text-xs text-blue-600 font-semibold">
-                    Quản lý
-                  </div>
-                </div>
               </div>
             </div>
           </div>

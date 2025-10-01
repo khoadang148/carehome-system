@@ -378,83 +378,69 @@ export default function AccountDetailsPage() {
 
                           <div className="flex gap-4 flex-wrap">
                             {(() => {
-                              const frontUrl = getFileUrl((account as any).cccd_front);
-                              return frontUrl ? (
+                              const rawPath = String((account as any).cccd_front || '').replace(/\\/g,'/').replace(/^"|"$/g,'');
+                              if (!rawPath) return null;
+                              const cleanPath = rawPath.replace(/^\/?(tmp\/)?uploads\//, 'uploads/');
+                              const url = photosAPI.getPhotoUrl(cleanPath);
+                              const fallbackUrl = `https://sep490-be-xniz.onrender.com/uploads/${cleanPath.replace(/^uploads\//,'')}`;
+                              return (
                                 <div className="flex flex-col items-center gap-2">
                                   <div className="text-xs font-bold text-green-600 uppercase tracking-wide text-center">
                                     Ảnh mặt trước
                                   </div>
                                   <a 
-                                    href={frontUrl} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
                                     className="block w-40 h-28 overflow-hidden rounded-lg border-2 border-green-500 bg-white shadow-lg hover:shadow-xl transition-shadow"
                                   >
                                     <img
-                                      src={frontUrl}
+                                      src={url}
                                       alt="CCCD mặt trước"
                                       className="w-full h-full object-cover"
                                       onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const placeholder = document.createElement('div');
-                                        placeholder.innerHTML = `
-                                          <div class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xs text-gray-500">
-                                            <div class="text-center">
-                                              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-1 opacity-50">
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                                <polyline points="21,15 16,10 5,21"/>
-                                              </svg>
-                                              <div>Không thể tải ảnh</div>
-                                            </div>
-                                          </div>
-                                        `;
-                                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                                        const img = e.currentTarget as HTMLImageElement;
+                                        if (img.src !== fallbackUrl) {
+                                          img.src = fallbackUrl;
+                                        }
                                       }}
                                     />
                                   </a>
                                 </div>
-                              ) : null;
+                              );
                             })()}
 
                             {(() => {
-                              const backUrl = getFileUrl((account as any).cccd_back);
-                              return backUrl ? (
+                              const rawPath = String((account as any).cccd_back || '').replace(/\\/g,'/').replace(/^"|"$/g,'');
+                              if (!rawPath) return null;
+                              const cleanPath = rawPath.replace(/^\/?(tmp\/)?uploads\//, 'uploads/');
+                              const url = photosAPI.getPhotoUrl(cleanPath);
+                              const fallbackUrl = `https://sep490-be-xniz.onrender.com/uploads/${cleanPath.replace(/^uploads\//,'')}`;
+                              return (
                                 <div className="flex flex-col items-center gap-2">
                                   <div className="text-xs font-bold text-green-600 uppercase tracking-wide text-center">
                                     Ảnh mặt sau
                                   </div>
                                   <a 
-                                    href={backUrl} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
                                     className="block w-40 h-28 overflow-hidden rounded-lg border-2 border-green-500 bg-white shadow-lg hover:shadow-xl transition-shadow"
                                   >
                                     <img
-                                      src={backUrl}
+                                      src={url}
                                       alt="CCCD mặt sau"
                                       className="w-full h-full object-cover"
                                       onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const placeholder = document.createElement('div');
-                                        placeholder.innerHTML = `
-                                          <div class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xs text-gray-500">
-                                            <div class="text-center">
-                                              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-1 opacity-50">
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                                <polyline points="21,15 16,10 5,21"/>
-                                              </svg>
-                                              <div>Không thể tải ảnh</div>
-                                            </div>
-                                          </div>
-                                        `;
-                                        e.currentTarget.parentNode?.appendChild(placeholder.firstElementChild!);
+                                        const img = e.currentTarget as HTMLImageElement;
+                                        if (img.src !== fallbackUrl) {
+                                          img.src = fallbackUrl;
+                                        }
                                       }}
                                     />
                                   </a>
                                 </div>
-                              ) : null;
+                              );
                             })()}
                           </div>
                         </div>

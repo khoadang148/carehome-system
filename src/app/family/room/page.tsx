@@ -294,28 +294,31 @@ export default function FamilyRoomPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto p-6">
 
-        <div className="bg-gradient-to-r from-white to-blue-50 rounded-3xl p-8 mb-8 shadow-xl border border-blue-100">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => router.push('/family')}
-              className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
-              title="Quay lại"
-            >
-              <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-            </button>
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <BuildingOfficeIcon className="w-8 h-8 text-white" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+        <div className="relative overflow-hidden rounded-3xl mb-8 shadow-xl border border-slate-200 bg-white">
+          <div className="absolute inset-0 opacity-70" style={{
+            background: 'radial-gradient(1200px 400px at 80% -10%, rgba(59,130,246,0.12), transparent), radial-gradient(800px 300px at -10% 120%, rgba(99,102,241,0.12), transparent)'
+          }} />
+          <div className="relative flex items-center gap-6 p-8">
+              <button
+                onClick={() => router.push('/family')}
+              className="group p-3.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 hover:shadow-md hover:-translate-x-0.5 transition-all duration-200"
+                title="Quay lại"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+              </button>
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <BuildingOfficeIcon className="w-8 h-8 text-white" />
+              </div>
+              <div className="flex-1">
+              <h1 className="text-4xl font-extrabold tracking-tight text-slate-800 mb-1">
                 Thông tin phòng & giường
-              </h1>
-              <p className="text-lg text-gray-600 font-medium">
+                </h1>
+              <p className="text-base text-slate-600 font-medium">
                 Xem thông tin chi tiết về các phòng và giường trong viện dưỡng lão
-              </p>
+                </p>
             </div>
           </div>
         </div>
@@ -417,7 +420,7 @@ export default function FamilyRoomPage() {
 
         {/* Đã bỏ phần thống kê theo yêu cầu */}
 
-        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg border border-gray-100">
+        <div className="bg-white rounded-2xl p-5 mb-8 shadow-lg border border-slate-200">
           <div className="flex flex-col lg:flex-row gap-4 items-center">
             <div className="flex-1 relative">
               <input
@@ -425,101 +428,105 @@ export default function FamilyRoomPage() {
                 placeholder="Tìm theo số phòng, loại phòng, tầng..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-200 rounded-xl text-base focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all duration-200 placeholder-slate-400"
               />
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             </div>
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 rounded-xl border border-blue-200">
-              <p className="text-blue-700 font-semibold text-lg">
-                Hiển thị: {filteredRooms.length} phòng
+            <div className="px-5 py-3 rounded-xl border-2 border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
+              <p className="text-slate-700 font-semibold">
+                Hiển thị: <span className="text-blue-600 font-bold">{filteredRooms.length}</span> phòng
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
+        <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gradient-to-r from-blue-600 to-indigo-600">
-                  <th className="px-6 py-4 text-left text-white font-bold text-base">Số phòng</th>
-                  <th className="px-6 py-4 text-left text-white font-bold text-base">Loại phòng</th>
-                  <th className="px-6 py-4 text-center text-white font-bold text-base">Số giường</th>
-                  <th className="px-6 py-4 text-center text-white font-bold text-base">Giới tính</th>
-                  <th className="px-6 py-4 text-center text-white font-bold text-base">Tầng</th>
-                  <th className="px-6 py-4 text-center text-white font-bold text-base">Trạng thái</th>
-                  <th className="px-6 py-4 text-center text-white font-bold text-base">Thao tác</th>
+                  <th className="px-6 py-4 text-left text-white font-semibold text-sm uppercase tracking-wide">Số phòng</th>
+                  <th className="px-6 py-4 text-left text-white font-semibold text-sm uppercase tracking-wide">Loại phòng</th>
+                  <th className="px-6 py-4 text-center text-white font-semibold text-sm uppercase tracking-wide">Số giường</th>
+                  <th className="px-6 py-4 text-center text-white font-semibold text-sm uppercase tracking-wide">Giới tính</th>
+                  <th className="px-6 py-4 text-center text-white font-semibold text-sm uppercase tracking-wide">Tầng</th>
+                  <th className="px-6 py-4 text-center text-white font-semibold text-sm uppercase tracking-wide">Trạng thái</th>
+                  <th className="px-6 py-4 text-center text-white font-semibold text-sm uppercase tracking-wide">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRooms.map((room, index) => {
-                  const type = getRoomType(room.room_type);
-                  return (
+            const type = getRoomType(room.room_type);
+            return (
                     <tr
                       key={room._id}
-                      className={`border-b border-gray-100 hover:bg-blue-50 transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                         }`}
                     >
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                            {room.room_number}
-                          </div>
-                        </div>
+                    <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                        {room.room_number}
+                      </div>
+                      </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                          <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-semibold">
                             {type ? type.type_name : room.room_type}
-                          </span>
-                        </div>
+                    </span>
+                  </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-semibold text-gray-900">{room.bed_count}</span>
+                        <span className="font-semibold text-slate-800">{room.bed_count}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${room.gender === "male"
-                          ? "bg-blue-100 text-blue-800"
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${room.gender === "male"
+                          ? "bg-blue-50 text-blue-700"
                           : room.gender === "female"
-                            ? "bg-pink-100 text-pink-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-pink-50 text-pink-700"
+                            : "bg-slate-50 text-slate-700"
                           }`}>
                           {room.gender === "male" ? "Nam" : room.gender === "female" ? "Nữ" : "Hỗn hợp"}
-                        </span>
+                    </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-semibold text-gray-900">Tầng {room.floor}</span>
+                        <span className="font-semibold text-slate-800">Tầng {room.floor}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-4 py-2 rounded-full text-sm font-bold ${room.status === "available"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                        <span className={`px-4 py-1.5 rounded-full text-sm font-bold ${room.status === "available"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-rose-50 text-rose-700"
                           }`}>
                           {room.status === "available" ? "Còn trống" : "Hết giường"}
-                        </span>
+                    </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
+                  <button
                           className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center gap-2 mx-auto ${selectedRoomId === room._id
-                            ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30"
-                            : "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                            ? "bg-rose-500 hover:bg-rose-600 text-white shadow-md"
+                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
                             }`}
                           onClick={() => setSelectedRoomId(selectedRoomId === room._id ? null : room._id)}
-                        >
-                          <EyeIcon className="w-4 h-4" />
+                  >
+                    <EyeIcon className="w-4 h-4" />
                           {selectedRoomId === room._id ? "Ẩn giường" : "Xem giường"}
-                        </button>
+                  </button>
                       </td>
                     </tr>
-                  );
-                })}
+            );
+          })}
               </tbody>
             </table>
           </div>
         </div>
 
         {selectedRoomId && (
-          <div className="mt-8 bg-gradient-to-br from-gray-50 to-blue-50 rounded-3xl p-8 shadow-xl border border-blue-100">
+          <div className="mt-8 rounded-3xl p-8 shadow-xl border border-slate-200 bg-white relative overflow-hidden">
+            <div className="absolute inset-0 opacity-60" style={{
+              background: 'radial-gradient(900px 300px at 110% 0%, rgba(79,70,229,0.07), transparent), radial-gradient(700px 260px at -10% 120%, rgba(59,130,246,0.08), transparent)'
+            }} />
+            <div className="relative">
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
@@ -533,7 +540,7 @@ export default function FamilyRoomPage() {
                 const type = room ? getRoomType(room.room_type) : null;
                 if (!type) return null;
                 return (
-                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
+                  <div className="bg-white/80 backdrop-blur rounded-2xl p-6 shadow-lg border border-slate-200 mb-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
                         <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
@@ -570,7 +577,7 @@ export default function FamilyRoomPage() {
                           {type.amenities.map((amenity, index) => (
                             <span
                               key={index}
-                              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium border border-blue-200"
+                              className="px-3 py-1 bg-slate-50 text-slate-700 rounded-full text-sm font-semibold border border-slate-200"
                             >
                               {amenity}
                             </span>
@@ -593,18 +600,18 @@ export default function FamilyRoomPage() {
                   <p className="text-gray-600">Phòng này hiện chưa có người cao tuổi nào được thiết lập.</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
+                <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gradient-to-r from-indigo-600 to-purple-600">
-                        <th className="px-6 py-4 text-left text-white font-bold text-base">Số giường</th>
-                        <th className="px-6 py-4 text-left text-white font-bold text-base">Loại giường</th>
-                        <th className="px-6 py-4 text-center text-white font-bold text-base">Trạng thái</th>
+                        <th className="px-6 py-4 text-left text-white font-semibold text-sm uppercase tracking-wide">Số giường</th>
+                        <th className="px-6 py-4 text-left text-white font-semibold text-sm uppercase tracking-wide">Loại giường</th>
+                        <th className="px-6 py-4 text-center text-white font-semibold text-sm uppercase tracking-wide">Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
                       {bedsOfRoom(selectedRoomId).map((bed, idx) => (
-                        <tr key={bed._id} className={`border-b border-gray-100 hover:bg-indigo-50 transition-all duration-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                        <tr key={bed._id} className={`border-b border-slate-100 hover:bg-indigo-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                           }`}>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -612,18 +619,18 @@ export default function FamilyRoomPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+                            <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm font-semibold border border-indigo-200">
                               {bed.bed_type === "standard" ? "Tiêu chuẩn" :
                                 bed.bed_type === "electric" ? "Giường điện" :
                                   bed.bed_type}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <span className={`px-4 py-2 rounded-full text-sm font-bold ${bed.status === "occupied"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-green-100 text-green-800"
+                            <span className={`px-4 py-1.5 rounded-full text-sm font-bold border ${bed.status === "occupied"
+                              ? "bg-rose-50 text-rose-700 border-rose-200"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200"
                               }`}>
-                              {bed.status === "occupied" ? "Đang sử dụng" : "Còn trống"}
+                              {bed.status === "occupied" ? "Đã có người cao tuổi" : "Còn trống"}
                             </span>
                           </td>
 
@@ -633,6 +640,7 @@ export default function FamilyRoomPage() {
                   </table>
                 </div>
               )}
+            </div>
             </div>
           </div>
         )}

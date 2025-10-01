@@ -873,7 +873,7 @@ export default function ServiceDetailsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-red-800 mb-1">
-                    ⚠️ CẢNH BÁO: CÓ GÓI DỊCH VỤ SẮP HẾT HẠN!
+                    CẢNH BÁO: CÓ GÓI DỊCH VỤ SẮP HẾT HẠN!
                   </h3>
                   <p className="text-red-700 text-sm font-medium">
                     Gói dịch vụ của <span className="font-bold text-red-900">{selectedRelative?.full_name || selectedRelative?.name || 'người thân'}</span> sắp hết hạn
@@ -929,7 +929,7 @@ export default function ServiceDetailsPage() {
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                 >
                   <ArrowPathIcon className="w-4 h-4" />
-                  Đổi tất cả
+                  THAY ĐỔI
                 </button>
               </div>
             </div>
@@ -987,10 +987,9 @@ export default function ServiceDetailsPage() {
               </div>
 
               {/* Bulk Action Buttons */}
-              {hasExpiringOrExpiredCarePlans() && !hasPendingServiceRequests() && (
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-gray-700 font-medium text-sm mb-3 text-center">Thao tác nhanh:</p>
-                  <div className="flex gap-2">
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                 <div className="flex gap-2">
+                  {hasExpiringOrExpiredCarePlans() && !hasPendingServiceRequests() && (
                     <button
                       onClick={() => setShowBulkExtensionModal(true)}
                       className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-sm font-medium rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow-lg"
@@ -998,19 +997,23 @@ export default function ServiceDetailsPage() {
                       <ArrowPathIcon className="w-4 h-4" />
                       Gia hạn tất cả
                     </button>
+                  )}
+                  {!hasPendingServiceRequests() && (
                     <button
                       onClick={() => router.push(`/family/services/${selectedRelative?._id || selectedRelative?.id}/change`)}
                       className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
                     >
                       <ArrowRightIcon className="w-4 h-4" />
-                      Đổi tất cả
+                      Thay đổi dịch vụ
                     </button>
-                  </div>
-                  <p className="text-yellow-600 text-xs text-center mt-2 font-medium">
-                    ⏰ Có gói dịch vụ sắp hết hạn
-                  </p>
+                  )}
                 </div>
-              )}
+                {hasExpiringOrExpiredCarePlans() && !hasPendingServiceRequests() && (
+                  <p className="text-yellow-600 text-xs text-center mt-2 font-medium">
+                    Có gói dịch vụ sắp hết hạn
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1113,7 +1116,7 @@ export default function ServiceDetailsPage() {
                                         ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
                                         : 'bg-gray-100 text-gray-700 border border-gray-200'
                                     }`}>
-                                      {carePlanAssignment?.status === 'completed' ? 'Hoàn tất đăng kýký' :
+                                      {carePlanAssignment?.status === 'completed' ? 'Hoàn tất đăng ký' :
                                        carePlanAssignment?.status === 'active' || carePlanAssignment?.status === 'approved' ? 'Đang sử dụng' :
                                        carePlanAssignment?.status === 'pending' ? 'Đang chờ duyệt' :
                                        carePlanAssignment?.status || 'Không xác định'}
@@ -1121,12 +1124,12 @@ export default function ServiceDetailsPage() {
                                     {/* Expiry Warning Badge */}
                                     {isCarePlanExpired(carePlanAssignment) && (
                                       <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200 animate-pulse">
-                                        ⚠️ ĐÃ HẾT HẠN
+                                        ĐÃ HẾT HẠN
                                       </span>
                                     )}
                                     {isCarePlanExpiringSoon(carePlanAssignment) && !isCarePlanExpired(carePlanAssignment) && (
                                       <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700 border border-yellow-200 animate-pulse">
-                                        ⏰ SẮP HẾT HẠN
+                                        SẮP HẾT HẠN
                                       </span>
                                     )}
                                   </div>
@@ -1175,7 +1178,7 @@ export default function ServiceDetailsPage() {
                                           : isCarePlanExpiringSoon(carePlanAssignment)
                                           ? 'text-yellow-700'
                                           : 'text-purple-700'
-                                      }`}>Ngày kết thúc</span>
+                                      }`}>Ngày kết thúc đến hết ngày</span>
                                     </div>
                                     <p className={`text-sm font-semibold ${
                                       isCarePlanExpired(carePlanAssignment) 
@@ -1186,32 +1189,28 @@ export default function ServiceDetailsPage() {
                                     }`}>
                                       {carePlanAssignment?.end_date ? formatDate(carePlanAssignment.end_date) : 'Không có thời hạn'}
                                     </p>
-                                    {/* Days remaining indicator */}
-                                    {carePlanAssignment?.end_date && (
-                                      <p className={`text-xs font-bold mt-1 ${
-                                        isCarePlanExpired(carePlanAssignment) 
-                                          ? 'text-red-600' 
-                                          : isCarePlanExpiringSoon(carePlanAssignment)
-                                          ? 'text-yellow-600'
-                                          : 'text-green-600'
-                                      }`}>
-                                        {(() => {
-                                          const endDate = new Date(carePlanAssignment.end_date);
-                                          const today = new Date();
-                                          const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                                          
-                                          if (daysUntilExpiry < 0) {
-                                            return `Đã hết hạn ${Math.abs(daysUntilExpiry)} ngày`;
-                                          } else if (daysUntilExpiry === 0) {
-                                            return 'Hết hạn hôm nay';
-                                          } else if (daysUntilExpiry <= 7) {
-                                            return `Còn ${daysUntilExpiry} ngày`;
-                                          } else {
-                                            return `Còn ${daysUntilExpiry} ngày`;
-                                          }
-                                        })()}
-                                      </p>
-                                    )}
+                                    {/* Days remaining indicator: only show when <= 7 days or expired */}
+                                    {carePlanAssignment?.end_date && (() => {
+                                      const endDate = new Date(carePlanAssignment.end_date);
+                                      const today = new Date();
+                                      const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                      if (daysUntilExpiry > 7) return null;
+                                      return (
+                                        <p className={`text-xs font-bold mt-1 ${
+                                          isCarePlanExpired(carePlanAssignment) 
+                                            ? 'text-red-600' 
+                                            : isCarePlanExpiringSoon(carePlanAssignment)
+                                            ? 'text-yellow-600'
+                                            : 'text-green-600'
+                                        }`}>
+                                          {daysUntilExpiry < 0
+                                            ? `Đã hết hạn ${Math.abs(daysUntilExpiry)} ngày`
+                                            : daysUntilExpiry === 0
+                                            ? 'Hết hạn hôm nay'
+                                            : `Còn ${daysUntilExpiry} ngày`}
+                                        </p>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -1389,11 +1388,24 @@ function BulkExtensionModal({
   onSuccess: () => void; 
   onShowSuccess: (message: string) => void;
 }) {
-  const [extensionPeriod, setExtensionPeriod] = useState('6'); // 6 tháng hoặc 12 tháng
+  const [extensionPeriod, setExtensionPeriod] = useState('6'); // '3' | '6' | '12' | 'custom'
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const { user } = useAuth();
+  const [customMonths, setCustomMonths] = useState<string>('3');
+    
+    // Helpers for date display within the modal
+    const formatDisplay = (date: Date) => date.toLocaleDateString('vi-VN');
+    const getEndOfMonthAfterAddingMonths = (baseDate: Date, addMonths: number) => {
+      return new Date(baseDate.getFullYear(), baseDate.getMonth() + addMonths + 1, 0);
+    };
+  const addDays = (date: Date, numDays: number) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    d.setDate(d.getDate() + numDays);
+    return d;
+  };
   
   // Format YYYY-MM-DD in local time to avoid timezone shift
   const formatLocalYMD = (date: Date) => {
@@ -1408,6 +1420,32 @@ function BulkExtensionModal({
     const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
     return carePlanAssignment && (isCarePlanExpired(carePlanAssignment) || isCarePlanExpiringSoon(carePlanAssignment));
   });
+  const expiredCount = expiringCarePlans.filter((cp: any) => {
+    const a = getAssignmentForCarePlan(cp._id);
+    return isCarePlanExpired(a);
+  }).length;
+  const expiringSoonCount = Math.max(0, expiringCarePlans.length - expiredCount);
+  
+    // Preview start/end dates for the bulk extension (using the earliest current end date)
+    const previewBaseEndDate: Date | null = (() => {
+      const ends = expiringCarePlans
+        .map((cp: any) => getAssignmentForCarePlan(cp._id))
+        .map((a: any) => (a?.end_date ? new Date(a.end_date) : null))
+        .filter((d: Date | null) => d && !isNaN((d as Date).getTime())) as Date[];
+      if (!ends.length) return null;
+      return new Date(Math.min.apply(null, ends.map(d => d.getTime())));
+    })();
+  
+    const previewMonths: number = (() => {
+      const isCustom = extensionPeriod === 'custom';
+      const parsed = isCustom ? parseInt(customMonths) : parseInt(extensionPeriod);
+      return Number.isFinite(parsed) ? Math.max(3, parsed) : 0;
+    })();
+  
+  const previewStartDateText = previewBaseEndDate ? formatDisplay(addDays(previewBaseEndDate, 1)) : 'N/A';
+  const previewEndDateText = previewBaseEndDate && previewMonths > 0
+      ? formatDisplay(getEndOfMonthAfterAddingMonths(addDays(previewBaseEndDate, 1), previewMonths))
+      : 'N/A';
 
   // Load user profile to get phone number
   useEffect(() => {
@@ -1427,6 +1465,10 @@ function BulkExtensionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!extensionPeriod || !note.trim()) return;
+    const isCustom = extensionPeriod === 'custom';
+    const parsed = isCustom ? parseInt(customMonths) : parseInt(extensionPeriod);
+    const extensionMonths = Number.isFinite(parsed) ? Math.max(3, parsed) : 0;
+    if (!extensionMonths) return;
 
     setSubmitting(true);
     try {
@@ -1434,15 +1476,14 @@ function BulkExtensionModal({
       const requests = expiringCarePlans.map(async (carePlan: any) => {
         const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
         const currentEndDate = new Date(carePlanAssignment?.end_date || new Date());
-        const extensionMonths = parseInt(extensionPeriod);
+        // Ngày bắt đầu = ngày kế tiếp ngày hết hạn hiện tại (local)
+        const nextDayAfterEnd = addDays(currentEndDate, 1);
+        const newStartDate = formatLocalYMD(nextDayAfterEnd);
 
-        // Theo yêu cầu: thời gian bắt đầu của gia hạn = ngày kết thúc gói cũ (local)
-        const newStartDate = formatLocalYMD(currentEndDate);
-
-        // Ngày hết hạn mới luôn là ngày cuối cùng của tháng đích sau khi cộng extensionMonths
+        // Ngày hết hạn mới = ngày cuối cùng của tháng đích tính từ ngày bắt đầu mới
         const targetMonthEnd = new Date(
-          currentEndDate.getFullYear(),
-          currentEndDate.getMonth() + extensionMonths + 1,
+          nextDayAfterEnd.getFullYear(),
+          nextDayAfterEnd.getMonth() + extensionMonths + 1,
           0
         );
         const newEndDateStr = formatLocalYMD(targetMonthEnd);
@@ -1453,14 +1494,14 @@ function BulkExtensionModal({
           request_type: 'service_date_change',
           new_start_date: newStartDate,
           new_end_date: newEndDateStr,
-          note: `${note} (Gia hạn gói: ${carePlan.plan_name} thêm ${extensionPeriod} tháng)`,
+          note: `${note} (Gia hạn gói: ${carePlan.plan_name} thêm ${extensionMonths} tháng)`,
           emergencyContactName: userProfile?.full_name || user?.name || '',
           emergencyContactPhone: userProfile?.phone || user?.phone || ''
         });
       });
 
       await Promise.all(requests);
-      const extensionText = extensionPeriod === '6' ? '6 tháng' : '12 tháng';
+      const extensionText = `${extensionMonths} tháng`;
       onShowSuccess(`Đã gửi thành công ${requests.length} yêu cầu gia hạn dịch vụ thêm ${extensionText}`);
       onSuccess();
     } catch (error) {
@@ -1471,89 +1512,173 @@ function BulkExtensionModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-900">Gia hạn tất cả gói dịch vụ</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <XMarkIcon className="w-6 h-6" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        {/* Header */}
+        <div className="relative px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow">
+              <ArrowPathIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold tracking-tight text-slate-900">Gia hạn tất cả gói dịch vụ</h3>
+              <p className="text-xs font-medium text-slate-500">Thực hiện gia hạn cho các gói sắp hết hạn</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-          <p className="text-sm text-yellow-800 font-medium mb-2">
-            Sẽ gia hạn {expiringCarePlans.length} gói dịch vụ:
-          </p>
-          <div className="space-y-1">
+        {/* Content */}
+        <div className="px-6 py-5 space-y-4">
+          <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-white ring-1 ring-amber-100 flex items-center justify-center shadow-sm">
+                  <ExclamationTriangleIcon className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Sẽ gia hạn {expiringCarePlans.length} gói dịch vụ</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                      {expiredCount} đã hết hạn
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      {expiringSoonCount} sắp hết hạn
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDetails(v => !v)}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-100"
+              >
+                {showDetails ? 'Thu gọn' : 'Xem chi tiết'}
+              </button>
+            </div>
+            {showDetails && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {expiringCarePlans.map((carePlan: any) => {
               const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
               const isExpired = isCarePlanExpired(carePlanAssignment);
-              const isExpiringSoon = isCarePlanExpiringSoon(carePlanAssignment);
-              
               return (
-                <div key={carePlan._id} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{carePlan.plan_name}</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    isExpired 
-                      ? 'bg-red-100 text-red-700' 
-                      : 'bg-yellow-100 text-yellow-700'
-                  }`}>
+                    <div key={carePlan._id} className="flex items-center justify-between gap-3 rounded-lg bg-white/70 px-3 py-2 border border-amber-100">
+                      <span className="text-sm font-medium text-slate-800 whitespace-normal break-words" title={carePlan.plan_name}>
+                        {carePlan.plan_name}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0 ${isExpired ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                     {isExpired ? 'Đã hết hạn' : 'Sắp hết hạn'}
                   </span>
                 </div>
               );
             })}
           </div>
+            )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Thời gian gia hạn *
-            </label>
-            <select
-              value={extensionPeriod}
-              onChange={(e) => setExtensionPeriod(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-              required
-            >
-              <option value="6">Gia hạn 6 tháng</option>
-              <option value="12">Gia hạn 12 tháng (1 năm)</option>
-            </select>
-           
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Thời gian gia hạn</label>
+                <div className="flex items-center gap-2 flex-nowrap w-full">
+                  {['3','6','12','custom'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setExtensionPeriod(opt)}
+                      className={`px-3 py-2 rounded-xl text-sm font-semibold transition-colors border-2 whitespace-nowrap ${extensionPeriod === opt
+                        ? opt === 'custom'
+                          ? 'border-amber-500 bg-amber-50 text-amber-700'
+                          : 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                      aria-pressed={extensionPeriod === opt}
+                    >
+                      {opt === '3' && '3 tháng'}
+                      {opt === '6' && '6 tháng'}
+                      {opt === '12' && '12 tháng'}
+                      {opt === 'custom' && 'Tùy chọn'}
+                    </button>
+                  ))}
+                  {extensionPeriod === 'custom' && (
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="number"
+                        min={3}
+                        step={1}
+                        value={customMonths}
+                        onChange={(e) => setCustomMonths(e.target.value)}
+                        placeholder="Số tháng"
+                        className="w-36 pr-12 rounded-xl border-2 border-amber-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                        aria-label="Số tháng gia hạn tùy chọn"
+                      />
+                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-600">tháng</span>
+                    </div>
+                  )}
+                </div>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                  Thời gian gia hạn tối thiểu là 3 tháng.
+                  </p>
+                  
+              </div>
+              <div className="hidden sm:block" />
+          </div>
+
+          {/* Preview start/end dates */}
+          <div className="rounded-xl border-2 border-blue-200 bg-blue-50/60 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày bắt đầu</div>
+                <div className="text-gray-900 font-semibold">
+                  {previewStartDateText}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày kết thúc</div>
+                <div className="text-gray-900 font-semibold">
+                  {previewEndDateText}
+                </div>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-blue-700">Thời gian hiệu lực được tính nối tiếp từ ngày hết hạn hiện tại và tự động đến cuối tháng.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Lý do gia hạn *
-            </label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ghi chú</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Nhập lý do gia hạn tất cả gói dịch vụ..."
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                className="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
               rows={3}
               required
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+            <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold hover:bg-slate-50"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={!extensionPeriod || !note.trim() || submitting}
-              className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-5 py-2.5 rounded-xl font-bold text-white shadow-md transition-all ${(!extensionPeriod || !note.trim() || submitting)
+                  ? 'bg-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700'}`}
             >
-              {submitting ? 'Đang gửi...' : `Gửi yêu cầu`}
+                {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

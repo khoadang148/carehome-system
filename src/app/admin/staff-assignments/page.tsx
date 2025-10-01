@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react'
+import useSWR from 'swr'
 import { toast } from 'react-toastify'
 import { getUserFriendlyError } from '@/lib/utils/error-translations';
 import { useRouter } from 'next/navigation';
@@ -31,11 +32,11 @@ export default function StaffAssignmentsPage() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [assignmentsError, setAssignmentsError] = useState('');
-  
+
   const [staffs, setStaffs] = useState<any[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState('');
-  
+
   const [residents, setResidents] = useState<any[]>([]);
   const [residentsLoading, setResidentsLoading] = useState(false);
   const [residentsError, setResidentsError] = useState('');
@@ -83,51 +84,54 @@ export default function StaffAssignmentsPage() {
     }
   }, [user, loading, router]);
 
-  const loadData = async () => {
-    if (!user || user.role !== 'admin') return;
+  // SWR data fetching for snappy loads
+  const enableFetch = Boolean(user && user.role === 'admin');
+  const { data: swrAssignments, isLoading: swrAssignmentsLoading, error: swrAssignmentsError, mutate: mutateAssignments } = useSWR(
+    enableFetch ? 'staffAssignments:getAll' : null,
+    () => (staffAssignmentsAPI as any).getAll?.(),
+    { revalidateOnFocus: true }
+  );
+  const { data: swrStaffs, isLoading: swrStaffsLoading, error: swrStaffsError, mutate: mutateStaffs } = useSWR(
+    enableFetch ? 'users:getByRoleWithStatus:staff' : null,
+    () => userAPI.getByRoleWithStatus('staff'),
+    { revalidateOnFocus: true }
+  );
+  const { data: swrResidents, isLoading: swrResidentsLoading, error: swrResidentsError, mutate: mutateResidents } = useSWR(
+    enableFetch ? 'residents:getAll' : null,
+    () => (residentAPI as any).getAll?.(),
+    { revalidateOnFocus: true }
+  );
 
-    try {
-      setAssignmentsLoading(true);
-      const assignmentsData = await (staffAssignmentsAPI as any).getAll?.() || [];
-      setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-    } catch (e: any) {
-      setAssignmentsError(e?.message || 'Lỗi tải danh sách phân công');
-      setAssignments([]);
-    } finally {
-      setAssignmentsLoading(false);
-    }
+  // Sync SWR → local UI state to minimize code changes below
+  useEffect(() => {
+    setAssignmentsLoading(Boolean(enableFetch && swrAssignmentsLoading));
+    if (Array.isArray(swrAssignments)) setAssignments(swrAssignments);
+    setAssignmentsError(swrAssignmentsError ? String(swrAssignmentsError) : '');
+  }, [enableFetch, swrAssignments, swrAssignmentsLoading, swrAssignmentsError]);
 
-    try {
-      setStaffLoading(true);
-      const staffData = await userAPI.getByRoleWithStatus('staff');
-      setStaffs(Array.isArray(staffData) ? staffData : []);
-    } catch (e: any) {
-      setStaffError(e?.message || 'Lỗi tải danh sách nhân viên');
-      setStaffs([]);
-    } finally {
-      setStaffLoading(false);
-    }
+  useEffect(() => {
+    setStaffLoading(Boolean(enableFetch && swrStaffsLoading));
+    if (Array.isArray(swrStaffs)) setStaffs(swrStaffs);
+    setStaffError(swrStaffsError ? String(swrStaffsError) : '');
+  }, [enableFetch, swrStaffs, swrStaffsLoading, swrStaffsError]);
 
-    try {
-      setResidentsLoading(true);
-      const residentsData = await (residentAPI as any).getAll?.() || [];
-      setResidents(Array.isArray(residentsData) ? residentsData : []);
-    } catch (e: any) {
-      setResidentsError(e?.message || 'Lỗi tải danh sách người cao tuổi');
-      setResidents([]);
-    } finally {
-      setResidentsLoading(false);
-    }
-  };
+  useEffect(() => {
+    setResidentsLoading(Boolean(enableFetch && swrResidentsLoading));
+    if (Array.isArray(swrResidents)) setResidents(swrResidents);
+    setResidentsError(swrResidentsError ? String(swrResidentsError) : '');
+  }, [enableFetch, swrResidents, swrResidentsLoading, swrResidentsError]);
 
   const forceReloadData = () => {
     if (!user || user.role !== 'admin') return;
-    loadData();
+    mutateAssignments();
+    mutateStaffs();
+    mutateResidents();
   };
 
   useEffect(() => {
-    loadData();
-  }, [user]);
+    // initial SWR load happens automatically; just ensure revalidate when user changes
+    if (enableFetch) forceReloadData();
+  }, [enableFetch]);
 
   // Reload data when assignments are updated/deleted successfully
   useEffect(() => {
@@ -139,7 +143,7 @@ export default function StaffAssignmentsPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && user && user.role === 'admin') {
-        loadData();
+        forceReloadData();
       }
     };
 
@@ -218,7 +222,7 @@ export default function StaffAssignmentsPage() {
         notes: formData.notes,
         responsibilities: formData.responsibilities,
       });
-      
+
       if (updatedAssignment) {
         setAssignments(prev => prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a));
       }
@@ -232,7 +236,7 @@ export default function StaffAssignmentsPage() {
         assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
-      
+
       // Reload data to get updated information
       setTimeout(() => {
         forceReloadData();
@@ -288,7 +292,7 @@ export default function StaffAssignmentsPage() {
         staff_id: simpleEditForm.staff_id,
         end_date: simpleEditForm.end_date || undefined,
       });
-      
+
       if (updatedAssignment) {
         setAssignments(prev => prev.map(a => a._id === selectedAssignment._id ? updatedAssignment : a));
       }
@@ -306,7 +310,7 @@ export default function StaffAssignmentsPage() {
         assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
-      
+
       // Reload data to get updated information
       setTimeout(() => {
         forceReloadData();
@@ -326,10 +330,10 @@ export default function StaffAssignmentsPage() {
     try {
       // Call the delete API
       await (staffAssignmentsAPI as any).delete?.(selectedAssignment._id);
-      
+
       // Remove the assignment from local state
       setAssignments(prev => prev.filter(a => a._id !== selectedAssignment._id));
-      
+
       setShowDeleteModal(false);
 
       setSuccessData({
@@ -338,7 +342,7 @@ export default function StaffAssignmentsPage() {
         assignment: selectedAssignment,
       });
       setShowSuccessModal(true);
-      
+
       // Reload data to get updated information
       setTimeout(() => {
         forceReloadData();
@@ -417,8 +421,8 @@ export default function StaffAssignmentsPage() {
 
   // Check if there are changes in the simple edit form
   const hasSimpleEditChanges = () => {
-    return simpleEditForm.staff_id !== originalStaffId || 
-           simpleEditForm.end_date !== originalEndDate;
+    return simpleEditForm.staff_id !== originalStaffId ||
+      simpleEditForm.end_date !== originalEndDate;
   };
 
   const openEditModal = (assignment: any) => {
@@ -567,145 +571,33 @@ export default function StaffAssignmentsPage() {
           50% { opacity: 0.7; }
         }
       `}</style>
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        position: 'relative'
-      }}>
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `
-          radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(139, 92, 246, 0.03) 0%, transparent 50%)
-        `,
-          pointerEvents: 'none'
-        }} />
+      <div className="min-h-screen bg-slate-50">
 
-        <div style={{
-          maxWidth: '1400px',
-          margin: '0 auto',
-          padding: '2rem 1.5rem',
-          position: 'relative',
-          zIndex: 1
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '2rem',
-            padding: '2.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(20px)',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              position: 'absolute',
-              top: '-50%',
-              right: '-20%',
-              width: '300px',
-              height: '300px',
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
-              borderRadius: '50%',
-              zIndex: 0
-            }} />
-            <div style={{
-              position: 'absolute',
-              bottom: '-30%',
-              left: '-10%',
-              width: '200px',
-              height: '200px',
-              background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
-              borderRadius: '50%',
-              zIndex: 0
-            }} />
+        <div className="max-w-[1200px] mx-auto px-4 py-6">
+          <div className="relative rounded-2xl mb-6 bg-white border border-slate-200 shadow-sm p-6">
 
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '1.5rem',
-              position: 'relative',
-              zIndex: 1
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div className="relative z-10 flex justify-between items-center flex-wrap gap-4">
+              <div className="flex items-center gap-6">
                 <button
                   onClick={() => router.push('/admin')}
-                  className="group p-3.5 rounded-full bg-gradient-to-r from-slate-100 to-slate-200 hover:from-red-100 hover:to-orange-100 text-slate-700 hover:text-red-700 hover:shadow-lg hover:shadow-red-200/50 hover:-translate-x-0.5 transition-all duration-300"
+                  className="group p-3 rounded-full bg-slate-100 text-slate-700 hover:text-red-700 hover:bg-red-50 transition-colors"
                   title="Quay lại"
                 >
                   <ArrowLeftIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                 </button>
-
-                <div style={{
-                  width: '4rem',
-                  height: '4rem',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  borderRadius: '1.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 8px 25px rgba(59, 130, 246, 0.4)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    position: 'absolute',
-                    top: '0',
-                    left: '0',
-                    right: '0',
-                    bottom: '0',
-                    background: 'linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%)',
-                    animation: 'shimmer 2s infinite'
-                  }} />
-                  <UserGroupIcon style={{ width: '2.25rem', height: '2.25rem', color: 'white' }} />
+                <div className="relative w-14 h-14 rounded-2xl bg-blue-600 shadow-md overflow-hidden">
+                  <UserGroupIcon className="w-9 h-9 text-white mx-auto my-3.5" />
                 </div>
 
                 <div>
-                  <h1 style={{
-                    fontSize: '2.5rem',
-                    fontWeight: 800,
-                    margin: 0,
-                    color: '#1e293b',
-                    letterSpacing: '-0.025em',
-                    lineHeight: 1.2
-                  }}>
-                    Quản lý phân công nhân viên
-                  </h1>
-                  <p style={{
-                    fontSize: '1.125rem',
-                    color: '#64748b',
-                    margin: '0.5rem 0 0 0',
-                    fontWeight: 500,
-                    lineHeight: 1.5
-                  }}>
-                    Quản lý tất cả phân công giữa nhân viên và phòng một cách hiệu quả
-                  </p>
+                  <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-tight m-0">Quản lý phân công nhân viên</h1>
+                  <p className="text-base text-slate-500 mt-1">Quản lý tất cả phân công giữa nhân viên và phòng</p>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '5rem' }}>
-                <div style={{
-                  position: 'relative',
-                  minWidth: '300px'
-                }}>
-                  <div style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      left: '1rem',
-                      zIndex: 2,
-                      color: searchFocused ? '#3b82f6' : '#9ca3af'
-                    }}>
+              <div className="flex items-center gap-3">
+                <div className="relative min-w-[300px]">
+                  <div className="relative flex items-center">
+                    <div className={`absolute left-4 z-10 ${searchFocused ? 'text-blue-600' : 'text-gray-400'}`}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.35-4.35"></path>
@@ -718,45 +610,12 @@ export default function StaffAssignmentsPage() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       onFocus={() => setSearchFocused(true)}
                       onBlur={() => setSearchFocused(false)}
-                      style={{
-                        width: '100%',
-                        padding: '0.875rem 1rem 0.875rem 3rem',
-                        borderRadius: '1rem',
-                        border: `2px solid ${searchFocused ? '#3b82f6' : '#e5e7eb'}`,
-                        background: 'white',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: searchFocused
-                          ? '0 0 0 3px rgba(59, 130, 246, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05)'
-                          : '0 2px 8px rgba(0, 0, 0, 0.05)'
-                      }}
+                      className={`w-full pl-12 pr-4 py-3 rounded-2xl bg-white text-sm outline-none transition-colors border ${searchFocused ? 'border-blue-500 ring-2 ring-blue-500/10' : 'border-gray-200'}`}
                     />
                     {searchTerm && (
                       <button
                         onClick={() => setSearchTerm('')}
-                        style={{
-                          position: 'absolute',
-                          right: '0.75rem',
-                          background: 'none',
-                          border: 'none',
-                          color: '#9ca3af',
-                          cursor: 'pointer',
-                          padding: '0.25rem',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={e => {
-                          e.currentTarget.style.color = '#ef4444';
-                          e.currentTarget.style.background = '#fef2f2';
-                        }}
-                        onMouseOut={e => {
-                          e.currentTarget.style.color = '#9ca3af';
-                          e.currentTarget.style.background = 'transparent';
-                        }}
+                        className="absolute right-3 text-gray-400 hover:text-red-500 rounded-full p-1"
                         title="Xóa tìm kiếm"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -768,39 +627,11 @@ export default function StaffAssignmentsPage() {
                   </div>
                 </div>
 
-
                 <Link
                   href="/admin/staff-assignments/new"
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '1rem',
-                    padding: '0.875rem 1.75rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
-                    textDecoration: 'none',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                    e.currentTarget.style.boxShadow = '0 12px 35px rgba(16, 185, 129, 0.4)';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.3)';
-                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl text-white bg-emerald-600 px-6 py-3 text-sm font-semibold hover:bg-emerald-700 transition-colors shadow"
                 >
-                  <PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                  <PlusIcon className="w-5 h-5" />
                   Tạo phân công mới
                 </Link>
               </div>
@@ -1920,136 +1751,136 @@ export default function StaffAssignmentsPage() {
                       }}>
                         Ngày kết thúc <span style={{ color: '#ef4444' }}>*</span>
                       </label>
-                    <div style={{
-                      position: 'relative',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}>
-                      <input
-                        type="text"
-                        placeholder="dd/mm/yyyy (bắt buộc)"
-                        value={simpleEditForm.end_date ? formatDateDDMMYYYY(simpleEditForm.end_date) : ''}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          const dateMatch = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-
-                          if (dateMatch) {
-                            const [, day, month, year] = dateMatch;
-                            const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                            setSimpleEditForm({ ...simpleEditForm, end_date: formattedDate });
-                            if (validationErrors.end_date) {
-                              setValidationErrors(prev => ({ ...prev, end_date: '' }));
-                            }
-                          } else if (inputValue === '') {
-                            setSimpleEditForm({ ...simpleEditForm, end_date: '' });
-                          } else {
-                            setSimpleEditForm({ ...simpleEditForm, end_date: inputValue });
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const inputValue = e.target.value;
-                          if (inputValue && !inputValue.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
-                            const date = new Date(inputValue);
-                            if (!isNaN(date.getTime())) {
-                              const formattedDate = formatDateDDMMYYYY(date);
-                              const yyyyMMdd = date.toISOString().split('T')[0];
-                              setSimpleEditForm({ ...simpleEditForm, end_date: yyyyMMdd });
-                            }
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 2.5rem 0.75rem 0.75rem',
-                          borderRadius: '0.5rem',
-                          border: '2px solid #e5e7eb',
-                          fontSize: '0.875rem',
-                          background: 'white',
-                          outline: 'none',
-                          transition: 'all 0.2s'
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowDatePicker(true)}
-                        style={{
-                          position: 'absolute',
-                          right: '0.5rem',
-                          background: 'none',
-                          border: 'none',
-                          color: '#6b7280',
-                          cursor: 'pointer',
-                          padding: '0.25rem',
-                          borderRadius: '0.25rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={e => {
-                          e.currentTarget.style.color = '#3b82f6';
-                          e.currentTarget.style.background = '#f3f4f6';
-                        }}
-                        onMouseOut={e => {
-                          e.currentTarget.style.color = '#6b7280';
-                          e.currentTarget.style.background = 'transparent';
-                        }}
-                        title="Chọn ngày"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                          <line x1="16" y1="2" x2="16" y2="6"></line>
-                          <line x1="8" y1="2" x2="8" y2="6"></line>
-                          <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                      </button>
-
-                      {showDatePicker && (
+                      <div style={{
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}>
                         <input
-                          type="date"
-                          value={simpleEditForm.end_date || ''}
+                          type="text"
+                          placeholder="dd/mm/yyyy (bắt buộc)"
+                          value={simpleEditForm.end_date ? formatDateDDMMYYYY(simpleEditForm.end_date) : ''}
                           onChange={(e) => {
-                            if (e.target.value) {
-                              setSimpleEditForm({ ...simpleEditForm, end_date: e.target.value });
+                            const inputValue = e.target.value;
+                            const dateMatch = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+                            if (dateMatch) {
+                              const [, day, month, year] = dateMatch;
+                              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                              setSimpleEditForm({ ...simpleEditForm, end_date: formattedDate });
+                              if (validationErrors.end_date) {
+                                setValidationErrors(prev => ({ ...prev, end_date: '' }));
+                              }
+                            } else if (inputValue === '') {
+                              setSimpleEditForm({ ...simpleEditForm, end_date: '' });
+                            } else {
+                              setSimpleEditForm({ ...simpleEditForm, end_date: inputValue });
                             }
-                            setShowDatePicker(false);
                           }}
-                          onBlur={() => setShowDatePicker(false)}
+                          onBlur={(e) => {
+                            const inputValue = e.target.value;
+                            if (inputValue && !inputValue.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                              const date = new Date(inputValue);
+                              if (!isNaN(date.getTime())) {
+                                const formattedDate = formatDateDDMMYYYY(date);
+                                const yyyyMMdd = date.toISOString().split('T')[0];
+                                setSimpleEditForm({ ...simpleEditForm, end_date: yyyyMMdd });
+                              }
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 2.5rem 0.75rem 0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '2px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowDatePicker(true)}
                           style={{
                             position: 'absolute',
-                            top: '0',
-                            left: '0',
-                            width: '100%',
-                            height: '100%',
-                            opacity: '0',
+                            right: '0.5rem',
+                            background: 'none',
+                            border: 'none',
+                            color: '#6b7280',
                             cursor: 'pointer',
-                            zIndex: 10
+                            padding: '0.25rem',
+                            borderRadius: '0.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s'
                           }}
-                          autoFocus
-                        />
-                      )}
-                    </div>
+                          onMouseOver={e => {
+                            e.currentTarget.style.color = '#3b82f6';
+                            e.currentTarget.style.background = '#f3f4f6';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.color = '#6b7280';
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                          title="Chọn ngày"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                          </svg>
+                        </button>
 
-                    {validationErrors.end_date && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        marginTop: '0.5rem',
-                        padding: '0.5rem 0.75rem',
-                        background: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        borderRadius: '0.375rem',
-                        color: '#dc2626'
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', flexShrink: 0 }}>
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <line x1="15" y1="9" x2="9" y2="15"></line>
-                          <line x1="9" y1="9" x2="15" y2="15"></line>
-                        </svg>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                          {validationErrors.end_date}
-                        </span>
+                        {showDatePicker && (
+                          <input
+                            type="date"
+                            value={simpleEditForm.end_date || ''}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setSimpleEditForm({ ...simpleEditForm, end_date: e.target.value });
+                              }
+                              setShowDatePicker(false);
+                            }}
+                            onBlur={() => setShowDatePicker(false)}
+                            style={{
+                              position: 'absolute',
+                              top: '0',
+                              left: '0',
+                              width: '100%',
+                              height: '100%',
+                              opacity: '0',
+                              cursor: 'pointer',
+                              zIndex: 10
+                            }}
+                            autoFocus
+                          />
+                        )}
                       </div>
-                    )}
+
+                      {validationErrors.end_date && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginTop: '0.5rem',
+                          padding: '0.5rem 0.75rem',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '0.375rem',
+                          color: '#dc2626'
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', flexShrink: 0 }}>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                          </svg>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                            {validationErrors.end_date}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2114,9 +1945,9 @@ export default function StaffAssignmentsPage() {
                             }}></div>
                             Đang cập nhật...
                           </div>
-                         ) : (
-                           selectedAssignment && isExpired(selectedAssignment.end_date) ? 'Gia hạn phân công' : 'Cập nhật phân công'
-                         )}
+                        ) : (
+                          selectedAssignment && isExpired(selectedAssignment.end_date) ? 'Gia hạn phân công' : 'Cập nhật phân công'
+                        )}
                       </button>
                     )}
                   </div>

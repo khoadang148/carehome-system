@@ -1606,32 +1606,21 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
                     {canAddParticipants() && !isActivityDatePassed() ? (
-                      <button
-                        onClick={() => {
-                          if (participationCount >= activity.capacity) {
-                            showNotification(
-                              'Đã đạt sức chứa tối đa',
-                              `Hoạt động này đã đạt sức chứa tối đa (${activity.capacity} người). Không thể thêm thêm người cao tuổi.`,
-                              'warning'
-                            );
-                            return;
-                          }
-                          setAddResidentModalOpen(true);
-                        }}
-                        disabled={participationCount >= activity.capacity}
-                        style={{
-                          background: participationCount >= activity.capacity ? '#9ca3af' : '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '0.5rem 1rem',
-                          fontWeight: 600,
-                          cursor: participationCount >= activity.capacity ? 'not-allowed' : 'pointer',
-                          opacity: participationCount >= activity.capacity ? 0.6 : 1
-                        }}
-                      >
-                        {participationCount >= activity.capacity ? 'Đã đạt sức chứa tối đa' : '+ Thêm người tham gia'}
-                      </button>
+                        <Link
+                          href={`/staff/activities/${activity.id}/add-residents`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            padding: '0.5rem 1rem',
+                            borderRadius: 6,
+                            textDecoration: 'none',
+                            fontWeight: 600
+                          }}
+                        >
+                          + Thêm người tham gia
+                        </Link>
                     ) : (
                       <div style={{
                         display: 'flex',
@@ -2254,6 +2243,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      {user?.role === 'admin' && (
       <Dialog open={addResidentModalOpen} onClose={() => setAddResidentModalOpen(false)} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">
           <div className="fixed inset-0 bg-black opacity-30" />
@@ -2294,6 +2284,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
           </Dialog.Panel>
         </div>
       </Dialog>
+      )}
 
       <Dialog open={notificationModal.isOpen} onClose={closeNotification} className="fixed z-50 inset-0 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen px-2 sm:px-4">

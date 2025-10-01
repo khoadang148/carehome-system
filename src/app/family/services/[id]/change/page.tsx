@@ -19,7 +19,7 @@ import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
-type DurationOption = "6" | "12";
+type DurationOption = "3" | "6" | "12" | "custom";
 
 export default function ChangeCarePlanPage() {
   const router = useRouter();
@@ -31,6 +31,7 @@ export default function ChangeCarePlanPage() {
   const [carePlans, setCarePlans] = useState<any[]>([]);
   const [mainPlanId, setMainPlanId] = useState<string>("");
   const [duration, setDuration] = useState<DurationOption | "">("");
+  const [customMonths, setCustomMonths] = useState<string>("");
   const [rooms, setRooms] = useState<any[]>([]);
   const [roomTypes, setRoomTypes] = useState<any[]>([]);
   const [roomType, setRoomType] = useState<string>("");
@@ -78,6 +79,50 @@ export default function ChangeCarePlanPage() {
     const dt = parseYMDToDate(ymd || '');
     return dt ? dt.toLocaleDateString('vi-VN') : '';
   };
+
+  // Helpers: today (local start), first day of next month
+  const todayStart = useMemo(() => {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }, []);
+  const nextMonthStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }, []);
+  const nextMonthStartYMD = useMemo(() => formatLocalYMD(nextMonthStart), [nextMonthStart]);
+  const firstDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+
+  const isCustomMonthsInvalid = useMemo(() => {
+    if (duration !== 'custom') return false;
+    const n = parseInt(customMonths || '0', 10);
+    return !Number.isFinite(n) || n < 3;
+  }, [duration, customMonths]);
+
+  // Compute endDate from startDate + duration/customMonths, then clamp to end of month (local)
+  useEffect(() => {
+    if (!startDate || !duration) {
+      setEndDate("");
+      return;
+    }
+    try {
+      const start = parseYMDToDate(startDate);
+      if (!start) { setEndDate(""); return; }
+      let months = 0;
+      if (duration === 'custom') {
+        months = parseInt(customMonths || '0', 10) || 0;
+      } else {
+        months = parseInt(String(duration), 10) || 0;
+      }
+      if (months < 3) { setEndDate(""); return; }
+      const temp = new Date(start);
+      temp.setMonth(temp.getMonth() + months);
+      const endOfMonth = new Date(temp.getFullYear(), temp.getMonth() + 1, 0);
+      endOfMonth.setHours(0, 0, 0, 0);
+      setEndDate(formatLocalYMD(endOfMonth));
+    } catch {
+      setEndDate("");
+    }
+  }, [startDate, duration, customMonths]);
 
   // Load care plans
   const { data: swrCarePlans } = useSWR("care-plans", () => carePlansAPI.getAll(), {
@@ -324,16 +369,18 @@ export default function ChangeCarePlanPage() {
     }
   }, [startDate, duration]);
 
-  // When entering step 6, auto-set start date to exactly the old plan's end date (local YMD)
+  // When entering step 6, initialize start date if empty to the minimal allowed first-of-month
   useEffect(() => {
     if (step !== 6) return;
     if (startDate) return; // keep user's manual selection
     try {
-      const base = currentEndDate ? new Date(currentEndDate) : new Date();
-      base.setHours(0, 0, 0, 0);
-      setStartDate(formatLocalYMD(base));
+      const hasEnd = !!currentEndDate;
+      const endLocal = hasEnd ? new Date(currentEndDate as Date) : null;
+      const isNotExpired = endLocal ? (new Date(endLocal.getFullYear(), endLocal.getMonth(), endLocal.getDate()) >= todayStart) : true;
+      const minStart = isNotExpired ? nextMonthStart : firstDayOfMonth(todayStart);
+      setStartDate(formatLocalYMD(minStart));
     } catch {}
-  }, [step, currentEndDate, startDate]);
+  }, [step, currentEndDate, startDate, todayStart, nextMonthStartYMD]);
 
   const handleSubmit = useCallback(async () => {
     if (!residentId || !mainPlanId || !duration) return;
@@ -1042,48 +1089,78 @@ export default function ChangeCarePlanPage() {
               Thời gian sử dụng
             </h3>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Thời hạn:</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="relative cursor-pointer">
-                    <input type="radio" name="duration" value="6" checked={duration === '6'} onChange={() => setDuration('6')} className="sr-only" />
-                    <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${duration === '6' ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${duration === '6' ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300'}`}>{duration === '6' && <div className="w-2 h-2 bg-white rounded-full"></div>}</div>
-                        <div>
-                          <div className="font-semibold text-gray-900">6 tháng</div>
-                          <div className="text-sm text-gray-500">Gia hạn nửa năm</div>
-                        </div>
-                      </div>
-                    </div>
-                  </label>
-                  <label className="relative cursor-pointer">
-                    <input type="radio" name="duration" value="12" checked={duration === '12'} onChange={() => setDuration('12')} className="sr-only" />
-                    <div className={`p-4 border-2 rounded-xl transition-all duration-200 ${duration === '12' ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${duration === '12' ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300'}`}>{duration === '12' && <div className="w-2 h-2 bg-white rounded-full"></div>}</div>
-                        <div>
-                          <div className="font-semibold text-gray-900">1 năm</div>
-                          <div className="text-sm text-gray-500">Gia hạn trọn năm</div>
-                        </div>
-                      </div>
-                    </div>
-                  </label>
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Thời hạn sử dụng dịch vụ</label>
+            <div className="flex items-center gap-2 flex-nowrap w-full">
+              {['3','6','12','custom'].map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setDuration(opt as DurationOption)}
+                  className={`px-3 py-2 rounded-xl text-sm font-semibold transition-colors border-2 whitespace-nowrap ${duration === opt
+                    ? opt === 'custom'
+                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      : 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                  aria-pressed={duration === opt}
+                >
+                  {opt === '3' && '3 tháng'}
+                  {opt === '6' && '6 tháng'}
+                  {opt === '12' && '12 tháng'}
+                  {opt === 'custom' && 'Tùy chọn'}
+                </button>
+              ))}
+              {duration === 'custom' && (
+                <div className="relative flex-shrink-0">
+                  <input
+                    type="number"
+                    min={3}
+                    step={1}
+                    value={customMonths}
+                    onChange={(e) => setCustomMonths(e.target.value)}
+                    onBlur={() => {
+                      const n = parseInt(customMonths || '0', 10);
+                      if (!Number.isFinite(n) || n < 3) setCustomMonths('3');
+                    }}
+                    placeholder="Số tháng"
+                    className="w-36 pr-12 rounded-xl border-2 border-amber-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                    aria-label="Số tháng sử dụng dịch vụ tùy chọn"
+                  />
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-600">tháng</span>
                 </div>
-              </div>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">Thời hạn sử dụng dịch vụ tối thiểu là 3 tháng.</p>
+            {duration === 'custom' && isCustomMonthsInvalid && (
+              <p className="mt-1 text-[11px] font-semibold text-red-600">Số tháng tối thiểu là 3.</p>
+            )}
+          </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ngày bắt đầu:</label>
-                <DatePicker
-                  selected={parseYMDToDate(startDate)}
-                  onChange={(date) => setStartDate(date ? formatLocalYMD(date) : '')}
-                  dateFormat="dd/MM/yyyy"
-                  minDate={currentEndDate ? new Date(currentEndDate) : new Date()}
-                  placeholderText="Chọn ngày bắt đầu"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                {(() => {
+                  const hasEnd = !!currentEndDate;
+                  const endLocal = hasEnd ? new Date(currentEndDate as Date) : null;
+                  const isNotExpired = endLocal ? (new Date(endLocal.getFullYear(), endLocal.getMonth(), endLocal.getDate()) >= todayStart) : true;
+                  const minStart = isNotExpired ? nextMonthStart : firstDayOfMonth(todayStart);
+                  return (
+                    <DatePicker
+                      selected={parseYMDToDate(startDate)}
+                      onChange={(date) => {
+                        if (!date) { setStartDate(''); return; }
+                        const normalized = firstDayOfMonth(date);
+                        setStartDate(formatLocalYMD(normalized));
+                      }}
+                      dateFormat="dd/MM/yyyy"
+                      minDate={minStart}
+                      placeholderText="Chọn ngày bắt đầu (ngày đầu tháng)"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  );
+                })()}
               </div>
+              <p className="text-xs text-gray-500 mt-1">Ngày bắt đầu phải là ngày đầu tháng để bắt đầu sử dụng.</p>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ngày kết thúc mới:</label>
@@ -1093,13 +1170,13 @@ export default function ChangeCarePlanPage() {
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   </div>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">Tự động tính: {duration || '0'} tháng từ ngày bắt đầu</p>
+                <p className="text-sm text-gray-500 mt-1">Tự động tính: {duration === 'custom' ? (customMonths || '0') : (duration || '0')} tháng từ ngày bắt đầu</p>
               </div>
             </div>
 
             <div className="flex justify-end mt-6 gap-3">
               <button onClick={() => setStep(5)} className="px-5 py-2 bg-white text-gray-500 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-all duration-200 shadow">Quay lại</button>
-              <button disabled={!startDate || !duration} onClick={() => setStep(7)} className={`px-5 py-2 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow ${!startDate || !duration ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'}`}>Tiếp tục</button>
+              <button disabled={!startDate || !duration || (duration === 'custom' && isCustomMonthsInvalid)} onClick={() => setStep(7)} className={`px-5 py-2 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow ${!startDate || !duration || (duration === 'custom' && isCustomMonthsInvalid) ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'}`}>Tiếp tục</button>
             </div>
           </div>
         )}

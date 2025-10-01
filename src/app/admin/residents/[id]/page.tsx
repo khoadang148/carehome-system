@@ -23,11 +23,15 @@ import { bedsAPI } from '@/lib/api';
 import { bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { careNotesAPI } from '@/lib/api';
+import { photosAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 import CareNotesDisplay from '@/components/staff/CareNotesDisplay';
 import AppointmentsDisplay from '@/components/staff/AppointmentsDisplay';
 import Avatar from '@/components/Avatar';
+import useSWR from 'swr';
+import { useResident, useVitalSigns as useVitalSignsSWR, useCareNotes as useCareNotesSWR, useRoom as useRoomSWR, useBedAssignments as useBedAssignmentsSWR } from '@/hooks/useSWRData';
+import { swrKeys } from '@/lib/swr-config';
 
 
 export default function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,21 +53,22 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
   const [bedLoading, setBedLoading] = useState(false);
 
   const now = new Date();
-  // Hiển thị tất cả assignments (không cần kiểm tra trạng thái active)
-  const activeAssignments = carePlanAssignments.filter((assignment: any) => {
+  // Phân nhóm assignment: đang hiệu lực và đã hết hạn (loại trừ cancelled)
+  const currentAssignments = carePlanAssignments.filter((assignment: any) => {
     const notExpired = !assignment?.end_date || new Date(assignment.end_date) >= now;
-    const notCancelled = !['cancelled', 'completed'].includes(String(assignment?.status || '').toLowerCase());
-    console.log('Filtering assignment:', assignment, {
-      notExpired,
-      notCancelled,
-      status: assignment?.status,
-      end_date: assignment?.end_date
-    });
+    const notCancelled = String(assignment?.status || '').toLowerCase() !== 'cancelled';
     return notExpired && notCancelled;
+  });
+
+  const expiredAssignments = carePlanAssignments.filter((assignment: any) => {
+    const isExpired = assignment?.end_date && new Date(assignment.end_date) < now;
+    const notCancelled = String(assignment?.status || '').toLowerCase() !== 'cancelled';
+    return isExpired && notCancelled;
   });
   
   console.log('All care plan assignments:', carePlanAssignments);
-  console.log('Active assignments:', activeAssignments);
+  console.log('Current assignments:', currentAssignments);
+  console.log('Expired assignments:', expiredAssignments);
 
   // Loại bỏ các biến không cần thiết
   // const allAssignments = carePlanAssignments.filter((assignment: any) => {
@@ -78,133 +83,94 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
   const residentId = React.use(params).id;
 
+  // SWR-driven data fetching
+  const { resident: residentData, isLoading: residentLoading } = useResident(residentId);
+  const { vitalSigns: vitalDataLatest, isLoading: vitalIsLoading } = useVitalSignsSWR(residentId);
+  const { careNotes: careNotesData, isLoading: careNotesIsLoading } = useCareNotesSWR(residentId);
+  const { bedAssignment: currentBedAssignment, roomId, isLoading: bedAssignmentsIsLoading, bedAssignments } = useBedAssignmentsSWR(residentId);
+  const { roomNumber: swrRoomNumber, isLoading: roomIsLoading } = useRoomSWR(roomId || '');
+
+  const { data: carePlanAssignmentsData } = useSWR(
+    residentId ? `care-plan-assignments-${residentId}` : null,
+    () => carePlansAPI.getByResidentId(residentId)
+  );
+
+  // Map resident data to UI shape
   useEffect(() => {
-    const fetchResident = async () => {
-      try {
-        const data = await residentAPI.getById(residentId);
-        const mapped = {
-          id: data._id,
-          name: data.full_name,
-          age: data.date_of_birth ? (new Date().getFullYear() - new Date(data.date_of_birth).getFullYear()) : '',
-          gender: data.gender,
-          admissionDate: data.admission_date,
-          dischargeDate: data.discharge_date,
-          relationship: data.relationship,
-          medicalHistory: data.medical_history,
-          currentMedications: data.current_medications,
-          allergies: data.allergies,
-          emergencyContact: data.emergency_contact,
-          careLevel: data.care_level,
-          avatar: Array.isArray(data.avatar) ? data.avatar[0] : data.avatar || null,
-          status: data.status,
-          ...data
-        };
-        setResident(mapped);
-        setRoomLoading(true);
-        try {
-          const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-          console.log('Bed assignments for room:', bedAssignments);
-          const bedAssignment = Array.isArray(bedAssignments) ?
-            bedAssignments.find((a: any) => a.bed_id?.room_id && !a.unassigned_date) : null;
+    if (residentData) {
+      const data: any = residentData;
+      const mapped = {
+        id: data._id,
+        name: data.full_name,
+        age: data.date_of_birth ? (new Date().getFullYear() - new Date(data.date_of_birth).getFullYear()) : '',
+        gender: data.gender,
+        admissionDate: data.admission_date,
+        dischargeDate: data.discharge_date,
+        relationship: data.relationship,
+        medicalHistory: data.medical_history,
+        currentMedications: data.current_medications,
+        allergies: data.allergies,
+        emergencyContact: data.emergency_contact,
+        careLevel: data.care_level,
+        avatar: Array.isArray(data.avatar) ? data.avatar[0] : data.avatar || null,
+        status: data.status,
+        ...data
+      };
+      setResident(mapped);
+    }
+    setLoading(residentLoading);
+  }, [residentData, residentLoading]);
 
-          if (bedAssignment?.bed_id?.room_id) {
-            if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
-              setRoomNumber(bedAssignment.bed_id.room_id.room_number);
-            } else {
-              const roomId = bedAssignment.bed_id.room_id._id || bedAssignment.bed_id.room_id;
-              if (roomId) {
-                const room = await roomsAPI.getById(roomId);
-                setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-              } else {
-                setRoomNumber('Chưa hoàn tất đăng kí');
-              }
-            }
-          } else {
-            const carePlanAssignments = await carePlansAPI.getByResidentId(residentId);
-            const assignment = Array.isArray(carePlanAssignments) ? carePlanAssignments.find((a: any) => a.bed_id?.room_id || a.assigned_room_id) : null;
-            const roomId = assignment?.bed_id?.room_id || assignment?.assigned_room_id;
-            const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-            if (roomIdString) {
-              const room = await roomsAPI.getById(roomIdString);
-              setRoomNumber(room?.room_number || 'Chưa hoàn tất đăng kí');
-            } else {
-              setRoomNumber('Chưa hoàn tất đăng kí');
-            }
-          }
-        } catch (error) {
-          setRoomNumber('Chưa hoàn tất đăng kí');
-        }
-        setRoomLoading(false);
-        try {
-          const assignments = await carePlansAPI.getByResidentId(residentId);
-          console.log('Care plan assignments:', assignments);
-          setCarePlanAssignments(Array.isArray(assignments) ? assignments : []);
-        } catch (error) {
-          console.log('No care plan assignments found for resident:', residentId);
-          setCarePlanAssignments([]);
-        }
-        setBedLoading(true);
-        try {
-          const bedAssignments = await bedAssignmentsAPI.getByResidentId(residentId);
-          console.log('Bed assignments for bed:', bedAssignments);
-          const bedAssignment = Array.isArray(bedAssignments) ?
-            bedAssignments.find((a: any) => a.bed_id && !a.unassigned_date) : null;
+  // Vital signs and care notes from SWR
+  useEffect(() => {
+    setVitalLoading(vitalIsLoading);
+    setVitalSigns(vitalDataLatest || null);
+  }, [vitalDataLatest, vitalIsLoading]);
 
-          if (bedAssignment?.bed_id) {
-            if (typeof bedAssignment.bed_id === 'object' && bedAssignment.bed_id.bed_number) {
-              setBedNumber(bedAssignment.bed_id.bed_number);
-            } else {
-              const bedId = bedAssignment.bed_id._id || bedAssignment.bed_id;
-              if (bedId) {
-                const bed = await bedsAPI.getById(bedId);
-                setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
-              } else {
-                setBedNumber('Chưa hoàn tất đăng kí');
-              }
-            }
-          } else {
-            let currentAssignment: any = null;
-            if (Array.isArray(carePlanAssignments)) {
-              currentAssignment = carePlanAssignments.find(a =>
-                (a.resident_id?._id || a.resident_id) === residentId
-              ) || carePlanAssignments[0];
-            }
-            const assignedBedId = currentAssignment?.assigned_bed_id as any;
-            const bedIdString = typeof assignedBedId === 'object' && assignedBedId?._id ? assignedBedId._id : assignedBedId;
-            if (bedIdString) {
-              try {
-                const bed = await bedsAPI.getById(bedIdString);
-                setBedNumber(bed?.bed_number || 'Chưa hoàn tất đăng kí');
-              } catch {
-                setBedNumber('Chưa hoàn tất đăng kí');
-              }
-            } else {
-              setBedNumber('Chưa hoàn tất đăng kí');
-            }
-          }
-        } catch (error) {
-          setBedNumber('Chưa hoàn tất đăng kí');
-        }
-        setBedLoading(false);
-        setCarePlans([]);
-        setVitalLoading(true);
-        const vitalData = await vitalSignsAPI.getByResidentId(residentId);
-        setVitalSigns(Array.isArray(vitalData) && vitalData.length > 0 ? vitalData[0] : null);
-        try {
-          const careNotesData = await careNotesAPI.getAll({ resident_id: residentId });
-          setCareNotes(Array.isArray(careNotesData) ? careNotesData : []);
-        } catch {
-          setCareNotes([]);
-        }
-      } catch (error) {
-        router.push('/admin/residents');
-      } finally {
-        setLoading(false);
-        setVitalLoading(false);
+  useEffect(() => {
+    setCareNotes(Array.isArray(careNotesData) ? careNotesData : []);
+  }, [careNotesData]);
+
+  // Care plan assignments via SWR
+  useEffect(() => {
+    if (Array.isArray(carePlanAssignmentsData)) {
+      setCarePlanAssignments(carePlanAssignmentsData);
+    } else if (carePlanAssignmentsData === undefined) {
+      // noop while loading
+    } else {
+      setCarePlanAssignments([]);
+    }
+  }, [carePlanAssignmentsData]);
+
+  // Room and bed from SWR hooks
+  useEffect(() => {
+    setRoomLoading(roomIsLoading || bedAssignmentsIsLoading);
+    if (swrRoomNumber) {
+      setRoomNumber(swrRoomNumber || 'Chưa hoàn tất đăng kí');
+    }
+  }, [swrRoomNumber, roomIsLoading, bedAssignmentsIsLoading]);
+
+  useEffect(() => {
+    setBedLoading(bedAssignmentsIsLoading);
+    const ba = currentBedAssignment || (Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id && !a.unassigned_date) : null);
+    if (ba?.bed_id) {
+      if (typeof ba.bed_id === 'object' && ba.bed_id.bed_number) {
+        setBedNumber(ba.bed_id.bed_number);
       }
-    };
-    fetchResident();
-  }, [residentId, router, refreshKey]);
+    } else {
+      // try from care plan assignment
+      let currentAssignment: any = null;
+      if (Array.isArray(carePlanAssignments)) {
+        currentAssignment = carePlanAssignments.find(a =>
+          (a.resident_id?._id || a.resident_id) === residentId
+        ) || carePlanAssignments[0];
+      }
+      const assignedBedId = currentAssignment?.assigned_bed_id as any;
+      if (!assignedBedId) {
+        setBedNumber('Chưa hoàn tất đăng kí');
+      }
+    }
+  }, [currentBedAssignment, bedAssignments, bedAssignmentsIsLoading, carePlanAssignments, residentId]);
 
   // Load care plan details by ID for display of name and price
   useEffect(() => {
@@ -707,13 +673,15 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                     margin: 0,
                     color: '#1e293b'
                   }}>
-                    Gói dịch vụ đang sử dụng
+                    {String(resident?.status || '').toLowerCase() === 'active' 
+                      ? 'Gói dịch vụ đã đăng ký' 
+                      : 'Gói dịch vụ đang sử dụng'}
                   </h3>
                 </div>
-                {activeAssignments.length > 0 ? (
+                {currentAssignments.length > 0 ? (
                   <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    {/* Active Assignments */}
-                    {activeAssignments.map((assignment: any, assignmentIdx: number) => (
+                    {/* Current Assignments */}
+                    {currentAssignments.map((assignment: any, assignmentIdx: number) => (
                       assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
                         assignment.care_plan_ids.map((planRef: any, planIdx: number) => {
                           const planId = (planRef && typeof planRef === 'object') ? (planRef._id || planRef.id) : planRef;
@@ -722,7 +690,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                           const price = plan?.monthly_price;
                           return (
                             <div
-                              key={`active-${assignment._id}-${planId || planIdx}`}
+                              key={`current-${assignment._id}-${planId || planIdx}`}
                               style={{
                                 background: 'rgba(255,255,255,0.8)',
                                 borderRadius: '0.5rem',
@@ -745,7 +713,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                           );
                         })
                       ) : (
-                        <div key={`empty-active-${assignmentIdx}`} style={{
+                        <div key={`empty-current-${assignmentIdx}`} style={{
                           background: 'rgba(255,255,255,0.8)',
                           borderRadius: '0.5rem',
                           padding: '1rem',
@@ -760,7 +728,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
                     {/* Link to details */}
                     <Link
-                      href={`/admin/residents/${residentId}/services/${activeAssignments[0]._id}`}
+                      href={`/admin/residents/${residentId}/services/${currentAssignments[0]._id}`}
                       style={{
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         color: 'white',
@@ -812,6 +780,95 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                 )}
               </div>
+
+              {expiredAssignments.length > 0 && (
+                <div style={{
+                  background: 'rgba(107, 114, 128, 0.06)',
+                  borderRadius: '1rem',
+                  padding: '1.5rem',
+                  border: '1px solid rgba(107, 114, 128, 0.2)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{
+                      width: '2rem',
+                      height: '2rem',
+                      background: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+                      borderRadius: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <ClipboardDocumentListIcon style={{ width: '1rem', height: '1rem', color: 'white' }} />
+                    </div>
+                    <h3 style={{
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      margin: 0,
+                      color: '#374151'
+                    }}>
+                      Gói dịch vụ đã hết hạn
+                    </h3>
+                  </div>
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {expiredAssignments.map((assignment: any, assignmentIdx: number) => (
+                      assignment.care_plan_ids && assignment.care_plan_ids.length > 0 ? (
+                        assignment.care_plan_ids.map((planRef: any, planIdx: number) => {
+                          const planId = (planRef && typeof planRef === 'object') ? (planRef._id || planRef.id) : planRef;
+                          const plan = planId && carePlanMap[planId] ? carePlanMap[planId] : (planRef || {});
+                          const name = plan?.plan_name || plan?.name || 'Gói dịch vụ';
+                          const price = plan?.monthly_price;
+                          const endDate = assignment?.end_date ? formatDateDDMMYYYY(assignment.end_date) : '';
+                          return (
+                            <div
+                              key={`expired-${assignment._id}-${planId || planIdx}`}
+                              style={{
+                                background: 'rgba(255,255,255,0.7)',
+                                borderRadius: '0.5rem',
+                                padding: '1rem',
+                                border: '1px solid #e5e7eb',
+                                marginBottom: '0.5rem',
+                                opacity: 0.9
+                              }}
+                            >
+                              <div style={{
+                                fontWeight: 600,
+                                fontSize: '1rem',
+                                color: '#6b7280'
+                              }}>
+                                <span>{name}</span>
+                              </div>
+                              <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+                                Giá: {price !== undefined ? formatDisplayCurrency(price) : '---'}
+                              </div>
+                              {endDate && (
+                                <div style={{ fontSize: '0.85rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                  Hết hạn: {endDate}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div key={`empty-expired-${assignmentIdx}`} style={{
+                          background: 'rgba(255,255,255,0.7)',
+                          borderRadius: '0.5rem',
+                          padding: '1rem',
+                          border: '1px solid #e5e7eb',
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          Assignment {assignmentIdx + 1}: Không có gói dịch vụ
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* CCCD Images Section */}
               <div style={{
@@ -867,36 +924,30 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                         border: '2px solid #e5e7eb',
                         background: '#f9fafb'
                       }}>
-                        <img
-                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/${resident.cccd_front}`}
-                          alt="CCCD mặt trước"
-                          style={{
-                            width: '100%',
-                            height: '200px',
-                            objectFit: 'cover',
-                            display: 'block'
-                          }}
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = 'none';
-                            const nextElement = target.nextElementSibling as HTMLElement;
-                            if (nextElement) {
-                              nextElement.style.display = 'flex';
-                            }
-                          }}
-                        />
-                        <div style={{
-                          display: 'none',
-                          width: '100%',
-                          height: '200px',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: '#f3f4f6',
-                          color: '#6b7280',
-                          fontSize: '0.875rem'
-                        }}>
-                          Không thể tải hình ảnh
-                        </div>
+                        {(() => {
+                          const rawPath = String(resident.cccd_front || '').replace(/\\/g, '/').replace(/^\"|\"$/g, '');
+                          const cleanPath = rawPath.replace(/^\/?(tmp\/)?uploads\//, 'uploads/');
+                          const url = photosAPI.getPhotoUrl(cleanPath);
+                          const fallbackUrl = `https://sep490-be-xniz.onrender.com/uploads/${cleanPath.replace(/^uploads\//, '')}`;
+                          return (
+                            <img
+                              src={url}
+                              alt="CCCD mặt trước"
+                              style={{
+                                width: '100%',
+                                height: '200px',
+                                objectFit: 'cover',
+                                display: 'block'
+                              }}
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                if (img.src !== fallbackUrl) {
+                                  img.src = fallbackUrl;
+                                }
+                              }}
+                            />
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div style={{
@@ -929,36 +980,30 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
                         border: '2px solid #e5e7eb',
                         background: '#f9fafb'
                       }}>
-                        <img
-                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/${resident.cccd_back}`}
-                          alt="CCCD mặt sau"
-                          style={{
-                            width: '100%',
-                            height: '200px',
-                            objectFit: 'cover',
-                            display: 'block'
-                          }}
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = 'none';
-                            const nextElement = target.nextElementSibling as HTMLElement;
-                            if (nextElement) {
-                              nextElement.style.display = 'flex';
-                            }
-                          }}
-                        />
-                        <div style={{
-                          display: 'none',
-                          width: '100%',
-                          height: '200px',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: '#f3f4f6',
-                          color: '#6b7280',
-                          fontSize: '0.875rem'
-                        }}>
-                          Không thể tải hình ảnh
-                        </div>
+                        {(() => {
+                          const rawPath = String(resident.cccd_back || '').replace(/\\/g, '/').replace(/^\"|\"$/g, '');
+                          const cleanPath = rawPath.replace(/^\/?(tmp\/)?uploads\//, 'uploads/');
+                          const url = photosAPI.getPhotoUrl(cleanPath);
+                          const fallbackUrl = `https://sep490-be-xniz.onrender.com/uploads/${cleanPath.replace(/^uploads\//, '')}`;
+                          return (
+                            <img
+                              src={url}
+                              alt="CCCD mặt sau"
+                              style={{
+                                width: '100%',
+                                height: '200px',
+                                objectFit: 'cover',
+                                display: 'block'
+                              }}
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                if (img.src !== fallbackUrl) {
+                                  img.src = fallbackUrl;
+                                }
+                              }}
+                            />
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div style={{

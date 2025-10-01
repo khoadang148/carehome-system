@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
 import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI, carePlanAssignmentsAPI } from "@/lib/api";
 import { clearCached } from "@/lib/utils/apiCache";
-import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon, ArrowPathIcon, FunnelIcon, ChartBarIcon, UserGroupIcon, CalendarDaysIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
+import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon, ArrowPathIcon, FunnelIcon, ChartBarIcon, UserGroupIcon, CalendarDaysIcon, CurrencyDollarIcon, PencilIcon, PlusIcon, TrashIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { BuildingOfficeIcon as BuildingOfficeIconSolid, HomeIcon as HomeIconSolid, UsersIcon as UsersIconSolid, MapPinIcon as MapPinIconSolid } from '@heroicons/react/24/solid';
 import { formatDisplayCurrency, formatActualCurrency, isDisplayMultiplierEnabled } from '@/lib/utils/currencyUtils';
 
@@ -61,6 +61,16 @@ export default function RoomManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal states
+  const [showRoomEditModal, setShowRoomEditModal] = useState(false);
+  const [showBedEditModal, setShowBedEditModal] = useState(false);
+  const [showAddBedModal, setShowAddBedModal] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [editingBed, setEditingBed] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
 
 
@@ -235,19 +245,320 @@ export default function RoomManagementPage() {
     router.push(`/admin/room-management/transfer?bedId=${bed._id}&roomId=${room._id}`);
   };
 
+  // Room management functions
+  const handleEditRoom = (room: Room) => {
+    setEditingRoom(room);
+    setShowRoomEditModal(true);
+  };
+
+  const handleEditBed = (bed: any) => {
+    setEditingBed(bed);
+    setShowBedEditModal(true);
+  };
+
+  const handleAddBed = (roomId: string) => {
+    setEditingRoom(rooms.find(r => r._id === roomId) || null);
+    setShowAddBedModal(true);
+  };
+
+  const handleUpdateRoom = async (formData: any) => {
+    if (!editingRoom) return;
+    
+    // Validate bed count against room type
+    const selectedRoomType = roomTypes.find(type => type.room_type === formData.room_type);
+    if (selectedRoomType) {
+      // Function to get max beds from room type
+      const getMaxBedsFromRoomType = (roomType: string): number => {
+        switch (roomType) {
+          case '2_bed': return 2;
+          case '3_bed': return 3;
+          case '4_5_bed': return 5;
+          case '6_8_bed': return 8;
+          default: return 10;
+        }
+      };
+      
+      const maxBeds = getMaxBedsFromRoomType(formData.room_type);
+      const requestedBeds = typeof formData.bed_count === 'number' ? formData.bed_count : parseInt(formData.bed_count);
+      
+      if (requestedBeds > maxBeds) {
+        setError(`Số lượng giường không được vượt quá ${maxBeds} giường (theo loại phòng ${selectedRoomType.type_name})`);
+      return;
+      }
+    }
+    
+    // Validate bed reduction - check if any beds are occupied or have pending requests
+    const currentBeds = bedsOfRoom(editingRoom._id);
+    const newBedCount = parseInt(formData.bed_count);
+    const currentBedCount = currentBeds.length;
+    
+    if (newBedCount < currentBedCount) {
+      // Check if any beds that would be removed are occupied
+      const bedsToRemove = currentBeds.slice(newBedCount);
+      const occupiedBeds = bedsToRemove.filter(bed => bed.status === 'occupied');
+      
+      if (occupiedBeds.length > 0) {
+        const occupiedBedNumbers = occupiedBeds.map(bed => bed.bed_number).join(', ');
+        setError(`Không thể giảm số giường vì có ${occupiedBeds.length} giường đang được sử dụng: ${occupiedBedNumbers}. Vui lòng chuyển resident ra khỏi các giường này trước.`);
+        return;
+      }
+      
+      // TODO: Check for pending room change requests
+      // This would require checking service requests or room change requests
+      // For now, we'll add a warning but allow the operation
+      console.warn('Bed reduction requested - consider checking for pending room change requests');
+    }
+    
+    setIsSubmitting(true);
+    try {
+      // Update room
+      await roomsAPI.update(editingRoom._id, formData);
+      
+      // If bed count changed, handle beds
+      if (formData.bed_count !== editingRoom.bed_count) {
+        const currentBeds = bedsOfRoom(editingRoom._id);
+        const newBedCount = parseInt(formData.bed_count);
+        const currentBedCount = currentBeds.length;
+        
+        if (newBedCount > currentBedCount) {
+          // Add new beds
+          console.log(`Adding ${newBedCount - currentBedCount} new beds for room ${editingRoom.room_number}`);
+          
+          // Get existing bed numbers to avoid duplicates
+          const existingBedNumbers = currentBeds.map(bed => bed.bed_number);
+          
+          // Also check all beds in the system to avoid any potential conflicts
+          const allBeds = beds.filter(bed => bed.room_id === editingRoom._id);
+          const allBedNumbers = allBeds.map(bed => bed.bed_number);
+          const combinedExistingNumbers = [...new Set([...existingBedNumbers, ...allBedNumbers])];
+          
+          console.log('Existing bed numbers:', existingBedNumbers);
+          console.log('All bed numbers in room:', allBedNumbers);
+          
+          // Find the next available bed numbers
+          const newBedNumbers: string[] = [];
+          let bedIndex = 1;
+          
+          for (let i = currentBedCount; i < newBedCount; i++) {
+            let bedNumber: string;
+            do {
+              // Try different naming patterns
+              if (bedIndex <= 26) {
+                // Use letters A-Z for first 26 beds
+                bedNumber = `${editingRoom.room_number}-${String.fromCharCode(64 + bedIndex)}`;
+              } else {
+                // Use numbers for beds beyond 26
+                bedNumber = `${editingRoom.room_number}-${bedIndex}`;
+              }
+              bedIndex++;
+            } while (combinedExistingNumbers.includes(bedNumber) || newBedNumbers.includes(bedNumber));
+            
+            newBedNumbers.push(bedNumber);
+            console.log(`Creating bed: ${bedNumber}`);
+            
+            await bedsAPI.create({
+              bed_number: bedNumber,
+              room_id: editingRoom._id,
+              bed_type: 'standard',
+              status: 'available'
+            });
+          }
+        } else if (newBedCount < currentBedCount) {
+          // Remove excess beds (only if not occupied)
+          const bedsToRemove = currentBeds.slice(newBedCount);
+          console.log(`Removing ${bedsToRemove.length} beds for room ${editingRoom.room_number}`);
+          
+          for (const bed of bedsToRemove) {
+            if (bed.status === 'available') {
+              console.log(`Deleting available bed: ${bed.bed_number}`);
+              await bedsAPI.delete(bed._id);
+      } else {
+              console.warn(`Cannot delete occupied bed: ${bed.bed_number} (status: ${bed.status})`);
+            }
+          }
+        }
+      }
+      
+      // Refresh data
+      await refreshData();
+      
+      setShowRoomEditModal(false);
+      setEditingRoom(null);
+      
+      // Create success message with bed count info
+      let successMsg = 'Cập nhật thông tin phòng thành công!';
+      if (formData.bed_count !== editingRoom.bed_count) {
+        const bedDiff = parseInt(formData.bed_count) - editingRoom.bed_count;
+        if (bedDiff > 0) {
+          successMsg += ` Đã thêm ${bedDiff} giường mới.`;
+        } else if (bedDiff < 0) {
+          const bedsToRemove = currentBeds.slice(parseInt(formData.bed_count));
+          const occupiedBeds = bedsToRemove.filter(bed => bed.status === 'occupied');
+          const deletedBeds = Math.abs(bedDiff) - occupiedBeds.length;
+          
+          if (deletedBeds > 0) {
+            successMsg += ` Đã xóa ${deletedBeds} giường trống.`;
+          }
+          if (occupiedBeds.length > 0) {
+            successMsg += ` ${occupiedBeds.length} giường đang sử dụng không thể xóa.`;
+          }
+        }
+      }
+      
+      setSuccessMessage(successMsg);
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error('Error updating room:', error);
+      setError('Không thể cập nhật thông tin phòng. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateBed = async (formData: any) => {
+    if (!editingBed) return;
+    
+    setIsSubmitting(true);
+    try {
+      await bedsAPI.update(editingBed._id, formData);
+      
+      // Refresh data
+      await refreshData();
+      
+      setShowBedEditModal(false);
+      setEditingBed(null);
+      setSuccessMessage('Cập nhật thông tin giường thành công!');
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error('Error updating bed:', error);
+      setError('Không thể cập nhật thông tin giường. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddNewBed = async (formData: any) => {
+    if (!editingRoom) return;
+    
+    // Check if room has reached maximum bed capacity
+    const currentBeds = bedsOfRoom(editingRoom._id);
+    const currentBedCount = currentBeds.length;
+    
+    // Get room type info to check max beds
+    const roomType = roomTypes.find(type => type.room_type === editingRoom.room_type);
+    if (roomType) {
+      // Function to get max beds from room type
+      const getMaxBedsFromRoomType = (roomType: string): number => {
+        switch (roomType) {
+          case '2_bed': return 2;
+          case '3_bed': return 3;
+          case '4_5_bed': return 5;
+          case '6_8_bed': return 8;
+          default: return 10;
+        }
+      };
+      
+      const maxBeds = getMaxBedsFromRoomType(editingRoom.room_type);
+      
+      if (currentBedCount >= maxBeds) {
+        setError(`Phòng ${editingRoom.room_number} đã đạt tối đa ${maxBeds} giường (loại phòng ${roomType.type_name}). Không thể thêm giường mới.`);
+        return;
+      }
+    }
+    
+    setIsSubmitting(true);
+    try {
+      // Get existing bed numbers to avoid duplicates
+      const existingBedNumbers = currentBeds.map(bed => bed.bed_number);
+      
+      // Also check all beds in the system to avoid any potential conflicts
+      const allBeds = beds.filter(bed => bed.room_id === editingRoom._id);
+      const allBedNumbers = allBeds.map(bed => bed.bed_number);
+      const combinedExistingNumbers = [...new Set([...existingBedNumbers, ...allBedNumbers])];
+      
+      // If no bed number provided, generate one
+      let bedNumber = formData.bed_number;
+      if (!bedNumber || bedNumber.trim() === '') {
+        // Find next available bed number
+        let bedIndex = 1;
+        do {
+          if (bedIndex <= 26) {
+            bedNumber = `${editingRoom.room_number}-${String.fromCharCode(64 + bedIndex)}`;
+          } else {
+            bedNumber = `${editingRoom.room_number}-${bedIndex}`;
+          }
+          bedIndex++;
+        } while (combinedExistingNumbers.includes(bedNumber));
+      } else {
+        // Check if provided bed number already exists
+        if (combinedExistingNumbers.includes(bedNumber)) {
+          setError(`Giường ${bedNumber} đã tồn tại. Vui lòng chọn tên khác.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      console.log(`Creating new bed: ${bedNumber}`);
+      
+      await bedsAPI.create({
+        bed_number: bedNumber,
+        bed_type: formData.bed_type,
+        room_id: editingRoom._id,
+          status: 'available'
+        });
+      
+      // Refresh data
+      await refreshData();
+      
+      setShowAddBedModal(false);
+      setEditingRoom(null);
+      setSuccessMessage(`Thêm giường ${bedNumber} thành công!`);
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error('Error adding bed:', error);
+      setError('Không thể thêm giường mới. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteBed = async (bedId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa giường này? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await bedsAPI.delete(bedId);
+      
+      // Refresh data
+      await refreshData();
+      
+      setSuccessMessage('Xóa giường thành công!');
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error('Error deleting bed:', error);
+      setError('Không thể xóa giường. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
 
 
 
-  const filteredRooms = rooms.filter((room) => {
-    const type = getRoomType(room.room_type);
-    const search = searchTerm.toLowerCase();
-    return (
-      room.room_number.toLowerCase().includes(search) ||
-      (type?.type_name?.toLowerCase() || '').includes(search) ||
-      (room.floor + '').includes(search)
-    );
-  });
+
+  const filteredRooms = rooms
+    .filter((room) => {
+      const type = getRoomType(room.room_type);
+      const search = searchTerm.toLowerCase();
+      return (
+        room.room_number.toLowerCase().includes(search) ||
+        (type?.type_name?.toLowerCase() || '').includes(search) ||
+        (room.floor + '').includes(search)
+      );
+    })
+    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true, sensitivity: 'base' }));
 
   const totalRooms = rooms.length;
   const availableRooms = rooms.filter(room => getRoomStatus(room) === "available").length;
@@ -423,16 +734,16 @@ export default function RoomManagementPage() {
                     <BuildingOfficeIcon className="w-5 h-5 text-white" />
                   </div>
                   Danh sách phòng
-                </h2>
+              </h2>
                 <p className="text-sm text-slate-600 font-semibold flex items-center gap-2">
                   <ChartBarIcon className="w-4 h-4 text-blue-500" />
                   Hiển thị {filteredRooms.length} trong tổng số {totalRooms} phòng
                 </p>
-              </div>
+            </div>
               <div className="text-xs text-slate-600 bg-gradient-to-r from-blue-100 to-indigo-100 px-3 py-2 rounded-xl border border-blue-200/50 font-semibold shadow-md">
                 <UserGroupIcon className="w-4 h-4 text-blue-500 inline mr-1" />
                 Quản lý phòng
-              </div>
+          </div>
             </div>
           </div>
 
@@ -443,43 +754,43 @@ export default function RoomManagementPage() {
                   <th className="px-4 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
                     <div className="flex items-center gap-2">
                       <HomeIcon className="w-4 h-4" />
-                      Số phòng
+                    Số phòng
                     </div>
                   </th>
                   <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[150px]">
                     <div className="flex items-center gap-2">
                       <CalendarDaysIcon className="w-4 h-4" />
-                      Loại phòng
+                    Loại phòng
                     </div>
                   </th>
                   <th className="px-3 py-3 text-center text-white font-bold text-xs uppercase tracking-wider min-w-[100px]">
                     <div className="flex items-center justify-center gap-2">
                       <BuildingOfficeIcon className="w-4 h-4" />
-                      Số giường
+                    Số giường
                     </div>
                   </th>
                   <th className="px-3 py-3 text-center text-white font-bold text-xs uppercase tracking-wider min-w-[100px]">
                     <div className="flex items-center justify-center gap-2">
                       <UserGroupIcon className="w-4 h-4" />
-                      Giới tính
+                    Giới tính
                     </div>
                   </th>
                   <th className="px-3 py-3 text-center text-white font-bold text-xs uppercase tracking-wider min-w-[80px]">
                     <div className="flex items-center justify-center gap-2">
                       <MapPinIcon className="w-4 h-4" />
-                      Tầng
+                    Tầng
                     </div>
                   </th>
                   <th className="px-3 py-3 text-center text-white font-bold text-xs uppercase tracking-wider min-w-[120px]">
                     <div className="flex items-center justify-center gap-2">
                       <ClockIcon className="w-4 h-4" />
-                      Trạng thái
+                    Trạng thái
                     </div>
                   </th>
                   <th className="px-3 py-3 text-center text-white font-bold text-xs uppercase tracking-wider min-w-[140px]">
                     <div className="flex items-center justify-center gap-2">
                       <EyeIcon className="w-4 h-4" />
-                      Thao tác
+                    Thao tác
                     </div>
                   </th>
                 </tr>
@@ -504,8 +815,8 @@ export default function RoomManagementPage() {
                       <td className="px-3 py-4">
                         <div className="flex items-center gap-2">
                           <span className="px-3 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 rounded-lg text-xs font-bold shadow-sm border border-blue-200">
-                            {type ? type.type_name : room.room_type}
-                          </span>
+                          {type ? type.type_name : room.room_type}
+                        </span>
                         </div>
                       </td>
                       <td className="px-3 py-4 text-center">
@@ -517,7 +828,7 @@ export default function RoomManagementPage() {
                             : room.gender === "female"
                               ? "bg-gradient-to-r from-pink-100 to-pink-200 text-pink-800 border border-pink-300"
                               : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300"
-                          }`}>
+                        }`}>
                           {room.gender === "male" ? "Nam" : room.gender === "female" ? "Nữ" : "Hỗn hợp"}
                         </span>
                       </td>
@@ -528,31 +839,41 @@ export default function RoomManagementPage() {
                           {(() => {
                             const statusInfo = getRoomStatusInfo(room);
                             return (
-                              <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-col items-center gap-1">
                                 <span className={`px-3 py-1 rounded-lg text-xs font-bold shadow-sm ${statusInfo.status === "available"
                                     ? "bg-gradient-to-r from-emerald-100 to-emerald-200 text-emerald-800 border border-emerald-300"
                                     : "bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300"
-                                  }`}>
-                                  {statusInfo.status === "available" ? "Còn trống" : "Hết giường"}
-                                </span>
+                          }`}>
+                            {statusInfo.status === "available" ? "Còn trống" : "Hết giường"}
+                          </span>
                                 <span className="text-xs text-slate-500 font-medium">
                                   {statusInfo.occupied}/{statusInfo.total} giường
-                                </span>
-                              </div>
+                          </span>
+                        </div>
                             );
                           })()}
-                        </td>
+                      </td>
                       <td className="px-3 py-4 text-center">
-                        <button
-                          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 flex items-center gap-1 mx-auto shadow-md hover:shadow-lg hover:-translate-y-0.5 ${selectedRoomId === room._id
-                              ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-red-500/25"
-                              : "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/25"
-                            }`}
-                          onClick={() => setSelectedRoomId(selectedRoomId === room._id ? null : room._id)}
-                        >
-                          <EyeIcon className="w-4 h-4" />
-                          {selectedRoomId === room._id ? "Ẩn giường" : "Xem giường"}
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditRoom(room)}
+                            className="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-1 shadow-md shadow-amber-500/25 hover:shadow-amber-600/40 hover:-translate-y-0.5"
+                            title="Chỉnh sửa phòng"
+                          >
+                            <PencilIcon className="w-3 h-3" />
+                            Sửa
+                          </button>
+                          <button
+                            className={`px-3 py-2 rounded-xl font-bold text-xs transition-all duration-300 flex items-center gap-1 shadow-md hover:shadow-lg hover:-translate-y-0.5 ${selectedRoomId === room._id
+                                ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-red-500/25"
+                                : "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/25"
+                              }`}
+                            onClick={() => setSelectedRoomId(selectedRoomId === room._id ? null : room._id)}
+                          >
+                            <EyeIcon className="w-4 h-4" />
+                            {selectedRoomId === room._id ? "Ẩn giường" : "Xem giường"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -639,12 +960,80 @@ export default function RoomManagementPage() {
               ) : (
                 <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl overflow-hidden shadow-lg border border-white/50 backdrop-blur-sm">
                   <div className="p-4 border-b border-slate-200/50 bg-gradient-to-r from-slate-50 to-indigo-50/30">
+                    <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-slate-700 to-indigo-700 flex items-center gap-2">
                       <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-md flex items-center justify-center">
                         <BuildingOfficeIcon className="w-4 h-4 text-white" />
                       </div>
                       Chi tiết giường
                     </h3>
+                      <button
+                        onClick={() => handleAddBed(selectedRoomId)}
+                        disabled={(() => {
+                          const room = rooms.find(r => r._id === selectedRoomId);
+                          if (!room) return true;
+                          const roomType = roomTypes.find(type => type.room_type === room.room_type);
+                          if (!roomType) return true;
+                          const getMaxBedsFromRoomType = (roomType: string): number => {
+                            switch (roomType) {
+                              case '2_bed': return 2;
+                              case '3_bed': return 3;
+                              case '4_5_bed': return 5;
+                              case '6_8_bed': return 8;
+                              default: return 10;
+                            }
+                          };
+                          const maxBeds = getMaxBedsFromRoomType(room.room_type);
+                          const currentBeds = bedsOfRoom(selectedRoomId);
+                          return currentBeds.length >= maxBeds;
+                        })()}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 shadow-md hover:-translate-y-0.5 ${
+                          (() => {
+                            const room = rooms.find(r => r._id === selectedRoomId);
+                            if (!room) return 'bg-slate-400 text-slate-200 cursor-not-allowed';
+                            const roomType = roomTypes.find(type => type.room_type === room.room_type);
+                            if (!roomType) return 'bg-slate-400 text-slate-200 cursor-not-allowed';
+                            const getMaxBedsFromRoomType = (roomType: string): number => {
+                              switch (roomType) {
+                                case '2_bed': return 2;
+                                case '3_bed': return 3;
+                                case '4_5_bed': return 5;
+                                case '6_8_bed': return 8;
+                                default: return 10;
+                              }
+                            };
+                            const maxBeds = getMaxBedsFromRoomType(room.room_type);
+                            const currentBeds = bedsOfRoom(selectedRoomId);
+                            return currentBeds.length >= maxBeds 
+                              ? 'bg-slate-400 text-slate-200 cursor-not-allowed' 
+                              : 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white shadow-emerald-500/25 hover:shadow-emerald-600/40';
+                          })()
+                        }`}
+                        title={(() => {
+                          const room = rooms.find(r => r._id === selectedRoomId);
+                          if (!room) return 'Không tìm thấy phòng';
+                          const roomType = roomTypes.find(type => type.room_type === room.room_type);
+                          if (!roomType) return 'Không tìm thấy loại phòng';
+                          const getMaxBedsFromRoomType = (roomType: string): number => {
+                            switch (roomType) {
+                              case '2_bed': return 2;
+                              case '3_bed': return 3;
+                              case '4_5_bed': return 5;
+                              case '6_8_bed': return 8;
+                              default: return 10;
+                            }
+                          };
+                          const maxBeds = getMaxBedsFromRoomType(room.room_type);
+                          const currentBeds = bedsOfRoom(selectedRoomId);
+                          return currentBeds.length >= maxBeds 
+                            ? `Phòng đã đạt tối đa ${maxBeds} giường` 
+                            : 'Thêm giường mới';
+                        })()}
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        Thêm giường
+                      </button>
+                    </div>
                   </div>
                   <table className="w-full">
                     <thead>
@@ -688,7 +1077,7 @@ export default function RoomManagementPage() {
                           }`}>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
+                              <div className="inline-flex items-center justify-center h-10 px-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white font-bold text-sm shadow-md whitespace-nowrap">
                                 {bed.bed_number}
                               </div>
                             </div>
@@ -737,16 +1126,33 @@ export default function RoomManagementPage() {
                             })()}
                           </td>
                           <td className="px-3 py-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleEditBed(bed)}
+                                className="px-2 py-1 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-1 shadow-md shadow-blue-500/25 hover:shadow-blue-600/40 hover:-translate-y-0.5"
+                                title="Chỉnh sửa giường"
+                              >
+                                <PencilIcon className="w-3 h-3" />
+                              </button>
+                              {bed.status === "available" && (
+                                <button
+                                  onClick={() => handleDeleteBed(bed._id)}
+                                  className="px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-1 shadow-md shadow-red-500/25 hover:shadow-red-600/40 hover:-translate-y-0.5"
+                                  title="Xóa giường"
+                                >
+                                  <TrashIcon className="w-3 h-3" />
+                                </button>
+                              )}
                             {bed.status === "occupied" && bed.assignment && (
                               <button
                                 onClick={() => openTransferPage(bed, rooms.find(r => r._id === selectedRoomId))}
-                                className="px-3 py-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-1 mx-auto shadow-md shadow-orange-500/25 hover:shadow-orange-600/40 hover:-translate-y-0.5"
+                                  className="px-2 py-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-1 shadow-md shadow-orange-500/25 hover:shadow-orange-600/40 hover:-translate-y-0.5"
                                 title="Chuyển đổi phòng/giường"
                               >
                                 <ArrowPathIcon className="w-3 h-3" />
-                                Chuyển
                               </button>
                             )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -773,6 +1179,695 @@ export default function RoomManagementPage() {
             </button>
           </div>
         )}
+
+        {/* Room Edit Modal */}
+        {showRoomEditModal && editingRoom && (
+          <RoomEditModal
+            room={editingRoom}
+            roomTypes={roomTypes}
+            onClose={() => {
+              setShowRoomEditModal(false);
+              setEditingRoom(null);
+            }}
+            onSave={handleUpdateRoom}
+            isSubmitting={isSubmitting}
+          />
+        )}
+
+        {/* Bed Edit Modal */}
+        {showBedEditModal && editingBed && (
+          <BedEditModal
+            bed={editingBed}
+            onClose={() => {
+              setShowBedEditModal(false);
+              setEditingBed(null);
+            }}
+            onSave={handleUpdateBed}
+            isSubmitting={isSubmitting}
+          />
+        )}
+
+        {/* Add Bed Modal */}
+        {showAddBedModal && editingRoom && (
+          <AddBedModal
+            room={editingRoom}
+            onClose={() => {
+              setShowAddBedModal(false);
+              setEditingRoom(null);
+            }}
+            onSave={handleAddNewBed}
+            isSubmitting={isSubmitting}
+            roomTypes={roomTypes}
+            bedsOfRoom={bedsOfRoom}
+          />
+        )}
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <SuccessModal
+            message={successMessage}
+            onClose={() => setShowSuccessModal(false)}
+          />
+        )}
+              </div>
+            </div>
+  );
+}
+
+// Room Edit Modal Component
+function RoomEditModal({ room, roomTypes, onClose, onSave, isSubmitting }: {
+  room: Room;
+  roomTypes: RoomType[];
+  onClose: () => void;
+  onSave: (data: any) => void;
+  isSubmitting: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    room_type: room.room_type,
+    bed_count: room.bed_count,
+    gender: room.gender,
+    floor: room.floor,
+    status: room.status
+  });
+
+  const [validationError, setValidationError] = useState('');
+
+  // Get current room type info
+  const currentRoomType = roomTypes.find(type => type.room_type === formData.room_type);
+  
+  // Function to get max beds from room type
+  const getMaxBedsFromRoomType = (roomType: string): number => {
+    switch (roomType) {
+      case '2_bed': return 2;
+      case '3_bed': return 3;
+      case '4_5_bed': return 5;
+      case '6_8_bed': return 8;
+      default: return 10;
+    }
+  };
+  
+  const maxBeds = getMaxBedsFromRoomType(formData.room_type);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Clear previous validation error
+    setValidationError('');
+    
+    // Validate bed count
+    const requestedBeds = typeof formData.bed_count === 'number' ? formData.bed_count : parseInt(formData.bed_count);
+    if (requestedBeds > maxBeds) {
+      setValidationError(`Số lượng giường không được vượt quá ${maxBeds} giường (theo loại phòng ${currentRoomType?.type_name})`);
+      return;
+    }
+    
+    // Validate bed reduction - check if any beds are occupied
+    // Note: We need to pass bedsOfRoom function to this component or restructure
+    // For now, we'll skip this validation in the modal and rely on the main function
+    
+    onSave(formData);
+  };
+
+  const handleRoomTypeChange = (newRoomType: string) => {
+    const newMaxBeds = getMaxBedsFromRoomType(newRoomType);
+    
+    // If current bed count exceeds new max, adjust it
+    if (formData.bed_count > newMaxBeds) {
+      setFormData({ ...formData, room_type: newRoomType, bed_count: newMaxBeds });
+    } else {
+      setFormData({ ...formData, room_type: newRoomType });
+    }
+    
+    setValidationError('');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-white/20 animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="relative p-8 border-b border-gradient-to-r from-blue-100 to-indigo-100">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-3xl"></div>
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <PencilIcon className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+                  Chỉnh sửa phòng
+                  </h2>
+                <p className="text-lg font-bold text-slate-600">Phòng {room.room_number}</p>
+              </div>
+            </div>
+                  <button
+              onClick={onClose}
+              className="p-3 hover:bg-red-50 rounded-2xl transition-all duration-300 group"
+            >
+              <XMarkIcon className="w-6 h-6 text-slate-500 group-hover:text-red-500 transition-colors" />
+                  </button>
+                </div>
+              </div>
+
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {/* Room Type */}
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></div>
+                Loại phòng
+                  </div>
+                    </label>
+            <div className="relative group">
+            <select
+              value={formData.room_type}
+              onChange={(e) => handleRoomTypeChange(e.target.value)}
+              className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300 shadow-lg hover:shadow-xl appearance-none cursor-pointer"
+                      required
+            >
+              {roomTypes.map((type) => {
+                const maxBedsForType = getMaxBedsFromRoomType(type.room_type);
+                return (
+                  <option key={type._id} value={type.room_type}>
+                    {type.type_name} 
+                    
+                  </option>
+                );
+              })}
+            </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                <ChevronDownIcon className="w-5 h-5 text-slate-400" />
+              </div>
+            </div>
+                  </div>
+
+          {/* Bed Count & Floor */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full"></div>
+                  Số giường
+                </div>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                max={maxBeds}
+                value={formData.bed_count}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setFormData({ ...formData, bed_count: value });
+                  
+                  // Clear previous error
+                  setValidationError('');
+                  
+                  // Validate max beds
+                  if (value > maxBeds) {
+                    setValidationError(`Số lượng giường không được vượt quá ${maxBeds} giường (theo loại phòng ${currentRoomType?.type_name})`);
+                    return;
+                  }
+                  
+                  // Validate bed reduction
+                  // Note: We can't access bedsOfRoom from here, so we'll skip this validation in real-time
+                  // The validation will be done in handleSubmit instead
+                }}
+                className={`w-full px-4 py-4 bg-white border-2 rounded-2xl text-slate-700 font-bold text-center focus:ring-4 transition-all duration-300 shadow-lg hover:shadow-xl ${
+                  validationError 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-100' 
+                    : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-100 hover:border-emerald-300'
+                }`}
+                      required
+                    />
+              <div className="text-xs text-slate-500 font-medium text-center mt-1">
+                Tối đa {maxBeds} giường
+                  </div>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+                  Tầng
+                </div>
+                    </label>
+                    <input
+                      type="number"
+                min="1"
+                max="20"
+                value={formData.floor}
+                onChange={(e) => setFormData({ ...formData, floor: parseInt(e.target.value) })}
+                className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-bold text-center focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-300 hover:border-purple-300 shadow-lg hover:shadow-xl"
+                      required
+                    />
+                  </div>
+                </div>
+
+          {/* Gender & Status */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full"></div>
+                  Giới tính
+                </div>
+                  </label>
+              <div className="relative group">
+                <select
+                  value={formData.gender}
+                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                  className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold focus:ring-4 focus:ring-pink-100 focus:border-pink-500 transition-all duration-300 group-hover:border-pink-300 shadow-lg hover:shadow-xl appearance-none cursor-pointer"
+                  required
+                >
+                  <option value="male">Nam</option>
+                  <option value="female">Nữ</option>
+                 
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <ChevronDownIcon className="w-5 h-5 text-slate-400" />
+                  </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"></div>
+                  Trạng thái
+                </div>
+              </label>
+              <div className="relative group">
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold focus:ring-4 focus:ring-orange-100 focus:border-orange-500 transition-all duration-300 group-hover:border-orange-300 shadow-lg hover:shadow-xl appearance-none cursor-pointer"
+                  required
+                >
+                  <option value="available">Có sẵn</option>
+                  <option value="maintenance">Bảo trì</option>
+                  <option value="occupied">Đã sử dụng</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <ChevronDownIcon className="w-5 h-5 text-slate-400" />
+                </div>
+              </div>
+                  </div>
+                </div>
+
+          {/* Validation Error */}
+          {validationError && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                  <XMarkIcon className="w-4 h-4 text-red-600" />
+                </div>
+                <p className="text-red-700 font-semibold text-sm">{validationError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 pt-6">
+                  <button
+                    type="button"
+              onClick={onClose}
+              className="flex-1 px-6 py-4 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 font-bold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 border border-slate-300"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <XMarkIcon className="w-5 h-5" />
+                Hủy bỏ
+              </div>
+                  </button>
+                  <button
+                    type="submit"
+              disabled={isSubmitting || !!validationError}
+              className="flex-1 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 text-white font-bold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Đang cập nhật...
+                </>
+              ) : (
+                <>
+                  <CheckIcon className="w-5 h-5" />
+                  Cập nhật phòng
+                </>
+              )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+  );
+}
+
+// Bed Edit Modal Component
+function BedEditModal({ bed, onClose, onSave, isSubmitting }: {
+  bed: any;
+  onClose: () => void;
+  onSave: (data: any) => void;
+  isSubmitting: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    bed_number: bed.bed_number,
+    bed_type: bed.bed_type,
+    status: bed.status
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-indigo-50 rounded-3xl shadow-2xl w-full max-w-md border border-white/20 animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="relative p-6 border-b border-gradient-to-r from-indigo-100 to-purple-100">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-pink-500/5 rounded-t-3xl"></div>
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                <PencilIcon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                  Chỉnh sửa giường
+                  </h2>
+                <p className="text-sm font-bold text-slate-600">Giường {bed.bed_number}</p>
+              </div>
+            </div>
+                  <button
+              onClick={onClose}
+              className="p-2 hover:bg-red-50 rounded-xl transition-all duration-300 group"
+            >
+              <XMarkIcon className="w-5 h-5 text-slate-500 group-hover:text-red-500 transition-colors" />
+                  </button>
+                </div>
+              </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Bed Number */}
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                Số giường
+              </div>
+                    </label>
+                    <input
+                      type="text"
+              value={formData.bed_number}
+              onChange={(e) => setFormData({ ...formData, bed_number: e.target.value })}
+              className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-bold text-center focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 hover:border-indigo-300 shadow-lg hover:shadow-xl"
+                      required
+                    />
+                  </div>
+
+          {/* Bed Type & Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full"></div>
+                  Loại giường
+                </div>
+                    </label>
+              <div className="relative group">
+                      <select
+              value={formData.bed_type}
+              onChange={(e) => setFormData({ ...formData, bed_type: e.target.value })}
+              className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all duration-300 group-hover:border-emerald-300 shadow-lg hover:shadow-xl appearance-none cursor-pointer"
+              required
+            >
+                  <option value="standard">Tiêu chuẩn</option>
+                  <option value="electric">Giường điện</option>
+                  <option value="hospital">Giường bệnh viện</option>
+                    </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+                  </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"></div>
+                  Trạng thái
+                </div>
+                    </label>
+              <div className="relative group">
+                    <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold focus:ring-4 focus:ring-orange-100 focus:border-orange-500 transition-all duration-300 group-hover:border-orange-300 shadow-lg hover:shadow-xl appearance-none cursor-pointer"
+                  required
+                >
+                  <option value="available">Có sẵn</option>
+                  <option value="occupied">Đang sử dụng</option>
+                  <option value="maintenance">Bảo trì</option>
+                    </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+                  </div>
+              </div>
+                  </div>
+                </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+              onClick={onClose}
+              className="flex-1 px-5 py-3 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 border border-slate-300"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <XMarkIcon className="w-4 h-4" />
+                Hủy
+              </div>
+                  </button>
+                  <button
+                    type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Đang cập nhật...
+                </>
+              ) : (
+                <>
+                  <CheckIcon className="w-4 h-4" />
+                  Cập nhật
+                </>
+              )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+  );
+}
+
+// Add Bed Modal Component
+function AddBedModal({ room, onClose, onSave, isSubmitting, roomTypes, bedsOfRoom }: {
+  room: Room;
+  onClose: () => void;
+  onSave: (data: any) => void;
+  isSubmitting: boolean;
+  roomTypes: RoomType[];
+  bedsOfRoom: (roomId: string) => any[];
+}) {
+  const [formData, setFormData] = useState({
+    bed_number: '',
+    bed_type: 'standard'
+  });
+
+  // Get room type info to check max beds
+  const roomType = roomTypes.find(type => type.room_type === room.room_type);
+  const getMaxBedsFromRoomType = (roomType: string): number => {
+    switch (roomType) {
+      case '2_bed': return 2;
+      case '3_bed': return 3;
+      case '4_5_bed': return 5;
+      case '6_8_bed': return 8;
+      default: return 10;
+    }
+  };
+  
+  const maxBeds = roomType ? getMaxBedsFromRoomType(room.room_type) : 10;
+  const currentBeds = bedsOfRoom(room._id);
+  const currentBedCount = currentBeds.length;
+  const canAddBed = currentBedCount < maxBeds;
+
+  // Generate suggested bed number
+  const getSuggestedBedNumber = () => {
+    // This is a simplified version - in real implementation, 
+    // we'd need to get existing beds from parent component
+    return `${room.room_number}-A`;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canAddBed) return;
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-emerald-50 rounded-3xl shadow-2xl w-full max-w-md border border-white/20 animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="relative p-6 border-b border-gradient-to-r from-emerald-100 to-green-100">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-green-500/5 to-teal-500/5 rounded-t-3xl"></div>
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
+                canAddBed 
+                  ? 'bg-gradient-to-br from-emerald-500 to-green-600 shadow-emerald-500/25' 
+                  : 'bg-gradient-to-br from-red-500 to-red-600 shadow-red-500/25'
+              }`}>
+                {canAddBed ? (
+                  <PlusIcon className="w-6 h-6 text-white" />
+                ) : (
+                  <XMarkIcon className="w-6 h-6 text-white" />
+                )}
+              </div>
+              <div>
+                <h2 className={`text-xl font-black text-transparent bg-clip-text ${
+                  canAddBed 
+                    ? 'bg-gradient-to-r from-emerald-600 to-green-600' 
+                    : 'bg-gradient-to-r from-red-600 to-red-700'
+                }`}>
+                  {canAddBed ? 'Thêm giường mới' : 'Không thể thêm giường'}
+                </h2>
+                <p className="text-sm font-bold text-slate-600">Phòng {room.room_number}</p>
+                <p className="text-xs text-slate-500">
+                  {currentBedCount}/{maxBeds} giường ({roomType?.type_name || 'Unknown'})
+                </p>
+              </div>
+            </div>
+                  <button
+              onClick={onClose}
+              className="p-2 hover:bg-red-50 rounded-xl transition-all duration-300 group"
+            >
+              <XMarkIcon className="w-5 h-5 text-slate-500 group-hover:text-red-500 transition-colors" />
+                  </button>
+                </div>
+              </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Bed Number */}
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full"></div>
+                Số giường
+                  </div>
+                      </label>
+                      <input
+              type="text"
+              value={formData.bed_number}
+              onChange={(e) => setFormData({ ...formData, bed_number: e.target.value })}
+              placeholder={getSuggestedBedNumber()}
+              disabled={!canAddBed}
+              className={`w-full px-4 py-4 rounded-2xl font-bold text-center transition-all duration-300 shadow-lg ${
+                canAddBed 
+                  ? 'bg-white border-2 border-slate-200 text-slate-700 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 hover:border-emerald-300 hover:shadow-xl placeholder-slate-400' 
+                  : 'bg-slate-100 border-2 border-slate-300 text-slate-400 cursor-not-allowed placeholder-slate-300'
+              }`}
+                        required
+                      />
+                    </div>
+
+          {/* Bed Type */}
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></div>
+                Loại giường
+                    </div>
+                      </label>
+            <div className="relative group">
+                      <select
+                value={formData.bed_type}
+                onChange={(e) => setFormData({ ...formData, bed_type: e.target.value })}
+                className="w-full px-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300 shadow-lg hover:shadow-xl appearance-none cursor-pointer"
+                required
+              >
+                <option value="standard">Tiêu chuẩn</option>
+                <option value="electric">Giường điện</option>
+                <option value="hospital">Giường bệnh viện</option>
+                      </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+                    </div>
+                    </div>
+                  </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+              onClick={onClose}
+              className="flex-1 px-5 py-3 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 border border-slate-300"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <XMarkIcon className="w-4 h-4" />
+                Hủy
+              </div>
+                  </button>
+                  <button
+                    type="submit"
+              disabled={isSubmitting || !canAddBed}
+              className={`flex-1 px-5 py-3 font-bold rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center gap-2 ${
+                canAddBed 
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 hover:shadow-xl hover:-translate-y-0.5 text-white' 
+                  : 'bg-gradient-to-r from-slate-400 to-slate-500 text-slate-200 cursor-not-allowed'
+              } ${isSubmitting ? 'disabled:from-slate-400 disabled:to-slate-500 disabled:shadow-none disabled:translate-y-0' : ''}`}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Đang thêm...
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="w-4 h-4" />
+                  Thêm giường
+                </>
+              )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+  );
+}
+
+// Success Modal Component
+function SuccessModal({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-green-50 rounded-3xl shadow-2xl w-full max-w-md border border-white/20 animate-in zoom-in-95 duration-300">
+        <div className="p-8 text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/25 animate-in zoom-in-110 duration-500">
+            <CheckIcon className="w-10 h-10 text-white" />
+          </div>
+          <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600 mb-3">
+            Thành công!
+          </h3>
+          <p className="text-slate-600 mb-8 font-semibold text-lg leading-relaxed">{message}</p>
+          <button
+            onClick={onClose}
+            className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2 mx-auto"
+          >
+            <CheckIcon className="w-5 h-5" />
+            Đóng
+          </button>
+        </div>
       </div>
     </div>
   );

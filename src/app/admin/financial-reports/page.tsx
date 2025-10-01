@@ -445,14 +445,7 @@ export default function FinancialReportsPage() {
               </div>
             </div>
           </div>
-          <div className="ml-auto flex items-center">
-            <button
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow transition-all duration-150"
-              onClick={() => router.push('/admin/financial-reports/new')}
-            >
-              + Tạo hóa đơn
-            </button>
-          </div>
+         
         </div>
 
         <div className="bg-white rounded-xl p-6 mb-8 shadow-sm border border-gray-100">

@@ -92,6 +92,8 @@ export default function RoomChangeRequestPage() {
     { revalidateOnFocus: true }
   );
   const [bedAssignments, setBedAssignments] = useState<any[]>([]);
+  const [currentAssignment, setCurrentAssignment] = useState<any | null>(null);
+  const [currentInfoLoading, setCurrentInfoLoading] = useState(false);
   const { data: serviceRequests = [], isLoading: serviceRequestsLoading } = useSWR<any[]>(
     () => (user?.id ? ["serviceRequests:mine", user.id] : null),
     () => serviceRequestsAPI.getMyRequests(),
@@ -127,7 +129,16 @@ export default function RoomChangeRequestPage() {
   };
 
   const getCurrentRoomAndBed = (residentId: string) => {
-    const assignment = bedAssignments.find((ba: any) => {
+    // Prefer the latest fetched assignment for the selected resident
+    const preferredAssignment = currentAssignment && (
+      (typeof currentAssignment.resident_id === 'string'
+        ? String(currentAssignment.resident_id)
+        : String(currentAssignment.resident_id?._id || currentAssignment.resident_id)) === String(residentId)
+    ) && !currentAssignment.unassigned_date
+      ? currentAssignment
+      : null;
+
+    const assignment = preferredAssignment || bedAssignments.find((ba: any) => {
       const baResidentId = typeof ba.resident_id === 'string'
         ? ba.resident_id
         : ba.resident_id?._id || ba.resident_id;
@@ -159,8 +170,8 @@ export default function RoomChangeRequestPage() {
     const resident = residents.find(r => r._id === selectedResident);
     if (!resident) return [];
 
-    // Check if resident is eligible for room change
-    if (resident.status !== 'admitted' && resident.status !== 'active') {
+    // Check if resident is eligible for room change (only admitted)
+    if (resident.status !== 'admitted') {
       return [];
     }
 
@@ -287,36 +298,30 @@ export default function RoomChangeRequestPage() {
     }
   }, [user, loading, router]);
 
-  // Load bed assignments when residents list changes (guard against update loops)
+  // Load bed assignment only for the selected resident to speed up the sidebar
   useEffect(() => {
-    const residentKey = Array.isArray(residents) ? residents.map(r => r._id).join(',') : '';
     let isCancelled = false;
-
-    const loadAssignments = async () => {
-      try {
-        if (!Array.isArray(residents) || residents.length === 0) {
-          // Only clear when needed to avoid infinite loops with new array refs
-          setBedAssignments(prev => (prev.length > 0 ? [] : prev));
+    const fetchAssignment = async () => {
+      if (!selectedResident) {
+        setCurrentAssignment(null);
           return;
         }
-
-        const assignmentsPromises = residents.map(resident =>
-          bedAssignmentsAPI.getByResidentId(resident._id)
-        );
-        const assignmentsResults = await Promise.all(assignmentsPromises);
-        const allAssignments = assignmentsResults.flat();
+      try {
+        setCurrentInfoLoading(true);
+        const list = await bedAssignmentsAPI.getByResidentId(selectedResident);
         if (isCancelled) return;
-        // Avoid redundant updates
-        setBedAssignments(prev => (prev.length !== allAssignments.length ? allAssignments : prev));
+        const active = Array.isArray(list) ? list.find((a: any) => !a.unassigned_date) : null;
+        setCurrentAssignment(active || null);
       } catch {
         if (isCancelled) return;
-        setBedAssignments(prev => (prev.length > 0 ? [] : prev));
+        setCurrentAssignment(null);
+      } finally {
+        if (!isCancelled) setCurrentInfoLoading(false);
       }
     };
-
-    loadAssignments();
+    fetchAssignment();
     return () => { isCancelled = true; };
-  }, [Array.isArray(residents) ? residents.map(r => r._id).join(',') : '']);
+  }, [selectedResident]);
 
   // Load user profile once
   useEffect(() => {
@@ -448,6 +453,20 @@ export default function RoomChangeRequestPage() {
                   {/* Current Room Info */}
                   {(() => {
                     const { room: currentRoom } = getCurrentRoomAndBed(selectedResident);
+                    if (currentInfoLoading) {
+                      return (
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-8 h-8 bg-slate-300 rounded-md animate-pulse" />
+                            <div className="h-4 w-40 bg-slate-200 rounded animate-pulse" />
+                          </div>
+                          <div className="ml-10 space-y-2">
+                            <div className="h-3 w-56 bg-slate-200 rounded animate-pulse" />
+                            <div className="h-3 w-48 bg-slate-200 rounded animate-pulse" />
+                          </div>
+                        </div>
+                      );
+                    }
                     return currentRoom ? (
                       <div className="bg-green-50 rounded-lg p-3 border border-green-200">
                         <div className="flex items-center gap-2 mb-2">
@@ -487,6 +506,19 @@ export default function RoomChangeRequestPage() {
                   {/* Current Bed Info */}
                   {(() => {
                     const { bed: currentBed } = getCurrentRoomAndBed(selectedResident);
+                    if (currentInfoLoading) {
+                      return (
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-8 h-8 bg-slate-300 rounded-md animate-pulse" />
+                            <div className="h-4 w-40 bg-slate-200 rounded animate-pulse" />
+                          </div>
+                          <div className="ml-10 space-y-2">
+                            <div className="h-3 w-56 bg-slate-200 rounded animate-pulse" />
+                          </div>
+                        </div>
+                      );
+                    }
                     return currentBed ? (
                       <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
                         <div className="flex items-center gap-2 mb-2">
@@ -560,7 +592,7 @@ export default function RoomChangeRequestPage() {
 
                 {(() => {
                   const eligibleResidents = residents.filter(r =>
-                    (r.status === 'admitted' || r.status === 'active') &&
+                    r.status === 'admitted' &&
                     !hasPendingRoomChangeRequest(r._id)
                   );
 
@@ -571,9 +603,9 @@ export default function RoomChangeRequestPage() {
                           <ExclamationTriangleIcon className="w-8 h-8 text-yellow-600" />
                         </div>
                         <h3 className="text-lg font-semibold text-yellow-900 mb-2">Không có người thân đủ điều kiện</h3>
-                        <p className="text-yellow-800 mb-4">
-                          Chỉ có thể đổi phòng cho người thân có trạng thái "Đã nhập viện" hoặc "Đang hoạt động" và chưa có yêu cầu đổi phòng đang chờ duyệt
-                        </p>
+                          <p className="text-yellow-800 mb-4">
+                            Chỉ có thể đổi phòng cho người thân có trạng thái "Đã nhập viện" và chưa có yêu cầu đổi phòng đang chờ duyệt
+                          </p>
                         <div className="text-sm text-yellow-700">
                           <p className="font-medium mb-2">Trạng thái hiện tại của người thân:</p>
                           <ul className="text-left space-y-1">
@@ -613,7 +645,7 @@ export default function RoomChangeRequestPage() {
                     >
                       <option value="">-- Chọn người thân --</option>
                       {residents.map((resident) => {
-                        const isEligible = (resident.status === 'admitted' || resident.status === 'active') &&
+                        const isEligible = resident.status === 'admitted' &&
                           !hasPendingRoomChangeRequest(resident._id);
                         const hasPending = hasPendingRoomChangeRequest(resident._id);
                         return (
@@ -640,7 +672,7 @@ export default function RoomChangeRequestPage() {
               {selectedResident && (() => {
                 const resident = residents.find(r => r._id === selectedResident);
                 const isEligible = resident &&
-                  (resident.status === 'admitted' || resident.status === 'active') &&
+                  resident.status === 'admitted' &&
                   !hasPendingRoomChangeRequest(resident._id);
                 const hasPending = resident && hasPendingRoomChangeRequest(resident._id);
 
@@ -674,7 +706,7 @@ export default function RoomChangeRequestPage() {
                               </span>
                             </p>
                             <p className="text-sm text-red-600 mt-2">
-                              Chỉ có thể đổi phòng cho người thân có trạng thái "Đã nhập viện" hoặc "Đang hoạt động"
+                              Chỉ có thể đổi phòng cho người thân có trạng thái "Đã nhập viện"
                             </p>
                           </>
                         )}

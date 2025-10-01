@@ -52,6 +52,8 @@ export default function ApprovalsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsData, setDetailsData] = useState<any | null>(null);
 
   // SWR hooks for data fetching with caching
   const { data: pendingUsers = [], error: usersError, mutate: mutateUsers } = useSWR(
@@ -141,6 +143,17 @@ export default function ApprovalsPage() {
       default:
         return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
+  };
+
+  const stripParentheses = (text?: string) => {
+    if (!text) return '---';
+    const cleaned = text.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    return cleaned || '---';
+  };
+
+  const formatSubmittedDate = (item: any) => {
+    const d = item?.createdAt || item?.created_at || item?.updatedAt || (item?.groupedRequests && (item.groupedRequests[0]?.createdAt || item.groupedRequests[0]?.created_at));
+    return d ? new Date(d).toLocaleDateString('vi-VN') : '---';
   };
 
   const getCurrentRoomAndBed = (residentId: string) => {
@@ -584,6 +597,20 @@ export default function ApprovalsPage() {
     router.push(`/admin/approvals/${item._id}`);
     return;
   };
+  const openRequestDetails = (groupedItem: any) => {
+    const firstId = groupedItem?._id || (groupedItem?.groupedRequests && groupedItem.groupedRequests[0]?._id);
+    if (firstId) {
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('serviceRequestPreview', JSON.stringify(groupedItem));
+        }
+      } catch {}
+      router.push(`/admin/approvals/service-requests/${firstId}`);
+      return;
+    }
+    setDetailsData(groupedItem);
+    setDetailsOpen(true);
+  };
 
   if (!user || user.role !== "admin") return null;
 
@@ -648,48 +675,19 @@ export default function ApprovalsPage() {
               </div>
             <div>
                 <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 mb-2 tracking-tight">
-                  Phê Duyệt Đăng Ký
+                  Phê Duyệt Yêu Cầu
               </h1>
                 <p className="text-base text-slate-600 font-semibold flex items-center gap-2">
-                  <ClipboardDocumentListIcon className="w-4 h-4 text-violet-500" />
-                  Quản lý và duyệt tài khoản người dùng
+                  Quản lý và duyệt tài khoản và yêu cầu dịch vụ người dùng
                 </p>
               </div>
             </div>
 
-            {/* Statistics Cards */}
-            <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-br from-violet-50 to-indigo-50 px-6 py-4 rounded-2xl border border-violet-200/50 shadow-md">
-                <div className="text-center">
-                  <div className="text-xs text-violet-600 font-bold mb-1 uppercase tracking-wide">
-                    Chờ duyệt
-                  </div>
-                  <div className="text-2xl font-black text-violet-700 mb-1">
-                    {pendingUsers.length}
-                  </div>
-                  <div className="text-xs text-violet-600 font-semibold">
-                    tài khoản
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-orange-50 to-red-50 px-6 py-4 rounded-2xl border border-orange-200/50 shadow-md">
-                <div className="text-center">
-                  <div className="text-xs text-orange-600 font-bold mb-1 uppercase tracking-wide">
-                    Yêu cầu dịch vụ
-                  </div>
-                  <div className="text-2xl font-black text-orange-700 mb-1">
-                    {pendingRoomChangeRequests.length}
-                  </div>
-                  <div className="text-xs text-orange-600 font-semibold">
-                    chờ duyệt
-                  </div>
-                </div>
-              </div>
-          </div>
+           
         </div>
 
           {/* Tabs */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 ml-20">
               <button
                 onClick={() => setActiveTab('users')}
                 className={`px-4 py-2 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 shadow-md ${
@@ -699,7 +697,7 @@ export default function ApprovalsPage() {
                 }`}
               >
                 <UserGroupIcon className="w-4 h-4" />
-                Tài khoản người dùng ({pendingUsers.length})
+                Tài khoản ({pendingUsers.length} yêu cầu) 
               </button>
               <button
                 onClick={() => setActiveTab('service-requests')}
@@ -710,10 +708,11 @@ export default function ApprovalsPage() {
                 }`}
               >
                 <HomeIcon className="w-4 h-4" />
-                Yêu cầu dịch vụ ({pendingRoomChangeRequests.length})
+                Dịch vụ ({pendingRoomChangeRequests.length} yêu cầu)
               </button>
             </div>
         </div>
+
 
         {/* Search and Filter Section */}
         <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl p-6 mb-6 shadow-lg border border-white/50 backdrop-blur-sm">
@@ -727,7 +726,7 @@ export default function ApprovalsPage() {
             <p className="text-sm text-slate-600 font-medium">
               {activeTab === 'users' 
                 ? 'Tìm kiếm tài khoản chờ duyệt theo thông tin cá nhân'
-                : 'Tìm kiếm yêu cầu dịch vụ theo tên người dùng, loại yêu cầu, ghi chú'
+                : 'Tìm kiếm yêu cầu dịch vụ theo tên người cao tuổi, loại yêu cầu, ghi chú'
               }
             </p>
           </div>
@@ -739,7 +738,7 @@ export default function ApprovalsPage() {
                 onChange={(e) => setSearch(e.target.value)}
               placeholder={activeTab === 'users' 
                 ? "Tìm theo họ tên, email, số điện thoại..."
-                : "Tìm theo tên người dùng, loại yêu cầu, ghi chú..."
+                : "Tìm theo tên người cao tuổi, loại yêu cầu, ghi chú..."
               }
               className="w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl text-sm outline-none bg-white transition-all duration-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-100 shadow-md hover:shadow-lg font-medium text-slate-700 group-hover:border-violet-300"
             />
@@ -825,13 +824,19 @@ export default function ApprovalsPage() {
                             Số điện thoại
                           </div>
                         </th>
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[160px]">
+                          <div className="flex items-center gap-2">
+                            <CalendarDaysIcon className="w-4 h-4" />
+                            Ngày gửi
+                          </div>
+                        </th>
                       </>
                     ) : (
                       <>
                         <th className="px-4 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[200px]">
                           <div className="flex items-center gap-2">
                             <UserIcon className="w-4 h-4" />
-                            Người dùng
+                            Người cao tuổi
                           </div>
                         </th>
                         <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[150px]">
@@ -840,10 +845,10 @@ export default function ApprovalsPage() {
                             Loại yêu cầu
                           </div>
                         </th>
-                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[200px]">
+                        <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[180px]">
                           <div className="flex items-center gap-2">
-                            <DocumentTextIcon className="w-4 h-4" />
-                            Chi tiết yêu cầu
+                            <CalendarDaysIcon className="w-4 h-4" />
+                            Ngày gửi
                           </div>
                         </th>
                         <th className="px-3 py-3 text-left text-white font-bold text-xs uppercase tracking-wider min-w-[200px]">
@@ -897,11 +902,15 @@ export default function ApprovalsPage() {
                           </td>
                           <td className="px-3 py-4 text-sm text-slate-700">
                             <div className="font-semibold text-slate-800 text-sm">{item.email || '---'}</div>
-                            <div className="text-slate-500 text-xs">Email đăng ký</div>
+                           
                           </td>
                           <td className="px-3 py-4 text-sm text-slate-700">
                             <div className="font-semibold text-slate-800 text-sm">{item.phone || '---'}</div>
-                            <div className="text-slate-500 text-xs">Số liên hệ</div>
+                            
+                          </td>
+                          <td className="px-3 py-4 text-sm text-slate-700">
+                            <div className="font-semibold text-slate-800 text-sm">{formatSubmittedDate(item)}</div>
+                          
                           </td>
                           <td className="px-3 py-4 text-center">
                             <div className="inline-flex gap-2">
@@ -953,65 +962,36 @@ export default function ApprovalsPage() {
                                 <div className="font-bold text-slate-800 truncate text-sm">
                                   {item.resident_id?.full_name || '---'}
                                 </div>
-                                <div className="text-xs text-slate-500">
-                                  {item.family_member_id?.full_name || '---'}
-                                </div>
+                                
                               </div>
                             </div>
                           </td>
                           <td className="px-3 py-4 text-sm text-slate-700">
                             <div className="font-semibold text-slate-800 text-sm">
                               {item.request_type === 'room_change' ? 'Đổi phòng' :
-                               item.request_type === 'service_date_change' ? `Gia hạn dịch vụ${item.count > 1 ? ` (${item.count} gói)` : ''}` :
-                               item.request_type === 'care_plan_change' ? `Đổi gói dịch vụ${item.count > 1 ? ` (${item.count} gói)` : ''}` :
+                               item.request_type === 'service_date_change' ? `Gia hạn dịch vụ ` :
+                               item.request_type === 'care_plan_change' ? `Đổi gói dịch vụ ` :
                                item.request_type || '---'}
                             </div>
-                            <div className="text-slate-500 text-xs">Loại yêu cầu</div>
+                            
                           </td>
                           <td className="px-3 py-4 text-sm text-slate-700">
-                            <div className="font-semibold text-slate-800 text-sm">
-                              {item.request_type === 'room_change' ? (
-                                <>
-                                  <div>Phòng: {item.target_room_id?.room_number || '---'}</div>
-                                  <div>Giường: {item.target_bed_id?.bed_number || '---'}</div>
-                                </>
-                              ) : item.request_type === 'service_date_change' ? (
-                                <>
-                                  <div>
-                                    Ngày hết hạn mới: {
-                                      (() => {
-                                        const dates = (item.groupedRequests || [item])
-                                          .map((r: any) => r.new_end_date)
-                                          .filter(Boolean)
-                                          .map((d: string) => new Date(d).toLocaleDateString('vi-VN'));
-                                        return dates.length ? [...new Set(dates)].join(', ') : '---';
-                                      })()
-                                    }
-                                  </div>
-                                </>
-                              ) : item.request_type === 'care_plan_change' ? (
-                                <>
-                                  <div>
-                                    Gói mới: {
-                                      (() => {
-                                        const names = (item.groupedRequests || [item])
-                                          .map((r: any) => r.target_service_package_id?.plan_name)
-                                          .filter(Boolean);
-                                        return names.length ? [...new Set(names)].join(', ') : (item.target_service_package_id?.plan_name || '---');
-                                      })()
-                                    }
-                                  </div>
-                                </>
-                              ) : '---'}
-                            </div>
-                            <div className="text-slate-500 text-xs">Chi tiết yêu cầu</div>
-                          </td>
+                            <div className="font-semibold text-slate-800 text-sm">{formatSubmittedDate(item)}</div>
+                            </td>
                           <td className="px-3 py-4 text-sm text-slate-700">
-                            <div className="font-semibold text-slate-800 text-sm">{item.note || '---'}</div>
-                            <div className="text-slate-500 text-xs">Ghi chú yêu cầu</div>
+                            <div className="font-semibold text-slate-800 text-sm">{stripParentheses(item.note)}</div>
+                           
                           </td>
                           <td className="px-3 py-4 text-center">
                             <div className="inline-flex gap-2">
+                              <button
+                                onClick={() => openRequestDetails(item)}
+                                title="Xem chi tiết"
+                                aria-label="Xem chi tiết"
+                                className="w-9 h-9 rounded-xl bg-gradient-to-r from-slate-500 to-slate-600 text-white hover:from-slate-600 hover:to-slate-700 inline-flex items-center justify-center shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                              >
+                                <EyeIcon className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => approveRoomChange(item._id)}
                                 disabled={busyId === item._id}
@@ -1064,6 +1044,13 @@ export default function ApprovalsPage() {
           name={successName}
           actionType={successActionType}
           details={successDetails}
+        />
+
+        <RequestDetailsModal
+          open={detailsOpen}
+          onClose={() => { setDetailsOpen(false); setDetailsData(null); }}
+          data={detailsData}
+          resolveRoomAndBed={getCurrentRoomAndBed}
         />
 
         {/* Reject Reason Modal */}
@@ -1215,8 +1202,8 @@ function RejectReasonModal({
   const isUserReject = type === 'user';
   const title = isUserReject ? 'Từ chối tài khoản' : 'Từ chối yêu cầu dịch vụ';
   const placeholder = isUserReject 
-    ? 'Nhập lý do từ chối tài khoản (tùy chọn)...' 
-    : 'Nhập lý do từ chối yêu cầu dịch vụ (tùy chọn)...';
+    ? 'Nhập lý do từ chối tài khoản này' 
+    : 'Nhập lý do từ chối yêu cầu dịch vụ này';
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1296,5 +1283,98 @@ function RejectReasonModal({
     </div>
   );
 }
+
+// Request Details Modal Component
+function RequestDetailsModal({
+  open,
+  onClose,
+  data,
+  resolveRoomAndBed
+}: {
+  open: boolean;
+  onClose: () => void;
+  data: any | null;
+  resolveRoomAndBed?: (residentId: string) => { room: any | null; bed: any | null };
+}) {
+  if (!open || !data) return null;
+
+  const grouped = data.groupedRequests || [data];
+  const typeLabel = data.request_type === 'room_change' ? 'Đổi phòng' :
+    data.request_type === 'service_date_change' ? 'Gia hạn dịch vụ' :
+    data.request_type === 'care_plan_change' ? 'Đổi gói dịch vụ' : data.request_type;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl p-6 max-w-2xl w-full shadow-xl border border-white/50 backdrop-blur-sm relative">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-200"
+        >
+          <XCircleIcon className="w-5 h-5" />
+        </button>
+
+        <div className="mb-4">
+          <h3 className="text-lg font-black text-slate-800">Chi tiết yêu cầu</h3>
+          <p className="text-sm text-slate-600">{typeLabel} • {data.resident_id?.full_name || '---'} • {data.family_member_id?.full_name || '---'}</p>
+        </div>
+
+        <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
+          {grouped.map((req: any) => (
+            <div key={req._id} className="rounded-xl border border-slate-200 p-3 bg-white">
+              <div className="text-sm text-slate-700 font-semibold mb-2">{new Date(req.createdAt || req.created_at || req.updatedAt || Date.now()).toLocaleString('vi-VN')}</div>
+              {req.request_type === 'room_change' && (() => {
+                const residentId = req.resident_id?._id || req.resident_id;
+                let fromStr: string | null = null;
+                try {
+                  if (resolveRoomAndBed) {
+                    const { room, bed } = resolveRoomAndBed(residentId);
+                    fromStr = room?.room_number && bed?.bed_number ? `Phòng ${room.room_number} • Giường ${bed.bed_number}` : null;
+                  }
+                } catch {}
+                const toStr = `${req.target_room_id?.room_number ? `Phòng ${req.target_room_id?.room_number}` : '---'}${req.target_bed_id?.bed_number ? ` • Giường ${req.target_bed_id?.bed_number}` : ''}`;
+                return <ChangePreview label="Đổi chỗ ở" from={fromStr} to={toStr} color="orange" />;
+              })()}
+              {req.request_type === 'service_date_change' && (
+                <ChangePreview label="Gia hạn đến" to={req.new_end_date ? new Date(req.new_end_date).toLocaleDateString('vi-VN') : '---'} color="orange" />
+              )}
+              {req.request_type === 'care_plan_change' && (
+                <ChangePreview label="Đổi gói dịch vụ" to={req.target_service_package_id?.plan_name || '---'} color="orange" />
+              )}
+              {req.note && <div className="text-sm text-slate-600 mt-2">Ghi chú: {req.note}</div>}
+              <div className="text-xs text-slate-500 mt-1">ID: {req._id}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl font-bold text-white bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 shadow-md">Đóng</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+  const Arrow = () => (
+    <span className="mx-2 text-slate-400 font-bold">→</span>
+  );
+
+  function ChangePreview({ label, from, to, color }: { label: string; from?: string | null; to?: string | null; color: 'violet' | 'orange' | 'slate' }) {
+    const colorFrom = color === 'violet' ? 'text-violet-700' : color === 'orange' ? 'text-orange-700' : 'text-slate-700';
+    const colorTo = color === 'violet' ? 'text-violet-700' : color === 'orange' ? 'text-orange-700' : 'text-slate-700';
+    return (
+      <div className="text-sm">
+        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-1">{label}</div>
+        {from && to ? (
+          <div className="flex items-center flex-wrap gap-y-1">
+            <span className={`font-bold ${colorFrom}`}>{from}</span>
+            <Arrow />
+            <span className={`font-bold ${colorTo}`}>{to}</span>
+          </div>
+        ) : (
+          <div className={`font-bold ${colorTo}`}>{to || from || '---'}</div>
+        )}
+      </div>
+    );
+  }
 
 

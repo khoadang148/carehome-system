@@ -775,21 +775,32 @@ export default function SelectPackagesPage() {
 
       let assignedBedId: string | null = null;
 
-      if (selectedBedId && !selectedBedId.includes('_bed_')) {
-        assignedBedId = selectedBedId;
-      } else if (selectedBedId && selectedBedId.includes('_bed_')) {
-        const selectedRoom = rooms.find(r => r._id === selectedRoomId);
-        const residentGender = (pendingResident?.gender) || residents.find(r => r._id === finalResidentId)?.gender;
-        const availableBeds = getBedsForRoom(selectedRoomId, residentGender);
-        const bedNumber = selectedBedId.split('_bed_')[1];
-        const actualBed = availableBeds.find(b => b.bed_number == bedNumber && !b._id.includes('_bed_'));
-        if (actualBed && actualBed._id) {
-          assignedBedId = actualBed._id;
+      // If user keeps existing room/bed during re-registration, use existing bed id
+      if (keepExistingRoomBed && existingBedInfo && (existingBedInfo._id || existingBedInfo.id)) {
+        assignedBedId = existingBedInfo._id || existingBedInfo.id;
+      } else {
+        if (selectedBedId && !selectedBedId.includes('_bed_')) {
+          assignedBedId = selectedBedId;
+        } else if (selectedBedId && selectedBedId.includes('_bed_')) {
+          const selectedRoom = rooms.find(r => r._id === selectedRoomId);
+          const residentGender = (pendingResident?.gender) || residents.find(r => r._id === finalResidentId)?.gender;
+          const availableBeds = getBedsForRoom(selectedRoomId, residentGender);
+          const bedNumber = selectedBedId.split('_bed_')[1];
+          const actualBed = availableBeds.find(b => b.bed_number == bedNumber && !(typeof b._id === 'string' && b._id.includes('_bed_')));
+          if (actualBed && (actualBed._id || actualBed.id)) {
+            assignedBedId = actualBed._id || actualBed.id;
+          }
         }
       }
 
-      const selectedRoom = rooms.find(r => r._id === selectedRoomId);
-      const selectedRoomType = selectedRoom?.room_type || '';
+      // Resolve final room and room type based on keepExistingRoomBed option
+      const finalRoomId = (keepExistingRoomBed && existingRoomInfo && (existingRoomInfo._id || existingRoomInfo.id))
+        ? (existingRoomInfo._id || existingRoomInfo.id)
+        : selectedRoomId;
+      const selectedRoom = rooms.find(r => r._id === finalRoomId);
+      const selectedRoomType = (keepExistingRoomBed && existingRoomInfo?.room_type)
+        ? existingRoomInfo.room_type
+        : (selectedRoom?.room_type || '');
 
       // Normalize dates to ISO strings for BE (bsonType: date)
       const startISO = startDate ? new Date(startDate).toISOString() : '';
@@ -828,7 +839,7 @@ export default function SelectPackagesPage() {
           preferred_floor: Number(familyPreferences.preferred_floor) || 0,
           special_requests: familyPreferences.special_requests || ""
         },
-        assigned_room_id: selectedRoomId,
+        assigned_room_id: finalRoomId,
         selected_room_type: selectedRoomType,
         ...(assignedBedId ? { assigned_bed_id: assignedBedId } : {}),
         staff_id: user?.id || "",

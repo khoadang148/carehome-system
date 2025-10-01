@@ -18,7 +18,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { residentAPI, bedAssignmentsAPI, API_BASE_URL, billsAPI } from '@/lib/api';
-import { carePlansAPI } from '@/lib/api';
+import { carePlansAPI, carePlanAssignmentsAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { userAPI } from "@/lib/api";
@@ -38,6 +38,11 @@ export default function ResidentsPage() {
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
   const [activeTab, setActiveTab] = useState<'admitted' | 'accepted' | 'discharged'>('admitted');
   const [unpaidBills, setUnpaidBills] = useState<{ [residentId: string]: any[] }>({});
+  const [showDischargeModal, setShowDischargeModal] = useState(false);
+  const [residentToDischarge, setResidentToDischarge] = useState<any>(null);
+  const [discharging, setDischarging] = useState(false);
+  const [dischargeReason, setDischargeReason] = useState('');
+  const [isDeceased, setIsDeceased] = useState(false);
 
   // SWR fetcher function
   const fetcher = (url: string) => fetch(url).then(res => res.json());
@@ -134,6 +139,23 @@ export default function ResidentsPage() {
     if (!Array.isArray(src)) return 0;
     return src.filter((r: any) => String(r?.status || r?.resident_status || '').toLowerCase() === 'discharged').length;
   }, [allRes]);
+
+  // Helper: show discharge button on Accepted tab only on the last day of the next month from admission_date
+  const isLastDayOfNextMonth = (isoString: string | null | undefined) => {
+    if (!isoString) return false;
+    const admission = new Date(isoString);
+    if (isNaN(admission.getTime())) return false;
+    const nextMonthFirst = new Date(admission.getFullYear(), admission.getMonth() + 1, 1);
+    const lastDayNextMonth = new Date(nextMonthFirst.getFullYear(), nextMonthFirst.getMonth() + 1, 0);
+    const today = new Date();
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const lastLocal = new Date(
+      lastDayNextMonth.getFullYear(),
+      lastDayNextMonth.getMonth(),
+      lastDayNextMonth.getDate()
+    );
+    return todayLocal.getTime() === lastLocal.getTime();
+  };
   
 
   
@@ -263,6 +285,79 @@ export default function ResidentsPage() {
   const handleDeleteClick = (id: number) => {
     setResidentToDelete(id);
     setShowDeleteModal(true);
+  };
+
+  const handleDischargeClick = (resident: any) => {
+    setResidentToDischarge(resident);
+    setDischargeReason('');
+    setIsDeceased(false);
+    setShowDischargeModal(true);
+  };
+
+  const confirmDischarge = async () => {
+    if (!residentToDischarge) return;
+    if (!dischargeReason.trim()) {
+      setSuccessMessage(`Vui lòng nhập ${isDeceased ? 'lý do qua đời' : 'lý do xuất viện'}.`);
+      setModalType('error');
+      setShowSuccessModal(true);
+      return;
+    }
+    setDischarging(true);
+    try {
+      try {
+        const assignments = await bedAssignmentsAPI.getByResidentId(residentToDischarge.id);
+        const active = Array.isArray(assignments) ? assignments.find((a: any) => !a.unassigned_date) : null;
+        if (active) {
+          await bedAssignmentsAPI.update(active._id, { unassigned_date: new Date().toISOString() });
+        }
+      } catch {}
+
+      try {
+        const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(residentToDischarge.id);
+        const activeCarePlans = Array.isArray(carePlanAssignments)
+          ? carePlanAssignments.filter((cpa: any) => !cpa.end_date || new Date(cpa.end_date) > new Date())
+          : [];
+        for (const carePlan of activeCarePlans) {
+          await carePlanAssignmentsAPI.update(carePlan._id, {
+            end_date: new Date().toISOString(),
+            status: 'completed',
+          });
+        }
+      } catch {}
+
+      await residentAPI.discharge(residentToDischarge.id, {
+        status: isDeceased ? 'deceased' : 'discharged',
+        reason: dischargeReason.trim()
+      });
+
+      // Refresh lists
+      if (activeTab === 'admitted') await mutateAdmitted();
+      if (activeTab === 'accepted') await mutateActive();
+      if (activeTab === 'discharged') await mutateAll();
+
+      setShowDischargeModal(false);
+      setResidentToDischarge(null);
+      setDischargeReason('');
+      setSuccessMessage(`Đã ${isDeceased ? 'qua đời' : 'xuất viện'} thành công. Người cao tuổi đã được xóa khỏi phòng và giường.`);
+      setModalType('success');
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      setShowDischargeModal(false);
+      setResidentToDischarge(null);
+      setDischargeReason('');
+      setSuccessMessage('Có lỗi khi xuất viện: ' + (error?.message || 'Lỗi không xác định'));
+      setModalType('error');
+      setShowSuccessModal(true);
+    } finally {
+      setDischarging(false);
+    }
+  };
+
+  const cancelDischarge = () => {
+    setShowDischargeModal(false);
+    setResidentToDischarge(null);
+    setDischargeReason('');
+    setIsDeceased(false);
   };
   
   const confirmDelete = async () => {
@@ -528,8 +623,42 @@ export default function ResidentsPage() {
                         >
                           <EyeIcon style={{width: '1rem', height: '1rem'}} />
                         </button>
-                       
-                       
+                        {user?.role && (
+                          (() => {
+                            const isAdmitted = (resident.status || '').toLowerCase() === 'admitted';
+                            const canShowOnAccepted = activeTab === 'accepted' && isLastDayOfNextMonth((resident as any).admission_date);
+                            if (isAdmitted || canShowOnAccepted) {
+                              return (
+                                <button
+                                  onClick={() => handleDischargeClick(resident)}
+                                  title="Xuất viện người cao tuổi"
+                                  style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '0.375rem',
+                                    border: 'none',
+                                    background: 'rgba(168, 85, 247, 0.1)',
+                                    color: '#a855f7',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.background = '#a855f7';
+                                    e.currentTarget.style.color = 'white';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)';
+                                    e.currentTarget.style.color = '#a855f7';
+                                  }}
+                                >
+                                  <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                  </svg>
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1143,6 +1272,251 @@ export default function ResidentsPage() {
           </div>
         </div>
       )}
+
+      {showDischargeModal && residentToDischarge && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem'
+            }}>
+              <svg style={{ width: '1.5rem', height: '1.5rem', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </div>
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: 600,
+              margin: '0 0 0.5rem 0',
+              color: '#1f2937'
+            }}>
+              {isDeceased ? 'Xác nhận qua đời' : 'Xác nhận xuất viện'}
+            </h3>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: '0 0 1rem 0',
+              lineHeight: '1.5'
+            }}>
+              Bạn có chắc chắn muốn {isDeceased ? 'đánh dấu' : 'xuất viện'} <strong>{residentToDischarge.name}</strong>?
+            </p>
+
+            {/* Checkbox for deceased status */}
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.05)',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              margin: '0 0 1rem 0',
+              border: '1px solid rgba(239, 68, 68, 0.1)'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#374151',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={isDeceased}
+                  onChange={(e) => setIsDeceased(e.target.checked)}
+                  style={{
+                    width: '1rem',
+                    height: '1rem',
+                    accentColor: '#ef4444'
+                  }}
+                />
+                <span>Người cao tuổi đã qua đời</span>
+              </label>
+            </div>
+
+            <div style={{
+              background: 'rgba(102, 126, 234, 0.05)',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              margin: '0 0 1rem 0',
+              border: '1px solid rgba(102, 126, 234, 0.1)'
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}>
+                {isDeceased ? 'Lý do qua đời' : 'Lý do xuất viện'} <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <textarea
+                value={dischargeReason}
+                onChange={(e) => setDischargeReason(e.target.value)}
+                placeholder={isDeceased ? "Nhập lý do qua đời..." : "Nhập lý do xuất viện..."}
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '0.75rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem',
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#667eea';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+              />
+              {!dischargeReason.trim() && (
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: '#ef4444',
+                  margin: '0.25rem 0 0 0'
+                }}>
+                  Vui lòng nhập {isDeceased ? 'lý do qua đời' : 'lý do xuất viện'}
+                </p>
+              )}
+            </div>
+            <div style={{
+              background: 'rgba(168, 85, 247, 0.1)',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              margin: '0 0 1.5rem 0',
+              textAlign: 'left'
+            }}>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#7c3aed',
+                margin: '0 0 0.5rem 0',
+                fontWeight: 600
+              }}>
+                Hành động này sẽ:
+              </p>
+              <ul style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                margin: 0,
+                paddingLeft: '1rem'
+              }}>
+                <li>Xóa người cao tuổi khỏi phòng và giường hiện tại</li>
+                <li>Kết thúc tất cả các gói dịch vụ đang sử dụng</li>
+                <li>Cập nhật trạng thái thành "{isDeceased ? 'Đã qua đời' : 'Đã xuất viện'}"</li>
+                <li>Ghi nhận ngày {isDeceased ? 'qua đời' : 'xuất viện'}</li>
+              </ul>
+            </div>
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={cancelDischarge}
+                disabled={discharging}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'white',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: discharging ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: discharging ? 0.6 : 1
+                }}
+                onMouseOver={(e) => {
+                  if (!discharging) {
+                    e.currentTarget.style.background = '#f9fafb';
+                    e.currentTarget.style.borderColor = '#9ca3af';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!discharging) {
+                    e.currentTarget.style.background = 'white';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                  }
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDischarge}
+                disabled={discharging || !dischargeReason.trim()}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: (discharging || !dischargeReason.trim()) ? '#9ca3af' : 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: (discharging || !dischargeReason.trim()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: (discharging || !dischargeReason.trim()) ? 0.6 : 1
+                }}
+                onMouseOver={(e) => {
+                  if (!discharging && dischargeReason.trim()) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!discharging && dischargeReason.trim()) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)';
+                  }
+                }}
+              >
+                {discharging ? (
+                  <>
+                    <div style={{
+                      display: 'inline-block',
+                      width: '1rem',
+                      height: '1rem',
+                      border: '2px solid transparent',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      marginRight: '0.5rem'
+                    }}></div>
+                    Đang xử lý...
+                  </>
+                ) : (
+                  isDeceased ? 'Xác nhận qua đời' : 'Xác nhận xuất viện'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
     </>
   );

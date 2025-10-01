@@ -70,6 +70,9 @@ export default function PaymentManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [truncatableRows, setTruncatableRows] = useState<Set<string>>(new Set());
+  const descRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -373,6 +376,48 @@ export default function PaymentManagement() {
       </div>
     );
   };
+
+  const toggleDescriptionRow = (rowId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
+  };
+
+  // Measure overflow for visible rows after render, avoid updating state during render
+  useEffect(() => {
+    const measure = () => {
+      const next = new Set<string>();
+      const visible = getCurrentPageTransactions();
+      for (const t of visible) {
+        const el = descRefs.current[t.id];
+        if (!el) continue;
+        const isOverflowing = el.scrollWidth > el.clientWidth;
+        if (isOverflowing) next.add(t.id);
+      }
+      // Only update if changed to prevent render loops
+      const changed = next.size !== truncatableRows.size || [...next].some(id => !truncatableRows.has(id));
+      if (changed) setTruncatableRows(next);
+    };
+
+    // Use rAF to ensure layout is settled
+    const r = requestAnimationFrame(measure);
+
+    // Observe resize to recompute
+    const ro = new ResizeObserver(() => measure());
+    const els = Object.values(descRefs.current).filter(Boolean) as HTMLDivElement[];
+    els.forEach(el => ro.observe(el));
+
+    return () => {
+      cancelAnimationFrame(r);
+      ro.disconnect();
+    };
+  }, [filteredTransactions, currentPage, itemsPerPage]);
 
   if (loading) {
     return (
@@ -891,13 +936,44 @@ export default function PaymentManagement() {
                     color: '#374151',
                     maxWidth: '250px'
                   }}>
-                    <div style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {transaction.description}
-                    </div>
+                    {(() => {
+                      const isExpanded = expandedRows.has(transaction.id);
+                      const hasOverflow = truncatableRows.has(transaction.id);
+                      const displayText = isExpanded || !hasOverflow
+                        ? transaction.description
+                        : (transaction.description || '').slice(0, 60) + '…';
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                          <div
+                            ref={(el) => { descRefs.current[transaction.id] = el; }}
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: isExpanded ? 'clip' : 'ellipsis',
+                              whiteSpace: isExpanded ? 'normal' : 'nowrap',
+                              wordBreak: 'break-word'
+                            }}
+                          >
+                            {displayText}
+                          </div>
+                          {hasOverflow && (
+                            <button
+                              onClick={() => toggleDescriptionRow(transaction.id)}
+                              style={{
+                                color: '#2563eb',
+                                background: 'transparent',
+                                border: 'none',
+                                padding: 0,
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {isExpanded ? 'Thu gọn' : 'Xem thêm'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td style={{
                     padding: '1rem 1.5rem',

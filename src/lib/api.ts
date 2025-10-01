@@ -82,16 +82,25 @@ async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 
   const cached = typeof window !== 'undefined' ? getCached<T>(key) : null;
   if (cached) return cached.data;
   
-  const res = await retryRequest(
-    () => apiClient.get<T>(url, { params }),
-    2, // max retries for cached requests
-    1000 // initial delay
-  );
-  
-  if (typeof window !== 'undefined') {
-    setCached<T>(key, { data: res.data as any, status: res.status, statusText: res.statusText }, ttlMs);
+  try {
+    const res = await retryRequest(
+      () => apiClient.get<T>(url, { params }),
+      2, // max retries for cached requests
+      1000 // initial delay
+    );
+    
+    if (typeof window !== 'undefined') {
+      setCached<T>(key, { data: res.data as any, status: res.status, statusText: res.statusText }, ttlMs);
+    }
+    return res.data as any;
+  } catch (error: any) {
+    console.error(`Error fetching ${url}:`, error);
+    // Return empty array for list endpoints to prevent UI crashes
+    if (url.includes('/activities') || url.includes('/residents') || url.includes('/users')) {
+      return [] as any;
+    }
+    throw error;
   }
-  return res.data as any;
 }
 
 const logoutClient = axios.create({
@@ -838,6 +847,16 @@ export const residentAPI = {
       throw error;
     }
   },
+
+  // Discharge resident (discharged or deceased)
+  discharge: async (id: string, dischargeData: { status: 'discharged' | 'deceased'; reason: string }) => {
+    try {
+      const response = await apiClient.patch(`${endpoints.residents}/${id}/discharge`, dischargeData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
   getAvatarUrl: (id: string) => {
     if (!id) return '';
     return `${STATIC_BASE_URL}/uploads/residents/${id}/avatar`;
@@ -1056,7 +1075,9 @@ export const activitiesAPI = {
     try {
       const data = await getWithCache<any[]>(endpoints.activities, params, 30_000); // Tăng cache time lên 30s
       return data as any[];
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Activities API error:', error);
+      // Return empty array instead of throwing to prevent UI crashes
       return [];
     }
   },
@@ -1160,6 +1181,16 @@ export const activityParticipationsAPI = {
   getAll: async (params?: any) => {
     try {
       const response = await apiClient.get(endpoints.activityParticipations, { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Stats: distinct activities per staff across system
+  getAllStaffStats: async () => {
+    try {
+      const response = await apiClient.get(`${endpoints.activityParticipations}/stats/all-staff`);
       return response.data;
     } catch (error) {
       throw error;
@@ -2407,6 +2438,33 @@ export const bedsAPI = {
       return response.data;
     } catch (error) {
       return null;
+    }
+  },
+  create: async (data: any) => {
+    try {
+      const response = await apiClient.post('/beds', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating bed:', error);
+      throw error;
+    }
+  },
+  update: async (id: string, data: any) => {
+    try {
+      const response = await apiClient.patch(`/beds/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating bed:', error);
+      throw error;
+    }
+  },
+  delete: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/beds/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting bed:', error);
+      throw error;
     }
   },
 };

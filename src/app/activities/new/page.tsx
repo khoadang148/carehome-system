@@ -29,7 +29,7 @@ export default function NewActivityPage() {
     date: '', 
     time: '',
     location: '',
-    capacity: '',
+    capacity: '10', // Mặc định 10 người
     activity_type: '' // Thêm trường này
   });
   const [dateValue, setDateValue] = useState<Date | null>(null);
@@ -91,13 +91,7 @@ export default function NewActivityPage() {
         }
         break;
       case 'capacity':
-        if (!value) {
-          errorMessage = 'Sức chứa không được để trống';
-        } else if (isNaN(Number(value)) || Number(value) <= 0) {
-          errorMessage = 'Sức chứa phải là số nguyên dương';
-        } else if (Number(value) > 100) {
-          errorMessage = 'Sức chứa tối đa 100 người';
-        }
+        // Không cần validate vì đã cố định ở 10
         break;
       case 'activity_type':
         if (!value) {
@@ -127,6 +121,11 @@ export default function NewActivityPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    // Không cho phép thay đổi capacity
+    if (name === 'capacity') {
+      return;
+    }
     
     // Clear error when user starts typing
     if (fieldErrors[name]) {
@@ -220,7 +219,7 @@ export default function NewActivityPage() {
       { name: 'activity_name', value: form.activity_name },
       { name: 'description', value: form.description },
       { name: 'duration', value: form.duration },
-      { name: 'capacity', value: form.capacity },
+      // Không validate capacity vì đã cố định ở 10
       { name: 'activity_type', value: showCustomInput ? customActivityType : form.activity_type },
       { name: 'location', value: showCustomLocationInput ? customLocation : form.location },
       { name: 'date', value: form.date },
@@ -746,25 +745,66 @@ export default function NewActivityPage() {
                   }}>
                     Sức chứa <span style={{color: '#ef4444'}}>*</span>
                   </label>
-                  <input 
-                    name="capacity" 
-                    type="number" 
-                    min={1} 
-                    value={form.capacity} 
-                    onChange={handleChange} 
-                    required 
-                    style={{ 
-                      width: '100%', 
-                      padding: '0.75rem', 
-                      borderRadius: '0.5rem', 
-                      border: '2px solid #e5e7eb', 
-                      fontSize: '0.95rem', 
-                      outline: 'none',
-                      transition: 'border-color 0.2s',
-                      background: 'white'
-                    }} 
-                    placeholder="10, 20, 50..."
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      name="capacity" 
+                      type="number" 
+                      value={form.capacity} 
+                      readOnly
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.75rem', 
+                        borderRadius: '0.5rem', 
+                        border: '2px solid #d1d5db', 
+                        fontSize: '0.95rem', 
+                        outline: 'none',
+                        background: '#f9fafb',
+                        color: '#6b7280',
+                        cursor: 'not-allowed'
+                      }} 
+                    />
+                   
+                  </div>
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: '#0369a1',
+                    lineHeight: '1.4'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div style={{
+                        width: '1rem',
+                        height: '1rem',
+                        background: '#0ea5e9',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: '0.6rem',
+                        fontWeight: 'bold',
+                        flexShrink: 0,
+                        marginTop: '0.1rem'
+                      }}>
+                        i
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Tại sao sức chứa được cố định ở 10 người?
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                          <li>Đảm bảo chất lượng chăm sóc và tương tác tốt nhất</li>
+                          <li>Phù hợp với không gian và thiết bị có sẵn</li>
+                          <li>Tuân thủ quy định an toàn và vệ sinh</li>
+                          <li>Dễ dàng quản lý và theo dõi tiến độ</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

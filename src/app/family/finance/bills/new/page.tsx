@@ -47,7 +47,31 @@ export default function FamilyCreateBillPage() {
       try {
         const res = await residentAPI.getByFamilyMemberId(user.id);
         const arr = Array.isArray(res) ? res : (res ? [res] : []);
-        setResidents(arr);
+        
+        // Nếu có residentId từ query, load chi tiết resident đó
+        if (residentIdFromQuery) {
+          const selectedResident = arr.find(r => (r._id || r.id) === residentIdFromQuery);
+          if (selectedResident) {
+            try {
+              // Load chi tiết resident để có đầy đủ thông tin
+              const detailedResident = await residentAPI.getById(selectedResident._id || selectedResident.id);
+              
+              // Cập nhật residents với thông tin chi tiết
+              const updatedResidents = arr.map(r => 
+                (r._id || r.id) === residentIdFromQuery ? detailedResident : r
+              );
+              setResidents(updatedResidents);
+            } catch (detailError) {
+              console.error('Error loading detailed resident:', detailError);
+              setResidents(arr);
+            }
+          } else {
+            setResidents(arr);
+          }
+        } else {
+          setResidents(arr);
+        }
+        
         if (residentIdFromQuery) {
           setSelectedResidentId(residentIdFromQuery);
         }
@@ -76,29 +100,63 @@ export default function FamilyCreateBillPage() {
           return;
         }
 
+        // Sử dụng UTC để tránh lệch múi giờ
         const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        const remainingDays = lastDayOfMonth - now.getDate() + 1;
+        const currentMonth = now.getUTCMonth();
+        const currentYear = now.getUTCFullYear();
+        const currentDay = now.getUTCDate();
+        
+        // Tính số ngày trong tháng hiện tại (UTC)
+        const lastDayOfMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
+        const remainingDays = lastDayOfMonth - currentDay + 1;
 
         const servicesMonthlyCost = Number(accepted.care_plans_monthly_cost || 0);
         const roomMonthlyCost = Number(accepted.room_monthly_cost || 0);
         const monthlyTotal = Number(accepted.total_monthly_cost || (servicesMonthlyCost + roomMonthlyCost));
-        const dailyRate = monthlyTotal / 30;
+        
+        // Tính tỷ lệ theo ngày chính xác dựa trên số ngày thực tế của tháng hiện tại
+        const dailyRate = monthlyTotal / lastDayOfMonth;
         const remainingDaysAmount = Math.round(dailyRate * remainingDays);
         const depositAmount = Math.round(monthlyTotal);
         const totalAmount = remainingDaysAmount + depositAmount;
 
-        const startDate = accepted.start_date ? new Date(accepted.start_date) : new Date();
-        const yyyy = startDate.getFullYear();
-        const mm = String(startDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(startDate.getDate()).padStart(2, '0');
+        // Xử lý ngày bắt đầu với UTC để tránh lệch múi giờ
+        let startDate: Date;
+        if (accepted.start_date) {
+          // Nếu start_date đã có format ISO, sử dụng trực tiếp
+          if (accepted.start_date.includes('T')) {
+            startDate = new Date(accepted.start_date);
+          } else {
+            // Nếu chỉ có date, thêm timezone UTC
+            startDate = new Date(accepted.start_date + 'T00:00:00.000Z');
+          }
+        } else {
+          startDate = new Date();
+        }
+        
+        // Đảm bảo date hợp lệ
+        if (isNaN(startDate.getTime())) {
+          startDate = new Date();
+        }
+        
+        const yyyy = startDate.getUTCFullYear();
+        const mm = String(startDate.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(startDate.getUTCDate()).padStart(2, '0');
         const dueISO = `${yyyy}-${mm}-${dd}`;
 
-        const currentMonthName = now.toLocaleDateString('vi-VN', { month: 'long' });
-        const nextMonth = new Date(currentYear, currentMonth + 1, 1);
-        const nextMonthName = nextMonth.toLocaleDateString('vi-VN', { month: 'long' });
+        // Sử dụng UTC để hiển thị tên tháng chính xác
+        const currentMonthName = new Date(Date.UTC(currentYear, currentMonth, 1)).toLocaleDateString('vi-VN', { month: 'long', timeZone: 'UTC' });
+        const nextMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 1));
+        const nextMonthName = nextMonth.toLocaleDateString('vi-VN', { month: 'long', timeZone: 'UTC' });
+
+        // Debug logging
+        console.log('Billing calculation debug:', {
+          accepted,
+          startDate: accepted.start_date,
+          dueISO,
+          remainingDays,
+          totalAmount
+        });
 
         setDetails({
           assignment: accepted,
@@ -204,21 +262,161 @@ export default function FamilyCreateBillPage() {
           <div className="bg-white rounded-2xl shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] overflow-hidden border border-white/30 p-6">
             <h2 className="text-xl font-bold text-slate-800 mb-4">Thông tin người thụ hưởng</h2>
             <div className="grid grid-cols-1 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Người thụ hưởng</label>
-              <select
-                value={selectedResidentId}
-                onChange={(e) => setSelectedResidentId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base bg-white shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200"
-              >
-                <option value="">-- Chọn người thụ hưởng --</option>
-                {residents.map((r) => (
-                  <option key={r._id || r.id} value={r._id || r.id}>
-                    {r.full_name || r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {residentIdFromQuery ? (
+                // Hiển thị thông tin resident đã chọn từ URL
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Người thụ hưởng</label>
+                  <div className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 bg-indigo-50 text-base font-semibold text-indigo-800 mb-4">
+                    {residents.find(r => (r._id || r.id) === selectedResidentId)?.full_name || residents.find(r => (r._id || r.id) === selectedResidentId)?.name || 'Đang tải...'}
+                  </div>
+                  
+                  {/* Thông tin cá nhân của resident */}
+                  {(() => {
+                    const selectedResident = residents.find(r => (r._id || r.id) === selectedResidentId);
+                    if (!selectedResident) return null;
+                    
+                    // Debug logging để kiểm tra dữ liệu CCCD
+                    console.log('Selected resident data:', selectedResident);
+                    console.log('CCCD fields:', {
+                      cccd_id: selectedResident.cccd_id,
+                      cccd: selectedResident.cccd,
+                      identity_card: selectedResident.identity_card,
+                      citizen_id: selectedResident.citizen_id,
+                      id_card: selectedResident.id_card
+                    });
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Thông tin cơ bản */}
+                        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
+                          <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            Thông tin cá nhân
+                          </h4>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                              <span className="text-xs text-slate-600">Giới tính:</span>
+                              <span className="text-sm font-medium text-slate-800">
+                                {selectedResident.gender === 'male' ? 'Nam' : selectedResident.gender === 'female' ? 'Nữ' : 'Khác'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                              <span className="text-xs text-slate-600">Ngày sinh:</span>
+                              <span className="text-sm font-medium text-slate-800">
+                                {selectedResident.date_of_birth ? 
+                                  new Date(selectedResident.date_of_birth).toLocaleDateString('vi-VN') : 
+                                  'Chưa có'
+                                }
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                              <span className="text-xs text-slate-600">Số CCCD:</span>
+                              <span className="text-sm font-medium text-slate-800">
+                                {(() => {
+                                  // Thử lấy CCCD từ nhiều trường dữ liệu
+                                  const cccd = selectedResident.cccd_id || 
+                                             selectedResident.cccd || 
+                                             selectedResident.identity_card ||
+                                             selectedResident.citizen_id ||
+                                             selectedResident.id_card;
+                                  
+                                  return cccd || 'Chưa có';
+                                })()}
+                              </span>
+                            </div>
+                            {selectedResident.admission_date && (
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                <span className="text-xs text-slate-600">Ngày nhập viện:</span>
+                                <span className="text-sm font-medium text-slate-800">
+                                  {new Date(selectedResident.admission_date).toLocaleDateString('vi-VN')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        
+                        {/* Thông tin người liên hệ khẩn cấp */}
+                        {selectedResident.emergency_contact && (
+                          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+                            <h4 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
+                              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              Người liên hệ khẩn cấp
+                            </h4>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-amber-600">Họ tên:</span>
+                                <span className="text-sm font-medium text-amber-800">
+                                  {selectedResident.emergency_contact.name || 'Chưa có'}
+                                </span>
+                              </div>
+                              {selectedResident.emergency_contact.phone && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-amber-600">Số điện thoại:</span>
+                                  <span className="text-sm font-medium text-amber-800">
+                                    {selectedResident.emergency_contact.phone}
+                                  </span>
+                                </div>
+                              )}
+                              {selectedResident.emergency_contact.email && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-amber-600">Email:</span>
+                                  <span className="text-sm font-medium text-amber-800">
+                                    {selectedResident.emergency_contact.email}
+                                  </span>
+                                </div>
+                              )}
+                              {selectedResident.emergency_contact.relationship && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-amber-600">Mối quan hệ:</span>
+                                  <span className="text-sm font-medium text-amber-800">
+                                    {selectedResident.emergency_contact.relationship.charAt(0).toUpperCase() + selectedResident.emergency_contact.relationship.slice(1)}
+                                  </span>
+                                </div>
+                              )}
+                              {selectedResident.emergency_contact.address && (
+                                <div className="flex items-start justify-between">
+                                  <span className="text-xs text-amber-600">Địa chỉ:</span>
+                                  <span className="text-xs font-medium text-amber-800 text-right max-w-[200px]">
+                                    {selectedResident.emergency_contact.address}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  
+                 
+                </div>
+              ) : (
+                // Hiển thị dropdown nếu không có residentId từ URL
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Người thụ hưởng</label>
+                  <select
+                    value={selectedResidentId}
+                    onChange={(e) => setSelectedResidentId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base bg-white shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200"
+                  >
+                    <option value="">-- Chọn người thụ hưởng --</option>
+                    {residents.map((r) => (
+                      <option key={r._id || r.id} value={r._id || r.id}>
+                        {r.full_name || r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -230,7 +428,30 @@ export default function FamilyCreateBillPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-50 rounded-md border border-slate-200 flex items-center justify-between">
                       <span className="text-sm text-slate-500 font-semibold">Hạn thanh toán</span>
-                      <span className="text-sm text-slate-800 font-bold">{new Date(details.dueDateISO).toLocaleDateString('vi-VN')}</span>
+                      <span className="text-sm text-slate-800 font-bold">
+                        {(() => {
+                          try {
+                            // Tạo date object từ ISO string
+                            const dueDate = new Date(details.dueDateISO + 'T00:00:00.000Z');
+                            
+                            // Kiểm tra date hợp lệ
+                            if (isNaN(dueDate.getTime())) {
+                              return 'Chưa xác định';
+                            }
+                            
+                            // Format theo định dạng Việt Nam
+                            return dueDate.toLocaleDateString('vi-VN', { 
+                              timeZone: 'UTC',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            });
+                          } catch (error) {
+                            console.error('Error formatting due date:', error);
+                            return 'Chưa xác định';
+                          }
+                        })()}
+                      </span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-md border border-slate-200 flex items-center justify-between">
                       <span className="text-sm text-slate-500 font-semibold">Tổng cộng</span>
@@ -240,6 +461,9 @@ export default function FamilyCreateBillPage() {
 
                   <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
                     <div className="text-sm text-blue-900 font-semibold mb-2">Chi tiết tính tiền</div>
+                    <div className="text-xs text-blue-700 mb-3 bg-blue-100 rounded-lg p-2">
+                      <strong>Cách tính:</strong> Tỷ lệ ngày = Chi phí hàng tháng ÷ Số ngày thực tế của tháng × Số ngày sử dụng
+                    </div>
                     <div className="space-y-1 text-sm text-blue-800">
                       <div className="flex items-center justify-between">
                         <span>Tiền dịch vụ (gói chăm sóc) / tháng</span>
@@ -255,7 +479,7 @@ export default function FamilyCreateBillPage() {
                       </div>
                       <div className="h-px bg-blue-200 my-2" />
                       <div className="flex items-center justify-between">
-                        <span>Hóa đơn tháng hiện tại: {details.remainingDays} ngày</span>
+                        <span>Hóa đơn tháng hiện tại: {details.remainingDays} ngày (từ {new Date().getUTCDate()}/{new Date().getUTCMonth() + 1} đến cuối tháng)</span>
                         <span className="font-semibold">{formatDisplayCurrency(details.remainingDaysAmount)}</span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -274,12 +498,7 @@ export default function FamilyCreateBillPage() {
                   </div>
 
                   <div className="flex items-center justify-end gap-3 pt-2">
-                    <button
-                      onClick={() => router.push('/services')}
-                      className="px-6 py-3 bg-white text-gray-600 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-all duration-200 shadow-md"
-                    >
-                      Quay lại
-                    </button>
+                   
                     <button
                       onClick={handleCreateAndPay}
                       disabled={!canSubmit || loading}

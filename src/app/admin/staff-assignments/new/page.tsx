@@ -40,7 +40,7 @@ export default function NewStaffAssignmentPage() {
 
   const [formData, setFormData] = useState({
     staff_id: '',
-    room_id: '',
+    room_ids: [] as string[],
     end_date: '',
     notes: '',
     responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'] as string[],
@@ -48,6 +48,7 @@ export default function NewStaffAssignmentPage() {
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
+  const [infoModal, setInfoModal] = useState<null | { title: string; message: string }>(null);
 
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -79,11 +80,13 @@ export default function NewStaffAssignmentPage() {
 
   // SWR data fetching for fast, cached loads
   const enableFetch = Boolean(user && user.role === 'admin');
-  const { data: swrStaff, isLoading: swrStaffLoading } = useSWR(enableFetch ? 'staff:getByRoleWithStatus' : null, () => userAPI.getByRoleWithStatus('staff'), { revalidateOnFocus: false });
-  const { data: swrRooms, isLoading: swrRoomsLoading } = useSWR(enableFetch ? 'rooms:getAll' : null, () => roomsAPI.getAll(), { revalidateOnFocus: false });
-  const { data: swrResidents, isLoading: swrResidentsLoading } = useSWR(enableFetch ? 'residents:getAll' : null, () => residentAPI.getAll(), { revalidateOnFocus: false });
-  const { data: swrAssignments, isLoading: swrAssignmentsLoading } = useSWR(enableFetch ? 'staffAssignments:getAll' : null, () => staffAssignmentsAPI.getAll(), { revalidateOnFocus: false });
-  const { data: swrBedAssignments } = useSWR(enableFetch ? 'bedAssignments:getAll' : null, () => bedAssignmentsAPI.getAll(), { revalidateOnFocus: false });
+  const swrOpts = { revalidateOnFocus: true, dedupingInterval: 5000, keepPreviousData: true } as const;
+  const { data: swrStaff, isLoading: swrStaffLoading } = useSWR(enableFetch ? 'staff:getByRoleWithStatus' : null, () => userAPI.getByRoleWithStatus('staff'), swrOpts);
+  const { data: swrRooms, isLoading: swrRoomsLoading } = useSWR(enableFetch ? 'rooms:getAll' : null, () => roomsAPI.getAll(), swrOpts);
+  // Disable fetching all residents to avoid heavy request and timeouts.
+  const { data: swrResidents, isLoading: swrResidentsLoading } = useSWR(null, null as any, swrOpts);
+  const { data: swrAssignments, isLoading: swrAssignmentsLoading } = useSWR(enableFetch ? 'staffAssignments:getAll' : null, () => staffAssignmentsAPI.getAll(), swrOpts);
+  const { data: swrBedAssignments } = useSWR(enableFetch ? 'bedAssignments:getAll' : null, () => bedAssignmentsAPI.getAll(), swrOpts);
 
   // Sync SWR data into existing local states to minimize code churn
   useEffect(() => {
@@ -96,22 +99,14 @@ export default function NewStaffAssignmentPage() {
     if (Array.isArray(swrRooms)) setRooms(swrRooms as any[]);
   }, [enableFetch, swrRooms, swrRoomsLoading]);
 
-  useEffect(() => {
-    setResidentsLoading(Boolean(enableFetch && swrResidentsLoading));
-    if (Array.isArray(swrResidents)) setResidents(swrResidents as any[]);
-  }, [enableFetch, swrResidents, swrResidentsLoading]);
+  // Skipped syncing residents from a heavy endpoint. We load per-room residents on demand.
 
   useEffect(() => {
     setAssignmentsLoading(Boolean(enableFetch && swrAssignmentsLoading));
     if (Array.isArray(swrAssignments)) setAssignments(swrAssignments as any[]);
   }, [enableFetch, swrAssignments, swrAssignmentsLoading]);
 
-  // Load room residents when rooms data is available (do not block on residents)
-  useEffect(() => {
-    if (rooms.length > 0) {
-      loadRoomResidents();
-    }
-  }, [rooms, residents]);
+  // Bỏ prefetch danh sách người cao tuổi theo phòng để tăng tốc render ban đầu
 
   const loadRoomResidents = async () => {
     setLoadingRoomResidents(true);
@@ -152,17 +147,18 @@ export default function NewStaffAssignmentPage() {
     }
   };
 
+  // Load residents for rooms once rooms data is available
+  useEffect(() => {
+    if (rooms.length > 0) {
+      loadRoomResidents();
+    }
+  }, [rooms]);
+
   // Helper functions thay thế Redux actions
   const createAssignment = async (data: any) => {
-    setCreatingAssignment(true);
-    try {
-      const res = await (staffAssignmentsAPI as any).create?.(data);
-      if (res) setAssignments(prev => [res, ...prev]);
-    } catch (e: any) {
-      toast.error(getUserFriendlyError(e?.message || 'Không thể tạo phân công'));
-    } finally {
-      setCreatingAssignment(false);
-    }
+    const res = await (staffAssignmentsAPI as any).create?.(data);
+    if (res) setAssignments(prev => [res, ...prev]);
+    return res;
   };
 
   const updateAssignment = async (id: string, data: any) => {
@@ -177,8 +173,22 @@ export default function NewStaffAssignmentPage() {
   const handleCreate = async () => {
     setValidationErrors({});
 
-    if (!formData.staff_id || !formData.room_id) {
-      toast.error('Vui lòng chọn nhân viên và phòng');
+    if (!formData.staff_id || formData.room_ids.length === 0) {
+      toast.error('Vui lòng chọn nhân viên và ít nhất một phòng');
+      return;
+    }
+
+    // Enforce bed limit at submit time for all selected rooms
+    const currentBeds = getActiveBedsCountForStaff(formData.staff_id);
+    const selectedBeds = formData.room_ids.reduce((sum, id) => {
+      const room = rooms.find(r => r._id === id);
+      return sum + (room?.bed_count || 0);
+    }, 0);
+    if (currentBeds + selectedBeds > MAX_BEDS_PER_STAFF) {
+      setInfoModal({
+        title: 'Không thể tạo phân công',
+        message: `Tổng số giường vượt quá ${MAX_BEDS_PER_STAFF}. Vui lòng giảm bớt phòng được chọn.`
+      });
       return;
     }
 
@@ -199,28 +209,21 @@ export default function NewStaffAssignmentPage() {
       return;
     }
 
-    if (!formData.room_id.match(/^[0-9a-fA-F]{24}$/)) {
-      toast.error('ID phòng không hợp lệ');
-      return;
+    for (const rid of formData.room_ids) {
+      if (!rid.match(/^[0-9a-fA-F]{24}$/)) {
+        setInfoModal({ title: 'Dữ liệu không hợp lệ', message: 'ID phòng không hợp lệ.' });
+        return;
+      }
     }
 
-    // Check if there's already an active assignment for this staff and room
-      const existingAssignment = assignments.find(assignment => {
-      const assignmentRoomId = assignment.room_id?._id || assignment.room_id;
-        const assignmentStaffId = assignment.staff_id?._id || assignment.staff_id;
-      return assignmentRoomId === formData.room_id && assignmentStaffId === formData.staff_id;
-      });
+    // Refresh latest assignments to avoid stale data causing duplicate key
+    try {
+      const latest = await (staffAssignmentsAPI as any).getAll?.();
+      if (Array.isArray(latest)) setAssignments(latest);
+    } catch {}
 
-      // Only block if there's an active assignment (not expired)
-      if (existingAssignment && existingAssignment.status === 'active') {
-      const room = rooms.find(r => r._id === formData.room_id);
-      toast.error(`Phòng ${room?.room_number || formData.room_id} đã được phân công cho nhân viên này rồi. Vui lòng chọn phòng khác hoặc nhân viên khác.`);
-      return;
-    }
-
-          const assignmentData: any = {
+          const baseAssignmentData: any = {
             staff_id: formData.staff_id,
-      room_id: formData.room_id,
             assigned_date: new Date().toISOString(),
             assigned_by: user?.id,
             responsibilities: formData.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -229,33 +232,59 @@ export default function NewStaffAssignmentPage() {
           if (formData.end_date && formData.end_date.trim() !== '') {
             const date = new Date(formData.end_date);
             if (!isNaN(date.getTime())) {
-              assignmentData.end_date = date.toISOString();
+              baseAssignmentData.end_date = date.toISOString();
             }
           }
 
           if (formData.notes && formData.notes.trim() !== '') {
-            assignmentData.notes = formData.notes;
+            baseAssignmentData.notes = formData.notes;
           }
 
-          // If there's an existing assignment, update it instead of creating new
-          if (existingAssignment) {
-            // Ensure the assignment is set to active when updating
-            assignmentData.status = 'active';
-            await updateAssignment(existingAssignment._id, assignmentData);
-          } else {
-            await createAssignment(assignmentData);
+          // Create or update assignments for all selected rooms
+          let successCount = 0;
+          for (const rid of formData.room_ids) {
+            const findExisting = () => assignments.find(a => {
+              const roomId = a.room_id?._id || a.room_id;
+              const staffId = a.staff_id?._id || a.staff_id;
+              return roomId === rid && staffId === formData.staff_id;
+            });
+
+            const assignmentData = { ...baseAssignmentData, room_id: rid } as any;
+            let existing = findExisting();
+            try {
+              if (existing) {
+                assignmentData.status = 'active';
+                await updateAssignment(existing._id, assignmentData);
+                successCount++;
+              } else {
+                await createAssignment(assignmentData);
+                successCount++;
+              }
+            } catch (err: any) {
+              // If duplicate key (409), try to update existing instead
+              if (String(err?.message || '').includes('409') || String(err?.status || '') === '409') {
+                existing = findExisting();
+                if (existing) {
+                  assignmentData.status = 'active';
+                  try { await updateAssignment(existing._id, assignmentData); successCount++; } catch {}
+                }
+              }
+            }
           }
 
-    // Set success data for modal
-      setSuccessData({
-      count: 1,
-        staff: selectedStaff,
-      room: selectedRoom,
-      residents: roomResidents[formData.room_id] || [],
-      hasExpiredUpdates: existingAssignment && (existingAssignment.status === 'expired' || isExpired(existingAssignment.end_date || '')),
-    });
-      
-      setShowSuccessModal(true);
+    // Show result
+      if (successCount > 0) {
+        setSuccessData({
+          count: successCount,
+          staff: selectedStaff,
+          rooms: selectedRooms,
+          residents: selectedResidents,
+          hasExpiredUpdates: false,
+        });
+        setShowSuccessModal(true);
+      } else {
+        setInfoModal({ title: 'Không thể tạo phân công', message: 'Tất cả các phòng đã được phân công hoặc bị trùng dữ liệu.' });
+      }
   };
 
   const handleSuccessClose = () => {
@@ -265,6 +294,7 @@ export default function NewStaffAssignmentPage() {
   };
 
   const handleShowResidents = (room: any) => {
+    // Chỉ tải residents khi cần để tránh chậm lần render đầu
     setSelectedRoomForResidents(room);
     setShowResidentsModal(true);
   };
@@ -277,7 +307,7 @@ export default function NewStaffAssignmentPage() {
   const resetForm = () => {
     setFormData({
       staff_id: '',
-      room_id: '',
+      room_ids: [],
       end_date: '',
       notes: '',
       responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
@@ -295,6 +325,44 @@ export default function NewStaffAssignmentPage() {
     const nowStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     return endStartOfDay < nowStartOfDay;
+  };
+
+  // Beds per staff constraint
+  const MAX_BEDS_PER_STAFF = 8;
+
+  const getActiveBedsCountForStaff = (staffId: string) => {
+    if (!staffId) return 0;
+    // Sum bed counts of rooms that have an active (non-expired) assignment for this staff
+    const relevant = assignments.filter(assignment => {
+      if (!assignment.room_id || !assignment.staff_id) return false;
+      const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
+      if (assignmentStaffId !== staffId) return false;
+      const isActive = assignment.status === 'active' && !isExpired(assignment.end_date || '');
+      return isActive;
+    });
+
+    let totalBeds = 0;
+    for (const a of relevant) {
+      const assignmentRoomId = a.room_id._id || a.room_id;
+      const room = rooms.find(r => r._id === assignmentRoomId);
+      totalBeds += room?.bed_count || 0;
+    }
+    return totalBeds;
+  };
+
+  const canAssignRoomToStaff = (staffId: string, roomId: string) => {
+    if (!staffId || !roomId) return true;
+    const currentBeds = getActiveBedsCountForStaff(staffId);
+    const room = rooms.find(r => r._id === roomId);
+    const roomBeds = room?.bed_count || 0;
+    return currentBeds + roomBeds <= MAX_BEDS_PER_STAFF;
+  };
+
+  const getSelectedBedsCount = (roomIds: string[]) => {
+    return roomIds.reduce((sum, id) => {
+      const room = rooms.find(r => r._id === id);
+      return sum + (room?.bed_count || 0);
+    }, 0);
   };
 
   const getAvailableRooms = () => {
@@ -373,8 +441,8 @@ export default function NewStaffAssignmentPage() {
   };
 
   const selectedStaff = staffList.find(staff => staff._id === formData.staff_id);
-  const selectedRoom = rooms.find(room => room._id === formData.room_id);
-  const selectedResidents = roomResidents[formData.room_id] || [];
+  const selectedRooms = rooms.filter(room => formData.room_ids.includes(room._id));
+  const selectedResidents = formData.room_ids.flatMap(rid => roomResidents[rid] || []);
 
 
 
@@ -397,7 +465,7 @@ export default function NewStaffAssignmentPage() {
   };
 
   const isFormValid = () => {
-    if (!formData.staff_id || !formData.room_id) return false;
+    if (!formData.staff_id || formData.room_ids.length === 0) return false;
 
     // Only validate end date if it's provided
     if (formData.end_date && formData.end_date.trim() !== '') {
@@ -765,7 +833,7 @@ export default function NewStaffAssignmentPage() {
                           ) : (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {getFilteredRooms().map((room) => {
-                                const isSelected = formData.room_id === room._id;
+                                const isSelected = formData.room_ids.includes(room._id);
                                 const roomResidentsCount = roomResidents[room._id]?.length || 0;
                               return (
                                 <div
@@ -778,10 +846,26 @@ export default function NewStaffAssignmentPage() {
                                     }
 
                                       // Allow selection for rooms with expired assignments or no assignments
-                                      setFormData({
-                                        ...formData,
-                                        room_id: isSelected ? '' : room._id
-                                      });
+                                      if (formData.staff_id && !isSelected) {
+                                        const currentBeds = getActiveBedsCountForStaff(formData.staff_id);
+                                        const selectedBeds = getSelectedBedsCount(formData.room_ids);
+                                        const roomBeds = rooms.find(r => r._id === room._id)?.bed_count || 0;
+                                        if (currentBeds + selectedBeds + roomBeds > MAX_BEDS_PER_STAFF) {
+                                          const remaining = Math.max(0, MAX_BEDS_PER_STAFF - (currentBeds + selectedBeds));
+                                          setInfoModal({
+                                            title: 'Không thể chọn phòng',
+                                            message: `Giới hạn tối đa ${MAX_BEDS_PER_STAFF} giường cho mỗi nhân viên. Vui lòng bỏ bớt phòng trước khi chọn thêm.`
+                                          });
+                                          return;
+                                        }
+                                      }
+
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        room_ids: isSelected
+                                          ? prev.room_ids.filter(id => id !== room._id)
+                                          : [...prev.room_ids, room._id]
+                                      }));
                                   }}
                                   className={`
                                 p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-[1.02]
@@ -874,17 +958,15 @@ export default function NewStaffAssignmentPage() {
                           )}
                         </div>
 
-                        {formData.room_id && (
+                        {formData.room_ids.length > 0 && (
                           <div className="mt-4 flex items-center justify-between bg-white rounded-xl p-4 border-2 border-green-200">
                             <p className="text-sm text-gray-600 flex items-center">
                               <CheckIcon className="w-4 h-4 mr-2 text-green-500" />
-                              Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">Phòng {selectedRoom?.room_number}</span>
-                              {selectedResidents.length > 0 && (
-                                <span className="text-gray-500">• {selectedResidents.length} người cao tuổi</span>
-                              )}
+                              Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">{selectedRooms.map(r => `Phòng ${r.room_number}`).join(', ')}</span>
+                              <span className="text-gray-500">• {selectedResidents.length} người cao tuổi</span>
                             </p>
                             <button
-                              onClick={() => setFormData({ ...formData, room_id: '' })}
+                              onClick={() => setFormData({ ...formData, room_ids: [] })}
                               className="text-sm text-red-600 hover:text-red-800 transition-colors font-medium"
                             >
                               Bỏ chọn
@@ -1040,15 +1122,15 @@ export default function NewStaffAssignmentPage() {
                         </div>
                       )}
 
-                      {selectedRoom && (
+                      {selectedRooms.length > 0 && (
                         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold text-green-900 flex items-center">
                               <CheckIcon className="w-4 h-4 mr-2" />
-                              Phòng được chọn: {selectedRoom.room_number}
+                              Phòng được chọn: {selectedRooms.map(r => r.room_number).join(', ')}
                             </h3>
                             <button
-                              onClick={() => setFormData({ ...formData, room_id: '' })}
+                              onClick={() => setFormData({ ...formData, room_ids: [] })}
                               className="text-xs text-green-600 hover:text-green-800 transition-colors font-medium"
                             >
                               Bỏ chọn
@@ -1063,7 +1145,7 @@ export default function NewStaffAssignmentPage() {
                                   </svg>
                                   </div>
                                   <div>
-                                  <p className="text-sm font-semibold text-green-900">Phòng {selectedRoom.room_number}</p>
+                                  <p className="text-sm font-semibold text-green-900">Phòng {selectedRooms.map(r => r.room_number).join(', ')}</p>
                                   </div>
                                 </div>
                             </div>
@@ -1083,10 +1165,10 @@ export default function NewStaffAssignmentPage() {
                               </div>
                             ) : selectedResidents.length > 0 ? (
                               <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
-                                <p className="text-sm font-semibold text-green-900 mb-2">Người cao tuổi trong phòng ({selectedResidents.length})</p>
+                                <p className="text-sm font-semibold text-green-900 mb-2">Người cao tuổi trong các phòng đã chọn ({selectedResidents.length})</p>
                                 <div className="space-y-2 max-h-32 overflow-y-auto">
-                                  {selectedResidents.map((resident) => (
-                                    <div key={resident._id} className="flex items-center text-xs">
+                                  {selectedResidents.map((resident, idx) => (
+                                    <div key={`${resident._id || resident.id || resident.resident_id || idx}`} className="flex items-center text-xs">
                                       <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center mr-2">
                                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                                       </div>
@@ -1097,7 +1179,7 @@ export default function NewStaffAssignmentPage() {
                               </div>
                             ) : (
                               <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
-                                <p className="text-sm text-gray-600">Không có người cao tuổi nào trong phòng này</p>
+                                <p className="text-sm text-gray-600">Không có người cao tuổi nào trong các phòng này</p>
                               </div>
                             )}
                           </div>
@@ -1138,7 +1220,7 @@ export default function NewStaffAssignmentPage() {
                         <div className="text-sm text-yellow-800 space-y-2">
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                            Sẽ tạo <span className="font-bold text-yellow-900 mx-1">1</span> phân công phòng
+                            Sẽ tạo <span className="font-bold text-yellow-900 mx-1">{formData.room_ids.length}</span> phân công phòng
                           </p>
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
@@ -1146,7 +1228,7 @@ export default function NewStaffAssignmentPage() {
                           </p>
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                            Phòng: <span className="font-semibold text-yellow-900 ml-1">{selectedRoom?.room_number || 'Chưa chọn'}</span>
+                            Phòng: <span className="font-semibold text-yellow-900 ml-1">{selectedRooms.length > 0 ? selectedRooms.map(r => r.room_number).join(', ') : 'Chưa chọn'}</span>
                           </p>
                           <p className="flex items-center">
                             <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
@@ -1179,8 +1261,8 @@ export default function NewStaffAssignmentPage() {
           </div>
         </div>
 
-        {showSuccessModal && successData && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {showSuccessModal && successData && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100">
               <div className="p-8 text-center">
                 <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
@@ -1231,6 +1313,24 @@ export default function NewStaffAssignmentPage() {
             </div>
           </div>
         )}
+      {infoModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div className="px-5 py-4">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">{infoModal.title}</h3>
+              <p className="text-sm text-gray-700">{infoModal.message}</p>
+            </div>
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setInfoModal(null)}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         
         {showResidentsModal && selectedRoomForResidents && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1281,8 +1381,8 @@ export default function NewStaffAssignmentPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {roomResidents[selectedRoomForResidents._id].map((resident) => (
-                      <div key={resident._id} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                    {roomResidents[selectedRoomForResidents._id].map((resident, idx) => (
+                      <div key={`${resident._id || resident.id || resident.resident_id || idx}`} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
                         <div className="flex items-center">
                           <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mr-3 shadow-md overflow-hidden">
                             <img

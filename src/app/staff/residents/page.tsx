@@ -51,7 +51,7 @@ export default function StaffResidentsPage() {
       return;
     }
     
-    if (user.role !== 'staff') {
+    if (user && user.role !== 'staff') {
       router.push('/');
       return;
     }

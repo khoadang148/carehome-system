@@ -32,12 +32,14 @@ import {
   staffAPI,
   carePlansAPI,
   roomsAPI,
+  bedsAPI,
   userAPI,
   activityParticipationsAPI,
   activitiesAPI,
   staffAssignmentsAPI,
   bedAssignmentsAPI,
-  billsAPI
+  billsAPI,
+  carePlanAssignmentsAPI
 } from '@/lib/api';
 import { useVitalSigns as useVitalSignsSWR, useBedAssignments as useBedAssignmentsSWR, useRoom as useRoomSWR, useStaffAssignments as useStaffAssignmentsSWR } from '@/hooks/useSWRData';
 import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
@@ -150,6 +152,8 @@ function FamilyPortalPageContent() {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
   const [roomLoading, setRoomLoading] = useState(false);
+  const [bedNumber, setBedNumber] = useState<string>('Chưa hoàn tất đăng kí');
+  const [bedLoading, setBedLoading] = useState(false);
   const [fetchedStaffNames, setFetchedStaffNames] = useState<{ [id: string]: string }>({});
   const [assignedStaff, setAssignedStaff] = useState<any[]>([]);
   const [assignedStaffLoading, setAssignedStaffLoading] = useState(false);
@@ -208,28 +212,19 @@ function FamilyPortalPageContent() {
   useEffect(() => {
     const preloadData = async () => {
       try {
-        const [serverDateResponse, staffData] = await Promise.allSettled([
-          fetch('/api/current-date', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-          }),
-          staffAPI.getAll()
-        ]);
-
-        if (serverDateResponse.status === 'fulfilled' && serverDateResponse.value.ok) {
-          const data = await serverDateResponse.value.json();
+        const serverDateResponse = await fetch('/api/current-date', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (serverDateResponse.ok) {
+          const data = await serverDateResponse.json();
           setServerToday(data.date);
         } else {
           setServerToday(new Date().toISOString().slice(0, 10));
         }
-
-        if (staffData.status === 'fulfilled') {
-          setStaffList(Array.isArray(staffData.value) ? staffData.value : []);
-        } else {
-          setStaffList([]);
-        }
+        // Defer staff list fetching; we lazily resolve staff names per note when needed
+        setStaffList([]);
       } catch (error) {
-
         setServerToday(new Date().toISOString().slice(0, 10));
         setStaffList([]);
       }
@@ -491,14 +486,87 @@ function FamilyPortalPageContent() {
   useEffect(() => { setCareNotesPage(1); }, [careNotes.length]);
   useEffect(() => { setVitalPage(1); }, [vitalSignsHistory.length]);
 
-  // SWR bed/room wiring
-  const { bedAssignment, roomId } = useBedAssignmentsSWR(selectedResidentId);
+  // SWR bed/room wiring (used for admitted residents)
+  const { bedAssignment, roomId, isLoading: bedIsLoading } = useBedAssignmentsSWR(selectedResidentId);
   const { room, isLoading: roomIsLoading } = useRoomSWR(roomId || '');
   useEffect(() => {
+    if (!selectedResident || selectedResident.status !== 'admitted') return;
     setRoomLoading(prev => (prev !== roomIsLoading ? roomIsLoading : prev));
     const nextRoomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
     setRoomNumber(prev => (prev !== nextRoomNumber ? nextRoomNumber : prev));
-  }, [roomIsLoading, room?.room_number]);
+    setBedLoading(prev => (prev !== bedIsLoading ? bedIsLoading : prev));
+    const nextBedNumber = bedAssignment?.bed_id?.bed_number || 'Chưa hoàn tất đăng kí';
+    setBedNumber(prev => (prev !== nextBedNumber ? nextBedNumber : prev));
+  }, [selectedResident, roomIsLoading, room?.room_number, bedIsLoading, bedAssignment?.bed_id?.bed_number]);
+
+  // For active residents, derive room/bed from care plan assignment
+  useEffect(() => {
+    const loadFromCarePlanAssignment = async () => {
+      if (!selectedResidentId || !selectedResident) return;
+      if (selectedResident.status !== 'active') return;
+      try {
+        setRoomLoading(true);
+        setBedLoading(true);
+
+        const assignments = await carePlanAssignmentsAPI.getByResidentId(selectedResidentId);
+        const list = Array.isArray(assignments) ? assignments : [];
+        if (list.length === 0) {
+          setRoomNumber('Chưa hoàn tất đăng kí');
+          setBedNumber('Chưa hoàn tất đăng kí');
+          return;
+        }
+
+        // Prefer active -> approved -> pending -> others, fallback to latest by created_at/start_date
+        const byPriority = (a: any) => {
+          const s = (a.status || '').toLowerCase();
+          if (s === 'active') return 0;
+          if (s === 'approved') return 1;
+          if (s === 'pending') return 2;
+          return 3;
+        };
+        const sorted = [...list]
+          .sort((a: any, b: any) => byPriority(a) - byPriority(b))
+          .sort((a: any, b: any) => {
+            const ta = new Date(a.created_at || a.start_date || 0).getTime();
+            const tb = new Date(b.created_at || b.start_date || 0).getTime();
+            return tb - ta; // latest first
+          });
+        const assignment = sorted[0];
+
+        // Resolve room number
+        let roomNum = 'Chưa hoàn tất đăng kí';
+        const ar = assignment?.assigned_room_id;
+        if (ar && typeof ar === 'object' && ar.room_number) {
+          roomNum = ar.room_number;
+        } else if (ar) {
+          try {
+            const r = await roomsAPI.getById(ar);
+            roomNum = r?.room_number || roomNum;
+          } catch {}
+        }
+
+        // Resolve bed number
+        let bedNum = 'Chưa hoàn tất đăng kí';
+        const ab = assignment?.assigned_bed_id;
+        if (ab && typeof ab === 'object' && ab.bed_number) {
+          bedNum = ab.bed_number;
+        } else if (ab) {
+          try {
+            const b = await bedsAPI.getById(ab);
+            if (b?.bed_number) bedNum = b.bed_number;
+          } catch {}
+        }
+
+        setRoomNumber(roomNum);
+        setBedNumber(bedNum);
+      } finally {
+        setRoomLoading(false);
+        setBedLoading(false);
+      }
+    };
+
+    loadFromCarePlanAssignment();
+  }, [selectedResidentId, selectedResident]);
 
   // SWR: Staff assignments — load in parallel and convert to UI shape
   const { assignedStaff: swrAssignedStaff, isLoading: swrAssignedLoading } = useStaffAssignmentsSWR(selectedResidentId);
@@ -1165,10 +1233,14 @@ function FamilyPortalPageContent() {
                         </span>
                       </div>
                       <div className="flex flex-col p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl border border-slate-300">
-                        <span className="text-slate-600 font-semibold text-sm mb-1.5 uppercase tracking-wider">Phòng</span>
-                        <span className="text-slate-800 font-extrabold text-lg">
-                          {roomLoading ? 'Đang tải...' : roomNumber}
+                        <span className="text-slate-600 font-semibold text-sm mb-1.5 uppercase tracking-wider">
+                          {selectedResident?.status === 'active' ? 'phòng & giường đã đăng ký' : 'Phòng & Giường'}
                         </span>
+                        <div className="text-slate-800 font-extrabold text-lg">
+                          {(roomLoading || bedLoading) ? 'Đang tải...' : (
+                            <span>Phòng: {roomNumber} — Giường: {bedNumber}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1210,37 +1282,37 @@ function FamilyPortalPageContent() {
                     </span>
                   </div>
                   <div className="text-sm text-slate-500 mb-5 text-center p-2 bg-slate-50 rounded-lg">
-                    Lần cập nhật gần nhất: {vitalLoading ? 'Đang tải...' : vitalSigns?.date_time ? formatDateDDMMYYYYWithTimezone(vitalSigns.date_time) : 'chưa hoàn tất đăng kí'}
+                    Lần cập nhật gần nhất: {swrVitalLoading ? 'Đang tải...' : (swrVital?.date_time || swrVital?.dateTime) ? formatDateDDMMYYYYWithTimezone(swrVital?.date_time || swrVital?.dateTime) : 'chưa hoàn tất đăng kí'}
                   </div>
                   <div className="grid grid-cols-6 gap-4 text-sm mb-5">
                     <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200 text-center">
                       <div className="text-red-700 font-semibold text-xs mb-1.5">Huyết áp (mmHg)</div>
-                      <div className="font-bold text-red-600 text-lg">{vitalLoading ? 'Đang tải...' : vitalSigns?.blood_pressure ?? '--'}</div>
+                      <div className="font-bold text-red-600 text-lg">{swrVitalLoading ? 'Đang tải...' : (swrVital?.blood_pressure ?? swrVital?.bloodPressure ?? '--')}</div>
                     </div>
                     <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 border border-emerald-200 text-center">
                       <div className="text-emerald-700 font-semibold text-xs mb-1.5">Nhịp tim (bpm)</div>
-                      <div className="font-bold text-emerald-600 text-lg">{vitalLoading ? 'Đang tải...' : vitalSigns?.heart_rate ?? '--'}</div>
+                      <div className="font-bold text-emerald-600 text-lg">{swrVitalLoading ? 'Đang tải...' : (swrVital?.heart_rate ?? swrVital?.heartRate ?? '--')}</div>
                     </div>
                     <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 border border-amber-200 text-center">
                       <div className="text-amber-700 font-semibold text-xs mb-1.5">Nhiệt độ cơ thể</div>
-                      <div className="font-bold text-amber-600 text-lg">{vitalLoading ? 'Đang tải...' : vitalSigns?.temperature ?? '--'}°C</div>
+                      <div className="font-bold text-amber-600 text-lg">{swrVitalLoading ? 'Đang tải...' : (swrVital?.temperature ?? '--')}°C</div>
                     </div>
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200 text-center">
                       <div className="text-blue-700 font-semibold text-xs mb-1.5">SpO2 (%)</div>
-                      <div className="font-bold text-blue-600 text-lg">{vitalLoading ? 'Đang tải...' : vitalSigns?.oxygen_level ?? vitalSigns?.oxygen_saturation ?? '--'}</div>
+                      <div className="font-bold text-blue-600 text-lg">{swrVitalLoading ? 'Đang tải...' : (swrVital?.oxygen_level ?? swrVital?.oxygen_saturation ?? swrVital?.oxygenSaturation ?? '--')}</div>
                     </div>
                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200 text-center">
                       <div className="text-purple-700 font-semibold text-xs mb-1.5">Nhịp thở (lần/phút)</div>
-                      <div className="font-bold text-purple-600 text-lg">{vitalLoading ? 'Đang tải...' : vitalSigns?.respiratory_rate ?? '--'}</div>
+                      <div className="font-bold text-purple-600 text-lg">{swrVitalLoading ? 'Đang tải...' : (swrVital?.respiratory_rate ?? swrVital?.respiratoryRate ?? '--')}</div>
                     </div>
                     <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 border border-indigo-200 text-center">
                       <div className="text-indigo-700 font-semibold text-xs mb-1.5">Cân nặng hiện tại</div>
-                      <div className="font-bold text-indigo-600 text-lg">{vitalLoading ? 'Đang tải...' : vitalSigns?.weight ?? '--'} kg</div>
+                      <div className="font-bold text-indigo-600 text-lg">{swrVitalLoading ? 'Đang tải...' : (swrVital?.weight ?? '--')} kg</div>
                     </div>
                   </div>
                   <div className="p-3 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200 text-emerald-700 font-semibold text-sm flex items-center gap-2.5 justify-center">
                     <span className="w-3 h-3 bg-emerald-500 rounded-full"></span>
-                    Tình trạng: {vitalLoading ? 'Đang tải...' : vitalSigns?.notes ?? 'Chưa hoàn tất đăng kí'}
+                    Tình trạng: {swrVitalLoading ? 'Đang tải...' : (swrVital?.notes ?? 'Chưa hoàn tất đăng kí')}
                   </div>
                 </div>
 
@@ -1323,7 +1395,7 @@ function FamilyPortalPageContent() {
             <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-xl border border-white/20 w-full">
               <Tab.Group selectedIndex={activeTab} onChange={handleTabChange}>
                 <Tab.List className="flex bg-gradient-to-r from-slate-50 to-slate-200 border-b border-white/20">
-                  <Tab className={({ selected }) =>
+                  <Tab onMouseEnter={() => { if (!tabsLoaded[0]) setTabLoading(prev => ({ ...prev, 0: true })); }} className={({ selected }) =>
                     `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${selected
                       ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
@@ -1334,7 +1406,7 @@ function FamilyPortalPageContent() {
                       <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
                     )}
                   </Tab>
-                  <Tab className={({ selected }) =>
+                  <Tab onMouseEnter={() => { if (!tabsLoaded[1] && !tabLoading[1]) loadCareNotesData(); }} className={({ selected }) =>
                     `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${selected
                       ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'
@@ -1345,7 +1417,7 @@ function FamilyPortalPageContent() {
                       <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
                     )}
                   </Tab>
-                  <Tab className={({ selected }) =>
+                  <Tab onMouseEnter={() => { if (!tabsLoaded[2] && !tabLoading[2]) loadVitalSignsData(); }} className={({ selected }) =>
                     `px-6 py-4 text-sm font-medium transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${selected
                       ? 'border-b-2 border-purple-500 text-purple-600 bg-white/50'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-white/30'

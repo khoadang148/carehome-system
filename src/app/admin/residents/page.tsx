@@ -43,7 +43,25 @@ export default function ResidentsPage() {
   const [residentToDischarge, setResidentToDischarge] = useState<any>(null);
   const [discharging, setDischarging] = useState(false);
   const [dischargeReason, setDischargeReason] = useState('');
+  const [isDeceased, setIsDeceased] = useState(false);
   const [unpaidBills, setUnpaidBills] = useState<{ [residentId: string]: any[] }>({});
+
+  // Helper: show discharge button on Accepted tab only on the last day of the next month from admission_date
+  const isLastDayOfNextMonth = (isoString: string | null | undefined) => {
+    if (!isoString) return false;
+    const admission = new Date(isoString);
+    if (isNaN(admission.getTime())) return false;
+    const nextMonthFirst = new Date(admission.getFullYear(), admission.getMonth() + 1, 1);
+    const lastDayNextMonth = new Date(nextMonthFirst.getFullYear(), nextMonthFirst.getMonth() + 1, 0);
+    const today = new Date();
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const lastLocal = new Date(
+      lastDayNextMonth.getFullYear(),
+      lastDayNextMonth.getMonth(),
+      lastDayNextMonth.getDate()
+    );
+    return todayLocal.getTime() === lastLocal.getTime();
+  };
 
   // SWR fetcher function
   const fetcher = (url: string) => fetch(url).then(res => res.json());
@@ -307,6 +325,7 @@ export default function ResidentsPage() {
   const handleDischargeClick = (resident: any) => {
     setResidentToDischarge(resident);
     setDischargeReason('');
+    setIsDeceased(false);
     setShowDischargeModal(true);
   };
 
@@ -315,7 +334,7 @@ export default function ResidentsPage() {
 
 
     if (!dischargeReason.trim()) {
-      setSuccessMessage('Vui lòng nhập lý do xuất viện.');
+      setSuccessMessage(`Vui lòng nhập ${isDeceased ? 'lý do qua đời' : 'lý do xuất viện'}.`);
       setModalType('error');
       setShowSuccessModal(true);
       return;
@@ -346,10 +365,9 @@ export default function ResidentsPage() {
       } catch (carePlanError) {
       }
 
-      await residentAPI.update(residentToDischarge.id, {
-        status: 'discharged',
-        discharge_date: new Date().toISOString(),
-        discharge_reason: dischargeReason.trim()
+      await residentAPI.discharge(residentToDischarge.id, {
+        status: isDeceased ? 'deceased' : 'discharged',
+        reason: dischargeReason.trim()
       });
 
       setRoomNumbers(prev => ({ ...prev, [residentToDischarge.id]: 'Đã xuất viện' }));
@@ -362,7 +380,7 @@ export default function ResidentsPage() {
       setResidentToDischarge(null);
       setDischargeReason('');
 
-      setSuccessMessage('Đã cập nhật trạng thái: Xuất viện thành công. Người cao tuổi đã được xóa khỏi phòng và giường.');
+      setSuccessMessage(`Đã cập nhật trạng thái: ${isDeceased ? 'Đã qua đời' : 'Xuất viện'} thành công. Người cao tuổi đã được xóa khỏi phòng và giường.`);
       setModalType('success');
       setShowSuccessModal(true);
     } catch (error: any) {
@@ -381,6 +399,7 @@ export default function ResidentsPage() {
     setShowDischargeModal(false);
     setResidentToDischarge(null);
     setDischargeReason('');
+    setIsDeceased(false);
   };
 
   const renderResidentsTable = (residents: any[], showRoomColumn: boolean = true) => (
@@ -578,15 +597,26 @@ export default function ResidentsPage() {
                     }}>
                       {(resident.status === 'accepted' || resident.status === 'active') && (
                         (() => {
-                          // Check if admission date has arrived
-                          const admissionDate = resident.admission_date;
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0); // Reset time to start of day
+                          // Check if admission date has arrived (date-only, local timezone)
+                          const isSameOrAfterLocalDate = (isoString: string | null | undefined) => {
+                            if (!isoString) return true;
+                            const parsed = new Date(isoString);
+                            const admissionLocal = new Date(
+                              parsed.getFullYear(),
+                              parsed.getMonth(),
+                              parsed.getDate()
+                            );
+                            const todayLocal = new Date();
+                            todayLocal.setHours(0, 0, 0, 0);
+                            return todayLocal.getTime() >= admissionLocal.getTime();
+                          };
+
+                          const admissionDate = resident.admission_date as string | null | undefined;
                           
                           // Check if resident has unpaid bills
                           const hasUnpaidBills = unpaidBills[resident.id] && unpaidBills[resident.id].length > 0;
                           
-                          const canAdmit = (!admissionDate || new Date(admissionDate) <= today) && !hasUnpaidBills;
+                          const canAdmit = isSameOrAfterLocalDate(admissionDate) && !hasUnpaidBills;
                           
                           return canAdmit ? (
                             <button
@@ -742,7 +772,10 @@ export default function ResidentsPage() {
                       >
                         <PencilIcon style={{ width: '1rem', height: '1rem' }} />
                       </button>
-                      {user?.role === 'admin' && resident.status === 'admitted' && (
+                      {user?.role === 'admin' && (
+                        resident.status === 'admitted' ||
+                        (activeTab === 'accepted' && isLastDayOfNextMonth(resident.admission_date))
+                      ) && (
                         <button
                           onClick={() => handleDischargeClick(resident)}
                           title="Xuất viện người cao tuổi"
@@ -1273,7 +1306,7 @@ export default function ResidentsPage() {
                 margin: '0 0 0.5rem 0',
                 color: '#1f2937'
               }}>
-                Xác nhận xuất viện
+                {isDeceased ? 'Xác nhận qua đời' : 'Xác nhận xuất viện'}
               </h3>
               <p style={{
                 fontSize: '0.875rem',
@@ -1281,8 +1314,39 @@ export default function ResidentsPage() {
                 margin: '0 0 1rem 0',
                 lineHeight: '1.5'
               }}>
-                Bạn có chắc chắn muốn xuất viện <strong>{residentToDischarge.name}</strong>?
+                Bạn có chắc chắn muốn {isDeceased ? 'đánh dấu' : 'xuất viện'} <strong>{residentToDischarge.name}</strong>?
               </p>
+
+              {/* Checkbox for deceased status */}
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.05)',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                margin: '0 0 1rem 0',
+                border: '1px solid rgba(239, 68, 68, 0.1)'
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isDeceased}
+                    onChange={(e) => setIsDeceased(e.target.checked)}
+                    style={{
+                      width: '1rem',
+                      height: '1rem',
+                      accentColor: '#ef4444'
+                    }}
+                  />
+                  <span>Người cao tuổi đã qua đời</span>
+                </label>
+              </div>
 
               <div style={{
                 background: 'rgba(102, 126, 234, 0.05)',
@@ -1298,12 +1362,12 @@ export default function ResidentsPage() {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Lý do xuất viện <span style={{ color: '#ef4444' }}>*</span>
+                  {isDeceased ? 'Lý do qua đời' : 'Lý do xuất viện'} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <textarea
                   value={dischargeReason}
                   onChange={(e) => setDischargeReason(e.target.value)}
-                  placeholder="Nhập lý do xuất viện..."
+                  placeholder={isDeceased ? "Nhập lý do qua đời..." : "Nhập lý do xuất viện..."}
                   style={{
                     width: '100%',
                     minHeight: '80px',
@@ -1329,7 +1393,7 @@ export default function ResidentsPage() {
                     color: '#ef4444',
                     margin: '0.25rem 0 0 0'
                   }}>
-                    Vui lòng nhập lý do xuất viện
+                    Vui lòng nhập {isDeceased ? 'lý do qua đời' : 'lý do xuất viện'}
                   </p>
                 )}
               </div>
@@ -1356,8 +1420,8 @@ export default function ResidentsPage() {
                 }}>
                   <li>Xóa người cao tuổi khỏi phòng và giường hiện tại</li>
                   <li>Kết thúc tất cả các gói dịch vụ đang sử dụng</li>
-                  <li>Cập nhật trạng thái thành "Đã xuất viện"</li>
-                  <li>Ghi nhận ngày xuất viện</li>
+                  <li>Cập nhật trạng thái thành "{isDeceased ? 'Đã qua đời' : 'Đã xuất viện'}"</li>
+                  <li>Ghi nhận ngày {isDeceased ? 'qua đời' : 'xuất viện'}</li>
                 </ul>
               </div>
               <div style={{
@@ -1436,7 +1500,7 @@ export default function ResidentsPage() {
                       Đang xử lý...
                     </>
                   ) : (
-                    'Xác nhận xuất viện'
+                    isDeceased ? 'Xác nhận qua đời' : 'Xác nhận xuất viện'
                   )}
                 </button>
               </div>
