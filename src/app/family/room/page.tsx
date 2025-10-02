@@ -374,21 +374,27 @@ export default function FamilyRoomPage() {
                                 <span className="font-medium">
                                   {(() => {
                                     // Debug log để xem dữ liệu
-                                    console.log('Debug - request.target_room_id:', request.target_room_id);
-                                    console.log('Debug - request.target_bed_id:', request.target_bed_id);
+                                    console.log('Debug - request.target_bed_assignment_id:', request.target_bed_assignment_id);
 
-                                    const roomNumber = request.target_room_id?.room_number ||
-                                      (typeof request.target_room_id === 'string' ?
-                                        rooms.find(r => r._id === request.target_room_id)?.room_number :
-                                        null);
+                                    // Tìm bed assignment từ target_bed_assignment_id
+                                    const targetBedAssignment = bedAssignments.find(ba => 
+                                      ba._id === request.target_bed_assignment_id
+                                    );
 
-                                    const bedNumber = request.target_bed_id?.bed_number ||
-                                      (typeof request.target_bed_id === 'string' ?
-                                        beds.find(b => b._id === request.target_bed_id)?.bed_number :
-                                        null);
-
-                                    if (roomNumber) {
-                                      return bedNumber ? `${roomNumber} - Giường ${bedNumber}` : roomNumber;
+                                    if (targetBedAssignment && targetBedAssignment.bed_id) {
+                                      const bed = typeof targetBedAssignment.bed_id === 'object' 
+                                        ? targetBedAssignment.bed_id 
+                                        : beds.find(b => b._id === targetBedAssignment.bed_id);
+                                      
+                                      if (bed) {
+                                        const room = typeof bed.room_id === 'object' 
+                                          ? bed.room_id 
+                                          : rooms.find(r => r._id === bed.room_id);
+                                        
+                                        if (room) {
+                                          return `${room.room_number} - Giường ${bed.bed_number}`;
+                                        }
+                                      }
                                     }
                                     return 'Chưa xác định';
                                   })()}

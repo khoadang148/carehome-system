@@ -1464,7 +1464,7 @@ function BulkExtensionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!extensionPeriod || !note.trim()) return;
+    if (!extensionPeriod) return;
     const isCustom = extensionPeriod === 'custom';
     const parsed = isCustom ? parseInt(customMonths) : parseInt(extensionPeriod);
     const extensionMonths = Number.isFinite(parsed) ? Math.max(3, parsed) : 0;
@@ -1475,6 +1475,11 @@ function BulkExtensionModal({
       // Create extension requests for all expiring care plans
       const requests = expiringCarePlans.map(async (carePlan: any) => {
         const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
+        
+        if (!carePlanAssignment?._id) {
+          throw new Error(`Không tìm thấy care plan assignment cho gói ${carePlan.plan_name}`);
+        }
+        
         const currentEndDate = new Date(carePlanAssignment?.end_date || new Date());
         // Ngày bắt đầu = ngày kế tiếp ngày hết hạn hiện tại (local)
         const nextDayAfterEnd = addDays(currentEndDate, 1);
@@ -1488,15 +1493,14 @@ function BulkExtensionModal({
         );
         const newEndDateStr = formatLocalYMD(targetMonthEnd);
         
-        return serviceRequestsAPI.create({
+        return serviceRequestsAPI.createServiceDateChange({
           resident_id: residentId,
           family_member_id: user?.id || '',
-          request_type: 'service_date_change',
-          new_start_date: newStartDate,
+          current_care_plan_assignment_id: carePlanAssignment._id,
           new_end_date: newEndDateStr,
-          note: `${note} (Gia hạn gói: ${carePlan.plan_name} thêm ${extensionMonths} tháng)`,
           emergencyContactName: userProfile?.full_name || user?.name || '',
-          emergencyContactPhone: userProfile?.phone || user?.phone || ''
+          emergencyContactPhone: userProfile?.phone || user?.phone || '',
+          medicalNote: note ? `${note} (Gia hạn gói: ${carePlan.plan_name} thêm ${extensionMonths} tháng)` : `Gia hạn gói: ${carePlan.plan_name} thêm ${extensionMonths} tháng`
         });
       });
 
@@ -1506,6 +1510,8 @@ function BulkExtensionModal({
       onSuccess();
     } catch (error) {
       console.error('Error submitting bulk extension requests:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra khi gửi yêu cầu gia hạn';
+      onShowSuccess(`Lỗi: ${errorMessage}`);
     } finally {
       setSubmitting(false);
     }
@@ -1652,10 +1658,9 @@ function BulkExtensionModal({
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Nhập lý do gia hạn tất cả gói dịch vụ..."
+              placeholder="Nhập lý do gia hạn tất cả gói dịch vụ (tùy chọn)..."
                 className="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
               rows={3}
-              required
             />
           </div>
 
@@ -1669,12 +1674,12 @@ function BulkExtensionModal({
             </button>
             <button
               type="submit"
-              disabled={!extensionPeriod || !note.trim() || submitting}
-                className={`px-5 py-2.5 rounded-xl font-bold text-white shadow-md transition-all ${(!extensionPeriod || !note.trim() || submitting)
+              disabled={!extensionPeriod || submitting}
+                className={`px-5 py-2.5 rounded-xl font-bold text-white shadow-md transition-all ${(!extensionPeriod || submitting)
                   ? 'bg-slate-300 cursor-not-allowed'
                   : 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700'}`}
             >
-                {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
+              {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
             </button>
           </div>
         </form>

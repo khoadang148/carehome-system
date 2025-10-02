@@ -1051,6 +1051,9 @@ export default function ApprovalsPage() {
           onClose={() => { setDetailsOpen(false); setDetailsData(null); }}
           data={detailsData}
           resolveRoomAndBed={getCurrentRoomAndBed}
+          bedAssignments={bedAssignments}
+          beds={beds}
+          rooms={rooms}
         />
 
         {/* Reject Reason Modal */}
@@ -1289,12 +1292,18 @@ function RequestDetailsModal({
   open,
   onClose,
   data,
-  resolveRoomAndBed
+  resolveRoomAndBed,
+  bedAssignments,
+  beds,
+  rooms
 }: {
   open: boolean;
   onClose: () => void;
   data: any | null;
   resolveRoomAndBed?: (residentId: string) => { room: any | null; bed: any | null };
+  bedAssignments: any[];
+  beds: any[];
+  rooms: any[];
 }) {
   if (!open || !data) return null;
 
@@ -1331,7 +1340,31 @@ function RequestDetailsModal({
                     fromStr = room?.room_number && bed?.bed_number ? `Phòng ${room.room_number} • Giường ${bed.bed_number}` : null;
                   }
                 } catch {}
-                const toStr = `${req.target_room_id?.room_number ? `Phòng ${req.target_room_id?.room_number}` : '---'}${req.target_bed_id?.bed_number ? ` • Giường ${req.target_bed_id?.bed_number}` : ''}`;
+                
+                // Tìm thông tin phòng/giường mới từ target_bed_assignment_id
+                let toStr = '---';
+                if (req.target_bed_assignment_id) {
+                  const targetBedAssignment = bedAssignments.find(ba => 
+                    ba._id === req.target_bed_assignment_id
+                  );
+                  
+                  if (targetBedAssignment && targetBedAssignment.bed_id) {
+                    const bed = typeof targetBedAssignment.bed_id === 'object' 
+                      ? targetBedAssignment.bed_id 
+                      : beds.find(b => b._id === targetBedAssignment.bed_id);
+                    
+                    if (bed) {
+                      const room = typeof bed.room_id === 'object' 
+                        ? bed.room_id 
+                        : rooms.find(r => r._id === bed.room_id);
+                      
+                      if (room) {
+                        toStr = `Phòng ${room.room_number} • Giường ${bed.bed_number}`;
+                      }
+                    }
+                  }
+                }
+                
                 return <ChangePreview label="Đổi chỗ ở" from={fromStr} to={toStr} color="orange" />;
               })()}
               {req.request_type === 'service_date_change' && (

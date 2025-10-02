@@ -2242,6 +2242,14 @@ export const bedAssignmentsAPI = {
       return [];
     }
   },
+  getAllStatuses: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/bed-assignments/all-statuses', { params });
+      return response.data;
+    } catch (error) {
+      return [];
+    }
+  },
   getPendingAssignments: async () => {
     try {
       const response = await apiClient.get('/bed-assignments/admin/pending');
@@ -2548,6 +2556,9 @@ export const serviceRequestsAPI = {
     target_service_package_id?: string;
     target_room_id?: string;
     target_bed_id?: string;
+    target_bed_assignment_id?: string;
+    target_care_plan_assignment_id?: string;
+    current_care_plan_assignment_id?: string;
     new_start_date?: string;
     new_end_date?: string;
     note?: string;
@@ -2624,6 +2635,23 @@ export const serviceRequestsAPI = {
       return response.data;
     } catch (error) {
       return [];
+    }
+  },
+
+  createServiceDateChange: async (data: {
+    resident_id: string;
+    family_member_id: string;
+    current_care_plan_assignment_id: string;
+    new_end_date: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    medicalNote?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/service-requests/service-date-change', data);
+      return response.data;
+    } catch (error) {
+      throw error;
     }
   }
 };

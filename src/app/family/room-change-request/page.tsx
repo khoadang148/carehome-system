@@ -109,6 +109,7 @@ export default function RoomChangeRequestPage() {
   const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [changeType, setChangeType] = useState<'room' | 'bed'>('room'); // 'room' = chuyển phòng, 'bed' = chuyển giường
   const loadingData = residentsLoading || roomsLoading || bedsLoading || roomTypesLoading || serviceRequestsLoading;
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -177,8 +178,19 @@ export default function RoomChangeRequestPage() {
 
     const { room: currentRoom } = getCurrentRoomAndBed(selectedResident);
 
-    return rooms.filter(room => {
-      // Same gender requirement
+    // Debug log để kiểm tra phòng hiện tại
+    console.log('Current room debug:', {
+      selectedResident,
+      currentRoom: currentRoom ? {
+        id: currentRoom._id,
+        number: currentRoom.room_number,
+        gender: currentRoom.gender
+      } : null,
+      totalRooms: rooms.length
+    });
+
+    const filteredRooms = rooms.filter(room => {
+      // Same gender requirement - sử dụng giới tính của phòng hiện tại hoặc mặc định
       const residentGender = currentRoom?.gender || 'male'; // default
       const sameGender = room.gender === residentGender;
 
@@ -195,9 +207,56 @@ export default function RoomChangeRequestPage() {
         bed.status === 'available'
       );
 
-      // Cho phép chọn lại phòng cũ (chỉ cần cùng giới tính và có giường trống)
+      // Debug log
+      console.log('Room filter debug:', {
+        roomNumber: room.room_number,
+        roomGender: room.gender,
+        residentGender,
+        sameGender,
+        hasAvailableBeds,
+        isCurrentRoom: currentRoom && room._id === currentRoom._id,
+        roomBedsCount: roomBeds.length,
+        availableBedsCount: roomBeds.filter(bed => bed.status === 'available').length
+      });
+
+      // Luôn cho phép chọn phòng hiện tại nếu có giường trống (để chuyển giường)
+      // Và cho phép chọn phòng khác nếu có giường trống (để chuyển phòng)
+      
+      // Đặc biệt: Luôn cho phép chọn phòng hiện tại nếu có giường trống
+      if (currentRoom && room._id === currentRoom._id) {
+        return hasAvailableBeds;
+      }
+      
+      // Các phòng khác: cần cùng giới tính và có giường trống
       return sameGender && hasAvailableBeds;
     });
+
+    // Fallback: Nếu phòng hiện tại không có trong danh sách, thêm vào nếu có giường trống
+    if (currentRoom && !filteredRooms.some(room => room._id === currentRoom._id)) {
+      const currentRoomBeds = beds.filter(bed => {
+        const bedRoomId = typeof bed.room_id === 'string'
+          ? bed.room_id
+          : (bed.room_id as { _id: string })._id;
+        return bedRoomId === currentRoom._id;
+      });
+      
+      const hasAvailableBedsInCurrentRoom = currentRoomBeds.some(bed =>
+        bed.status === 'available'
+      );
+      
+      if (hasAvailableBedsInCurrentRoom) {
+        console.log('Adding current room to available rooms:', currentRoom.room_number);
+        filteredRooms.unshift(currentRoom);
+      }
+    }
+
+    return filteredRooms;
+  };
+
+  // Xác định loại thay đổi dựa trên phòng được chọn
+  const determineChangeType = (roomId: string) => {
+    const { room: currentRoom } = getCurrentRoomAndBed(selectedResident);
+    return currentRoom && roomId === currentRoom._id ? 'bed' : 'room';
   };
 
   const bedsOfRoom = (roomId: string) => {
@@ -212,10 +271,20 @@ export default function RoomChangeRequestPage() {
     const bedsWithStatus = roomBeds.map(bed => {
       // Kiểm tra xem giường này có đang được yêu cầu trong service requests pending không
       const isPendingInRequest = serviceRequests.some((request: any) => {
-        const targetBedId = typeof request.target_bed_id === 'string'
-          ? request.target_bed_id
-          : request.target_bed_id?._id || request.target_bed_id;
-        return request.request_type === 'room_change' && request.status === 'pending' && String(targetBedId) === String(bed._id);
+        if (request.request_type === 'room_change' && request.status === 'pending' && request.target_bed_assignment_id) {
+          // Tìm bed assignment từ target_bed_assignment_id
+          const targetBedAssignment = bedAssignments.find(ba => 
+            ba._id === request.target_bed_assignment_id
+          );
+          
+          if (targetBedAssignment && targetBedAssignment.bed_id) {
+            const targetBedId = typeof targetBedAssignment.bed_id === 'string'
+              ? targetBedAssignment.bed_id
+              : targetBedAssignment.bed_id._id || targetBedAssignment.bed_id;
+            return String(targetBedId) === String(bed._id);
+          }
+        }
+        return false;
       });
 
       return {
@@ -234,6 +303,10 @@ export default function RoomChangeRequestPage() {
   const handleRoomSelection = (roomId: string) => {
     const roomBeds = bedsOfRoom(roomId);
     const { bed: currentBed } = getCurrentRoomAndBed(selectedResident);
+
+    // Xác định loại thay đổi
+    const newChangeType = determineChangeType(roomId);
+    setChangeType(newChangeType);
 
     // Lọc giường trống, nhưng nếu chọn phòng cũ thì loại trừ giường hiện tại
     const availableBedsData = roomBeds.filter(bed => {
@@ -335,7 +408,9 @@ export default function RoomChangeRequestPage() {
       addNotification({
         type: 'error',
         title: 'Thiếu thông tin',
-        message: 'Vui lòng chọn người thân, phòng, giường mới và nhập lý do đổi phòng.',
+        message: changeType === 'room' 
+          ? 'Vui lòng chọn người thân, phòng, giường mới và nhập lý do đổi phòng.'
+          : 'Vui lòng chọn người thân, giường mới và nhập lý do chuyển giường.',
         category: 'system'
       });
       return;
@@ -343,16 +418,38 @@ export default function RoomChangeRequestPage() {
 
     setSubmitting(true);
     try {
-      await serviceRequestsAPI.create({
+      // Bước 1: Tạo bed assignment mới với status "pending"
+      const bedAssignmentData = {
+        resident_id: selectedResident,
+        bed_id: selectedBed,
+        assigned_by: user?.id || '',
+        status: 'pending'
+      };
+
+      console.log('Creating bed assignment:', bedAssignmentData);
+      const newBedAssignment = await bedAssignmentsAPI.create(bedAssignmentData);
+      console.log('Bed assignment created:', newBedAssignment);
+      console.log('Bed assignment ID:', newBedAssignment._id);
+
+      // Validate that we have the bed assignment ID
+      if (!newBedAssignment || !newBedAssignment._id) {
+        throw new Error('Failed to create bed assignment - no ID returned');
+      }
+
+      // Bước 2: Tạo service request với target_bed_assignment_id
+      const serviceRequestData = {
         resident_id: selectedResident,
         family_member_id: user?.id || '',
-        request_type: 'room_change',
-        target_room_id: selectedRoom,
-        target_bed_id: selectedBed,
+        request_type: 'room_change' as const, // Backend expects lowercase, use const assertion
+        target_bed_assignment_id: newBedAssignment._id,
         note: note,
         emergencyContactName: emergencyContactName || userProfile?.full_name || '',
-        emergencyContactPhone: emergencyContactPhone || userProfile?.phone || ''
-      });
+        emergencyContactPhone: emergencyContactPhone || userProfile?.phone || '',
+        medicalNote: '' // Optional field
+      };
+
+      console.log('Creating service request:', serviceRequestData);
+      await serviceRequestsAPI.create(serviceRequestData);
 
       // Show success modal instead of redirecting immediately
       setShowSuccessModal(true);
@@ -473,12 +570,14 @@ export default function RoomChangeRequestPage() {
                           <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center text-white font-bold">
                             <HomeIcon className="w-4 h-4" />
                           </div>
-                          <div>
-                            <p className="text-xs text-green-700 font-medium">Phòng hiện tại</p>
-                            <p className="text-sm font-bold text-green-900">
-                              {currentRoom.room_number} - Tầng {currentRoom.floor}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-xs text-green-700 font-medium">
+                            {changeType === 'bed' ? 'Phòng hiện tại (chuyển giường)' : 'Phòng hiện tại'}
+                          </p>
+                          <p className="text-sm font-bold text-green-900">
+                            {currentRoom.room_number} - Tầng {currentRoom.floor}
+                          </p>
+                        </div>
                         </div>
                         <div className="ml-10 text-xs text-green-600 space-y-1">
                           <p><span className="font-medium">Phòng dành cho:</span> {currentRoom.gender === 'male' ? 'Nam' : 'Nữ'}</p>
@@ -525,12 +624,14 @@ export default function RoomChangeRequestPage() {
                           <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center text-white font-bold">
                             <MapPinIcon className="w-4 h-4" />
                           </div>
-                          <div>
-                            <p className="text-xs text-purple-700 font-medium">Giường hiện tại</p>
-                            <p className="text-sm font-bold text-purple-900">
-                              {currentBed.bed_number}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-xs text-purple-700 font-medium">
+                            {changeType === 'bed' ? 'Giường hiện tại (sẽ chuyển)' : 'Giường hiện tại'}
+                          </p>
+                          <p className="text-sm font-bold text-purple-900">
+                            {currentBed.bed_number}
+                          </p>
+                        </div>
                         </div>
                         <div className="ml-10 text-xs text-purple-600">
                           <p><span className="font-medium">Loại giường:</span> {
@@ -566,7 +667,10 @@ export default function RoomChangeRequestPage() {
                         <div>
                           <p className="text-xs text-green-700 font-medium">Sẵn sàng gửi yêu cầu</p>
                           <p className="text-xs font-medium text-green-900">
-                            Đã chọn phòng và giường mới
+                            {changeType === 'room' 
+                              ? 'Đã chọn phòng và giường mới'
+                              : 'Đã chọn giường mới trong phòng hiện tại'
+                            }
                           </p>
                         </div>
                       </div>
@@ -719,8 +823,13 @@ export default function RoomChangeRequestPage() {
                   <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                       <HomeIcon className="w-6 h-6 text-blue-600" />
-                      Chọn phòng mới
+                      Chọn phòng
                     </h2>
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        💡 <strong>Hướng dẫn:</strong> Chọn phòng hiện tại để chuyển giường trong cùng phòng, hoặc chọn phòng khác để chuyển phòng hoàn toàn.
+                      </p>
+                    </div>
 
                     {getAvailableRooms().length === 0 ? (
                       <div className="text-center py-12 bg-yellow-50 rounded-xl border border-yellow-200">
@@ -761,8 +870,8 @@ export default function RoomChangeRequestPage() {
                                         Phòng {room.room_number}
                                       </span>
                                       {isCurrentRoom && (
-                                        <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">
-                                          Phòng hiện tại
+                                        <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                          Phòng hiện tại (chuyển giường)
                                         </span>
                                       )}
                                     </div>
@@ -805,10 +914,17 @@ export default function RoomChangeRequestPage() {
                                       (bed) => bed.status === "pending_request"
                                     ).length;
 
-                                    if (pendingCount > 0) {
-                                      return `${room.bed_count} (${availableCount} giường trống, ${pendingCount} đang yêu cầu)`;
+                                    if (isCurrentRoom) {
+                                      if (pendingCount > 0) {
+                                        return `${room.bed_count} (${availableCount} giường trống để chuyển, ${pendingCount} đang yêu cầu)`;
+                                      }
+                                      return `${room.bed_count} (${availableCount} giường trống để chuyển)`;
+                                    } else {
+                                      if (pendingCount > 0) {
+                                        return `${room.bed_count} (${availableCount} giường trống, ${pendingCount} đang yêu cầu)`;
+                                      }
+                                      return `${room.bed_count} (${availableCount} giường trống)`;
                                     }
-                                    return `${room.bed_count} (${availableCount} giường trống)`;
                                   })()}
                                 </div>
                               </div>
@@ -831,7 +947,7 @@ export default function RoomChangeRequestPage() {
                 <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                     <MapPinIcon className="w-6 h-6 text-green-600" />
-                    Chọn giường mới
+                    {changeType === 'room' ? 'Chọn giường mới' : 'Chọn giường khác trong phòng'}
                   </h2>
 
                   {availableBeds.length === 0 ? (
@@ -839,7 +955,9 @@ export default function RoomChangeRequestPage() {
                       <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <ExclamationTriangleIcon className="w-8 h-8 text-yellow-600" />
                       </div>
-                      <h3 className="text-lg font-semibold text-yellow-900 mb-2">Không có giường trống</h3>
+                      <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                        {changeType === 'room' ? 'Không có giường trống' : 'Không có giường khác trong phòng'}
+                      </h3>
                       <p className="text-yellow-800">
                         {(() => {
                           const { room: currentRoom, bed: currentBed } = getCurrentRoomAndBed(selectedResident);
@@ -848,7 +966,9 @@ export default function RoomChangeRequestPage() {
                           const pendingBeds = roomBeds.filter(bed => bed.status === 'pending_request');
 
                           if (isCurrentRoom && currentBed) {
-                            return `Phòng này chỉ có giường ${currentBed.bed_number} (giường hiện tại) còn trống`;
+                            return changeType === 'bed' 
+                              ? `Phòng này chỉ có giường ${currentBed.bed_number} (giường hiện tại) còn trống. Không thể chuyển giường trong cùng phòng.`
+                              : `Phòng này chỉ có giường ${currentBed.bed_number} (giường hiện tại) còn trống`;
                           }
 
                           if (pendingBeds.length > 0) {
@@ -856,7 +976,9 @@ export default function RoomChangeRequestPage() {
                             return `Phòng này có ${pendingBeds.length} giường đang được yêu cầu: ${pendingBedNumbers}`;
                           }
 
-                          return "Phòng này không có giường nào còn trống";
+                          return changeType === 'room' 
+                            ? "Phòng này không có giường nào còn trống"
+                            : "Phòng này không có giường nào khác còn trống";
                         })()}
                       </p>
                     </div>
@@ -921,13 +1043,13 @@ export default function RoomChangeRequestPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Lý do đổi phòng *
+                      {changeType === 'room' ? 'Lý do đổi phòng *' : 'Lý do chuyển giường *'}
                     </label>
                     <textarea
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
                       className="w-full p-3 border-2 border-slate-200 rounded-xl text-sm outline-none bg-white transition-all duration-300 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 shadow-md hover:shadow-lg font-medium text-slate-700"
-                      placeholder="Nhập lý do muốn đổi phòng..."
+                      placeholder={changeType === 'room' ? 'Nhập lý do muốn đổi phòng...' : 'Nhập lý do muốn chuyển giường...'}
                       rows={3}
                       required
                     />
@@ -988,8 +1110,10 @@ export default function RoomChangeRequestPage() {
 
               {/* Message */}
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Yêu cầu đổi phòng của bạn đã được gửi thành công và đang chờ duyệt từ quản trị viên.
-                Bạn sẽ nhận được thông báo khi yêu cầu được xử lý.
+                {changeType === 'room' 
+                  ? 'Yêu cầu đổi phòng của bạn đã được gửi thành công và đang chờ duyệt từ quản trị viên. Bạn sẽ nhận được thông báo khi yêu cầu được xử lý.'
+                  : 'Yêu cầu chuyển giường của bạn đã được gửi thành công và đang chờ duyệt từ quản trị viên. Bạn sẽ nhận được thông báo khi yêu cầu được xử lý.'
+                }
               </p>
 
               {/* Action Buttons */}
