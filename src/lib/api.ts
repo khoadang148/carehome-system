@@ -15,7 +15,8 @@ export const retryRequest = async (requestFn: () => Promise<any>, maxRetries: nu
       const networkish = error?.code === 'ECONNABORTED' ||
         (typeof error?.message === 'string' && (
           error.message.includes('timeout') ||
-          error.message.includes('Network Error')
+          error.message.includes('Network Error') ||
+          error.message.includes('ECONNABORTED')
         )) ||
         !error?.response;
 
@@ -25,6 +26,7 @@ export const retryRequest = async (requestFn: () => Promise<any>, maxRetries: nu
       const isRetryableError = networkish || transientHttp;
 
       if (isLastAttempt || !isRetryableError) {
+        console.error(`Final attempt failed:`, error);
         throw error;
       }
 
@@ -73,7 +75,7 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
-  timeout: 15000, // Giảm timeout xuống 15s để tránh chờ quá lâu
+  timeout: 30000, // Tăng timeout lên 30s để tránh timeout errors
 });
 
 // Transparent GET cache helper for list-like endpoints with retry
@@ -85,8 +87,8 @@ async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 
   try {
     const res = await retryRequest(
       () => apiClient.get<T>(url, { params }),
-      1, // Giảm retry xuống 1 lần
-      2000 // Tăng delay lên 2s
+      3, // Tăng retry lên 3 lần
+      1000 // Giảm delay xuống 1s
     );
     
     if (typeof window !== 'undefined') {
@@ -666,9 +668,13 @@ export const userAPI = {
 export const residentAPI = {
   getAll: async (params?: any) => {
     try {
+      console.log('Fetching all residents with params:', params);
       const data = await getWithCache<any[]>(endpoints.residents, params, 60_000); // Tăng cache time lên 1 phút
+      console.log('Residents API response:', data);
       return data as any[];
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error fetching residents:', error);
+      // Return empty array for graceful degradation
       return [];
     }
   },

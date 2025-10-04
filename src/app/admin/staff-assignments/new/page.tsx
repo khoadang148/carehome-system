@@ -83,8 +83,8 @@ export default function NewStaffAssignmentPage() {
   const swrOpts = { revalidateOnFocus: true, dedupingInterval: 5000, keepPreviousData: true } as const;
   const { data: swrStaff, isLoading: swrStaffLoading } = useSWR(enableFetch ? 'staff:getByRoleWithStatus' : null, () => userAPI.getByRoleWithStatus('staff'), swrOpts);
   const { data: swrRooms, isLoading: swrRoomsLoading } = useSWR(enableFetch ? 'rooms:getAll' : null, () => roomsAPI.getAll(), swrOpts);
-  // Disable fetching all residents to avoid heavy request and timeouts.
-  const { data: swrResidents, isLoading: swrResidentsLoading } = useSWR(null, null as any, swrOpts);
+  // Enable residents fetching with optimized approach
+  const { data: swrResidents, isLoading: swrResidentsLoading } = useSWR(enableFetch ? 'residents:getAll' : null, () => residentAPI.getAll(), swrOpts);
   const { data: swrAssignments, isLoading: swrAssignmentsLoading } = useSWR(enableFetch ? 'staffAssignments:getAll' : null, () => staffAssignmentsAPI.getAll(), swrOpts);
   const { data: swrBedAssignments } = useSWR(enableFetch ? 'bedAssignments:getAll' : null, () => bedAssignmentsAPI.getAll(), swrOpts);
 
@@ -99,7 +99,11 @@ export default function NewStaffAssignmentPage() {
     if (Array.isArray(swrRooms)) setRooms(swrRooms as any[]);
   }, [enableFetch, swrRooms, swrRoomsLoading]);
 
-  // Skipped syncing residents from a heavy endpoint. We load per-room residents on demand.
+  // Sync residents data from SWR
+  useEffect(() => {
+    setResidentsLoading(Boolean(enableFetch && swrResidentsLoading));
+    if (Array.isArray(swrResidents)) setResidents(swrResidents as any[]);
+  }, [enableFetch, swrResidents, swrResidentsLoading]);
 
   useEffect(() => {
     setAssignmentsLoading(Boolean(enableFetch && swrAssignmentsLoading));
@@ -189,25 +193,47 @@ export default function NewStaffAssignmentPage() {
 
   // Helper functions thay thế Redux actions
   const createAssignment = async (data: any) => {
-    const res = await (staffAssignmentsAPI as any).create?.(data);
-    if (res) setAssignments(prev => [res, ...prev]);
-    return res;
+    try {
+      const res = await (staffAssignmentsAPI as any).create?.(data);
+      if (res) {
+        setAssignments(prev => [res, ...prev]);
+        return res;
+      }
+      throw new Error('Không nhận được phản hồi từ server');
+    } catch (error: any) {
+      console.error('Error creating assignment:', error);
+      throw error; // Re-throw để xử lý ở level cao hơn
+    }
   };
 
   const updateAssignment = async (id: string, data: any) => {
     try {
       const res = await (staffAssignmentsAPI as any).update?.(id, data);
-      if (res) setAssignments(prev => prev.map(a => (a._id === id ? res : a)));
-    } catch (e: any) {
-      toast.error(getUserFriendlyError(e?.message || 'Không thể cập nhật phân công'));
+      if (res) {
+        setAssignments(prev => prev.map(a => (a._id === id ? res : a)));
+        return res;
+      }
+      throw new Error('Không nhận được phản hồi từ server');
+    } catch (error: any) {
+      console.error('Error updating assignment:', error);
+      throw error; // Re-throw để xử lý ở level cao hơn
     }
   };
 
   const handleCreate = async () => {
+    // Prevent double submission
+    if (creatingAssignment) {
+      toast.warning('Đang xử lý yêu cầu, vui lòng chờ...');
+      return;
+    }
+
     setValidationErrors({});
+    setCreatingAssignment(true);
+    setError('');
 
     if (!formData.staff_id || formData.room_ids.length === 0) {
       toast.error('Vui lòng chọn nhân viên và ít nhất một phòng');
+      setCreatingAssignment(false);
       return;
     }
 
@@ -222,6 +248,7 @@ export default function NewStaffAssignmentPage() {
         title: 'Không thể tạo phân công',
         message: `Tổng số giường vượt quá ${MAX_BEDS_PER_STAFF}. Vui lòng giảm bớt phòng được chọn.`
       });
+      setCreatingAssignment(false);
       return;
     }
 
@@ -233,80 +260,127 @@ export default function NewStaffAssignmentPage() {
 
     if (endDate < today) {
       setValidationErrors({ end_date: 'Ngày kết thúc không được ở quá khứ' });
+      setCreatingAssignment(false);
       return;
       }
     }
 
     if (!formData.staff_id.match(/^[0-9a-fA-F]{24}$/)) {
       toast.error('ID nhân viên không hợp lệ');
+      setCreatingAssignment(false);
       return;
     }
 
     for (const rid of formData.room_ids) {
       if (!rid.match(/^[0-9a-fA-F]{24}$/)) {
         setInfoModal({ title: 'Dữ liệu không hợp lệ', message: 'ID phòng không hợp lệ.' });
+        setCreatingAssignment(false);
         return;
       }
     }
 
-    // Refresh latest assignments to avoid stale data causing duplicate key
     try {
-      const latest = await (staffAssignmentsAPI as any).getAll?.();
-      if (Array.isArray(latest)) setAssignments(latest);
-    } catch {}
+      // Show progress toast
+      toast.info('Đang tạo phân công...', { autoClose: 2000 });
 
-          const baseAssignmentData: any = {
-            staff_id: formData.staff_id,
-            assigned_date: new Date().toISOString(),
-            assigned_by: user?.id,
-            responsibilities: formData.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
+      // Prepare base assignment data
+      const baseAssignmentData: any = {
+        staff_id: formData.staff_id,
+        assigned_date: new Date().toISOString(),
+        assigned_by: user?.id,
+        responsibilities: formData.responsibilities || ['vital_signs', 'care_notes', 'activities', 'photos'],
+      };
+
+      if (formData.end_date && formData.end_date.trim() !== '') {
+        const date = new Date(formData.end_date);
+        if (!isNaN(date.getTime())) {
+          baseAssignmentData.end_date = date.toISOString();
+        }
+      }
+
+      if (formData.notes && formData.notes.trim() !== '') {
+        baseAssignmentData.notes = formData.notes;
+      }
+
+      // Create assignments for all selected rooms in parallel for better performance
+      const assignmentPromises = formData.room_ids.map(async (rid, index) => {
+        try {
+          const assignmentData = { ...baseAssignmentData, room_id: rid } as any;
+          
+          // Check if assignment already exists
+          const existing = assignments.find(a => {
+            const roomId = a.room_id?._id || a.room_id;
+            const staffId = a.staff_id?._id || a.staff_id;
+            return roomId === rid && staffId === formData.staff_id;
+          });
+
+          let result;
+          if (existing) {
+            assignmentData.status = 'active';
+            result = await updateAssignment(existing._id, assignmentData);
+            return { success: true, roomId: rid, action: 'updated', data: result };
+          } else {
+            result = await createAssignment(assignmentData);
+            return { success: true, roomId: rid, action: 'created', data: result };
+          }
+        } catch (err: any) {
+          console.error(`Error creating assignment for room ${rid}:`, err);
+          
+          // Determine error type for better user feedback
+          let errorMessage = 'Lỗi không xác định';
+          if (err?.response?.status === 409) {
+            errorMessage = 'Phòng đã được phân công cho nhân viên này';
+          } else if (err?.response?.status === 400) {
+            errorMessage = 'Dữ liệu không hợp lệ';
+          } else if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+            errorMessage = 'Kết nối chậm, vui lòng thử lại';
+          } else if (err?.response?.status >= 500) {
+            errorMessage = 'Lỗi máy chủ';
+          }
+          
+          return { 
+            success: false, 
+            roomId: rid, 
+            error: err, 
+            errorMessage,
+            statusCode: err?.response?.status,
+            code: err?.code
           };
+        }
+      });
 
-          if (formData.end_date && formData.end_date.trim() !== '') {
-            const date = new Date(formData.end_date);
-            if (!isNaN(date.getTime())) {
-              baseAssignmentData.end_date = date.toISOString();
-            }
-          }
+      // Wait for all assignments to complete
+      const results = await Promise.allSettled(assignmentPromises);
+      
+      // Process results
+      const successfulResults = results
+        .filter(result => result.status === 'fulfilled' && result.value.success)
+        .map(result => (result as any).value);
+      
+      const failedResults = results
+        .filter(result => result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success))
+        .map(result => result.status === 'fulfilled' ? (result as any).value : { 
+          success: false, 
+          roomId: 'unknown', 
+          error: result.reason,
+          errorMessage: 'Promise rejected'
+        });
 
-          if (formData.notes && formData.notes.trim() !== '') {
-            baseAssignmentData.notes = formData.notes;
-          }
+      const successCount = successfulResults.length;
+      const failureCount = failedResults.length;
 
-          // Create or update assignments for all selected rooms
-          let successCount = 0;
-          for (const rid of formData.room_ids) {
-            const findExisting = () => assignments.find(a => {
-              const roomId = a.room_id?._id || a.room_id;
-              const staffId = a.staff_id?._id || a.staff_id;
-              return roomId === rid && staffId === formData.staff_id;
-            });
+      console.log('Assignment creation results:', {
+        total: formData.room_ids.length,
+        successful: successCount,
+        failed: failureCount,
+        successfulResults,
+        failedResults
+      });
 
-            const assignmentData = { ...baseAssignmentData, room_id: rid } as any;
-            let existing = findExisting();
-            try {
-              if (existing) {
-                assignmentData.status = 'active';
-                await updateAssignment(existing._id, assignmentData);
-                successCount++;
-              } else {
-                await createAssignment(assignmentData);
-                successCount++;
-              }
-            } catch (err: any) {
-              // If duplicate key (409), try to update existing instead
-              if (String(err?.message || '').includes('409') || String(err?.status || '') === '409') {
-                existing = findExisting();
-                if (existing) {
-                  assignmentData.status = 'active';
-                  try { await updateAssignment(existing._id, assignmentData); successCount++; } catch {}
-                }
-              }
-            }
-          }
-
-    // Show result
-      if (successCount > 0) {
+      // Show appropriate feedback based on results
+      if (successCount > 0 && failureCount === 0) {
+        // All successful
+        toast.success(`Đã tạo thành công ${successCount} phân công!`);
         setSuccessData({
           count: successCount,
           staff: selectedStaff,
@@ -315,9 +389,37 @@ export default function NewStaffAssignmentPage() {
           hasExpiredUpdates: false,
         });
         setShowSuccessModal(true);
+      } else if (successCount > 0 && failureCount > 0) {
+        // Partial success - show detailed error info
+        const errorDetails = failedResults.map(f => (f as any).errorMessage || 'Lỗi không xác định').join(', ');
+        toast.warning(`Tạo thành công ${successCount}/${formData.room_ids.length} phân công. Lỗi: ${errorDetails}`);
+        
+        setSuccessData({
+          count: successCount,
+          staff: selectedStaff,
+          rooms: selectedRooms,
+          residents: selectedResidents,
+          hasExpiredUpdates: false,
+          errors: failedResults
+        });
+        setShowSuccessModal(true);
       } else {
-        setInfoModal({ title: 'Không thể tạo phân công', message: 'Tất cả các phòng đã được phân công hoặc bị trùng dữ liệu.' });
+        // All failed - show detailed error info
+        const errorDetails = failedResults.map(f => (f as any).errorMessage || 'Lỗi không xác định').join(', ');
+        toast.error(`Không thể tạo phân công. Lỗi: ${errorDetails}`);
+        
+        setInfoModal({ 
+          title: 'Không thể tạo phân công', 
+          message: `Tất cả các phòng đều gặp lỗi: ${errorDetails}`
+        });
       }
+    } catch (error: any) {
+      console.error('Error creating assignments:', error);
+      toast.error('Có lỗi xảy ra khi tạo phân công. Vui lòng thử lại.');
+      setError('Có lỗi xảy ra khi tạo phân công');
+    } finally {
+      setCreatingAssignment(false);
+    }
   };
 
   const handleSuccessClose = () => {
@@ -337,16 +439,6 @@ export default function NewStaffAssignmentPage() {
     setSelectedRoomForResidents(null);
   };
 
-  const resetForm = () => {
-    setFormData({
-      staff_id: '',
-      room_ids: [],
-      end_date: '',
-      notes: '',
-      responsibilities: ['vital_signs', 'care_notes', 'activities', 'photos'],
-    });
-    setValidationErrors({});
-  };
 
   const isExpired = (endDate: string) => {
     if (!endDate) return false;
@@ -584,6 +676,10 @@ export default function NewStaffAssignmentPage() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
       `}</style>
       <div style={{
         minHeight: '100vh',
@@ -696,34 +792,6 @@ export default function NewStaffAssignmentPage() {
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
-                  onClick={resetForm}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    color: '#6b7280',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.75rem',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    background: 'white'
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                    e.currentTarget.style.borderColor = '#9ca3af';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.borderColor = '#d1d5db';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  Làm mới
-                </button>
-                <button
                   onClick={handleCreate}
                   disabled={creatingAssignment || !isFormValid()}
                   style={{
@@ -744,7 +812,9 @@ export default function NewStaffAssignmentPage() {
                     boxShadow: creatingAssignment || !isFormValid()
                       ? 'none'
                       : '0 4px 12px rgba(59, 130, 246, 0.3)',
-                    opacity: creatingAssignment || !isFormValid() ? 0.6 : 1
+                    opacity: creatingAssignment || !isFormValid() ? 0.6 : 1,
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                   onMouseOver={e => {
                     if (!creatingAssignment && isFormValid()) {
@@ -771,7 +841,16 @@ export default function NewStaffAssignmentPage() {
                         borderRadius: '50%',
                         animation: 'spin 1s linear infinite'
                       }}></div>
-                      Đang tạo...
+                      <span>Đang tạo phân công...</span>
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                        animation: 'shimmer 2s infinite'
+                      }}></div>
                     </>
                   ) : (
                     <>
@@ -819,6 +898,12 @@ export default function NewStaffAssignmentPage() {
                         <UserPlusIcon className="w-5 h-5 text-blue-600" />
                       </div>
                       Thông tin phân công
+                      {creatingAssignment && (
+                        <div className="ml-4 flex items-center text-blue-600">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                          <span className="text-sm font-medium">Đang xử lý...</span>
+                        </div>
+                      )}
                     </h2>
 
                     <div className="space-y-8">
@@ -829,7 +914,8 @@ export default function NewStaffAssignmentPage() {
                         <select
                           value={formData.staff_id}
                           onChange={(e) => setFormData({ ...formData, staff_id: e.target.value })}
-                          className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:outline-none transition-all duration-200 text-lg"
+                          disabled={creatingAssignment}
+                          className={`w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:outline-none transition-all duration-200 text-lg ${creatingAssignment ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <option value="">Chọn nhân viên</option>
                           {staffList.length > 0 ? (
@@ -862,7 +948,8 @@ export default function NewStaffAssignmentPage() {
                               placeholder="Tìm kiếm phòng theo số phòng..."
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 focus:outline-none transition-all duration-200 text-lg"
+                              disabled={creatingAssignment}
+                              className={`w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 focus:outline-none transition-all duration-200 text-lg ${creatingAssignment ? 'opacity-50 cursor-not-allowed' : ''}`}
                             />
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                               <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -903,6 +990,7 @@ export default function NewStaffAssignmentPage() {
                                 <div
                                     key={room._id}
                                   onClick={() => {
+                                    if (creatingAssignment) return;
                                     // Block if there's an active assignment to any staff
                                     if (hasActiveAssignment(room._id)) {
                                       const activeStaffId = getActiveAssignmentStaff(room._id);
@@ -940,7 +1028,11 @@ export default function NewStaffAssignmentPage() {
                                     }));
                                   }}
                                   className={`
-                                p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-[1.02]
+                                p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02]
+                                ${creatingAssignment 
+                                  ? 'cursor-not-allowed opacity-50' 
+                                  : 'cursor-pointer'
+                                }
                                 ${isSelected
                                       ? 'border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 shadow-lg ring-4 ring-green-100'
                                       : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md hover:bg-gray-50'
@@ -1048,12 +1140,6 @@ export default function NewStaffAssignmentPage() {
                               Đã chọn: <span className="font-semibold text-green-600 ml-1 mr-1">{selectedRooms.map(r => `Phòng ${r.room_number}`).join(', ')}</span>
                               <span className="text-gray-500">• {selectedResidents.length} người cao tuổi</span>
                             </p>
-                            <button
-                              onClick={() => setFormData({ ...formData, room_ids: [] })}
-                              className="text-sm text-red-600 hover:text-red-800 transition-colors font-medium"
-                            >
-                              Bỏ chọn
-                            </button>
                           </div>
                         )}
                       </div>
@@ -1212,12 +1298,6 @@ export default function NewStaffAssignmentPage() {
                               <CheckIcon className="w-4 h-4 mr-2" />
                               Phòng được chọn: {selectedRooms.map(r => r.room_number).join(', ')}
                             </h3>
-                            <button
-                              onClick={() => setFormData({ ...formData, room_ids: [] })}
-                              className="text-xs text-green-600 hover:text-green-800 transition-colors font-medium"
-                            >
-                              Bỏ chọn
-                            </button>
                           </div>
                           <div className="space-y-3">
                             <div className="bg-white rounded-lg p-3 border border-green-200 shadow-sm">
