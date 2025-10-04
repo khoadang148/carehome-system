@@ -56,7 +56,7 @@ export default function StaffChatButton({
     };
 
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 10000);
+    const interval = setInterval(fetchUnreadCount, 20000); // Poll every 20 seconds để giảm tải
 
     return () => clearInterval(interval);
   }, [familyMemberId]);

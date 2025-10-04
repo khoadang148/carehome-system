@@ -2792,11 +2792,11 @@ export const messagesAPI = {
             apiClient.get('/messages/unread-count', {
               headers: { 'Cache-Control': 'no-cache' },
             }),
-            10000, // Giảm timeout xuống 10s
+            5000, // Giảm timeout xuống 5s
             'messagesAPI.getUnreadCount'
           ),
-        1, // Chỉ retry 1 lần
-        1000
+        0, // Không retry để tránh delay
+        500
       );
       
       const count = response.data?.unreadCount || 0;
@@ -2805,7 +2805,7 @@ export const messagesAPI = {
       
       return { unreadCount: count };
     } catch (error) {
-      console.warn('Failed to fetch unread count, using cached value or default:', error instanceof Error ? error.message : String(error));
+      // Silent error handling - không log warning để tránh spam console
       
       // Nếu có cache cũ, sử dụng nó
       if (unreadCountCache) {

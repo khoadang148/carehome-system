@@ -175,26 +175,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           totalUnread: computedTotal,
         }));
       } catch (error) {
-        // Silent error handling for polling
+        // Silent error handling for polling - không ảnh hưởng đến UI
+        // Chỉ cập nhật state nếu có lỗi và chưa có giá trị
+        setChatState(prev => ({
+          ...prev,
+          totalUnread: prev.totalUnread || 0,
+        }));
       }
     };
 
-    pollUnreadCounts();
+    // Chỉ poll nếu user đã đăng nhập và có role phù hợp
+    if (user && (user.role === 'family' || user.role === 'staff')) {
+      pollUnreadCounts();
+      const interval = setInterval(pollUnreadCounts, 15000); // Tăng interval lên 15s để giảm tải
 
-    const interval = setInterval(pollUnreadCounts, 10000); 
-
-    
-    const onFocus = () => pollUnreadCounts();
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', onFocus);
-    }
-
-    return () => {
-      clearInterval(interval);
+      const onFocus = () => {
+        // Chỉ poll khi focus nếu không có lỗi gần đây
+        pollUnreadCounts();
+      };
+      
       if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', onFocus);
+        window.addEventListener('focus', onFocus);
       }
-    };
+
+      return () => {
+        clearInterval(interval);
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('focus', onFocus);
+        }
+      };
+    }
   }, [user]);
 
   const value: ChatContextType = {

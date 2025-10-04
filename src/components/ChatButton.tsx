@@ -64,7 +64,7 @@ export default function ChatButton({
 
     fetchUnreadCount();
     
-    const interval = setInterval(fetchUnreadCount, 15000); // Poll every 15 seconds
+    const interval = setInterval(fetchUnreadCount, 20000); // Poll every 20 seconds để giảm tải
         
     return () => {
       isMountedRef.current = false;

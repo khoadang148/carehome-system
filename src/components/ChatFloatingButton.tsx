@@ -63,15 +63,16 @@ export default function ChatFloatingButton({ unreadCount = 0 }: ChatFloatingButt
         const newCount = response.unreadCount || 0;
         setActualUnreadCount(newCount);
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        // Silent error handling - không log error để tránh spam console
+        // Giữ nguyên giá trị hiện tại nếu có lỗi
       } finally {
         isFetching = false;
       }
     };
 
     fetchUnreadCount();
-    // Poll every 15 seconds
-    const interval = setInterval(fetchUnreadCount, 15000);
+    // Poll every 20 seconds để giảm tải
+    const interval = setInterval(fetchUnreadCount, 20000);
     return () => clearInterval(interval);
   }, [user?.id]);
 
