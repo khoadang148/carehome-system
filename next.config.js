@@ -132,14 +132,15 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'https://sep490-be-xniz.onrender.com/:path*',
-      },
-    ];
-  },
+  // Removed rewrites - Vercel handles API routes differently
+  // async rewrites() {
+  //   return [
+  //     {
+  //       source: '/api/:path*',
+  //       destination: 'https://sep490-be-xniz.onrender.com/:path*',
+  //     },
+  //   ];
+  // },
   env: {
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== 'production' ? '/api' : 'https://sep490-be-xniz.onrender.com'),
