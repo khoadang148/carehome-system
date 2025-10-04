@@ -73,11 +73,11 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
-  timeout: 30000, // Tăng timeout lên 30s để tránh socket hang up
+  timeout: 15000, // Giảm timeout xuống 15s để tránh chờ quá lâu
 });
 
 // Transparent GET cache helper for list-like endpoints with retry
-async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 30_000): Promise<T> {
+async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 60_000): Promise<T> {
   const key = buildCacheKey(API_BASE_URL, url, params);
   const cached = typeof window !== 'undefined' ? getCached<T>(key) : null;
   if (cached) return cached.data;
@@ -85,8 +85,8 @@ async function getWithCache<T = any>(url: string, params?: any, ttlMs: number = 
   try {
     const res = await retryRequest(
       () => apiClient.get<T>(url, { params }),
-      2, // max retries for cached requests
-      1000 // initial delay
+      1, // Giảm retry xuống 1 lần
+      2000 // Tăng delay lên 2s
     );
     
     if (typeof window !== 'undefined') {

@@ -406,31 +406,31 @@ export default function NewStaffAssignmentPage() {
         return false; // Don't show rooms without residents
       }
 
-      const selectedStaffId = formData.staff_id;
-      if (!selectedStaffId) {
-        // If no staff selected, show all rooms with residents
-          return true;
-      } else {
-        // Check if this room is already assigned to this staff
-        const specificAssignment = assignments.find(assignment => {
-          if (!assignment.room_id || !assignment.staff_id) return false;
-          const assignmentRoomId = assignment.room_id._id || assignment.room_id;
-          const assignmentStaffId = assignment.staff_id._id || assignment.staff_id;
-          return assignmentRoomId === room._id && assignmentStaffId === selectedStaffId;
-        });
+      // Check if this room is already assigned to ANY staff (not just the selected one)
+      const roomAssignments = assignments.filter(assignment => {
+        if (!assignment.room_id) return false;
+        const assignmentRoomId = assignment.room_id._id || assignment.room_id;
+        return assignmentRoomId === room._id;
+      });
 
-        if (!specificAssignment) {
-          return true;
-        }
+      // If no assignments exist for this room, it's available
+      if (roomAssignments.length === 0) {
+        return true;
+      }
 
-        // If assignment exists but is expired, allow reassignment
-        if (specificAssignment.end_date && isExpired(specificAssignment.end_date)) {
-          return true;
-        }
+      // Check if all assignments for this room are expired
+      const hasActiveAssignment = roomAssignments.some(assignment => {
+        if (!assignment.end_date) return true; // No end date means active
+        return !isExpired(assignment.end_date); // Not expired means active
+      });
 
-        // If assignment is active, don't show this room
+      // If there's an active assignment, don't show this room
+      if (hasActiveAssignment) {
         return false;
       }
+
+      // If all assignments are expired, allow reassignment
+      return true;
     });
   };
 
@@ -444,6 +444,37 @@ export default function NewStaffAssignmentPage() {
     return roomAssignments.length > 0 && roomAssignments.every(assignment =>
       assignment.end_date && isExpired(assignment.end_date)
     );
+  };
+
+  const hasActiveAssignment = (roomId: string) => {
+    const roomAssignments = assignments.filter(assignment => {
+      if (!assignment.room_id) return false;
+      const assignmentRoomId = assignment.room_id._id || assignment.room_id;
+      return assignmentRoomId === roomId;
+    });
+
+    return roomAssignments.some(assignment => {
+      if (!assignment.end_date) return true; // No end date means active
+      return !isExpired(assignment.end_date); // Not expired means active
+    });
+  };
+
+  const getActiveAssignmentStaff = (roomId: string) => {
+    const roomAssignments = assignments.filter(assignment => {
+      if (!assignment.room_id) return false;
+      const assignmentRoomId = assignment.room_id._id || assignment.room_id;
+      return assignmentRoomId === roomId;
+    });
+
+    const activeAssignment = roomAssignments.find(assignment => {
+      if (!assignment.end_date) return true; // No end date means active
+      return !isExpired(assignment.end_date); // Not expired means active
+    });
+
+    if (activeAssignment && activeAssignment.staff_id) {
+      return activeAssignment.staff_id._id || activeAssignment.staff_id;
+    }
+    return null;
   };
 
   const getAssignmentStatus = (roomId: string) => {
@@ -872,33 +903,41 @@ export default function NewStaffAssignmentPage() {
                                 <div
                                     key={room._id}
                                   onClick={() => {
-                                    // Only block if there's an active assignment (not expired)
-                                      if (formData.staff_id && getAssignmentStatus(room._id) === 'active') {
+                                    // Block if there's an active assignment to any staff
+                                    if (hasActiveAssignment(room._id)) {
+                                      const activeStaffId = getActiveAssignmentStaff(room._id);
+                                      const isAssignedToCurrentStaff = formData.staff_id && activeStaffId === formData.staff_id;
+                                      
+                                      if (isAssignedToCurrentStaff) {
                                         toast.error(`Phòng ${room.room_number} đã được phân công cho nhân viên này rồi. Vui lòng chọn phòng khác hoặc nhân viên khác.`);
+                                      } else {
+                                        const activeStaff = staffList.find(s => s._id === activeStaffId);
+                                        toast.error(`Phòng ${room.room_number} đã được phân công cho ${activeStaff?.full_name || 'nhân viên khác'}. Mỗi phòng chỉ có thể được phân công cho 1 nhân viên.`);
+                                      }
                                       return;
                                     }
 
-                                      // Allow selection for rooms with expired assignments or no assignments
-                                      if (formData.staff_id && !isSelected) {
-                                        const currentBeds = getActiveBedsCountForStaff(formData.staff_id);
-                                        const selectedBeds = getSelectedBedsCount(formData.room_ids);
-                                        const roomBeds = rooms.find(r => r._id === room._id)?.bed_count || 0;
-                                        if (currentBeds + selectedBeds + roomBeds > MAX_BEDS_PER_STAFF) {
-                                          const remaining = Math.max(0, MAX_BEDS_PER_STAFF - (currentBeds + selectedBeds));
-                                          setInfoModal({
-                                            title: 'Không thể chọn phòng',
-                                            message: `Giới hạn tối đa ${MAX_BEDS_PER_STAFF} giường cho mỗi nhân viên. Vui lòng bỏ bớt phòng trước khi chọn thêm.`
-                                          });
-                                          return;
-                                        }
+                                    // Allow selection for rooms with expired assignments or no assignments
+                                    if (formData.staff_id && !isSelected) {
+                                      const currentBeds = getActiveBedsCountForStaff(formData.staff_id);
+                                      const selectedBeds = getSelectedBedsCount(formData.room_ids);
+                                      const roomBeds = rooms.find(r => r._id === room._id)?.bed_count || 0;
+                                      if (currentBeds + selectedBeds + roomBeds > MAX_BEDS_PER_STAFF) {
+                                        const remaining = Math.max(0, MAX_BEDS_PER_STAFF - (currentBeds + selectedBeds));
+                                        setInfoModal({
+                                          title: 'Không thể chọn phòng',
+                                          message: `Giới hạn tối đa ${MAX_BEDS_PER_STAFF} giường cho mỗi nhân viên. Vui lòng bỏ bớt phòng trước khi chọn thêm.`
+                                        });
+                                        return;
                                       }
+                                    }
 
-                                      setFormData(prev => ({
-                                        ...prev,
-                                        room_ids: isSelected
-                                          ? prev.room_ids.filter(id => id !== room._id)
-                                          : [...prev.room_ids, room._id]
-                                      }));
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      room_ids: isSelected
+                                        ? prev.room_ids.filter(id => id !== room._id)
+                                        : [...prev.room_ids, room._id]
+                                    }));
                                   }}
                                   className={`
                                 p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-[1.02]
@@ -938,19 +977,30 @@ export default function NewStaffAssignmentPage() {
                                             Xem danh sách người cao tuổi
                                           </button>
 
-                                          {formData.staff_id && getAssignmentStatus(room._id) === 'active' && (
-                                          <p className="text-xs text-red-600 font-medium mt-1">
-                                            ⚠️ Đã được phân công cho nhân viên này
-                                          </p>
-                                        )}
-                                          {formData.staff_id && getAssignmentStatus(room._id) === 'expired' && (
+                                          {hasActiveAssignment(room._id) && (
+                                            (() => {
+                                              const activeStaffId = getActiveAssignmentStaff(room._id);
+                                              const isAssignedToCurrentStaff = formData.staff_id && activeStaffId === formData.staff_id;
+                                              const activeStaff = staffList.find(s => s._id === activeStaffId);
+                                              
+                                              if (isAssignedToCurrentStaff) {
+                                                return (
+                                                  <p className="text-xs text-red-600 font-medium mt-1">
+                                                    ⚠️ Đã được phân công cho nhân viên này
+                                                  </p>
+                                                );
+                                              } else {
+                                                return (
+                                                  <p className="text-xs text-red-600 font-medium mt-1">
+                                                    ❌ Đã được phân công cho {activeStaff?.full_name || 'nhân viên khác'}
+                                                  </p>
+                                                );
+                                              }
+                                            })()
+                                          )}
+                                          {!hasActiveAssignment(room._id) && hasExpiredAssignments(room._id) && (
                                           <p className="text-xs text-orange-600 font-medium mt-1">
                                             🔄 Có thể phân công lại (đã hết hạn)
-                                          </p>
-                                        )}
-                                          {!formData.staff_id && hasExpiredAssignments(room._id) && (
-                                          <p className="text-xs text-orange-600 font-medium mt-1">
-                                            🔄 Có thể phân công lại
                                           </p>
                                         )}
                                       </div>
@@ -984,7 +1034,7 @@ export default function NewStaffAssignmentPage() {
                                     <UserPlusIcon className="w-8 h-8 text-gray-400" />
                                   </div>
                                   <p className="text-lg font-medium mb-2">Không có phòng nào khả dụng</p>
-                                  <p className="text-sm">Tất cả phòng có người cao tuổi đã được phân công</p>
+                                  <p className="text-sm">Tất cả phòng có người cao tuổi đã được phân công cho nhân viên khác</p>
                                 </>
                               )}
                             </div>

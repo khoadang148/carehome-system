@@ -19,9 +19,11 @@ export const useResidents = () => {
     swrKeys.residents(),
     () => residentAPI.getAll(),
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // Tắt để giảm API calls
       revalidateOnReconnect: true,
-      refreshInterval: 60000, // 1 minute - residents don't change often
+      refreshInterval: 300000, // 5 minutes - tăng lên
+      dedupingInterval: 120000, // 2 minutes
+      errorRetryCount: 1, // Giảm retry
     }
   );
 
@@ -109,7 +111,9 @@ export const useStaff = () => {
     {
       revalidateOnFocus: false, // Staff data doesn't change often
       revalidateOnReconnect: true,
-      refreshInterval: 300000, // 5 minutes
+      refreshInterval: 600000, // 10 minutes - tăng lên
+      dedupingInterval: 300000, // 5 minutes
+      errorRetryCount: 1, // Giảm retry
     }
   );
 
