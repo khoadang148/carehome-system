@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
+import useSWR from 'swr';
 import {
   ArrowLeftIcon,
   XMarkIcon,
@@ -17,8 +18,10 @@ import {
   ArrowPathIcon,
   ArrowRightIcon
 } from '@heroicons/react/24/outline';
-import { carePlansAPI, carePlanAssignmentsAPI, residentAPI, userAPI, roomsAPI, bedAssignmentsAPI, serviceRequestsAPI, bedsAPI } from '@/lib/api';
+import { carePlansAPI, carePlanAssignmentsAPI, residentAPI, userAPI, roomsAPI, bedAssignmentsAPI, serviceRequestsAPI, bedsAPI, roomTypesAPI } from '@/lib/api';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
+import { swrConfigs } from '@/lib/swr-config';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 const getAvatarUrl = (avatarPath: string | null | undefined) => {
   if (!avatarPath) return '/default-avatar.svg';
@@ -33,10 +36,19 @@ const getAvatarUrl = (avatarPath: string | null | undefined) => {
 // Helper function to check if bed assignment is active
 const isBedAssignmentActive = (assignment: any) => {
   if (!assignment) return false;
-  if (!assignment.unassigned_date) return true; // null = active
-  const unassignedDate = new Date(assignment.unassigned_date);
-  const now = new Date();
-  return unassignedDate > now; // ngày trong tương lai = active
+  
+  // Nếu status là 'active', luôn active
+  if (assignment.status === 'active') return true;
+  
+  // Nếu status là 'done', kiểm tra unassigned_date
+  if (assignment.status === 'done') {
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  }
+  
+  return false; // Các status khác không active
 };
 
 export default function ServiceDetailsPage() {
@@ -44,30 +56,155 @@ export default function ServiceDetailsPage() {
   const params = useParams();
   const { user } = useAuth();
 
-  const [relatives, setRelatives] = useState<any[]>([]);
-  const [selectedRelative, setSelectedRelative] = useState<any>(null);
-  const [residentCarePlans, setResidentCarePlans] = useState<any[]>([]);
-  const [residentCarePlanDetail, setResidentCarePlanDetail] = useState<any>(null);
-  const [carePlanDetails, setCarePlanDetails] = useState<any[]>([]);
-  const [carePlanAssignments, setCarePlanAssignments] = useState<any[]>([]);
-  const [loadingCarePlanDetail, setLoadingCarePlanDetail] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const [roomNumber, setRoomNumber] = useState<string>('Chưa hoàn tất đăng kí');
-  const [bedNumber, setBedNumber] = useState<string>('Chưa phân giường');
-  const [roomLoading, setRoomLoading] = useState(false);
-  const [roomPrice, setRoomPrice] = useState<number>(0);
   const [expandedServices, setExpandedServices] = useState<{ [key: number]: boolean }>({});
   const [showBulkExtensionModal, setShowBulkExtensionModal] = useState(false);
-  // Removed old BulkChangeModal in favor of dedicated change page
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-  const [targetPlanNames, setTargetPlanNames] = useState<Record<string, string>>({});
-  const [targetRoomsById, setTargetRoomsById] = useState<Record<string, any>>({});
-  const [targetBedsById, setTargetBedsById] = useState<Record<string, any>>({});
+  const [upcomingChanges, setUpcomingChanges] = useState<any[]>([]);
 
   const residentId = params.id as string;
+
+  // SWR hooks for data fetching
+  const { data: relatives = [], isLoading: loadingRelatives } = useSWR(
+    user?.id ? `/relatives/${user.id}` : null,
+    () => residentAPI.getByFamilyMemberId(user?.id || ''),
+    swrConfigs.user
+  );
+
+  const selectedRelative = useMemo(() => {
+    if (!relatives.length) return null;
+    const selected = relatives.find((r: any) => r._id === residentId);
+    return selected || relatives[0];
+  }, [relatives, residentId]);
+
+  const { data: carePlanAssignments = [], isLoading: loadingCarePlanAssignments } = useSWR(
+    selectedRelative?._id ? `/care-plan-assignments/${selectedRelative._id}` : null,
+    () => carePlanAssignmentsAPI.getByResidentId(selectedRelative._id),
+    swrConfigs.user
+  );
+
+  const { data: bedAssignments = [], isLoading: loadingBedAssignments } = useSWR(
+    selectedRelative?._id ? `/bed-assignments/${selectedRelative._id}` : null,
+    () => bedAssignmentsAPI.getByResidentId(selectedRelative._id),
+    swrConfigs.user
+  );
+
+  const { data: pendingRequests = [] } = useSWR(
+    user?.id ? `/service-requests/${user.id}` : null,
+    () => serviceRequestsAPI.getMyRequests(),
+    swrConfigs.frequent
+  );
+
+  const { data: roomTypes = [] } = useSWR(
+    '/room-types',
+    () => roomTypesAPI.getAll(),
+    swrConfigs.stable
+  );
+
+  // Computed values
+  const filteredCarePlanAssignments = useMemo(() => {
+    if (!Array.isArray(carePlanAssignments)) return [];
+    return carePlanAssignments.filter((assignment: any) => {
+      return assignment.status === 'done' || assignment.status === 'active' || assignment.status === 'accepted';
+    });
+  }, [carePlanAssignments]);
+
+  const activeCarePlanAssignments = useMemo(() => {
+    return filteredCarePlanAssignments.filter((assignment: any) => {
+      // Nếu status là 'active', luôn active
+      if (assignment.status === 'active') return true;
+      
+      // Nếu status là 'done', kiểm tra end_date
+      if (assignment.status === 'done') {
+        if (!assignment.end_date) return true; // null = active
+        const endDate = new Date(assignment.end_date);
+        const now = new Date();
+        return endDate > now; // ngày trong tương lai = active
+      }
+      
+      // Nếu status là 'accepted', kiểm tra start_date để xem đã bắt đầu chưa
+      if (assignment.status === 'accepted') {
+        if (!assignment.start_date) return true; // null = active
+        const startDate = new Date(assignment.start_date);
+        const now = new Date();
+        return startDate <= now; // đã bắt đầu = active
+      }
+      
+      return false; // Các status khác không active
+    });
+  }, [filteredCarePlanAssignments]);
+
+  const { data: carePlanDetails = [], isLoading: loadingCarePlanDetails } = useSWR(
+    activeCarePlanAssignments.length > 0 ? `/care-plan-details/${selectedRelative?._id}` : null,
+    async () => {
+      if (activeCarePlanAssignments.length === 0) return [];
+      
+      const allCarePlanIds: any[] = [];
+      activeCarePlanAssignments.forEach((assignment: any) => {
+        if (Array.isArray(assignment.care_plan_ids)) {
+          assignment.care_plan_ids.forEach((plan: any) => {
+            const planId = plan._id || plan;
+            if (!allCarePlanIds.find(p => (p._id || p) === planId)) {
+              allCarePlanIds.push(plan);
+            }
+          });
+        }
+      });
+
+      if (allCarePlanIds.length === 0) return [];
+
+      const carePlanPromises = allCarePlanIds.map(async (plan: any) => {
+        const planId = plan._id || plan;
+        try {
+          const planData = await carePlansAPI.getById(planId);
+          return planData;
+        } catch (err) {
+          return plan;
+        }
+      });
+
+      return await Promise.all(carePlanPromises);
+    },
+    swrConfigs.user
+  );
+
+  const residentCarePlanDetail = useMemo(() => {
+    return activeCarePlanAssignments.length > 0 ? activeCarePlanAssignments[0] : null;
+  }, [activeCarePlanAssignments]);
+
+  const roomInfo = useMemo(() => {
+    if (!Array.isArray(bedAssignments)) return { roomNumber: 'Chưa hoàn tất đăng kí', bedNumber: 'Chưa phân giường', roomPrice: 0 };
+    
+    const filteredAssignments = bedAssignments.filter(a => 
+      a.bed_id && (a.status === 'done' || a.status === 'active')
+    );
+    
+    const activeAssignment = filteredAssignments.find(a => isBedAssignmentActive(a));
+    
+    if (!activeAssignment?.bed_id) {
+      return { roomNumber: 'Chưa hoàn tất đăng kí', bedNumber: 'Chưa phân giường', roomPrice: 0 };
+    }
+
+    let roomData: any = null;
+    let bedData: any = null;
+    let roomPrice = 0;
+
+    if (typeof activeAssignment.bed_id === 'object' && activeAssignment.bed_id.room_id) {
+      roomData = activeAssignment.bed_id.room_id;
+      bedData = activeAssignment.bed_id;
+    }
+
+    if (roomData?.room_type && roomTypes.length > 0) {
+      const roomType = roomTypes.find((type: any) => type.room_type === roomData.room_type);
+      roomPrice = roomType?.monthly_price || 0;
+    }
+
+    return {
+      roomNumber: roomData?.room_number || 'Chưa hoàn tất đăng kí',
+      bedNumber: bedData?.bed_number || 'Chưa phân giường',
+      roomPrice
+    };
+  }, [bedAssignments, roomTypes]);
 
   useEffect(() => {
     if (!user) {
@@ -83,367 +220,22 @@ export default function ServiceDetailsPage() {
     }
   }, [user, router]);
 
-  useEffect(() => {
-    const loadRelatives = async () => {
-      try {
-        setLoading(true);
-        const response = await residentAPI.getByFamilyMemberId(user?.id || '');
-        const relativesData = Array.isArray(response) ? response : [];
-        setRelatives(relativesData);
+  // Loading states
+  const loading = loadingRelatives;
+  const loadingCarePlanDetail = loadingCarePlanAssignments || loadingCarePlanDetails;
+  const roomLoading = loadingBedAssignments;
 
-        const selected = relativesData.find((r: any) => r._id === residentId);
-        if (selected) {
-          setSelectedRelative(selected);
-        } else if (relativesData.length > 0) {
-          setSelectedRelative(relativesData[0]);
-        }
-      } catch (error) {
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user?.id) {
-      loadRelatives();
-    }
-  }, [user?.id, residentId]);
-
-  useEffect(() => {
-    const loadCarePlans = async () => {
-      if (!selectedRelative?._id) return;
-
-      try {
-        const response = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
-        setResidentCarePlans(Array.isArray(response) ? response : []);
-      } catch (error) {
-      }
-    };
-
-    loadCarePlans();
-  }, [selectedRelative?._id]);
-
-  useEffect(() => {
-    const loadCarePlanDetail = async () => {
-      if (!selectedRelative?._id || residentCarePlans.length === 0) return;
-
-      try {
-        setLoadingCarePlanDetail(true);
-
-        const allAssignments = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
-        
-        // Lọc ra những assignment không bị hủy, từ chối, hoặc đang chờ duyệt
-        const activeAssignments = allAssignments.filter((assignment: any) => {
-          // Loại bỏ các assignment bị hủy, từ chối, hoặc đang chờ duyệt
-          if (assignment.status === 'cancelled' || 
-              assignment.status === 'pending' || 
-              assignment.status === 'rejected') {
-            return false;
-          }
-          
-          return true; // Hiển thị các trạng thái khác (active, completed, etc.)
-        });
-        
-        setCarePlanAssignments(activeAssignments);
-
-        const allCarePlanIds: any[] = [];
-        if (Array.isArray(activeAssignments)) {
-          activeAssignments.forEach((assignment: any) => {
-            if (Array.isArray(assignment.care_plan_ids)) {
-              assignment.care_plan_ids.forEach((plan: any) => {
-                const planId = plan._id || plan;
-                if (!allCarePlanIds.find(p => (p._id || p) === planId)) {
-                  allCarePlanIds.push(plan);
-                }
-              });
-            }
-          });
-        }
-
-        if (allCarePlanIds.length > 0) {
-          const carePlanPromises = allCarePlanIds.map(async (plan: any) => {
-            const planId = plan._id || plan;
-            try {
-              const planData = await carePlansAPI.getById(planId);
-              return planData;
-            } catch (err) {
-              return plan;
-            }
-          });
-
-          const carePlanData = await Promise.all(carePlanPromises);
-          setCarePlanDetails(carePlanData);
-        } else {
-          setCarePlanDetails([]);
-        }
-
-        if (activeAssignments.length > 0) {
-          setResidentCarePlanDetail(activeAssignments[0]);
-
-          // Ưu tiên sử dụng room_monthly_cost từ care plan assignment
-          const assignmentWithRoomCost = activeAssignments.find((assignment: any) =>
-            assignment.room_monthly_cost && assignment.room_monthly_cost > 0
-          );
-          if (assignmentWithRoomCost) {
-            setRoomPrice(assignmentWithRoomCost.room_monthly_cost);
-          }
-        }
-      } catch (error) {
-      } finally {
-        setLoadingCarePlanDetail(false);
-      }
-    };
-
-    loadCarePlanDetail();
-  }, [selectedRelative?._id, residentCarePlans]);
-
-  // Load pending requests
-  useEffect(() => {
-    const loadPendingRequests = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const requests = await serviceRequestsAPI.getMyRequests();
-        const pending = Array.isArray(requests) ? requests.filter((req: any) => req.status === 'pending') : [];
-        setPendingRequests(pending);
-      } catch (error) {
-        console.error('Error loading pending requests:', error);
-        setPendingRequests([]);
-      }
-    };
-
-    loadPendingRequests();
-  }, [user?.id]);
-
-  // Resolve missing details for pending requests (plan name, room number, bed number)
-  useEffect(() => {
-    (async () => {
-      const updatesPlan: Record<string, string> = {};
-      const updatesRooms: Record<string, any> = {};
-      const updatesBeds: Record<string, any> = {};
-      const tasks: Promise<void>[] = [];
-
-      for (const req of pendingRequests || []) {
-        // Plan name
-        if (req?.request_type === 'care_plan_change') {
-          const planId = typeof req?.target_service_package_id === 'string' ? req.target_service_package_id : null;
-          if (planId && !targetPlanNames[planId]) {
-            tasks.push((async () => {
-              try {
-                const plan = await carePlansAPI.getById(planId);
-                if (plan?.plan_name) updatesPlan[planId] = plan.plan_name;
-              } catch {}
-            })());
-          }
-        }
-        // Room number
-        const roomId = typeof req?.target_room_id === 'string' ? req.target_room_id : null;
-        if (roomId && !targetRoomsById[roomId]) {
-          tasks.push((async () => {
-            try {
-              const room = await roomsAPI.getById(roomId);
-              if (room?._id) updatesRooms[roomId] = room;
-            } catch {}
-          })());
-        }
-        // Bed number
-        const bedId = typeof req?.target_bed_id === 'string' ? req.target_bed_id : null;
-        if (bedId && !targetBedsById[bedId]) {
-          tasks.push((async () => {
-            try {
-              const bed = await bedsAPI.getById(bedId);
-              if (bed?._id) updatesBeds[bedId] = bed;
-              // If room not provided but bed has room_id, fetch room too
-              const bedRoomId = (bed?.room_id && typeof bed.room_id === 'object' && bed.room_id?._id)
-                ? bed.room_id._id
-                : (typeof bed?.room_id === 'string' ? bed.room_id : '');
-              if (bedRoomId && !targetRoomsById[bedRoomId]) {
-                try {
-                  const room = await roomsAPI.getById(bedRoomId);
-                  if (room?._id) updatesRooms[bedRoomId] = room;
-                } catch {}
-              }
-            } catch {}
-          })());
-        }
-      }
-
-      if (tasks.length > 0) {
-        await Promise.all(tasks);
-        if (Object.keys(updatesPlan).length) setTargetPlanNames(prev => ({ ...prev, ...updatesPlan }));
-        if (Object.keys(updatesRooms).length) setTargetRoomsById(prev => ({ ...prev, ...updatesRooms }));
-        if (Object.keys(updatesBeds).length) setTargetBedsById(prev => ({ ...prev, ...updatesBeds }));
-      }
-    })();
+  // Computed values for pending requests
+  const pendingServiceRequests = useMemo(() => {
+    return Array.isArray(pendingRequests) ? pendingRequests.filter((req: any) => req.status === 'pending') : [];
   }, [pendingRequests]);
 
+  // Load upcoming changes when data is available
   useEffect(() => {
-    if (!selectedRelative?._id) {
-      setRoomNumber('Chưa hoàn tất đăng kí');
-      setBedNumber('Chưa phân giường');
-      setRoomPrice(0);
-      return;
+    if (selectedRelative?._id && carePlanAssignments.length > 0) {
+      loadUpcomingChanges();
     }
-    
-    setRoomLoading(true);
-    
-    // Helper function để kiểm tra bed assignment đã bắt đầu chưa
-    const isBedStarted = (bedAssignment: any) => {
-      if (!bedAssignment?.assigned_date) return true;
-      const startDate = new Date(bedAssignment.assigned_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return startDate <= today;
-    };
-
-    // Helper function để kiểm tra bed assignment còn active không
-    const isBedAssignmentActive = (assignment: any) => {
-      if (!assignment) return false;
-      if (!assignment.unassigned_date) return true; // null = active
-      const unassignedDate = new Date(assignment.unassigned_date);
-      const now = new Date();
-      return unassignedDate > now; // ngày trong tương lai = active
-    };
-
-    // Hàm để cập nhật thông tin phòng và lấy giá từ room_types
-    const updateRoomInfo = async (roomData: any, bedInfo: any, bedAssignment: any = null) => {
-      console.log('updateRoomInfo called with:', { roomData, bedInfo, bedAssignment });
-      
-      setRoomNumber(roomData?.room_number || 'Chưa hoàn tất đăng kí');
-      
-      if (bedInfo) {
-        console.log('Bed info found:', bedInfo);
-        if (typeof bedInfo === 'object' && bedInfo.bed_number) {
-          // Kiểm tra ngày bắt đầu của bed assignment
-          if (bedAssignment && !isBedStarted(bedAssignment)) {
-            console.log('Bed assignment not started yet, showing future date');
-            setBedNumber('Sẽ sử dụng từ ' + new Date(bedAssignment.assigned_date).toLocaleDateString('vi-VN'));
-          } else {
-            console.log('Setting bed number:', bedInfo.bed_number);
-            setBedNumber(bedInfo.bed_number);
-          }
-        } else {
-          const bedId = typeof bedInfo === 'object' && bedInfo?._id ? bedInfo._id : bedInfo;
-          if (bedAssignment && !isBedStarted(bedAssignment)) {
-            console.log('Bed assignment not started yet, showing future date');
-            setBedNumber('Sẽ sử dụng từ ' + new Date(bedAssignment.assigned_date).toLocaleDateString('vi-VN'));
-          } else {
-            console.log('Setting bed ID:', bedId);
-            setBedNumber(bedId || 'Chưa phân giường');
-          }
-        }
-      } else {
-        console.log('No bed info found, setting to Chưa phân giường');
-        setBedNumber('Chưa phân giường');
-      }
-
-      // Lấy giá phòng từ room_types dựa trên room_type của phòng
-      if (roomData?.room_type) {
-        try {
-          // Import roomTypesAPI để lấy giá phòng
-          const { roomTypesAPI } = await import('@/lib/api');
-          const roomTypes = await roomTypesAPI.getAll();
-          const roomType = roomTypes.find((type: any) => type.room_type === roomData.room_type);
-          
-          if (roomType && roomType.monthly_price) {
-            setRoomPrice(roomType.monthly_price);
-          } else {
-            setRoomPrice(0);
-          }
-        } catch (error) {
-          console.error('Error fetching room type price:', error);
-          setRoomPrice(0);
-        }
-      } else {
-        setRoomPrice(0);
-      }
-    };
-
-    // Sử dụng endpoint mới để lấy tất cả bed assignments với status
-    bedAssignmentsAPI.getAllStatuses({ resident_id: selectedRelative._id })
-      .then((assignments: any[]) => {
-        console.log('All bed assignments for resident:', selectedRelative._id, assignments);
-        
-        // Tìm bed assignment active (còn hạn) và đã bắt đầu sử dụng
-        const activeAssignment = Array.isArray(assignments) ? 
-          assignments.find(a => 
-            a.bed_id?.room_id && 
-            (a.status === 'active' || a.status === 'accepted') && 
-            isBedAssignmentActive(a) && 
-            isBedStarted(a)
-          ) : null;
-        
-        console.log('Active assignment found:', activeAssignment);
-        
-        if (activeAssignment?.bed_id?.room_id) {
-          const roomData = activeAssignment.bed_id.room_id;
-          
-          if (typeof roomData === 'object' && roomData.room_number) {
-            // Có thông tin phòng đầy đủ
-            updateRoomInfo(roomData, activeAssignment.bed_id, activeAssignment);
-          } else {
-            // Cần fetch thông tin phòng
-            const roomId = roomData._id || roomData;
-            if (roomId) {
-              return roomsAPI.getById(roomId)
-                .then((room: any) => {
-                  updateRoomInfo(room, activeAssignment.bed_id, activeAssignment);
-                })
-                .catch(() => {
-                  updateRoomInfo(null, null, activeAssignment);
-                });
-            } else {
-              updateRoomInfo(null, null, activeAssignment);
-            }
-          }
-        } else {
-          // Không có bed assignment active, thử từ care plan assignments
-          return carePlanAssignmentsAPI.getByResidentId(selectedRelative._id)
-            .then((careAssignments: any[]) => {
-              const careAssignment = Array.isArray(careAssignments) ? 
-                careAssignments.find(a => a.bed_id?.room_id || a.assigned_room_id) : null;
-              
-              const roomId = careAssignment?.bed_id?.room_id || careAssignment?.assigned_room_id;
-              const roomIdString = typeof roomId === 'object' && roomId?._id ? roomId._id : roomId;
-              
-              if (roomIdString) {
-                return roomsAPI.getById(roomIdString)
-                  .then((room: any) => {
-                    updateRoomInfo(room, careAssignment?.bed_id, careAssignment);
-                  })
-                  .catch(() => {
-                    updateRoomInfo(null, null, careAssignment);
-                  });
-              } else {
-                updateRoomInfo(null, null, careAssignment);
-              }
-            })
-            .catch(() => {
-              updateRoomInfo(null, null, null);
-            });
-        }
-      })
-      .catch(() => {
-        updateRoomInfo(null, null, null);
-      })
-      .finally(() => setRoomLoading(false));
-  }, [selectedRelative?._id]);
-
-  // Debug logging để kiểm tra roomPrice
-  useEffect(() => {
-    if (roomPrice > 0) {
-      console.log('Room price updated:', roomPrice);
-    }
-  }, [roomPrice]);
-
-  // Debug logging để kiểm tra carePlanDetails
-  useEffect(() => {
-    if (carePlanDetails.length > 0) {
-      console.log('Care plan details updated:', carePlanDetails.map(cp => ({
-        name: cp.plan_name,
-        price: cp.monthly_price
-      })));
-    }
-  }, [carePlanDetails]);
+  }, [selectedRelative?._id, carePlanAssignments]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
@@ -524,9 +316,9 @@ export default function ServiceDetailsPage() {
   };
 
   const getAssignmentForCarePlan = (carePlanId: string) => {
-    if (!Array.isArray(carePlanAssignments)) return null;
+    if (!Array.isArray(activeCarePlanAssignments)) return null;
 
-    return carePlanAssignments.find((assignment: any) => {
+    return activeCarePlanAssignments.find((assignment: any) => {
       if (Array.isArray(assignment.care_plan_ids)) {
         return assignment.care_plan_ids.some((plan: any) => {
           const planId = plan._id || plan;
@@ -540,7 +332,8 @@ export default function ServiceDetailsPage() {
   // ✅ Helper function để lấy current bed assignment ID của resident
   const getCurrentBedAssignmentId = async (residentId: string): Promise<string | null> => {
     try {
-      const assignments = await bedAssignmentsAPI.getAllStatuses({ resident_id: residentId });
+      // Sử dụng API getByResidentId thay vì getAllStatuses để tránh lỗi 403
+      const assignments = await bedAssignmentsAPI.getByResidentId(residentId);
       if (!Array.isArray(assignments)) return null;
       
       // Tìm active assignment (còn hạn) và đã bắt đầu sử dụng
@@ -562,11 +355,8 @@ export default function ServiceDetailsPage() {
 
     return carePlanDetails.reduce((total, carePlan) => {
       const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
-      // Chỉ tính chi phí cho các gói đang sử dụng (active, approved đã bắt đầu) hoặc đã hoàn tất (done, completed)
-      if (carePlanAssignment && (
-        ((carePlanAssignment.status === 'active' || carePlanAssignment.status === 'approved') && isCarePlanStarted(carePlanAssignment)) ||
-        (carePlanAssignment.status === 'done' || carePlanAssignment.status === 'completed')
-      )) {
+      // Chỉ tính chi phí cho các gói còn active (done/active và chưa hết hạn)
+      if (carePlanAssignment && isCarePlanAssignmentActive(carePlanAssignment)) {
         return total + (carePlan.monthly_price || 0);
       }
       return total;
@@ -574,8 +364,8 @@ export default function ServiceDetailsPage() {
   };
 
   const getDisplayRoomPrice = () => {
-    // Sử dụng roomPrice đã được lấy từ room_types
-    return roomPrice;
+    // Sử dụng roomPrice từ roomInfo
+    return roomInfo.roomPrice;
   };
 
   const isCarePlanExpired = (carePlanAssignment: any) => {
@@ -583,6 +373,203 @@ export default function ServiceDetailsPage() {
     const endDate = new Date(carePlanAssignment.end_date);
     const today = new Date();
     return endDate < today;
+  };
+
+  // Helper function để kiểm tra care plan assignment còn active không
+  const isCarePlanAssignmentActive = (assignment: any) => {
+    if (!assignment) return false;
+    
+    // Nếu status là 'active', luôn active
+    if (assignment.status === 'active') return true;
+    
+    // Nếu status là 'done', kiểm tra end_date
+    if (assignment.status === 'done') {
+      if (!assignment.end_date) return true; // null = active
+      const endDate = new Date(assignment.end_date);
+      const now = new Date();
+      return endDate > now; // ngày trong tương lai = active
+    }
+    
+    return false; // Các status khác không active
+  };
+
+  // Helper function để kiểm tra care plan assignment đã được accepted nhưng chưa bắt đầu
+  const isCarePlanAssignmentAccepted = (assignment: any) => {
+    if (!assignment) return false;
+    return assignment.status === 'accepted' || assignment.status === 'approved';
+  };
+
+  // Helper function để kiểm tra bed assignment đã được accepted nhưng chưa bắt đầu
+  const isBedAssignmentAccepted = (assignment: any) => {
+    if (!assignment) return false;
+    return assignment.status === 'accepted' || assignment.status === 'approved';
+  };
+
+  // Helper function để kiểm tra assignment chưa bắt đầu sử dụng
+  const isAssignmentNotStarted = (assignment: any, startDateField: string = 'start_date') => {
+    if (!assignment?.[startDateField]) return true; // Nếu không có ngày bắt đầu, coi như chưa bắt đầu
+    const startDate = new Date(assignment[startDateField]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return startDate > today; // Ngày bắt đầu trong tương lai = chưa bắt đầu
+  };
+
+  // Lấy các thay đổi sắp tới từ care plan và bed assignments đã accepted
+  const loadUpcomingChanges = async () => {
+    if (!selectedRelative?._id) return;
+    
+    try {
+      const changes: any[] = [];
+      
+      // Lấy tất cả care plan assignments để tìm gói accepted chưa bắt đầu
+      const allCarePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(selectedRelative._id);
+      const upcomingCarePlans = Array.isArray(allCarePlanAssignments) ? 
+        allCarePlanAssignments.filter((assignment: any) => 
+          isCarePlanAssignmentAccepted(assignment) && isAssignmentNotStarted(assignment, 'start_date')
+        ) : [];
+
+      // Lấy bed assignments đã accepted nhưng chưa bắt đầu
+      const bedAssignments = await bedAssignmentsAPI.getByResidentId(selectedRelative._id);
+      const upcomingBedAssignments = Array.isArray(bedAssignments) ? 
+        bedAssignments.filter((assignment: any) => 
+          isBedAssignmentAccepted(assignment) && isAssignmentNotStarted(assignment, 'assigned_date')
+        ) : [];
+
+      // Thêm care plan changes
+      for (const assignment of upcomingCarePlans) {
+        if (assignment.care_plan_ids && Array.isArray(assignment.care_plan_ids)) {
+          // Fetch chi tiết care plans
+          const carePlanDetails: any[] = [];
+          for (const plan of assignment.care_plan_ids) {
+            try {
+              const planId = plan._id || plan;
+              const planData = await carePlansAPI.getById(planId);
+              carePlanDetails.push({
+                name: planData?.plan_name || 'Gói dịch vụ',
+                price: planData?.monthly_price || 0,
+                description: planData?.description || '',
+                services: planData?.services_included || []
+              });
+            } catch (error) {
+              carePlanDetails.push({
+                name: plan?.plan_name || 'Gói dịch vụ',
+                price: 0,
+                description: '',
+                services: []
+              });
+            }
+          }
+          
+          if (carePlanDetails.length > 0) {
+            changes.push({
+              type: 'care_plan',
+              title: 'Gói dịch vụ mới',
+              details: carePlanDetails,
+              effectiveDate: assignment.start_date ? 
+                new Date(assignment.start_date).toLocaleDateString('vi-VN') : 'Chưa xác định',
+              endDate: assignment.end_date ? 
+                new Date(assignment.end_date).toLocaleDateString('vi-VN') : 'Chưa xác định',
+              status: 'accepted'
+            });
+          }
+        }
+      }
+
+      // Thêm bed assignment changes
+      for (const assignment of upcomingBedAssignments) {
+        if (assignment.bed_id) {
+          let roomInfo: any = null;
+          let bedInfo: any = null;
+          let roomType = '';
+          let roomPrice = 0;
+          
+          if (typeof assignment.bed_id === 'object' && assignment.bed_id.room_id) {
+            // Có thông tin phòng đầy đủ
+            const room = assignment.bed_id.room_id;
+            const bed = assignment.bed_id;
+            // @ts-ignore
+            roomInfo = {
+              number: room.room_number || 'N/A',
+              type: room.room_type || '',
+              id: room._id || room.id
+            };
+            // @ts-ignore
+            bedInfo = {
+              number: bed.bed_number || 'N/A',
+              id: bed._id || bed.id
+            };
+            roomType = room.room_type || '';
+          } else {
+            // Cần fetch thông tin bed và room
+            try {
+              const bedId = typeof assignment.bed_id === 'string' ? assignment.bed_id : assignment.bed_id._id;
+              const bed = await bedsAPI.getById(bedId);
+              if (bed?.room_id) {
+                const roomId = typeof bed.room_id === 'string' ? bed.room_id : bed.room_id._id;
+                const room = await roomsAPI.getById(roomId);
+                // @ts-ignore
+                roomInfo = {
+                  number: room?.room_number || 'N/A',
+                  type: room?.room_type || '',
+                  id: room?._id || room?.id
+                };
+                // @ts-ignore
+                bedInfo = {
+                  number: bed.bed_number || 'N/A',
+                  id: bed._id || bed.id
+                };
+                roomType = room?.room_type || '';
+              }
+            } catch (error) {
+              // @ts-ignore
+              roomInfo = {
+                number: 'Chưa xác định',
+                type: '',
+                id: ''
+              };
+            }
+          }
+          
+          // Lấy giá phòng từ room type
+          if (roomType) {
+            try {
+              const { roomTypesAPI } = await import('@/lib/api');
+              const roomTypes = await roomTypesAPI.getAll();
+              const roomTypeData = roomTypes.find((type: any) => type.room_type === roomType);
+              roomPrice = roomTypeData?.monthly_price || 0;
+            } catch (error) {
+              roomPrice = 0;
+            }
+          }
+          
+          changes.push({
+            type: 'bed_assignment',
+            title: 'Phòng/giường mới',
+            roomInfo,
+            bedInfo,
+            roomType,
+            roomPrice,
+            effectiveDate: assignment.assigned_date ? 
+              new Date(assignment.assigned_date).toLocaleDateString('vi-VN') : 'Chưa xác định',
+            unassignedDate: assignment.unassigned_date ? 
+              new Date(assignment.unassigned_date).toLocaleDateString('vi-VN') : 'Chưa xác định',
+            status: 'accepted'
+          });
+        }
+      }
+
+      console.log('Debug - Upcoming changes loaded:', {
+        totalChanges: changes.length,
+        carePlanChanges: changes.filter(c => c.type === 'care_plan').length,
+        bedChanges: changes.filter(c => c.type === 'bed_assignment').length,
+        changes
+      });
+      
+      setUpcomingChanges(changes);
+    } catch (error) {
+      console.error('Error loading upcoming changes:', error);
+      setUpcomingChanges([]);
+    }
   };
 
   const isCarePlanStarted = (carePlanAssignment: any) => {
@@ -612,13 +599,16 @@ export default function ServiceDetailsPage() {
   const hasExpiringOrExpiredCarePlans = () => {
     return carePlanDetails.some((carePlan: any) => {
       const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
-      return carePlanAssignment && (isCarePlanExpired(carePlanAssignment) || isCarePlanExpiringSoon(carePlanAssignment));
+      // Chỉ kiểm tra các gói còn active (done/active và chưa hết hạn)
+      return carePlanAssignment && 
+             isCarePlanAssignmentActive(carePlanAssignment) && 
+             (isCarePlanExpired(carePlanAssignment) || isCarePlanExpiringSoon(carePlanAssignment));
     });
   };
 
   // Check if there are pending service requests for this resident
   const hasPendingServiceRequests = () => {
-    const hasPending = pendingRequests.some((request: any) => {
+    const hasPending = pendingServiceRequests.some((request: any) => {
       const requestResidentId = typeof request.resident_id === 'string' 
         ? request.resident_id 
         : request.resident_id?._id;
@@ -640,7 +630,7 @@ export default function ServiceDetailsPage() {
     
     console.log('hasPendingServiceRequests result:', {
       hasPending,
-      totalPendingRequests: pendingRequests.length,
+      totalPendingRequests: pendingServiceRequests.length,
       selectedResidentId: selectedRelative?._id,
       selectedResidentName: selectedRelative?.full_name || selectedRelative?.name
     });
@@ -650,7 +640,7 @@ export default function ServiceDetailsPage() {
 
   // Get pending service requests for this resident (grouped by type and details)
   const getPendingServiceRequests = () => {
-    const requests = pendingRequests.filter((request: any) => {
+    const requests = pendingServiceRequests.filter((request: any) => {
       const requestResidentId = typeof request.resident_id === 'string' 
         ? request.resident_id 
         : request.resident_id?._id;
@@ -674,8 +664,7 @@ export default function ServiceDetailsPage() {
       
       // Add plan name to the group
       if (request.request_type === 'care_plan_change') {
-        const planName = request.target_service_package_id?.plan_name || 
-          (typeof request.target_service_package_id === 'string' ? targetPlanNames[request.target_service_package_id] : 'N/A');
+        const planName = request.target_service_package_id?.plan_name || 'N/A';
         if (planName && !acc[key].planNames.includes(planName)) {
           acc[key].planNames.push(planName);
         }
@@ -686,7 +675,9 @@ export default function ServiceDetailsPage() {
             plan: cp,
             assignment: getAssignmentForCarePlan(cp._id)
           }))
-          .filter(({ assignment }) => assignment && (isCarePlanExpired(assignment) || isCarePlanExpiringSoon(assignment)))
+          .filter(({ assignment }) => assignment && 
+                   isCarePlanAssignmentActive(assignment) && 
+                   (isCarePlanExpired(assignment) || isCarePlanExpiringSoon(assignment)))
           .map(({ plan, assignment }) => ({
             name: plan?.plan_name || 'Gói dịch vụ',
             oldEndDate: assignment?.end_date || null
@@ -703,10 +694,7 @@ export default function ServiceDetailsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải thông tin...</p>
-        </div>
+        <LoadingSpinner size="xl" text="Đang tải thông tin..." />
       </div>
     );
   }
@@ -769,7 +757,6 @@ export default function ServiceDetailsPage() {
                   onChange={(e) => {
                     const selected = relatives.find(r => r._id === e.target.value);
                     if (selected) {
-                      setSelectedRelative(selected);
                       router.push(`/family/services/${selected._id}`);
                     }
                   }}
@@ -858,8 +845,8 @@ export default function ServiceDetailsPage() {
                                         carePlanAssignment.care_plan_ids.forEach((plan: any) => {
                                           if (typeof plan === 'object' && plan.plan_name) {
                                             planNames.push(plan.plan_name as string);
-                                          } else if (typeof plan === 'string' && targetPlanNames[plan]) {
-                                            planNames.push(targetPlanNames[plan] as string);
+                                          } else if (typeof plan === 'string') {
+                                            planNames.push(plan);
                                           }
                                         });
                                       }
@@ -1128,7 +1115,7 @@ export default function ServiceDetailsPage() {
                   <div className="flex items-center space-x-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
                     <HomeIcon className="w-5 h-5 text-green-600" />
                     <span className="text-gray-900 font-medium">
-                      {roomLoading ? 'Đang tải...' : roomNumber}
+                      {roomLoading ? 'Đang tải...' : roomInfo.roomNumber}
                     </span>
                   </div>
                 </div>
@@ -1180,8 +1167,7 @@ export default function ServiceDetailsPage() {
               <div className="p-6">
                 {loadingCarePlanDetail ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Đang tải thông tin dịch vụ...</p>
+                    <LoadingSpinner size="lg" text="Đang tải thông tin dịch vụ..." />
                   </div>
                 ) : residentCarePlanDetail ? (
                   <div className="space-y-6">
@@ -1242,12 +1228,14 @@ export default function ServiceDetailsPage() {
                           carePlanDetails.map((carePlan: any, index: number) => {
                           const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
                             
-                            // Chỉ hiển thị các gói đang active/accepted/approved, loại bỏ các gói bị hủy, từ chối, hoặc đang chờ duyệt
-                            if (!carePlanAssignment || 
-                                carePlanAssignment.status === 'cancelled' || 
-                                carePlanAssignment.status === 'pending' ||
-                                carePlanAssignment.status === 'rejected') {
-                              return null; // Không hiển thị gói bị hủy, từ chối, hoặc đang chờ duyệt
+                            // Chỉ hiển thị các gói đang sử dụng (không phải sắp tới)
+                            if (!carePlanAssignment || !isCarePlanAssignmentActive(carePlanAssignment)) {
+                              return null; // Không hiển thị gói không active
+                            }
+                            
+                            // Không hiển thị gói accepted chưa bắt đầu (sẽ hiển thị ở phần upcoming)
+                            if (carePlanAssignment.status === 'accepted' && isAssignmentNotStarted(carePlanAssignment, 'start_date')) {
+                              return null;
                             }
                             
                           return (
@@ -1433,7 +1421,7 @@ export default function ServiceDetailsPage() {
                         </div>
                         <div>
                           <h4 className="font-bold text-gray-900 text-lg">Phòng & Giường</h4>
-                          <p className="text-gray-600 text-sm">Vị trí lưu trú hiện tại</p>
+                          <p className="text-gray-600 text-sm">phòng/giường lưu trú hiện tại</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -1441,7 +1429,7 @@ export default function ServiceDetailsPage() {
                           <div className="bg-white rounded-lg p-3 border border-green-100">
                             <p className="text-gray-600 text-sm mb-1">Phòng</p>
                             <p className="text-xl font-bold text-green-600">
-                              {roomLoading ? 'Đang tải...' : roomNumber}
+                              {roomLoading ? 'Đang tải...' : roomInfo.roomNumber}
                             </p>
                           </div>
                         </div>
@@ -1449,14 +1437,135 @@ export default function ServiceDetailsPage() {
                           <div className="bg-white rounded-lg p-3 border border-green-100">
                             <p className="text-gray-600 text-sm mb-1">Giường</p>
                             <p className="text-xl font-bold text-green-600">
-                              {roomLoading ? 'Đang tải...' : bedNumber}
+                              {roomLoading ? 'Đang tải...' : roomInfo.bedNumber}
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
 
+                    {/* Thông tin thay đổi sắp tới */}
+                    {upcomingChanges.length > 0 && (
+                      <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200 shadow-sm hover:shadow-md transition-all duration-300">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <div className="bg-purple-100 p-2 rounded-lg">
+                            <ClockIcon className="w-6 h-6 text-purple-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-900 text-lg">Thay đổi sắp tới</h4>
+                            <p className="text-gray-600 text-sm">Các thay đổi đã được phê duyệt và sẽ có hiệu lực từ ngày chỉ định</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          {upcomingChanges.map((change: any, index: number) => (
+                            <div key={index} className="bg-white rounded-xl p-5 border border-purple-100 shadow-sm hover:shadow-md transition-all duration-200">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
+                                    {change.type === 'care_plan' ? 'Gói dịch vụ' : 'Phòng/giường'}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base font-bold text-gray-800">
+                                      Có hiệu lực từ {change.effectiveDate}
+                                    </span>
+                                    {(change.endDate || change.unassignedDate) && (
+                                      <span className="text-base font-bold text-gray-800">
+                                        đến {change.endDate || change.unassignedDate}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs text-gray-500 mb-1">Trạng thái</div>
+                                  <div className="text-sm font-semibold text-green-700">
+                                    Đã phê duyệt
+                                  </div>
+                                </div>
+                              </div>
 
+                              {change.type === 'care_plan' ? (
+                                <div className="space-y-3">
+                                  <h5 className="font-bold text-gray-900 text-lg">{change.title}:</h5>
+                                  {change.details.map((plan: any, planIndex: number) => (
+                                    <div key={planIndex} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                                      <div className="flex items-start justify-between mb-2">
+                                        <div className="flex-1">
+                                          <h6 className="font-bold text-gray-900 text-base">{plan.name}</h6>
+                                          <p className="text-gray-600 text-sm mt-1">{plan.description}</p>
+                                        </div>
+                                        <div className="text-right ml-4">
+                                          <div className="text-lg font-bold text-blue-600">
+                                            {formatDisplayCurrency(plan.price)}
+                                          </div>
+                                          <p className="text-gray-500 text-xs">mỗi tháng</p>
+                                        </div>
+                                      </div>
+                                      
+                                      {plan.services && plan.services.length > 0 && (
+                                        <div className="mt-3">
+                                          <p className="text-gray-700 text-sm font-medium mb-2">Dịch vụ bao gồm:</p>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {plan.services.slice(0, 3).map((service: string, serviceIndex: number) => (
+                                              <span key={serviceIndex} className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">
+                                                {service}
+                                              </span>
+                                            ))}
+                                            {plan.services.length > 3 && (
+                                              <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full font-medium">
+                                                +{plan.services.length - 3} dịch vụ khác
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <h5 className="font-bold text-gray-900 text-lg">{change.title}:</h5>
+                                  <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-4 border border-green-100">
+                                    <div className="grid grid-cols-2 gap-4 mb-3">
+                                      <div className="text-center">
+                                        <div className="bg-white rounded-lg p-3 border border-green-100">
+                                          <p className="text-gray-600 text-sm mb-1">Phòng</p>
+                                          <p className="text-xl font-bold text-green-600">
+                                            {change.roomInfo?.number || 'N/A'}
+                                          </p>
+                  
+                                        </div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="bg-white rounded-lg p-3 border border-green-100">
+                                          <p className="text-gray-600 text-sm mb-1">Giường</p>
+                                          <p className="text-xl font-bold text-green-600">
+                                            {change.bedInfo?.number || 'N/A'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {change.roomPrice > 0 && (
+                                      <div className="text-center mb-3">
+                                        <p className="text-gray-600 text-sm">Giá phòng</p>
+                                        <p className="text-lg font-bold text-green-600">
+                                          {formatDisplayCurrency(change.roomPrice)}
+                                        </p>
+                                        <p className="text-gray-500 text-xs">mỗi tháng</p>
+                                      </div>
+                                    )}
+                                    
+                                   
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                   </div>
                 ) : (
@@ -1490,6 +1599,7 @@ export default function ServiceDetailsPage() {
            getCurrentBedAssignmentId={getCurrentBedAssignmentId}
            isCarePlanExpired={isCarePlanExpired}
            isCarePlanExpiringSoon={isCarePlanExpiringSoon}
+           isCarePlanAssignmentActive={isCarePlanAssignmentActive}
            residentId={selectedRelative?._id}
            onClose={() => setShowBulkExtensionModal(false)}
            onSuccess={() => {
@@ -1506,22 +1616,40 @@ export default function ServiceDetailsPage() {
 
       {/* Bulk Change Modal removed in favor of dedicated change page */}
 
-       {/* Success Modal */}
+       {/* Success/Error Modal */}
        {showSuccessModal && (
          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
              <div className="text-center">
-               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <CheckCircleIcon className="w-8 h-8 text-green-600" />
-               </div>
-               <h3 className="text-lg font-bold text-gray-900 mb-2">Thành công!</h3>
-               <p className="text-gray-600 mb-6">{successMessage}</p>
-               <button
-                 onClick={() => setShowSuccessModal(false)}
-                 className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-               >
-                 Đóng
-               </button>
+               {successMessage.startsWith('Lỗi:') ? (
+                 <>
+                   <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+                   </div>
+                   <h3 className="text-lg font-bold text-gray-900 mb-2">Có lỗi xảy ra!</h3>
+                   <p className="text-gray-600 mb-6">{successMessage}</p>
+                   <button
+                     onClick={() => setShowSuccessModal(false)}
+                     className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                   >
+                     Đóng
+                   </button>
+                 </>
+               ) : (
+                 <>
+                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <CheckCircleIcon className="w-8 h-8 text-green-600" />
+                   </div>
+                   <h3 className="text-lg font-bold text-gray-900 mb-2">Thành công!</h3>
+                   <p className="text-gray-600 mb-6">{successMessage}</p>
+                   <button
+                     onClick={() => setShowSuccessModal(false)}
+                     className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                   >
+                     Đóng
+                   </button>
+                 </>
+               )}
              </div>
            </div>
          </div>
@@ -1536,7 +1664,8 @@ function BulkExtensionModal({
   getAssignmentForCarePlan, 
   getCurrentBedAssignmentId,
   isCarePlanExpired, 
-  isCarePlanExpiringSoon, 
+  isCarePlanExpiringSoon,
+  isCarePlanAssignmentActive,
   residentId, 
   onClose, 
   onSuccess,
@@ -1547,6 +1676,7 @@ function BulkExtensionModal({
   getCurrentBedAssignmentId: (residentId: string) => Promise<string | null>;
   isCarePlanExpired: (assignment: any) => boolean; 
   isCarePlanExpiringSoon: (assignment: any) => boolean; 
+  isCarePlanAssignmentActive: (assignment: any) => boolean;
   residentId: string; 
   onClose: () => void; 
   onSuccess: () => void; 
@@ -1582,7 +1712,9 @@ function BulkExtensionModal({
   // Get all expiring/expired care plans
   const expiringCarePlans = carePlanDetails.filter((carePlan: any) => {
     const carePlanAssignment = getAssignmentForCarePlan(carePlan._id);
-    return carePlanAssignment && (isCarePlanExpired(carePlanAssignment) || isCarePlanExpiringSoon(carePlanAssignment));
+    return carePlanAssignment && 
+           isCarePlanAssignmentActive(carePlanAssignment) && 
+           (isCarePlanExpired(carePlanAssignment) || isCarePlanExpiringSoon(carePlanAssignment));
   });
   const expiredCount = expiringCarePlans.filter((cp: any) => {
     const a = getAssignmentForCarePlan(cp._id);
@@ -1645,9 +1777,9 @@ function BulkExtensionModal({
         }
 
         // ✅ Lấy current bed assignment ID
-        const currentBedAssignmentId = await getCurrentBedAssignmentId(residentId);
+        let currentBedAssignmentId = await getCurrentBedAssignmentId(residentId);
         if (!currentBedAssignmentId) {
-          throw new Error(`Không tìm thấy bed assignment hiện tại cho resident ${residentId}`);
+          throw new Error(`Không tìm thấy bed assignment hiện tại cho resident ${residentId}. Vui lòng liên hệ quản trị viên để được hỗ trợ.`);
         }
         
         const currentEndDate = new Date(carePlanAssignment?.end_date || new Date());
@@ -1668,7 +1800,7 @@ function BulkExtensionModal({
           resident_id: residentId,
           family_member_id: user?.id || '',
           current_care_plan_assignment_id: carePlanAssignment._id,
-          current_bed_assignment_id: currentBedAssignmentId, // ✅ Thêm field bắt buộc
+          current_bed_assignment_id: currentBedAssignmentId!, // ✅ Thêm field bắt buộc
           new_end_date: newEndDateStr,
           emergencyContactName: userProfile?.full_name || user?.name || '',
           emergencyContactPhone: userProfile?.phone || user?.phone || '',
@@ -1678,11 +1810,12 @@ function BulkExtensionModal({
 
       await Promise.all(requests);
       const extensionText = `${extensionMonths} tháng`;
-      onShowSuccess(`Đã gửi thành công ${requests.length} yêu cầu gia hạn dịch vụ thêm ${extensionText}`);
+      onShowSuccess(`Đã gửi thành công yêu cầu gia hạn dịch vụ thêm ${extensionText}`);
       onSuccess();
     } catch (error) {
       console.error('Error submitting bulk extension requests:', error);
       const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra khi gửi yêu cầu gia hạn';
+      // Hiển thị modal lỗi thay vì success
       onShowSuccess(`Lỗi: ${errorMessage}`);
     } finally {
       setSubmitting(false);
@@ -1808,21 +1941,30 @@ function BulkExtensionModal({
 
           {/* Preview start/end dates */}
           <div className="rounded-xl border-2 border-blue-200 bg-blue-50/60 p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày bắt đầu</div>
                 <div className="text-gray-900 font-semibold">
                   {previewStartDateText}
                 </div>
+                <div className="text-[10px] text-gray-500 mt-1">Giữ nguyên</div>
               </div>
               <div>
-                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày kết thúc</div>
-                <div className="text-gray-900 font-semibold">
+                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày kết thúc cũ</div>
+                <div className="text-gray-600 font-medium line-through">
+                  {previewBaseEndDate ? formatDisplay(previewBaseEndDate) : 'N/A'}
+                </div>
+                <div className="text-[10px] text-red-500 mt-1">Trước khi gia hạn</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-[11px] uppercase tracking-wide mb-1">Ngày kết thúc mới</div>
+                <div className="text-green-700 font-bold">
                   {previewEndDateText}
                 </div>
+                <div className="text-[10px] text-green-600 mt-1">Sau khi gia hạn</div>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-blue-700">Thời gian hiệu lực được tính nối tiếp từ ngày hết hạn hiện tại và tự động đến cuối tháng.</p>
+            <p className="mt-3 text-[11px] text-blue-700">Thời gian hiệu lực được tính nối tiếp từ ngày hết hạn hiện tại và tự động đến cuối tháng.</p>
           </div>
 
           <div>

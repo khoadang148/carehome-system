@@ -511,15 +511,18 @@ function FamilyPortalPageContent() {
   // SWR bed/room wiring (used for admitted residents)
   const { bedAssignment, roomId, isLoading: bedIsLoading } = useBedAssignmentsSWR(selectedResidentId);
   const { room, isLoading: roomIsLoading } = useRoomSWR(roomId || '');
+  
   useEffect(() => {
     if (!selectedResident || selectedResident.status !== 'admitted') return;
+    
     setRoomLoading(prev => (prev !== roomIsLoading ? roomIsLoading : prev));
-    const nextRoomNumber = room?.room_number || 'Chưa hoàn tất đăng kí';
+    const nextRoomNumber = bedAssignment ? (room?.room_number || 'Chưa hoàn tất đăng kí') : 'Chưa hoàn tất đăng kí';
     setRoomNumber(prev => (prev !== nextRoomNumber ? nextRoomNumber : prev));
+    
     setBedLoading(prev => (prev !== bedIsLoading ? bedIsLoading : prev));
-    const nextBedNumber = bedAssignment?.bed_id?.bed_number || 'Chưa hoàn tất đăng kí';
+    const nextBedNumber = bedAssignment ? (bedAssignment?.bed_id?.bed_number || 'Chưa hoàn tất đăng kí') : 'Chưa hoàn tất đăng kí';
     setBedNumber(prev => (prev !== nextBedNumber ? nextBedNumber : prev));
-  }, [selectedResident, roomIsLoading, room?.room_number, bedIsLoading, bedAssignment?.bed_id?.bed_number]);
+  }, [selectedResident, roomIsLoading, room?.room_number, bedIsLoading, bedAssignment]);
 
   // For active residents, derive room/bed from care plan assignment
   useEffect(() => {

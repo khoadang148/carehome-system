@@ -5,7 +5,8 @@ import useSWR from 'swr';
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useNotifications } from "@/lib/contexts/notification-context";
-import { serviceRequestsAPI, residentAPI, roomsAPI, roomTypesAPI, bedsAPI, bedAssignmentsAPI, userAPI } from "@/lib/api";
+import { serviceRequestsAPI, residentAPI, roomsAPI, roomTypesAPI, bedsAPI, bedAssignmentsAPI, userAPI, carePlanAssignmentsAPI } from "@/lib/api";
+import { useBedAssignments as useBedAssignmentsSWR, useRoom as useRoomSWR } from '@/hooks/useSWRData';
 import {
   ArrowLeftIcon,
   HomeIcon,
@@ -23,13 +24,25 @@ import {
   HomeIcon as HomeIconSolid
 } from "@heroicons/react/24/solid";
 
-// Helper function to check if bed assignment is active
+// Helper function to check if bed assignment is active (for admitted residents)
 const isBedAssignmentActive = (assignment) => {
   if (!assignment) return false;
-  if (!assignment.unassigned_date) return true; // null = active
-  const unassignedDate = new Date(assignment.unassigned_date);
-  const now = new Date();
-  return unassignedDate > now; // ngày trong tương lai = active
+  
+  // Chỉ chấp nhận status 'done' và 'active'
+  if (assignment.status !== 'done' && assignment.status !== 'active') return false;
+  
+  // Nếu status là 'active', luôn active
+  if (assignment.status === 'active') return true;
+  
+  // Nếu status là 'done', kiểm tra unassigned_date
+  if (assignment.status === 'done') {
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  }
+  
+  return false;
 };
 
 interface Resident {
@@ -100,15 +113,17 @@ export default function RoomChangeRequestPage() {
     () => roomTypesAPI.getAll(),
     { revalidateOnFocus: true }
   );
-  const [bedAssignments, setBedAssignments] = useState<any[]>([]);
-  const [currentAssignment, setCurrentAssignment] = useState<any | null>(null);
-  const [currentInfoLoading, setCurrentInfoLoading] = useState(false);
+  const [currentCarePlanAssignment, setCurrentCarePlanAssignment] = useState<any | null>(null);
+  const [selectedResident, setSelectedResident] = useState<string>("");
+  
+  // SWR hooks for bed assignments and room data
+  const { bedAssignment, roomId, isLoading: bedIsLoading } = useBedAssignmentsSWR(selectedResident);
+  const { room, isLoading: roomIsLoading } = useRoomSWR(roomId || '');
   const { data: serviceRequests = [], isLoading: serviceRequestsLoading } = useSWR<any[]>(
     () => (user?.id ? ["serviceRequests:mine", user.id] : null),
     () => serviceRequestsAPI.getMyRequests(),
     { revalidateOnFocus: true }
   );
-  const [selectedResident, setSelectedResident] = useState<string>("");
   const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [selectedBed, setSelectedBed] = useState<string>("");
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
@@ -120,6 +135,7 @@ export default function RoomChangeRequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [changeType, setChangeType] = useState<'room' | 'bed'>('room'); // 'room' = chuyển phòng, 'bed' = chuyển giường
   const loadingData = residentsLoading || roomsLoading || bedsLoading || roomTypesLoading || serviceRequestsLoading;
+  const currentInfoLoading = bedIsLoading || roomIsLoading;
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const getRoomType = (room_type: string) =>
@@ -139,39 +155,34 @@ export default function RoomChangeRequestPage() {
   };
 
   const getCurrentRoomAndBed = (residentId: string) => {
-    // Prefer the latest fetched assignment for the selected resident
-    const preferredAssignment = currentAssignment && (
-      (typeof currentAssignment.resident_id === 'string'
-        ? String(currentAssignment.resident_id)
-        : String(currentAssignment.resident_id?._id || currentAssignment.resident_id)) === String(residentId)
-    ) && isBedAssignmentActive(currentAssignment)
-      ? currentAssignment
-      : null;
+    // Chỉ trả về data nếu đang load cho resident được chọn
+    if (String(residentId) !== String(selectedResident)) {
+      return { room: null, bed: null };
+    }
 
-    const assignment = preferredAssignment || bedAssignments.find((ba: any) => {
-      const baResidentId = typeof ba.resident_id === 'string'
-        ? ba.resident_id
-        : ba.resident_id?._id || ba.resident_id;
-      return String(baResidentId) === String(residentId) && isBedAssignmentActive(ba);
-    });
-
-    if (!assignment) return { room: null, bed: null };
+    // Sử dụng data từ SWR hooks
+    if (!bedAssignment) return { room: null, bed: null };
 
     // Resolve bed
     let bed: any = null;
-    if (assignment.bed_id && typeof assignment.bed_id === 'object') {
-      bed = assignment.bed_id;
-    } else if (assignment.bed_id) {
-      bed = beds.find((b: any) => b._id === assignment.bed_id);
+    if (bedAssignment.bed_id && typeof bedAssignment.bed_id === 'object') {
+      bed = bedAssignment.bed_id;
+    } else if (bedAssignment.bed_id) {
+      bed = beds.find((b: any) => b._id === bedAssignment.bed_id);
     }
 
     if (!bed) return { room: null, bed: null };
 
-    // Resolve room from beds list
-    const bedRoomId = typeof bed.room_id === 'string' ? bed.room_id : (bed.room_id?._id || bed.room_id);
-    const room = rooms.find((r: any) => String(r._id) === String(bedRoomId)) || null;
+    // Sử dụng room từ SWR hook hoặc tìm từ beds list
+    if (room) {
+      return { room, bed };
+    }
 
-    return { room, bed };
+    // Fallback: resolve room from beds list
+    const bedRoomId = typeof bed.room_id === 'string' ? bed.room_id : (bed.room_id?._id || bed.room_id);
+    const foundRoom = rooms.find((r: any) => String(r._id) === String(bedRoomId)) || null;
+
+    return { room: foundRoom, bed };
   };
 
   const getAvailableRooms = () => {
@@ -216,6 +227,22 @@ export default function RoomChangeRequestPage() {
         bed.status === 'available'
       );
 
+      // Validation: Kiểm tra main care plan id cho ROOM_CHANGE
+      // Phòng mới phải có cùng main care plan id với phòng hiện tại
+      let sameMainCarePlan = true;
+      if (currentCarePlanAssignment && currentCarePlanAssignment.care_plan_ids && Array.isArray(currentCarePlanAssignment.care_plan_ids)) {
+        // Lấy main care plan id từ current assignment (care plan đầu tiên trong mảng)
+        const currentMainCarePlanId = currentCarePlanAssignment.care_plan_ids[0];
+        const currentMainCarePlanIdStr = typeof currentMainCarePlanId === 'string' ? currentMainCarePlanId : currentMainCarePlanId?._id;
+        
+        // Kiểm tra phòng mới có cùng main care plan id không
+        // Giả sử room có field main_care_plan_id hoặc tương tự
+        // Nếu không có field này, có thể cần thêm logic khác
+        if ((room as any).main_care_plan_id && currentMainCarePlanIdStr) {
+          sameMainCarePlan = (room as any).main_care_plan_id === currentMainCarePlanIdStr;
+        }
+      }
+
       // Debug log
       console.log('Room filter debug:', {
         roomNumber: room.room_number,
@@ -223,21 +250,24 @@ export default function RoomChangeRequestPage() {
         residentGender,
         sameGender,
         hasAvailableBeds,
+        sameMainCarePlan,
         isCurrentRoom: currentRoom && room._id === currentRoom._id,
         roomBedsCount: roomBeds.length,
-        availableBedsCount: roomBeds.filter(bed => bed.status === 'available').length
+        availableBedsCount: roomBeds.filter(bed => bed.status === 'available').length,
+        currentMainCarePlanId: currentCarePlanAssignment?.care_plan_ids?.[0],
+        roomMainCarePlanId: (room as any).main_care_plan_id
       });
 
       // Luôn cho phép chọn phòng hiện tại nếu có giường trống (để chuyển giường)
-      // Và cho phép chọn phòng khác nếu có giường trống (để chuyển phòng)
+      // Và cho phép chọn phòng khác nếu có giường trống và cùng main care plan (để chuyển phòng)
       
       // Đặc biệt: Luôn cho phép chọn phòng hiện tại nếu có giường trống
       if (currentRoom && room._id === currentRoom._id) {
         return hasAvailableBeds;
       }
       
-      // Các phòng khác: cần cùng giới tính và có giường trống
-      return sameGender && hasAvailableBeds;
+      // Các phòng khác: cần cùng giới tính, có giường trống và cùng main care plan id
+      return sameGender && hasAvailableBeds && sameMainCarePlan;
     });
 
     // Fallback: Nếu phòng hiện tại không có trong danh sách, thêm vào nếu có giường trống
@@ -281,17 +311,8 @@ export default function RoomChangeRequestPage() {
       // Kiểm tra xem giường này có đang được yêu cầu trong service requests pending không
       const isPendingInRequest = serviceRequests.some((request: any) => {
         if (request.request_type === 'room_change' && request.status === 'pending' && request.target_bed_assignment_id) {
-          // Tìm bed assignment từ target_bed_assignment_id
-          const targetBedAssignment = bedAssignments.find(ba => 
-            ba._id === request.target_bed_assignment_id
-          );
-          
-          if (targetBedAssignment && targetBedAssignment.bed_id) {
-            const targetBedId = typeof targetBedAssignment.bed_id === 'string'
-              ? targetBedAssignment.bed_id
-              : targetBedAssignment.bed_id._id || targetBedAssignment.bed_id;
-            return String(targetBedId) === String(bed._id);
-          }
+          // Tạm thời disable logic này vì cần refactor để không phụ thuộc vào bedAssignments array
+          return false;
         }
         return false;
       });
@@ -380,31 +401,28 @@ export default function RoomChangeRequestPage() {
     }
   }, [user, loading, router]);
 
-  // Load bed assignment only for the selected resident to speed up the sidebar
+  // Load care plan assignment for the selected resident
   useEffect(() => {
     let isCancelled = false;
-    const fetchAssignment = async () => {
+    const fetchCarePlanAssignment = async () => {
       if (!selectedResident) {
-        setCurrentAssignment(null);
-          return;
-        }
+        setCurrentCarePlanAssignment(null);
+        return;
+      }
       try {
-        setCurrentInfoLoading(true);
-        const list = await bedAssignmentsAPI.getAllStatuses({ resident_id: selectedResident });
+        // Fetch care plan assignments
+        const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(selectedResident);
         if (isCancelled) return;
-        const active = Array.isArray(list) ? list.find((a: any) => 
-          isBedAssignmentActive(a) && 
-          (a.status === 'active' || a.status === 'accepted')
+        const activeCarePlanAssignment = Array.isArray(carePlanAssignments) ? carePlanAssignments.find((a: any) => 
+          a.status === 'active'
         ) : null;
-        setCurrentAssignment(active || null);
+        setCurrentCarePlanAssignment(activeCarePlanAssignment || null);
       } catch {
         if (isCancelled) return;
-        setCurrentAssignment(null);
-      } finally {
-        if (!isCancelled) setCurrentInfoLoading(false);
+        setCurrentCarePlanAssignment(null);
       }
     };
-    fetchAssignment();
+    fetchCarePlanAssignment();
     return () => { isCancelled = true; };
   }, [selectedResident]);
 
@@ -430,12 +448,20 @@ export default function RoomChangeRequestPage() {
 
     setSubmitting(true);
     try {
+      // Lấy bed assignment hiện tại để lấy unassigned_date
+      const currentBedAssignment = bedAssignment;
+      const unassignedDate = currentBedAssignment?.unassigned_date || null;
+
+      console.log('Current bed assignment:', currentBedAssignment);
+      console.log('Unassigned date from current assignment:', unassignedDate);
+
       // Bước 1: Tạo bed assignment mới với status "pending"
       const bedAssignmentData = {
         resident_id: selectedResident,
         bed_id: selectedBed,
         assigned_by: user?.id || '',
-        status: 'pending'
+        status: 'pending',
+        unassigned_date: unassignedDate // Truyền unassigned_date từ bed assignment hiện tại
       };
 
       console.log('Creating bed assignment:', bedAssignmentData);

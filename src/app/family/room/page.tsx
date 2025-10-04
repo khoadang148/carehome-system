@@ -7,13 +7,25 @@ import { roomsAPI, bedsAPI, roomTypesAPI, serviceRequestsAPI, residentAPI, bedAs
 import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
-// Helper function to check if bed assignment is active
+// Helper function to check if bed assignment is active (for admitted residents)
 const isBedAssignmentActive = (assignment) => {
   if (!assignment) return false;
-  if (isBedAssignmentActive(a)) return true; // null = active
-  const unassignedDate = new Date(assignment.unassigned_date);
-  const now = new Date();
-  return unassignedDate > now; // ngày trong tương lai = active
+  
+  // Chỉ chấp nhận status 'done' và 'active'
+  if (assignment.status !== 'done' && assignment.status !== 'active') return false;
+  
+  // Nếu status là 'active', luôn active
+  if (assignment.status === 'active') return true;
+  
+  // Nếu status là 'done', kiểm tra unassigned_date
+  if (assignment.status === 'done') {
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  }
+  
+  return false;
 };
 
 interface Room {
@@ -151,6 +163,52 @@ export default function FamilyRoomPage() {
     loadAssignments();
   }, [residentsIdsKey]);
 
+  // Load bed assignments for pending service requests
+  useEffect(() => {
+    const loadPendingRequestAssignments = async () => {
+      if (!Array.isArray(serviceRequestsData) || serviceRequestsData.length === 0) {
+        return;
+      }
+
+      const pendingRoomChangeRequests = serviceRequestsData.filter((req: any) => 
+        req.request_type === 'room_change' && 
+        req.status === 'pending' && 
+        req.target_bed_assignment_id
+      );
+
+      if (pendingRoomChangeRequests.length === 0) {
+        return;
+      }
+
+      try {
+        // Load bed assignments for pending requests
+        const assignmentPromises = pendingRoomChangeRequests.map((req: any) => {
+          // Xử lý trường hợp target_bed_assignment_id là object hoặc string
+          const assignmentId = typeof req.target_bed_assignment_id === 'object' 
+            ? req.target_bed_assignment_id?._id || req.target_bed_assignment_id?.id
+            : req.target_bed_assignment_id;
+          
+          return assignmentId ? bedAssignmentsAPI.getById(assignmentId).catch(() => null) : Promise.resolve(null);
+        });
+        
+        const assignmentResults = await Promise.all(assignmentPromises);
+        const validAssignments = assignmentResults.filter(Boolean);
+        
+        if (validAssignments.length > 0) {
+          setBedAssignments(prev => {
+            const existingIds = new Set(prev.map(ba => ba._id));
+            const newAssignments = validAssignments.filter(ba => !existingIds.has(ba._id));
+            return [...prev, ...newAssignments];
+          });
+        }
+      } catch (error) {
+        console.error('Error loading pending request assignments:', error);
+      }
+    };
+
+    loadPendingRequestAssignments();
+  }, [serviceRequestsData]);
+
   // Function to refresh service requests
   const refreshServiceRequests = async () => {
     setRefreshing(true);
@@ -214,7 +272,7 @@ export default function FamilyRoomPage() {
       const baResidentId = typeof ba.resident_id === 'string'
         ? ba.resident_id
         : ba.resident_id?._id || ba.resident_id;
-      return baResidentId === residentId && isBedAssignmentActive(a);
+      return baResidentId === residentId && isBedAssignmentActive(ba);
     });
 
     if (!assignment) return { room: null, bed: null };
@@ -383,22 +441,37 @@ export default function FamilyRoomPage() {
                                 <span className="font-medium">
                                   {(() => {
                                     // Debug log để xem dữ liệu
+                                    console.log('Debug - request:', request);
                                     console.log('Debug - request.target_bed_assignment_id:', request.target_bed_assignment_id);
+                                    console.log('Debug - bedAssignments:', bedAssignments);
 
                                     // Tìm bed assignment từ target_bed_assignment_id
+                                    // Xử lý trường hợp target_bed_assignment_id là object hoặc string
+                                    const targetBedAssignmentId = typeof request.target_bed_assignment_id === 'object' 
+                                      ? request.target_bed_assignment_id?._id || request.target_bed_assignment_id?.id
+                                      : request.target_bed_assignment_id;
+                                    
+                                    console.log('Debug - targetBedAssignmentId:', targetBedAssignmentId);
+                                    
                                     const targetBedAssignment = bedAssignments.find(ba => 
-                                      ba._id === request.target_bed_assignment_id
+                                      ba._id === targetBedAssignmentId
                                     );
+
+                                    console.log('Debug - targetBedAssignment from array:', targetBedAssignment);
 
                                     if (targetBedAssignment && targetBedAssignment.bed_id) {
                                       const bed = typeof targetBedAssignment.bed_id === 'object' 
                                         ? targetBedAssignment.bed_id 
                                         : beds.find(b => b._id === targetBedAssignment.bed_id);
                                       
+                                      console.log('Debug - bed:', bed);
+                                      
                                       if (bed) {
                                         const room = typeof bed.room_id === 'object' 
                                           ? bed.room_id 
                                           : rooms.find(r => r._id === bed.room_id);
+                                        
+                                        console.log('Debug - room:', room);
                                         
                                         if (room) {
                                           return `${room.room_number} - Giường ${bed.bed_number}`;

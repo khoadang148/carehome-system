@@ -8,7 +8,7 @@ import { BuildingOfficeIcon, ArrowLeftIcon, ExclamationTriangleIcon, CheckCircle
 // Helper function to check if bed assignment is active
 const isBedAssignmentActive = (assignment) => {
   if (!assignment) return false;
-  if (isBedAssignmentActive(a)) return true; // null = active
+  if (!assignment.unassigned_date) return true; // null = active
   const unassignedDate = new Date(assignment.unassigned_date);
   const now = new Date();
   return unassignedDate > now; // ngày trong tương lai = active
@@ -75,7 +75,102 @@ export default function TransferPage() {
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [availableBeds, setAvailableBeds] = useState<any[]>([]);
   const [transferLoading, setTransferLoading] = useState(false);
+  const [currentCarePlanAssignment, setCurrentCarePlanAssignment] = useState<any | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const [residentId, setResidentId] = useState<string | null>(null);
+
+  // Load care plan assignment for the current resident
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchCarePlanAssignment = async () => {
+      if (!residentId) {
+        setCurrentCarePlanAssignment(null);
+        return;
+      }
+      try {
+        // Fetch care plan assignments
+        const carePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(residentId);
+        if (isCancelled) return;
+        const activeCarePlanAssignment = Array.isArray(carePlanAssignments) ? carePlanAssignments.find((a: any) => 
+          a.status === 'active'
+        ) : null;
+        setCurrentCarePlanAssignment(activeCarePlanAssignment || null);
+      } catch {
+        if (isCancelled) return;
+        setCurrentCarePlanAssignment(null);
+      }
+    };
+    fetchCarePlanAssignment();
+    return () => { isCancelled = true; };
+  }, [residentId]);
+
+  // Update available rooms when care plan assignment changes
+  useEffect(() => {
+    if (!rooms.length || !currentRoom || !currentCarePlanAssignment) return;
+
+    const availableRoomsData = rooms.filter((r: Room) => {
+      const sameGender = r.gender === currentRoom.gender;
+      
+      // Kiểm tra xem phòng có giường trống hay không (cho phép chọn phòng hiện tại nhưng loại trừ chính giường hiện tại)
+      const roomBeds = beds.filter(bed => {
+        const bedRoomId = typeof bed.room_id === 'string'
+          ? bed.room_id
+          : (bed.room_id as { _id: string })._id;
+        return bedRoomId === r._id;
+      });
+
+      const roomAssignments = bedAssignments.filter(assignment => {
+        if (!assignment.bed_id || !assignment.bed_id.room_id) {
+          return false;
+        }
+
+        const assignmentRoomId = typeof assignment.bed_id.room_id === 'string'
+          ? assignment.bed_id.room_id
+          : assignment.bed_id.room_id._id;
+
+        return assignmentRoomId === r._id;
+      });
+
+      const assignmentMap = new Map();
+      roomAssignments.forEach(assignment => {
+        assignmentMap.set(assignment.bed_id._id, assignment);
+      });
+
+      const hasAvailableBeds = roomBeds.some(bed => {
+        const assignment = assignmentMap.get(bed._id);
+        const status = assignment && isBedAssignmentActive(assignment) ? 'occupied' : 'available';
+        // Nếu là phòng hiện tại thì loại trừ chính giường đang ở
+        const isCurrentRoom = r._id === currentRoom._id;
+        const isCurrentBed = isCurrentRoom && currentBed && bed._id === currentBed._id;
+        return status === 'available' && !isCurrentBed;
+      });
+
+      // Validation: Kiểm tra main care plan id cho ROOM_CHANGE
+      // Phòng mới phải có cùng main care plan id với phòng hiện tại
+      let sameMainCarePlan = true;
+      if (currentCarePlanAssignment && currentCarePlanAssignment.care_plan_ids && Array.isArray(currentCarePlanAssignment.care_plan_ids)) {
+        // Lấy main care plan id từ current assignment (care plan đầu tiên trong mảng)
+        const currentMainCarePlanId = currentCarePlanAssignment.care_plan_ids[0];
+        const currentMainCarePlanIdStr = typeof currentMainCarePlanId === 'string' ? currentMainCarePlanId : currentMainCarePlanId?._id;
+        
+        // Kiểm tra phòng mới có cùng main care plan id không
+        // Giả sử room có field main_care_plan_id hoặc tương tự
+        if ((r as any).main_care_plan_id && currentMainCarePlanIdStr) {
+          sameMainCarePlan = (r as any).main_care_plan_id === currentMainCarePlanIdStr;
+        }
+      }
+
+      // Luôn cho phép chọn phòng hiện tại nếu có giường trống (để chuyển giường)
+      if (currentRoom && r._id === currentRoom._id) {
+        return hasAvailableBeds;
+      }
+      
+      // Các phòng khác: cần cùng giới tính, có giường trống và cùng main care plan id
+      return sameGender && hasAvailableBeds && sameMainCarePlan;
+    });
+
+    setAvailableRooms(availableRoomsData);
+  }, [rooms, currentRoom, beds, bedAssignments, currentCarePlanAssignment, currentBed]);
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState({
@@ -120,7 +215,19 @@ export default function TransferPage() {
 
         setCurrentRoom(currentRoomData);
         setCurrentBed(currentBedData);
+        
+        // Set resident ID for care plan assignment loading
+        if (currentBedData.assignment && currentBedData.assignment.resident_id) {
+          const residentId = typeof currentBedData.assignment.resident_id === 'string' 
+            ? currentBedData.assignment.resident_id 
+            : (currentBedData.assignment.resident_id as any)?._id;
+          if (residentId) {
+            setResidentId(residentId);
+          }
+        }
 
+        // Tạm thời lọc phòng chỉ dựa trên giới tính và giường trống
+        // Logic kiểm tra gói dịch vụ sẽ được thêm trong useEffect riêng
         const availableRoomsData = roomsData.filter((r: Room) => {
           const sameGender = r.gender === currentRoomData.gender;
           
@@ -149,15 +256,9 @@ export default function TransferPage() {
             assignmentMap.set(assignment.bed_id._id, assignment);
           });
 
-          const bedsWithStatus = roomBeds.map(bed => {
-            const assignment = assignmentMap.get(bed._id);
-            const status = assignment && isBedAssignmentActive(a) ? 'occupied' : 'available';
-            return status;
-          });
-
           const hasAvailableBeds = roomBeds.some(bed => {
             const assignment = assignmentMap.get(bed._id);
-            const status = assignment && isBedAssignmentActive(a) ? 'occupied' : 'available';
+            const status = assignment && isBedAssignmentActive(assignment) ? 'occupied' : 'available';
             // Nếu là phòng hiện tại thì loại trừ chính giường đang ở
             const isCurrentRoom = r._id === roomId;
             const isCurrentBed = isCurrentRoom && currentBedData && bed._id === currentBedData._id;
@@ -225,7 +326,7 @@ export default function TransferPage() {
 
     const bedsWithStatus = roomBeds.map(bed => {
       const assignment = assignmentMap.get(bed._id);
-      const status = assignment && isBedAssignmentActive(a) ? 'occupied' : 'available';
+      const status = assignment && isBedAssignmentActive(assignment) ? 'occupied' : 'available';
 
       return {
         _id: bed._id,
@@ -504,8 +605,8 @@ export default function TransferPage() {
                   <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <ExclamationTriangleIcon className="w-8 h-8 text-yellow-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-yellow-900 mb-2">Không có phòng khả dụng</h3>
-                  <p className="text-yellow-800">Không tìm thấy phòng cùng giới tính và còn trống</p>
+                    <h3 className="text-lg font-semibold text-yellow-900 mb-2">Không có phòng khả dụng</h3>
+                    <p className="text-yellow-800">Không tìm thấy phòng cùng giới tính, cùng gói dịch vụ và còn trống</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -568,6 +669,8 @@ export default function TransferPage() {
                               </div>
                               <span className="font-medium">Loại phòng:</span> {type?.type_name}
                             </div>
+
+                           
                           </div>
                         </div>
                       </button>

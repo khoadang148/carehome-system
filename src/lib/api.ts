@@ -2261,9 +2261,23 @@ export const bedAssignmentsAPI = {
   },
   getAllStatuses: async (params?: any) => {
     try {
-      const response = await apiClient.get('/bed-assignments/all-statuses', { params });
+      const response = await retryRequest(
+        () => apiClient.get('/bed-assignments/all-statuses', { params }),
+        2, // max retries
+        1000 // initial delay
+      );
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Bed assignments all statuses API error:', error);
+      // Fallback to getByResidentId if available
+      if (params?.resident_id) {
+        try {
+          console.log('Falling back to getByResidentId for resident:', params.resident_id);
+          return await bedAssignmentsAPI.getByResidentId(params.resident_id);
+        } catch (fallbackError) {
+          console.error('Fallback also failed:', fallbackError);
+        }
+      }
       return [];
     }
   },
@@ -2483,22 +2497,32 @@ export const bedsAPI = {
   getAll: async (params?: any) => {
     try {
       console.log('Calling beds API with params:', params);
-      // Temporarily bypass cache to debug
-      const response = await apiClient.get('/beds', { params });
+      // Use retry mechanism for beds API
+      const response = await retryRequest(
+        () => apiClient.get('/beds', { params }),
+        3, // max retries
+        1000 // initial delay
+      );
       console.log('Beds API response:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Beds API error:', error);
+      // Return empty array to prevent UI crashes
       return [];
     }
   },
   getByRoom: async (roomId: string, status?: 'available' | 'occupied') => {
     try {
-      const response = await apiClient.get(`/beds/by-room/${roomId}`, {
-        params: status ? { status } : undefined,
-      });
+      const response = await retryRequest(
+        () => apiClient.get(`/beds/by-room/${roomId}`, {
+          params: status ? { status } : undefined,
+        }),
+        2, // max retries
+        1000 // initial delay
+      );
       return response.data;
     } catch (error) {
+      console.error('Beds by room API error:', error);
       return [];
     }
   },
@@ -2566,24 +2590,57 @@ export { apiClient };
 export { API_BASE_URL };
 
 export const serviceRequestsAPI = {
+  /**
+   * Tạo service request với 3 loại:
+   * 
+   * 1. CARE_PLAN_CHANGE: Thay đổi gói dịch vụ
+   *    - Tạo care plan assignment và bed assignment mới với status "pending"
+   *    - Lưu target_care_plan_assignment_id và target_bed_assignment_id
+   *    - Bắt buộc nhập note (lý do thay đổi)
+   *    - Backend logic khi admin duyệt/từ chối:
+   *      + Approve: service request -> approved, assignments -> accepted -> active, 
+   *        current assignments -> end_date/unassigned_date = cuối tháng hiện tại -> done
+   *      + Reject: service request -> rejected, assignments -> rejected
+   * 
+   * 2. SERVICE_DATE_CHANGE: Gia hạn dịch vụ
+   *    - Lưu current_care_plan_assignment_id và new_end_date
+   *    - Note không bắt buộc
+   *    - Backend logic khi admin duyệt/từ chối:
+   *      + Approve: service request -> approved, current assignment end_date -> new_end_date
+   *      + Reject: service request -> rejected, không thay đổi gì
+   * 
+   * 3. ROOM_CHANGE: Thay đổi phòng/giường
+   *    - Tạo bed assignment mới với status "pending"
+   *    - Lưu target_bed_assignment_id
+   *    - Bắt buộc nhập note (lý do thay đổi)
+   *    - Phòng mới phải có cùng main care plan id với phòng hiện tại
+   *    - Backend logic khi admin duyệt/từ chối:
+   *      + Approve: service request -> approved, new bed assignment -> active, 
+   *        current bed assignment -> exchanged
+   *      + Reject: service request -> rejected, new bed assignment -> rejected
+   */
   create: async (data: {
     resident_id: string;
     family_member_id: string;
     request_type: 'care_plan_change' | 'service_date_change' | 'room_change';
+    // CARE_PLAN_CHANGE fields
+    target_care_plan_assignment_id?: string;
+    target_bed_assignment_id?: string;
+    current_care_plan_assignment_id?: string;
+    current_bed_assignment_id?: string;
+    selected_room_type?: string;
+    // SERVICE_DATE_CHANGE fields
+    new_end_date?: string;
+    // Legacy fields for backward compatibility
     target_service_package_id?: string;
     target_room_id?: string;
     target_bed_id?: string;
-    target_bed_assignment_id?: string;
-    target_care_plan_assignment_id?: string;
-    current_care_plan_assignment_id?: string;
-    current_bed_assignment_id?: string;
     new_start_date?: string;
-    new_end_date?: string;
-    note?: string;
+    // Common fields
+    note?: string; // Required for CARE_PLAN_CHANGE and ROOM_CHANGE, optional for SERVICE_DATE_CHANGE
     emergencyContactName: string;
     emergencyContactPhone: string;
     medicalNote?: string;
-    selected_room_type?: string;
     rejection_reason?: string;
   }) => {
     try {
@@ -2666,7 +2723,7 @@ export const serviceRequestsAPI = {
     new_end_date: string;
     emergencyContactName: string;
     emergencyContactPhone: string;
-    medicalNote?: string;
+    medicalNote?: string; // Note không bắt buộc cho SERVICE_DATE_CHANGE
   }) => {
     try {
       const response = await apiClient.post('/service-requests/service-date-change', data);

@@ -145,24 +145,82 @@ export default function RoomManagementPage() {
   const getRoomType = (room_type: string) =>
     roomTypes.find((t) => t.room_type === room_type);
 
+  // Helper function to ensure only one active assignment per resident
+  const getUniqueActiveAssignments = (assignments: any[]) => {
+    const residentToActiveAssignment = new Map();
+    
+    assignments.forEach(assignment => {
+      if (isAssignmentActive(assignment) && assignment.resident_id) {
+        const residentId = typeof assignment.resident_id === 'string' 
+          ? assignment.resident_id 
+          : assignment.resident_id._id;
+        
+        if (!residentToActiveAssignment.has(residentId)) {
+          residentToActiveAssignment.set(residentId, assignment);
+        } else {
+          // Nếu resident đã có assignment active, so sánh assigned_date và lấy cái mới nhất
+          const existingAssignment = residentToActiveAssignment.get(residentId);
+          const existingDate = new Date(existingAssignment.assigned_date);
+          const currentDate = new Date(assignment.assigned_date);
+          
+          if (currentDate > existingDate) {
+            console.warn(`Resident ${residentId} has multiple active assignments. Keeping the latest one.`, {
+              existing: existingAssignment._id,
+              current: assignment._id,
+              existingDate: existingDate.toISOString(),
+              currentDate: currentDate.toISOString()
+            });
+            residentToActiveAssignment.set(residentId, assignment);
+          } else {
+            console.warn(`Resident ${residentId} has multiple active assignments. Keeping the existing one.`, {
+              existing: existingAssignment._id,
+              current: assignment._id,
+              existingDate: existingDate.toISOString(),
+              currentDate: currentDate.toISOString()
+            });
+          }
+        }
+      }
+    });
+    
+    return Array.from(residentToActiveAssignment.values());
+  };
+
   // Helper function to check if assignment is active
   const isAssignmentActive = (assignment: any) => {
     if (!assignment) return false;
-    if (!assignment.unassigned_date) return true; // null = active
-    const unassignedDate = new Date(assignment.unassigned_date);
-    const now = new Date();
-    const isActive = unassignedDate > now; // ngày trong tương lai = active
     
-    // Debug logging
-    console.log('Checking assignment active status:', {
-      assignmentId: assignment._id,
-      unassigned_date: assignment.unassigned_date,
-      unassignedDate: unassignedDate.toISOString(),
-      now: now.toISOString(),
-      isActive: isActive
-    });
+    // Kiểm tra status trước
+    if (assignment.status !== 'active' && assignment.status !== 'done') {
+      return false;
+    }
     
-    return isActive;
+    // Nếu status là 'active', luôn active
+    if (assignment.status === 'active') {
+      return true;
+    }
+    
+    // Nếu status là 'done', kiểm tra unassigned_date
+    if (assignment.status === 'done') {
+      if (!assignment.unassigned_date) return true; // null = active
+      const unassignedDate = new Date(assignment.unassigned_date);
+      const now = new Date();
+      const isActive = unassignedDate > now; // ngày trong tương lai = active
+      
+      // Debug logging
+      console.log('Checking assignment active status:', {
+        assignmentId: assignment._id,
+        status: assignment.status,
+        unassigned_date: assignment.unassigned_date,
+        unassignedDate: unassignedDate.toISOString(),
+        now: now.toISOString(),
+        isActive: isActive
+      });
+      
+      return isActive;
+    }
+    
+    return false;
   };
 
   const bedsOfRoom = (roomId: string) => {
@@ -181,24 +239,40 @@ export default function RoomManagementPage() {
     });
     
     console.log('Room assignments for room', roomId, ':', roomAssignments);
+    
+    // Đảm bảo mỗi resident chỉ có 1 assignment active duy nhất
+    const uniqueActiveAssignments = getUniqueActiveAssignments(roomAssignments);
+    console.log('Unique active assignments for room', roomId, ':', uniqueActiveAssignments);
 
     // Gom theo bed và chọn assignment đang active, nếu không có thì chọn mới nhất
-    const bedIdToAssignments = roomAssignments.reduce((map, assignment) => {
+    const bedIdToAssignments = uniqueActiveAssignments.reduce((map, assignment) => {
       const bedId = assignment.bed_id._id;
-      if (!map[bedId]) map[bedId] = [] as typeof roomAssignments;
+      if (!map[bedId]) map[bedId] = [] as typeof uniqueActiveAssignments;
       map[bedId].push(assignment);
       return map;
-    }, {} as Record<string, typeof roomAssignments>);
+    }, {} as Record<string, typeof uniqueActiveAssignments>);
 
     const uniqueBeds = Object.entries(bedIdToAssignments).map(([bedId, assignments]) => {
       console.log('Processing bed:', bedId, 'with assignments:', assignments);
       
-      // Kiểm tra assignment active
-      const active = assignments.find(a => isAssignmentActive(a)) || null;
+      // Kiểm tra assignment active - chỉ lấy 1 assignment active duy nhất
+      const activeAssignments = (assignments as any[]).filter(a => isAssignmentActive(a));
+      const active = activeAssignments.length > 0 ? activeAssignments[0] : null;
+      
+      // Nếu có nhiều hơn 1 assignment active, log warning và chỉ lấy cái đầu tiên
+      if (activeAssignments.length > 1) {
+        console.warn(`Bed ${bedId} has multiple active assignments:`, activeAssignments.map(a => ({
+          id: a._id,
+          resident: a.resident_id?.full_name,
+          status: a.status,
+          assigned_date: a.assigned_date
+        })));
+      }
+      
       console.log('Active assignment for bed', bedId, ':', active);
       
       // Nếu không có active, lấy assignment mới nhất theo assigned_date để lấy metadata giường
-      const latest = assignments.slice().sort((a, b) => (
+      const latest = (assignments as any[]).slice().sort((a, b) => (
         new Date(b.assigned_date).getTime() - new Date(a.assigned_date).getTime()
       ))[0];
 

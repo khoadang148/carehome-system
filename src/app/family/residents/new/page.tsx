@@ -2615,7 +2615,17 @@ export default function NewResidentRegistrationPage() {
                             resident_id: residentId,
                             bed_id: bedIdToAssign,
                             assigned_by: (user && (user as any).id) ? (user as any).id : '',
-                            status: 'pending'
+                            status: 'pending',
+                            unassigned_date: endDate || (() => {
+                              // Fallback: calculate end date if not set
+                              const fallbackStart = new Date();
+                              const fallbackEnd = new Date(fallbackStart);
+                              fallbackEnd.setMonth(fallbackEnd.getMonth() + 6);
+                              const year = fallbackEnd.getFullYear();
+                              const month = fallbackEnd.getMonth();
+                              const lastDay = new Date(year, month + 1, 0).getDate();
+                              return `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+                            })()
                           });
                           if (!createdBedAssignment || !(createdBedAssignment._id || createdBedAssignment.id)) {
                             throw new Error('Không thể tạo bed assignment');

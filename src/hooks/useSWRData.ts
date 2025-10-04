@@ -290,8 +290,29 @@ export const useBedAssignments = (residentId: string) => {
     }
   );
 
+  // Helper function to check if bed assignment is active (for admitted residents)
+  const isBedAssignmentActiveForAdmitted = (assignment: any) => {
+    if (!assignment) return false;
+    
+    // Chỉ chấp nhận status 'done' và 'active'
+    if (assignment.status !== 'done' && assignment.status !== 'active') return false;
+    
+    // Nếu status là 'active', luôn active
+    if (assignment.status === 'active') return true;
+    
+    // Nếu status là 'done', kiểm tra unassigned_date
+    if (assignment.status === 'done') {
+      if (!assignment.unassigned_date) return true; // null = active
+      const unassignedDate = new Date(assignment.unassigned_date);
+      const now = new Date();
+      return unassignedDate > now; // ngày trong tương lai = active
+    }
+    
+    return false;
+  };
+
   const bedAssignment = data && Array.isArray(data) 
-    ? data.find((a: any) => a.bed_id?.room_id)
+    ? data.find((a: any) => a.bed_id?.room_id && isBedAssignmentActiveForAdmitted(a))
     : null;
 
   const roomId = bedAssignment?.bed_id?.room_id?._id || bedAssignment?.bed_id?.room_id;

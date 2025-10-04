@@ -75,4 +75,30 @@ export const getAvatarUrlWithFallback = (avatarPath: string, fallback?: string):
     console.error('Error processing avatar URL:', error);
     return finalFallback;
   }
+};
+
+// Helper function để kiểm tra xem URL hình ảnh có hợp lệ không
+export const isValidImageUrl = (url: string): boolean => {
+  if (!url) return false;
+  
+  // Kiểm tra format URL
+  try {
+    const urlObj = new URL(url);
+    return ['http:', 'https:'].includes(urlObj.protocol);
+  } catch {
+    return false;
+  }
+};
+
+// Helper function để tạo fallback URL cho hình ảnh
+export const createImageFallback = (originalUrl: string, fallbackUrl: string = '/default-avatar.svg'): string => {
+  if (!originalUrl) return fallbackUrl;
+  
+  // Nếu URL gốc hợp lệ, trả về URL gốc
+  if (isValidImageUrl(originalUrl)) {
+    return originalUrl;
+  }
+  
+  // Nếu không, trả về fallback
+  return fallbackUrl;
 }; 

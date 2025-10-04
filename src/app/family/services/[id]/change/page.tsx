@@ -523,7 +523,17 @@ export default function ChangeCarePlanPage() {
         resident_id: residentId,
         bed_id: payloadBedId,
         status: 'pending',
-        assigned_by: assignedBy
+        assigned_by: assignedBy,
+        unassigned_date: endISO || (() => {
+          // Fallback: calculate end date if not set
+          const fallbackStart = new Date();
+          const fallbackEnd = new Date(fallbackStart);
+          fallbackEnd.setMonth(fallbackEnd.getMonth() + 6);
+          const year = fallbackEnd.getFullYear();
+          const month = fallbackEnd.getMonth();
+          const lastDay = new Date(year, month + 1, 0).getDate();
+          return `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        })()
       };
 
       console.log("Creating bed assignment:", bedAssignmentData);
@@ -555,6 +565,14 @@ export default function ChangeCarePlanPage() {
       // Get selected room type
       const selectedRoomForType = rooms.find(r => r._id === selectedRoomId);
       const selectedRoomTypeValue = selectedRoomForType?.room_type || '';
+      
+      console.log('Debug - Room type info:', {
+        selectedRoomId,
+        selectedRoomForType,
+        selectedRoomTypeValue,
+        roomType,
+        finalSelectedRoomType: selectedRoomTypeValue || roomType
+      });
 
       // Create service request with the new assignment IDs
       const serviceRequestData = {
@@ -569,7 +587,7 @@ export default function ChangeCarePlanPage() {
         emergencyContactName: userProfile?.full_name || userProfile?.name || (user as any)?.name || 'Chưa có thông tin',
         emergencyContactPhone: userProfile?.phone || (user as any)?.phone || 'Chưa có thông tin',
         medicalNote: additionalNote || undefined,
-        selected_room_type: selectedRoomTypeValue,
+        selected_room_type: selectedRoomTypeValue || roomType, // Fallback to roomType if selectedRoomTypeValue is empty
         // Legacy fields for backward compatibility
         target_service_package_id: mainPlanId,
         new_start_date: startISO,

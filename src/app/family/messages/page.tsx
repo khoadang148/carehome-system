@@ -160,7 +160,7 @@ export default function MessagesPage() {
         console.log('Staff data from API:', staffData);
         
         // Kiểm tra cấu trúc dữ liệu trả về
-        let processedStaff = [];
+        let processedStaff: any[] = [];
         
         if (staffData && staffData.success && Array.isArray(staffData.data)) {
           // Cấu trúc: { success: true, data: [...] }

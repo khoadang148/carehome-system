@@ -27,7 +27,7 @@ import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 // Helper function to check if bed assignment is active
 const isBedAssignmentActive = (assignment) => {
   if (!assignment) return false;
-  if (isBedAssignmentActive(a)) return true; // null = active
+  if (!assignment.unassigned_date) return true; // null = active
   const unassignedDate = new Date(assignment.unassigned_date);
   const now = new Date();
   return unassignedDate > now; // ngày trong tương lai = active

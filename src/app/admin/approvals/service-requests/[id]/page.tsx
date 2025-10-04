@@ -1188,51 +1188,99 @@ export default function ServiceRequestDetailsPage() {
                               </h3>
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                               <div>
                                 <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Thời gian gia hạn
+                                  Ngày bắt đầu
                                 </p>
                                 <p className="text-lg font-semibold text-blue-700">
                                   {(() => {
-                                    // Calculate extension period from medical note or new_end_date
-                                    if (r.medicalNote) {
-                                      const match = r.medicalNote.match(/thêm (\d+) tháng/);
-                                      if (match && match[1]) {
-                                        return `${match[1]} tháng`;
-                                      }
-                                    }
-                                    
-                                    // Fallback: try to calculate from dates if available
                                     const cpaId = typeof r.current_care_plan_assignment_id === 'string' 
                                       ? r.current_care_plan_assignment_id 
                                       : r.current_care_plan_assignment_id?._id;
                                     
-                                    if (cpaId && carePlanAssignmentDetails[cpaId] && r.new_end_date) {
+                                    if (cpaId && carePlanAssignmentDetails[cpaId]) {
                                       const assignment = carePlanAssignmentDetails[cpaId];
-                                      if (assignment.end_date) {
-                                        const oldEnd = new Date(assignment.end_date);
-                                        const newEnd = new Date(r.new_end_date);
-                                        const diffMonths = Math.round((newEnd.getTime() - oldEnd.getTime()) / (1000 * 60 * 60 * 24 * 30));
-                                        if (diffMonths > 0) {
-                                          return `${diffMonths} tháng`;
-                                        }
-                                      }
+                                      return assignment.start_date ? formatDate(assignment.start_date) : '---';
                                     }
-
                                     return '---';
                                   })()}
                                 </p>
+                                <p className="text-xs text-slate-500 mt-1">Giữ nguyên</p>
                               </div>
 
                               <div>
                                 <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Gia hạn đến ngày
+                                  Ngày kết thúc cũ
+                                </p>
+                                <p className="text-lg font-semibold text-gray-600 line-through">
+                                  {(() => {
+                                    const cpaId = typeof r.current_care_plan_assignment_id === 'string' 
+                                      ? r.current_care_plan_assignment_id 
+                                      : r.current_care_plan_assignment_id?._id;
+                                    
+                                    if (cpaId && carePlanAssignmentDetails[cpaId]) {
+                                      const assignment = carePlanAssignmentDetails[cpaId];
+                                      return assignment.end_date ? formatDate(assignment.end_date) : '---';
+                                    }
+                                    return '---';
+                                  })()}
+                                </p>
+                                <p className="text-xs text-red-500 mt-1">Trước khi gia hạn</p>
+                              </div>
+
+                              <div>
+                                <p className="text-xs font-medium text-slate-600 mb-2">
+                                  Ngày kết thúc mới
                                 </p>
                                 <p className="text-lg font-semibold text-emerald-700">
                                   {formatDate(r.new_end_date)}
                                 </p>
+                                <p className="text-xs text-green-600 mt-1">Sau khi gia hạn</p>
                               </div>
+                            </div>
+
+                            {/* Extension Period Summary */}
+                            <div className="bg-gradient-to-r from-blue-50 to-emerald-50 rounded-xl p-4 border border-blue-200 mb-6">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </div>
+                                <p className="text-sm font-bold text-slate-800">Thời gian gia hạn</p>
+                              </div>
+                              <p className="text-lg font-semibold text-blue-700">
+                                {(() => {
+                                  // Calculate extension period from medical note or new_end_date
+                                  if (r.medicalNote) {
+                                    const match = r.medicalNote.match(/thêm (\d+) tháng/);
+                                    if (match && match[1]) {
+                                      return `${match[1]} tháng`;
+                                    }
+                                  }
+                                  
+                                  // Fallback: try to calculate from dates if available
+                                  const cpaId = typeof r.current_care_plan_assignment_id === 'string' 
+                                    ? r.current_care_plan_assignment_id 
+                                    : r.current_care_plan_assignment_id?._id;
+                                  
+                                  if (cpaId && carePlanAssignmentDetails[cpaId] && r.new_end_date) {
+                                    const assignment = carePlanAssignmentDetails[cpaId];
+                                    if (assignment.end_date) {
+                                      const oldEnd = new Date(assignment.end_date);
+                                      const newEnd = new Date(r.new_end_date);
+                                      const diffMonths = Math.round((newEnd.getTime() - oldEnd.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                      if (diffMonths > 0) {
+                                        return `${diffMonths} tháng`;
+                                      }
+                                    }
+                                  }
+
+                                  return '---';
+                                })()}
+                              </p>
+                              <p className="text-xs text-blue-600 mt-1">Thời gian hiệu lực được tính nối tiếp từ ngày hết hạn hiện tại và tự động đến cuối tháng</p>
                             </div>
 
                             {/* Service Packages Section */}
@@ -1669,7 +1717,7 @@ export default function ServiceRequestDetailsPage() {
 
                             {/* New Service Packages and Room/Bed */}
                             <div className="mb-8">
-                              <h4 className="text-sm font-bold text-slate-800 mb-4">Gói và phòng/giường mới</h4>
+                              <h4 className="text-sm font-bold text-slate-800 mb-4">Gói dịch vụ và phòng/giường mới</h4>
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                 {/* New Service Packages */}
                                 <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200 min-w-0 flex-1">
