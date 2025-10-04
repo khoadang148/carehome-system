@@ -560,28 +560,6 @@ export default function EditActivityPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      {/* Assigned residents (read-only) for the staff responsible */}
-      <div className="max-w-7xl mx-auto px-6 pb-8 relative z-10">
-        <div className="bg-white rounded-3xl p-6 shadow border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-gray-800 m-0">
-              Người cao tuổi thuộc nhân viên phụ trách
-            </h3>
-            {loadingResidents && <span className="text-sm text-gray-500">Đang tải…</span>}
-          </div>
-          {residentOptions.length === 0 && !loadingResidents ? (
-            <p className="text-sm text-gray-500 m-0">Không có dữ liệu phân công.</p>
-          ) : (
-            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 m-0 p-0 list-none">
-              {residentOptions.map((r) => (
-                <li key={r.id} className="text-sm text-gray-700">
-                  {r.name || '---'}{r.room ? ` · Phòng: ${r.room}` : ''}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
 
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">

@@ -89,14 +89,17 @@ export default function FamilyCreateBillPage() {
       setError(null);
       if (!selectedResidentId) return;
       try {
-        // Fetch all assignments for resident, then find the accepted one
+        // Fetch all assignments for resident, then find the accepted or pending one
         const assignments = await carePlanAssignmentsAPI.getByResidentId(selectedResidentId);
         const accepted = Array.isArray(assignments)
-          ? assignments.find((a: any) => String(a?.status || '').toLowerCase() === 'completed')
+          ? assignments.find((a: any) => {
+              const status = String(a?.status || '').toLowerCase();
+              return status === 'completed' || status === 'pending';
+            })
           : null;
 
         if (!accepted) {
-          setError('Chưa tìm thấy gói dịch vụ được duyệt cho người thụ hưởng này.');
+          setError('Chưa tìm thấy gói dịch vụ cho người thụ hưởng này.');
           return;
         }
 

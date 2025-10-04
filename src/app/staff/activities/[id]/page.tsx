@@ -31,6 +31,15 @@ import { useResidents } from '@/lib/contexts/residents-context';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { activitiesAPI, activityParticipationsAPI, staffAssignmentsAPI, bedAssignmentsAPI, residentAPI, photosAPI } from '@/lib/api';
 import { Dialog } from '@headlessui/react';
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import UploadSuccessModal from '@/components/UploadSuccessModal';
 
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -93,9 +102,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const isActivityToday = () => {
     if (!activity?.date) return false;
     
-    // Sử dụng thời gian hiện tại (không cần trừ 7 giờ vì đã xử lý trong mapActivityFromAPI)
+    // Sử dụng thời gian hiện tại Việt Nam (UTC+7)
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const vietnamTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // Chuyển từ UTC sang UTC+7
+    const today = vietnamTime.toISOString().split('T')[0];
     
     return activity.date === today;
   };
@@ -103,12 +113,13 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
   const isActivityTimeReached = () => {
     if (!activity?.date || !activity?.scheduledTime) return false;
     
-    // Sử dụng thời gian hiện tại (không cần trừ 7 giờ vì đã xử lý trong mapActivityFromAPI)
+    // Sử dụng thời gian hiện tại Việt Nam (UTC+7)
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const vietnamTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // Chuyển từ UTC sang UTC+7
+    const today = vietnamTime.toISOString().split('T')[0];
     
     console.log('🔍 TIME CHECK - Activity date:', activity.date, 'Today:', today);
-    console.log('🔍 TIME CHECK - Activity time:', activity.scheduledTime, 'Current time:', now.toLocaleTimeString('vi-VN', { hour12: false }));
+    console.log('🔍 TIME CHECK - Activity time:', activity.scheduledTime, 'Current Vietnam time:', vietnamTime.toLocaleTimeString('vi-VN', { hour12: false }));
     
     // Nếu không phải hôm nay, chưa đến giờ
     if (activity.date !== today) {
@@ -118,10 +129,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
     
     // Nếu là hôm nay, kiểm tra thời gian
     const [hours, minutes] = activity.scheduledTime.split(':');
-    const activityTime = new Date(now);
+    const activityTime = new Date(vietnamTime);
     activityTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
     
-    const canEvaluate = now >= activityTime;
+    const canEvaluate = vietnamTime >= activityTime;
     console.log('🔍 TIME CHECK - Can evaluate:', canEvaluate, 'Activity time:', activityTime.toLocaleTimeString('vi-VN', { hour12: false }));
     
     return canEvaluate;
@@ -214,7 +225,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 const beds = await bedAssignmentsAPI.getAll();
                 if (Array.isArray(beds)) {
                   residents = beds
-                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .filter((ba: any) => isBedAssignmentActive(ba) && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
                     .map((ba: any) => ba.resident_id)
                     .filter(Boolean);
                 }
@@ -420,6 +431,12 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         });
       };
 
+      const convertToVietnamDate = (utcTime: Date) => {
+        // Trừ 7 giờ để hiển thị đúng ngày (database lưu UTC+7, cần trừ để hiển thị đúng)
+        const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
+        return correctTime.toLocaleDateString('en-CA');
+      };
+
       return {
         id: apiActivity._id,
         name: apiActivity.activity_name,
@@ -429,7 +446,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         startTime: convertToVietnamTime(scheduleTime),
         endTime: convertToVietnamTime(endTime),
         duration: apiActivity.duration,
-        date: scheduleTime.toLocaleDateString('en-CA'),
+        date: convertToVietnamDate(scheduleTime),
         location: apiActivity.location,
         capacity: apiActivity.capacity,
         participants: 0,

@@ -20,6 +20,15 @@ import 'react-toastify/dist/ReactToastify.css';
 import { formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone, getDateYYYYMMDDWithTimezone, formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, userAPI, bedAssignmentsAPI } from '@/lib/api';
 
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
+
 const ensureString = (value: any): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'object' && value !== null) {
@@ -75,6 +84,7 @@ export default function StaffVitalSignsPage() {
       setLoading(true);
       try {
         const myAssignmentsData = await staffAssignmentsAPI.getMyAssignments();
+        console.log('Staff assignments response (vital signs):', myAssignmentsData);
         const myAssignments = Array.isArray(myAssignmentsData) ? myAssignmentsData : [];
         
         const isAssignmentActive = (a: any) => {
@@ -87,25 +97,40 @@ export default function StaffVitalSignsPage() {
           return end >= today;
         };
 
+        // If no assignments, show empty state
+        if (myAssignments.length === 0) {
+          console.log('No assignments found (vital signs)');
+          setResidents([]);
+          setRoomNumbers({});
+          return;
+        }
+
         const isRoomBased = myAssignments.some((a: any) => a && (a.room_id || a.residents));
+        console.log('Is room based (vital signs):', isRoomBased, 'Assignments:', myAssignments);
         let residentRows: any[] = [];
 
         if (isRoomBased) {
           const activeRoomAssignments = myAssignments.filter((a: any) => isAssignmentActive(a));
+          console.log('Active room assignments (vital signs):', activeRoomAssignments);
           for (const assignment of activeRoomAssignments) {
             const room = assignment.room_id;
             const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
             let residentsList: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+            console.log('Assignment room:', room, 'Residents from assignment:', residentsList);
+            
             if ((!residentsList || residentsList.length === 0) && roomId) {
               try {
                 const bedAssignments = await bedAssignmentsAPI.getAll();
                 if (Array.isArray(bedAssignments)) {
                   residentsList = bedAssignments
-                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .filter((ba: any) => isBedAssignmentActive(ba) && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
                     .map((ba: any) => ba.resident_id)
                     .filter(Boolean);
+                  console.log('Found residents for room', roomId, ':', residentsList);
                 }
-              } catch {}
+              } catch (error) {
+                console.error('Error fetching bed assignments:', error);
+              }
             }
             for (const res of residentsList) {
               residentRows.push({ id: res?._id, name: res?.full_name || '', avatar: Array.isArray(res?.avatar) ? res.avatar[0] : res?.avatar || null, roomId });
@@ -134,13 +159,25 @@ export default function StaffVitalSignsPage() {
             hasRoom: !!ridToNumber[r.roomId]
           }));
 
+          console.log('Final residents (room-based):', finalResidents);
           const validResidents = finalResidents.filter(r => r.hasRoom);
+          console.log('Valid residents (room-based):', validResidents);
+          
+          if (validResidents.length === 0) {
+            console.log('No residents found in any assigned rooms (vital signs)');
+            setResidents([]);
+            setRoomNumbers({});
+            return;
+          }
+          
           setResidents(validResidents);
           const roomNumbersMap: {[residentId: string]: string} = {};
           validResidents.forEach((resident: any) => { roomNumbersMap[resident.id] = resident.roomNumber; });
           setRoomNumbers(roomNumbersMap);
         } else {
+          console.log('Using backward compatibility mode (vital signs)');
           const activeAssignments = myAssignments.filter((assignment: any) => isAssignmentActive(assignment));
+          console.log('Active assignments (backward compatibility):', activeAssignments);
         const assignedResidents = await Promise.all(
           activeAssignments.map(async (assignment: any) => {
             let residentIdToFetch = assignment.resident_id;
@@ -182,7 +219,17 @@ export default function StaffVitalSignsPage() {
             }
           })
         );
+          console.log('Assigned residents (backward compatibility):', assignedResidents);
           const validResidents = (assignedResidents || []).filter((resident: any) => resident && resident.hasRoom);
+          console.log('Valid residents (backward compatibility):', validResidents);
+          
+          if (validResidents.length === 0) {
+            console.log('No residents found in backward compatibility mode (vital signs)');
+            setResidents([]);
+            setRoomNumbers({});
+            return;
+          }
+          
         setResidents(validResidents);
         const roomNumbersMap: {[residentId: string]: string} = {};
           validResidents.forEach((resident: any) => { roomNumbersMap[resident.id] = resident.roomNumber; });

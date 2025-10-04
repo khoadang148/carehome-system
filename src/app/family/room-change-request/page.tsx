@@ -23,6 +23,15 @@ import {
   HomeIcon as HomeIconSolid
 } from "@heroicons/react/24/solid";
 
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
+
 interface Resident {
   _id: string;
   full_name: string;
@@ -135,7 +144,7 @@ export default function RoomChangeRequestPage() {
       (typeof currentAssignment.resident_id === 'string'
         ? String(currentAssignment.resident_id)
         : String(currentAssignment.resident_id?._id || currentAssignment.resident_id)) === String(residentId)
-    ) && !currentAssignment.unassigned_date
+    ) && isBedAssignmentActive(currentAssignment)
       ? currentAssignment
       : null;
 
@@ -143,7 +152,7 @@ export default function RoomChangeRequestPage() {
       const baResidentId = typeof ba.resident_id === 'string'
         ? ba.resident_id
         : ba.resident_id?._id || ba.resident_id;
-      return String(baResidentId) === String(residentId) && !ba.unassigned_date;
+      return String(baResidentId) === String(residentId) && isBedAssignmentActive(ba);
     });
 
     if (!assignment) return { room: null, bed: null };
@@ -381,9 +390,12 @@ export default function RoomChangeRequestPage() {
         }
       try {
         setCurrentInfoLoading(true);
-        const list = await bedAssignmentsAPI.getByResidentId(selectedResident);
+        const list = await bedAssignmentsAPI.getAllStatuses({ resident_id: selectedResident });
         if (isCancelled) return;
-        const active = Array.isArray(list) ? list.find((a: any) => !a.unassigned_date) : null;
+        const active = Array.isArray(list) ? list.find((a: any) => 
+          isBedAssignmentActive(a) && 
+          (a.status === 'active' || a.status === 'accepted')
+        ) : null;
         setCurrentAssignment(active || null);
       } catch {
         if (isCancelled) return;
@@ -440,7 +452,7 @@ export default function RoomChangeRequestPage() {
       const serviceRequestData = {
         resident_id: selectedResident,
         family_member_id: user?.id || '',
-        request_type: 'room_change' as const, // Backend expects lowercase, use const assertion
+        request_type: 'room_change' as const,
         target_bed_assignment_id: newBedAssignment._id,
         note: note,
         emergencyContactName: emergencyContactName || userProfile?.full_name || '',

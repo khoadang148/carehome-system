@@ -7,6 +7,15 @@ import { roomsAPI, bedsAPI, roomTypesAPI, serviceRequestsAPI, residentAPI, bedAs
 import { BuildingOfficeIcon, MagnifyingGlassIcon, EyeIcon, ArrowLeftIcon, HomeIcon, UsersIcon, MapPinIcon, ClockIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (isBedAssignmentActive(a)) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
+
 interface Room {
   _id: string;
   room_number: string;
@@ -205,7 +214,7 @@ export default function FamilyRoomPage() {
       const baResidentId = typeof ba.resident_id === 'string'
         ? ba.resident_id
         : ba.resident_id?._id || ba.resident_id;
-      return baResidentId === residentId && !ba.unassigned_date;
+      return baResidentId === residentId && isBedAssignmentActive(a);
     });
 
     if (!assignment) return { room: null, bed: null };

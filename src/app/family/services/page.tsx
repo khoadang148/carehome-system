@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { DocumentPlusIcon, MagnifyingGlassIcon, FunnelIcon, ArrowsUpDownIcon, ClockIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { carePlansAPI, residentAPI, carePlanAssignmentsAPI } from '@/lib/api';
+import { DocumentPlusIcon, MagnifyingGlassIcon, FunnelIcon, ArrowsUpDownIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { carePlansAPI, residentAPI } from '@/lib/api';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
 
 export default function ServicesPage() {
@@ -16,7 +16,6 @@ export default function ServicesPage() {
   const [carePlansError, setCarePlansError] = useState<string | null>(null);
 
   const [relatives, setRelatives] = useState<any[]>([]);
-  const [residentServiceStatus, setResidentServiceStatus] = useState<{[key: string]: any}>({});
   const [loadingServiceStatus, setLoadingServiceStatus] = useState(false);
 
   // Filtering and sorting state
@@ -88,50 +87,16 @@ export default function ServicesPage() {
 
   useEffect(() => {
     if (!user?.id) return;
+    setLoadingServiceStatus(true);
     residentAPI.getByFamilyMemberId(user.id)
       .then((data) => {
         const residentsData = Array.isArray(data) ? data : [];
         setRelatives(residentsData);
-        
-        // Kiểm tra trạng thái dịch vụ cho từng resident
-        if (residentsData.length > 0) {
-          setLoadingServiceStatus(true);
-          const statusPromises = residentsData.map(async (resident: any) => {
-            try {
-              const assignments = await carePlanAssignmentsAPI.getByResidentId(resident._id);
-              return {
-                residentId: resident._id,
-                residentStatus: resident.status,
-                assignments: Array.isArray(assignments) ? assignments : [],
-                hasActiveService: assignments.some((a: any) => a.status === 'active' || a.status === 'approved'),
-                hasPendingService: assignments.some((a: any) => a.status === 'pending'),
-                hasRejectedService: assignments.some((a: any) => a.status === 'rejected')
-              };
-            } catch (error) {
-              return {
-                residentId: resident._id,
-                residentStatus: resident.status,
-                assignments: [],
-                hasActiveService: false,
-                hasPendingService: false,
-                hasRejectedService: false
-              };
-            }
-          });
-          
-          Promise.all(statusPromises).then((statuses) => {
-            const statusMap: {[key: string]: any} = {};
-            
-            statuses.forEach(status => {
-              statusMap[status.residentId] = status;
-            });
-            
-            setResidentServiceStatus(statusMap);
-            setLoadingServiceStatus(false);
-          });
-        }
       })
-      .catch(() => setRelatives([]));
+      .catch(() => setRelatives([]))
+      .finally(() => {
+        setLoadingServiceStatus(false);
+      });
   }, [user]);
 
   return (
@@ -156,35 +121,15 @@ export default function ServicesPage() {
               Điều Khoản & Quy Định
             </button>
 
-            {/* Hiển thị nút phù hợp dựa trên trạng thái dịch vụ của resident */}
+            {/* Hiển thị nút xem dịch vụ đã đăng ký */}
             {relatives.length > 0 && !loadingServiceStatus && (
-              (() => {
-                // Kiểm tra có resident nào đang chờ duyệt không
-                const hasPendingResidents = Object.values(residentServiceStatus).some((status: any) => 
-                  status.hasPendingService && status.residentStatus !== 'pending'
-                );
-                
-                if (hasPendingResidents) {
-                  return (
-                    <div className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white border-2 border-yellow-400 rounded-full text-base font-semibold cursor-default transition-all duration-300 backdrop-blur-md shadow-lg">
-                      <ClockIcon className="w-5 h-5" />
-                      Đang chờ duyệt dịch vụ
-                    </div>
-                  );
-                }
-                
-                // Tất cả resident đều đã có dịch vụ - hiển thị nút xem dịch vụ đã đăng ký
-                const firstResident = relatives[0];
-                return (
               <button
-                    onClick={() => router.push(`/family/services/${firstResident._id}`)}
-                    className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400 rounded-full text-base font-semibold cursor-pointer transition-all duration-300 backdrop-blur-md shadow-lg hover:from-blue-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
-                  >
-                    <CheckCircleIcon className="w-5 h-5" />
+                onClick={() => router.push(`/family/services/${relatives[0]._id}`)}
+                className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400 rounded-full text-base font-semibold cursor-pointer transition-all duration-300 backdrop-blur-md shadow-lg hover:from-blue-600 hover:to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                <CheckCircleIcon className="w-5 h-5" />
                 Gói dịch vụ đã đăng ký
               </button>
-                );
-              })()
             )}
 
             {/* Loading state */}
@@ -200,39 +145,15 @@ export default function ServicesPage() {
 
       <div className="max-w-7xl mx-auto px-8 py-16 -mt-8">
         {user?.role === 'family' && relatives.length > 0 && !loadingServiceStatus && (
-          (() => {
-            // Kiểm tra có resident nào đang chờ duyệt không
-            const hasPendingResidents = Object.values(residentServiceStatus).some((status: any) => 
-              status.hasPendingService && status.residentStatus !== 'pending'
-            );
-            
-            if (hasPendingResidents) {
-              return (
-                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-500 rounded-xl p-6 mb-8 text-center">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <ClockIcon className="w-5 h-5 text-yellow-500" />
-                    <span className="font-semibold text-yellow-900">Đang chờ duyệt</span>
-                  </div>
-                  <p className="text-yellow-900 text-sm leading-relaxed">
-                    Đơn đăng ký dịch vụ của bạn đang được xem xét. Chúng tôi sẽ thông báo kết quả trong thời gian sớm nhất. Bạn có thể xem thông tin các gói dịch vụ khác trong khi chờ đợi.
-                  </p>
-                </div>
-              );
-            }
-            
-            // Tất cả resident đều đã có dịch vụ
-            return (
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-500 rounded-xl p-6 mb-8 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-                  <CheckCircleIcon className="w-5 h-5 text-blue-500" />
-                  <span className="font-semibold text-blue-900">Dịch vụ đang hoạt động</span>
+              <CheckCircleIcon className="w-5 h-5 text-blue-500" />
+              <span className="font-semibold text-blue-900">Dịch vụ đang hoạt động</span>
             </div>
             <p className="text-blue-900 text-sm leading-relaxed">
-                  Tất cả người thân của bạn đã có gói dịch vụ đang hoạt động. Sử dụng nút "Gói dịch vụ đã đăng ký" để xem chi tiết hoặc liên hệ nhân viên chăm sóc để được hỗ trợ.
+              Tất cả người thân của bạn đã có gói dịch vụ đang hoạt động. Sử dụng nút "Gói dịch vụ đã đăng ký" để xem chi tiết hoặc liên hệ nhân viên chăm sóc để được hỗ trợ.
             </p>
           </div>
-            );
-          })()
         )}
 
         {/* Filtering and Sorting Section */}

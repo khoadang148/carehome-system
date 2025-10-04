@@ -10,6 +10,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { staffAssignmentsAPI, carePlansAPI, roomsAPI, userAPI, bedAssignmentsAPI, residentAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import Avatar from '@/components/Avatar';
 
 interface Resident {
@@ -62,6 +71,7 @@ export default function StaffResidentsPage() {
       setLoadingData(true);
       try {
         const data = await staffAssignmentsAPI.getMyAssignments();
+        console.log('Staff assignments response:', data);
         const assignmentsData = Array.isArray(data) ? data : [];
 
         const isAssignmentActive = (a: any) => {
@@ -76,6 +86,16 @@ export default function StaffResidentsPage() {
 
         // Detect new room-based shape: item has room_id and residents array
         const isRoomBased = assignmentsData.some((a: any) => a && (a.room_id || a.residents));
+        console.log('Is room based:', isRoomBased, 'Assignments data:', assignmentsData);
+        
+        // If no assignments, show empty state
+        if (assignmentsData.length === 0) {
+          console.log('No assignments found');
+          setResidentsData([]);
+          setRoomNumbers({});
+          setError('');
+          return;
+        }
 
         if (isRoomBased) {
           // Flatten residents from each assigned room
@@ -83,26 +103,37 @@ export default function StaffResidentsPage() {
           const flattened: any[] = [];
 
           const activeRoomAssignments = assignmentsData.filter((a: any) => isAssignmentActive(a));
+          console.log('Active room assignments:', activeRoomAssignments);
 
           for (const assignment of activeRoomAssignments) {
             const room = assignment.room_id;
             let residents: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+            console.log('Assignment room:', room, 'Residents:', residents);
 
             // Cache room info for later number resolution
             const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
             if (roomId && !uniqueRooms[roomId]) uniqueRooms[roomId] = room;
 
-            // Fallback: if BE doesn't include residents in assignment, derive from bed assignments by room
-            if ((!residents || residents.length === 0) && roomId) {
+            // Get residents from bed assignments for this room
+            if (roomId) {
               try {
                 const bedAssignments = await bedAssignmentsAPI.getAll();
                 if (Array.isArray(bedAssignments)) {
-                  residents = bedAssignments
-                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                  const roomBedAssignments = bedAssignments.filter((ba: any) => {
+                    if (!isBedAssignmentActive(ba) || !ba.bed_id) return false;
+                    const bedRoomId = typeof ba.bed_id.room_id === 'object' ? ba.bed_id.room_id._id : ba.bed_id.room_id;
+                    return bedRoomId === roomId;
+                  });
+                  
+                  residents = roomBedAssignments
                     .map((ba: any) => ba.resident_id)
                     .filter(Boolean);
+                  
+                  console.log('Found residents for room', roomId, ':', residents);
                 }
-              } catch {}
+              } catch (error) {
+                console.error('Error fetching bed assignments:', error);
+              }
             }
 
             for (const resident of residents) {
@@ -123,6 +154,11 @@ export default function StaffResidentsPage() {
                 __roomId: roomId,
               });
             }
+            
+            // If no residents found for this room, log it
+            if (residents.length === 0) {
+              console.log('No residents found for room', roomId, 'in assignment', assignment._id);
+            }
           }
 
           // Enrich with avatar + emergency contact from resident detail
@@ -141,6 +177,16 @@ export default function StaffResidentsPage() {
             }
           }));
 
+          console.log('Flattened residents:', flattened);
+          
+          if (flattened.length === 0) {
+            console.log('No residents found in any assigned rooms');
+            setResidentsData([]);
+            setRoomNumbers({});
+            setError('');
+            return;
+          }
+          
           setResidentsData(enriched);
 
           // Resolve room numbers for residents
@@ -166,6 +212,7 @@ export default function StaffResidentsPage() {
           setRoomNumbers(nextMap);
         } else {
           // Backward compatibility: resident-based assignments
+          console.log('Using backward compatibility mode');
           const mapped = assignmentsData
             .filter((assignment: any) => isAssignmentActive(assignment))
             .map((assignment: any) => {
@@ -202,6 +249,16 @@ export default function StaffResidentsPage() {
             }
           }));
 
+          console.log('Mapped residents (backward compatibility):', mapped);
+          
+          if (mapped.length === 0) {
+            console.log('No residents found in backward compatibility mode');
+            setResidentsData([]);
+            setRoomNumbers({});
+            setError('');
+            return;
+          }
+          
           setResidentsData(enriched);
 
           const roomEntries = await Promise.all(
@@ -245,6 +302,7 @@ export default function StaffResidentsPage() {
           setRoomNumbers(nextMap);
         }
         
+        console.log('Final residents data:', residentsData);
         setError('');
       } catch (err) {
         setError('Không thể tải danh sách người cao tuổi được phân công.');

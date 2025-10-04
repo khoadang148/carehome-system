@@ -13,6 +13,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
+
 interface Resident {
   id: number | string;
   full_name: string;
@@ -59,6 +68,7 @@ export default function CareNotesPage() {
   const loadResidents = async () => {
     try {
       const assignmentsData = await staffAssignmentsAPI.getMyAssignments();
+      console.log('Staff assignments response (assessments):', assignmentsData);
       const assignments = Array.isArray(assignmentsData) ? assignmentsData : [];
 
       const isAssignmentActive = (a: any) => {
@@ -72,35 +82,61 @@ export default function CareNotesPage() {
       };
 
       const isRoomBased = assignments.some((a: any) => a && (a.room_id || a.residents));
+      console.log('Is room based (assessments):', isRoomBased, 'Assignments:', assignments);
+
+      // If no assignments, show empty state
+      if (assignments.length === 0) {
+        console.log('No assignments found (assessments)');
+        setResidents([]);
+        setCareNotesMap({});
+        return;
+      }
 
       let residentRows: any[] = [];
       if (isRoomBased) {
         const activeRoomAssignments = assignments.filter((a: any) => isAssignmentActive(a));
+        console.log('Active room assignments (assessments):', activeRoomAssignments);
         for (const assignment of activeRoomAssignments) {
           const room = assignment.room_id;
           const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
           let residentsList: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+          console.log('Assignment room:', room, 'Residents from assignment:', residentsList);
+          
           if ((!residentsList || residentsList.length === 0) && roomId) {
             try {
               const bedAssignments = await bedAssignmentsAPI.getAll();
               if (Array.isArray(bedAssignments)) {
                 residentsList = bedAssignments
-                  .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                  .filter((ba: any) => isBedAssignmentActive(ba) && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
                   .map((ba: any) => ba.resident_id)
                   .filter(Boolean);
+                console.log('Found residents for room', roomId, ':', residentsList);
               }
-            } catch {}
+            } catch (error) {
+              console.error('Error fetching bed assignments:', error);
+            }
           }
           for (const res of residentsList) {
             residentRows.push({ id: res?._id, name: res?.full_name || '', dob: res?.date_of_birth, care_level: res?.care_level, avatar: res?.avatar, roomId });
                 }
               }
             } else {
+        console.log('Using backward compatibility mode (assessments)');
         const activeAssignments = assignments.filter((assignment: any) => isAssignmentActive(assignment));
+        console.log('Active assignments (backward compatibility):', activeAssignments);
         for (const assignment of activeAssignments) {
           const res = assignment.resident_id || {};
           residentRows.push({ id: res?._id || res?.id, name: res?.full_name || '', dob: res?.date_of_birth, care_level: res?.care_level, avatar: res?.avatar });
         }
+      }
+
+      console.log('Resident rows (assessments):', residentRows);
+      
+      if (residentRows.length === 0) {
+        console.log('No residents found in any assigned rooms (assessments)');
+        setResidents([]);
+        setCareNotesMap({});
+        return;
       }
 
       // Enrich residents and compute age + avatar
@@ -152,6 +188,7 @@ export default function CareNotesPage() {
         room_number: r.roomId ? (ridToNumber[r.roomId] || '') : r.room_number || '',
       }));
 
+      console.log('Final residents (assessments):', residentsWithNotes);
       setResidents(residentsWithNotes);
 
 

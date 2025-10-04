@@ -301,7 +301,13 @@ export default function NewResidentRegistrationPage() {
     if (startDate && registrationPeriod) {
       const start = new Date(startDate);
       const end = new Date(start);
-      end.setMonth(end.getMonth() + parseInt(registrationPeriod));
+      // Tính đúng: cộng thêm months - 1 tháng, sau đó lấy ngày cuối tháng
+      end.setMonth(end.getMonth() + parseInt(registrationPeriod) - 1);
+      // Lấy ngày cuối tháng
+      const year = end.getFullYear();
+      const month = end.getMonth();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      end.setDate(lastDay);
       setEndDate(end.toISOString().split('T')[0]);
     }
   }, [startDate, registrationPeriod]);

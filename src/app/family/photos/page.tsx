@@ -95,9 +95,6 @@ export default function FamilyPhotosPage() {
         }));
 
         setAllPhotos(mapped);
-        if (mapped.length === 0) {
-          setError("Chưa có ảnh nào được chia sẻ cho người thân của bạn.");
-        }
         setLoading(false);
       })
       .catch(err => {
@@ -158,7 +155,7 @@ export default function FamilyPhotosPage() {
   const prevLightbox = () => setLightboxIndex(i => (i !== null && i > 0 ? i - 1 : i));
   const nextLightbox = () => setLightboxIndex(i => (i !== null && i < filteredPhotos.length - 1 ? i + 1 : i));
 
-  const downloadPhoto = async (url: string, name: string, fallbackUrl?: string) => {
+  const downloadPhoto = async (url: string, name: string, fallbackUrl?: string, fileType?: string) => {
     try {
       const accessToken = clientStorage.getItem("access_token");
       let response = await fetch(url, {
@@ -173,19 +170,28 @@ export default function FamilyPhotosPage() {
       }
       
       if (!response.ok) {
-        throw new Error('Failed to fetch image');
+        throw new Error('Failed to fetch file');
       }
       
       const blob = await response.blob();
       const a = document.createElement("a");
       a.href = window.URL.createObjectURL(blob);
-      a.download = name || "photo.jpg";
+      
+      // Determine file extension based on file type
+      let extension = "jpg";
+      if (fileType && fileType.startsWith('video/')) {
+        extension = fileType.split('/')[1] || "mp4";
+      } else if (fileType && fileType.startsWith('image/')) {
+        extension = fileType.split('/')[1] || "jpg";
+      }
+      
+      a.download = name || `file.${extension}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(a.href);
     } catch (err) {
-      toast.error("Không thể tải ảnh. Vui lòng thử lại!");
+      toast.error("Không thể tải file. Vui lòng thử lại!");
     }
   };
 
@@ -193,6 +199,7 @@ export default function FamilyPhotosPage() {
 
   if (loading) return <div className="text-center mt-12 text-slate-500 text-xl">Đang tải ảnh...</div>;
   if (error) return <div className="text-center mt-12 text-red-500 text-xl">Lỗi: {error}</div>;
+  if (allPhotos.length === 0) return <div className="text-center mt-12 text-slate-500 text-xl">Chưa có ảnh nào được chia sẻ cho người thân của bạn.</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-0 font-sans">
@@ -268,11 +275,45 @@ export default function FamilyPhotosPage() {
             <div key={date} className="mb-10">
               <div className="font-bold text-lg text-slate-500 mb-5 tracking-wide shadow-sm">{new Date(date).toLocaleDateString("vi-VN")}</div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {groupedPhotos[date].map((photo, idx) => (
+                {groupedPhotos[date].map((photo, idx) => {
+                  const isVideo = photo.file_type && photo.file_type.startsWith('video/');
+                  
+                  return (
                   <div
                     key={photo.id || idx}
                     className="relative rounded-2xl overflow-hidden bg-slate-50 shadow-lg group"
                   >
+                      {isVideo ? (
+                        <video
+                          src={photo.url}
+                          onClick={() => router.push(`/family/photos/${photo.id}`)}
+                          className="w-full h-56 object-cover block bg-gray-100 rounded-2xl cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                          controls
+                          preload="metadata"
+                          onError={(e) => {
+                            const video = e.currentTarget as HTMLVideoElement;
+                            // Try fallback URL first
+                            if (photo.fallbackUrl && video.src !== photo.fallbackUrl) {
+                              video.src = photo.fallbackUrl;
+                              return;
+                            }
+                            // If fallback also fails, show placeholder
+                            video.style.display = 'none';
+                            const placeholder = document.createElement('div');
+                            placeholder.innerHTML = `
+                              <div class="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-gray-500 text-sm font-medium">
+                                <div class="text-center">
+                                  <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-2 opacity-50">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                  </svg>
+                                  <div>Không thể tải video</div>
+                                </div>
+                              </div>
+                            `;
+                            video.parentNode?.appendChild(placeholder.firstElementChild!);
+                          }}
+                        />
+                      ) : (
                     <img
                       src={photo.url}
                       alt={photo.caption}
@@ -303,24 +344,26 @@ export default function FamilyPhotosPage() {
                         img.parentNode?.appendChild(placeholder.firstElementChild!);
                       }}
                     />
+                      )}
 
                     <button
-                      onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || "photo.jpg", photo.fallbackUrl)}
+                      onClick={() => downloadPhoto(photo.url, photo.fileName || photo.caption || (isVideo ? "video.mp4" : "photo.jpg"), photo.fallbackUrl, photo.file_type)}
                       className="absolute top-3 right-3 bg-gradient-to-br from-white to-slate-50 border-2 border-red-500 rounded-lg text-red-500 p-2 cursor-pointer text-base font-medium shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-gradient-to-br hover:from-red-500 hover:to-red-600 hover:text-white hover:-translate-y-1 hover:scale-105 hover:shadow-xl"
-                      title="Tải ảnh xuống"
+                      title={isVideo ? "Tải video xuống" : "Tải ảnh xuống"}
                     >
                       <ArrowDownTrayIcon className="w-4 h-4" />
                     </button>
 
                     <button
                       onClick={() => router.push(`/family/photos/${photo.id}`)}
-                      title="Xem chi tiết ảnh"
+                      title={isVideo ? "Xem chi tiết video" : "Xem chi tiết ảnh"}
                       className="absolute top-14 right-3 bg-gradient-to-br from-white to-slate-50 border-2 border-blue-500 rounded-lg text-blue-500 p-2 cursor-pointer text-base font-medium shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-gradient-to-br hover:from-blue-500 hover:to-blue-600 hover:text-white hover:-translate-y-1 hover:scale-105 hover:shadow-xl"
                     >
                       <EyeIcon className="w-4 h-4" />
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))
@@ -344,6 +387,22 @@ export default function FamilyPhotosPage() {
             <ChevronLeftIcon className="w-9 h-9" />
           </button>
 
+          {filteredPhotos[lightboxIndex].file_type && filteredPhotos[lightboxIndex].file_type.startsWith('video/') ? (
+            <video
+              src={filteredPhotos[lightboxIndex].url}
+              className="max-w-[84vw] max-h-[84vh] rounded-3xl shadow-2xl bg-white object-contain"
+              onClick={e => e.stopPropagation()}
+              controls
+              autoPlay
+              onError={(e) => {
+                const video = e.currentTarget as HTMLVideoElement;
+                // Try fallback URL first
+                if (filteredPhotos[lightboxIndex].fallbackUrl && video.src !== filteredPhotos[lightboxIndex].fallbackUrl) {
+                  video.src = filteredPhotos[lightboxIndex].fallbackUrl;
+                }
+              }}
+            />
+          ) : (
           <img
             src={filteredPhotos[lightboxIndex].url}
             alt={filteredPhotos[lightboxIndex].caption}
@@ -357,6 +416,7 @@ export default function FamilyPhotosPage() {
               }
             }}
           />
+          )}
 
           <button
             onClick={e => { e.stopPropagation(); nextLightbox(); }}
@@ -377,11 +437,11 @@ export default function FamilyPhotosPage() {
                 Ngày gửi: {filteredPhotos[lightboxIndex].date && new Date(filteredPhotos[lightboxIndex].date).toLocaleDateString("vi-VN")}
               </div>
               <button
-                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || "photo.jpg", filteredPhotos[lightboxIndex].fallbackUrl); }}
+                onClick={e => { e.stopPropagation(); downloadPhoto(filteredPhotos[lightboxIndex].url, filteredPhotos[lightboxIndex].fileName || filteredPhotos[lightboxIndex].caption || (filteredPhotos[lightboxIndex].file_type && filteredPhotos[lightboxIndex].file_type.startsWith('video/') ? "video.mp4" : "photo.jpg"), filteredPhotos[lightboxIndex].fallbackUrl, filteredPhotos[lightboxIndex].file_type); }}
                 className="mt-5 bg-gradient-to-r from-red-500 to-orange-400 text-white border-none rounded-2xl py-3 px-8 font-bold text-lg cursor-pointer shadow-lg transition-all duration-200 hover:from-red-500 hover:to-orange-500"
-                title="Tải ảnh này"
+                title={filteredPhotos[lightboxIndex].file_type && filteredPhotos[lightboxIndex].file_type.startsWith('video/') ? "Tải video này" : "Tải ảnh này"}
               >
-                <ArrowDownTrayIcon className="w-4 h-4 mr-3 inline align-middle" /> Tải ảnh
+                <ArrowDownTrayIcon className="w-4 h-4 mr-3 inline align-middle" /> {filteredPhotos[lightboxIndex].file_type && filteredPhotos[lightboxIndex].file_type.startsWith('video/') ? "Tải video" : "Tải ảnh"}
               </button>
             </div>
           </div>

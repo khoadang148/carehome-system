@@ -360,6 +360,15 @@ export default function StaffAssignmentsPage() {
     setSuccessData(null);
   };
 
+  // Helper function to check if bed assignment is active
+  const isBedAssignmentActive = (assignment: any) => {
+    if (!assignment) return false;
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  };
+
   const handleShowResidents = async (room: any) => {
     setSelectedRoomForResidents(room);
     setLoadingRoomResidents(true);
@@ -374,8 +383,8 @@ export default function StaffAssignmentsPage() {
 
       if (Array.isArray(bedAssignments)) {
         bedAssignments.forEach((assignment: any) => {
-          // Only consider active assignments (no unassigned_date)
-          if (assignment && assignment.resident_id && assignment.bed_id && !assignment.unassigned_date) {
+          // Check if assignment is active using the helper function
+          if (assignment && assignment.resident_id && assignment.bed_id && isBedAssignmentActive(assignment)) {
             const roomId = assignment.bed_id.room_id?._id || assignment.bed_id.room_id;
 
             if (roomId !== room._id) return;

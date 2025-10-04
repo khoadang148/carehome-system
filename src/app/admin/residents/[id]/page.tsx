@@ -33,6 +33,15 @@ import useSWR from 'swr';
 import { useResident, useVitalSigns as useVitalSignsSWR, useCareNotes as useCareNotesSWR, useRoom as useRoomSWR, useBedAssignments as useBedAssignmentsSWR } from '@/hooks/useSWRData';
 import { swrKeys } from '@/lib/swr-config';
 
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (isBedAssignmentActive(a)) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
+
 
 export default function ResidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -152,7 +161,7 @@ export default function ResidentDetailPage({ params }: { params: Promise<{ id: s
 
   useEffect(() => {
     setBedLoading(bedAssignmentsIsLoading);
-    const ba = currentBedAssignment || (Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id && !a.unassigned_date) : null);
+    const ba = currentBedAssignment || (Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id && isBedAssignmentActive(a)) : null);
     if (ba?.bed_id) {
       if (typeof ba.bed_id === 'object' && ba.bed_id.bed_number) {
         setBedNumber(ba.bed_id.bed_number);

@@ -174,7 +174,7 @@ export default function ApprovalDetailPage() {
               Chi tiết phê duyệt
             </h1>
                 <p className="text-base text-slate-600 font-semibold flex items-center gap-2">
-                  <DocumentTextIcon className="w-4 h-4 text-violet-500" />
+                  
                   Xem và xử lý yêu cầu phê duyệt tài khoản người dùng
                 </p>
               </div>

@@ -24,7 +24,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useResidents } from '@/lib/contexts/residents-context';
-import { activitiesAPI, activityParticipationsAPI } from '@/lib/api';
+import { activitiesAPI, activityParticipationsAPI, staffAssignmentsAPI } from '@/lib/api';
 import ResidentEvaluationModal from '@/components/ResidentEvaluationModal';
 import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
@@ -56,14 +56,12 @@ const mapActivityFromAPI = (apiActivity: any) => {
     }
 
     const convertToVietnamTime = (utcTime: Date) => {
-      // Trừ 7 giờ để hiển thị đúng thời gian (database lưu UTC+7, cần trừ để hiển thị đúng)
-      const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
-      return correctTime.toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
+      // Lấy thời gian UTC trực tiếp từ database, không chuyển đổi múi giờ
+      const utcHours = utcTime.getUTCHours();
+      const utcMinutes = utcTime.getUTCMinutes();
+      return `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
     };
+
 
     return {
       id: apiActivity._id,
@@ -74,7 +72,7 @@ const mapActivityFromAPI = (apiActivity: any) => {
       duration: apiActivity.duration,
       startTime: convertToVietnamTime(scheduleTime),
       endTime: convertToVietnamTime(endTime),
-      date: scheduleTime.toLocaleDateString('en-CA'), // Format YYYY-MM-DD cho local date
+      date: `${scheduleTime.getUTCFullYear()}-${(scheduleTime.getUTCMonth() + 1).toString().padStart(2, '0')}-${scheduleTime.getUTCDate().toString().padStart(2, '0')}`, // Format YYYY-MM-DD từ UTC date
       location: apiActivity.location,
       capacity: apiActivity.capacity,
       participants: 0,
@@ -113,6 +111,7 @@ export default function StaffActivitiesPage() {
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [evaluationResidents, setEvaluationResidents] = useState<any[]>([]);
 
+
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,32 +140,100 @@ export default function StaffActivitiesPage() {
           return;
         }
 
-        const participations = await activityParticipationsAPI.getByStaffId(user.id);
+        // Lấy tất cả hoạt động
+        const allActivities = await activitiesAPI.getAll();
+        console.log('All activities:', allActivities);
 
-        const activityIds = [...new Set(participations.map((p: any) => p.activity_id?._id || p.activity_id))].filter(Boolean);
+        // Lấy staff assignments để xác định hoạt động nào được gán cho staff này
+        const staffAssignments = await staffAssignmentsAPI.getMyAssignments();
+        console.log('Staff assignments:', staffAssignments);
+        
+        // Thử lấy từ activity participations nếu staff assignments không có
+        let activityParticipations: any[] = [];
+        try {
+          activityParticipations = await activityParticipationsAPI.getAll();
+          console.log('Activity participations:', activityParticipations);
+        } catch (err) {
+          console.log('Error fetching participations:', err);
+        }
 
-        const activityPromises = activityIds.map(async (activityId: any) => {
-          try {
-            if (!activityId) {
-              return null;
-            }
-            const activityData = await activitiesAPI.getById(activityId);
-            return mapActivityFromAPI(activityData);
-          } catch (error) {
-            return null;
+        // Lọc hoạt động dựa trên staff assignments
+        const assignedActivityIds = new Set<string>();
+        
+        console.log('Debug staff assignments structure:', staffAssignments);
+        
+        for (const assignment of staffAssignments) {
+          console.log('Assignment object:', assignment);
+          console.log('Assignment keys:', Object.keys(assignment));
+          console.log('Assignment.activity_id:', assignment.activity_id);
+          console.log('Assignment.activity:', assignment.activity);
+          console.log('Assignment.activityId:', assignment.activityId);
+          
+          // Thử nhiều cách để lấy activity ID
+          let activityId = null;
+          
+          if (assignment.activity_id) {
+            activityId = typeof assignment.activity_id === 'object' 
+              ? assignment.activity_id._id || assignment.activity_id.id
+              : assignment.activity_id;
+          } else if (assignment.activity) {
+            activityId = typeof assignment.activity === 'object' 
+              ? assignment.activity._id || assignment.activity.id
+              : assignment.activity;
+          } else if (assignment.activityId) {
+            activityId = typeof assignment.activityId === 'object' 
+              ? assignment.activityId._id || assignment.activityId.id
+              : assignment.activityId;
           }
-        });
+          
+          console.log('Extracted activity ID:', activityId);
+          if (activityId) {
+            assignedActivityIds.add(activityId);
+          }
+        }
 
-        const activityResults = await Promise.all(activityPromises);
-        const validActivities = activityResults.filter(Boolean);
+        console.log('Assigned activity IDs from staff assignments:', Array.from(assignedActivityIds));
+        
+        // Nếu không có activities từ staff assignments, thử lấy từ participations
+        if (assignedActivityIds.size === 0 && activityParticipations.length > 0) {
+          console.log('No activities from staff assignments, trying participations...');
+          
+          for (const participation of activityParticipations) {
+            const participationStaffId = participation.staff_id?._id || participation.staff_id;
+            const participationActivityId = participation.activity_id?._id || participation.activity_id;
+            
+            console.log('Participation staff ID:', participationStaffId);
+            console.log('Current user ID:', user.id);
+            console.log('Participation activity ID:', participationActivityId);
+            
+            if (participationStaffId === user.id && participationActivityId) {
+              assignedActivityIds.add(participationActivityId);
+            }
+          }
+        }
+        
+        console.log('Final assigned activity IDs:', Array.from(assignedActivityIds));
 
-        validActivities.sort((a, b) => {
+        // Lọc hoạt động được gán cho staff này
+        const assignedActivities = allActivities.filter(activity => 
+          assignedActivityIds.has(activity._id)
+        );
+
+        console.log('Assigned activities:', assignedActivities);
+
+        // Map activities
+        const mappedActivities = assignedActivities.map(activity => 
+          mapActivityFromAPI(activity)
+        ).filter(Boolean);
+
+        mappedActivities.sort((a, b) => {
           if (!a || !b) return 0;
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
 
-        setActivities(validActivities);
+        setActivities(mappedActivities);
       } catch (err: any) {
+        console.error('Error fetching activities:', err);
         setError('Không thể tải danh sách hoạt động. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
@@ -290,7 +357,7 @@ export default function StaffActivitiesPage() {
 
       const filteredParticipations = participations.filter((p: any) => {
         if (!p.date) return false;
-        const participationDate = new Date(p.date).toLocaleDateString('en-CA');
+        const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
         return participationDate === activity.date;
       });
 
@@ -337,7 +404,7 @@ export default function StaffActivitiesPage() {
 
           const filtered = participations.filter((p: any) => {
             const participationActivityId = p.activity_id?._id || p.activity_id;
-            const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
+            const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
             return participationActivityId === activity.id && participationDate === activity.date;
           });
 
@@ -714,7 +781,7 @@ export default function StaffActivitiesPage() {
                       <div>
                         <div className="text-[0.75rem] text-gray-500 font-medium mb-0.5">Ngày:</div>
                         <div className="text-sm text-gray-900 font-semibold">
-                          {activity.date ? new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN') : '-'}
+                          {activity.date ? new Date(activity.date + 'T00:00:00Z').toLocaleDateString('vi-VN') : '-'}
                         </div>
                       </div>
                     </div>
@@ -792,7 +859,7 @@ export default function StaffActivitiesPage() {
 
                   const joined = participations.filter((p: any) => {
                     const participationActivityId = p.activity_id?._id || p.activity_id;
-                    const participationDate = p.date ? new Date(p.date).toLocaleDateString('en-CA') : null;
+                    const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
                     return participationActivityId === activity.id && participationDate === activity.date;
                   });
 

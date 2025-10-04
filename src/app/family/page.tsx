@@ -39,9 +39,11 @@ import {
   staffAssignmentsAPI,
   bedAssignmentsAPI,
   billsAPI,
-  carePlanAssignmentsAPI
+  carePlanAssignmentsAPI,
+  serviceRequestsAPI
 } from '@/lib/api';
 import { useVitalSigns as useVitalSignsSWR, useBedAssignments as useBedAssignmentsSWR, useRoom as useRoomSWR, useStaffAssignments as useStaffAssignmentsSWR } from '@/hooks/useSWRData';
+import useSWR from 'swr';
 import { formatDateDDMMYYYY, formatDateDDMMYYYYWithTimezone, formatTimeWithTimezone } from '@/lib/utils/validation';
 import SuccessModal from '@/components/SuccessModal';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -172,6 +174,26 @@ function FamilyPortalPageContent() {
   const activeResidentIdRef = useRef<string>('');
   const [unpaidBills, setUnpaidBills] = useState<any[]>([]);
   const [billsLoading, setBillsLoading] = useState(false);
+
+  // Fetch service requests to check for pending ones
+  const { data: serviceRequests = [], isLoading: serviceRequestsLoading } = useSWR<any[]>(
+    user?.id ? ['serviceRequests:mine', user.id] : null,
+    () => serviceRequestsAPI.getMyRequests(),
+    { revalidateOnFocus: true }
+  );
+
+  // Get pending service requests
+  const getPendingServiceRequests = () => {
+    return serviceRequests.filter((request: any) => 
+      request.status === 'pending' && 
+      (request.request_type === 'service_date_change' || 
+       request.request_type === 'care_plan_change' || 
+       request.request_type === 'room_change')
+    );
+  };
+
+  const pendingRequests = getPendingServiceRequests();
+  const hasPendingRequests = pendingRequests.length > 0;
 
   useEffect(() => {
     // Only sync vitals when the Vital Signs tab is active to avoid frequent
@@ -569,17 +591,30 @@ function FamilyPortalPageContent() {
   }, [selectedResidentId, selectedResident]);
 
   // SWR: Staff assignments — load in parallel and convert to UI shape
-  const { assignedStaff: swrAssignedStaff, isLoading: swrAssignedLoading } = useStaffAssignmentsSWR(selectedResidentId);
+  const { assignedStaff: swrAssignedStaff, isLoading: swrAssignedLoading, error: swrAssignedError } = useStaffAssignmentsSWR(selectedResidentId);
   const assignedCount = Array.isArray(swrAssignedStaff) ? swrAssignedStaff.length : 0;
+  
+  // Debug logging cho staff assignments
+  useEffect(() => {
+    console.log('Family page - Staff assignments data:', {
+      selectedResidentId,
+      swrAssignedStaff,
+      swrAssignedLoading,
+      swrAssignedError,
+      assignedCount
+    });
+  }, [selectedResidentId, swrAssignedStaff, swrAssignedLoading, swrAssignedError, assignedCount]);
+  
   useEffect(() => {
     // Only update when values actually change to avoid loops from new array identities
     setAssignedStaffLoading(prev => (prev !== swrAssignedLoading ? swrAssignedLoading : prev));
+    setAssignedStaffError(swrAssignedError ? 'Không thể tải thông tin nhân viên' : '');
     setAssignedStaff(prev => {
       const next = Array.isArray(swrAssignedStaff) ? swrAssignedStaff : [];
       if (prev.length !== next.length) return next;
       return prev;
     });
-  }, [swrAssignedLoading, assignedCount]);
+  }, [swrAssignedLoading, assignedCount, swrAssignedError]);
 
   // Remove heavy manual resident data loader for room/vital/staff; handled by SWR hooks above
 
@@ -1160,6 +1195,67 @@ function FamilyPortalPageContent() {
                 </div>
               </div>
 
+              {/* Thông báo yêu cầu đang chờ duyệt */}
+              {hasPendingRequests && (
+                <div className="mb-6 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <ClockIcon className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-blue-800">
+                          Có {pendingRequests.length} yêu cầu đang chờ duyệt
+                        </h3>
+                        <p className="text-sm text-blue-600">
+                          {(() => {
+                            const types = pendingRequests.map((req: any) => {
+                              switch (req.request_type) {
+                                case 'service_date_change': return 'gia hạn dịch vụ';
+                                case 'care_plan_change': return 'đổi gói dịch vụ';
+                                case 'room_change': return 'đổi phòng';
+                                default: return 'yêu cầu khác';
+                              }
+                            });
+                            const uniqueTypes = [...new Set(types)];
+                            return `Loại yêu cầu: ${uniqueTypes.join(', ')}`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {pendingRequests.some((req: any) => req.request_type === 'service_date_change' || req.request_type === 'care_plan_change') && (
+                        <button
+                          onClick={() => router.push(`/family/services/${selectedResidentId}`)}
+                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          Xem dịch vụ
+                        </button>
+                      )}
+                      {pendingRequests.some((req: any) => req.request_type === 'room_change') && (
+                        <button
+                          onClick={() => router.push('/family/room')}
+                          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          Xem phòng
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-blue-200">
+                    <p className="text-sm text-blue-700 font-medium">
+                      <span className="font-bold">Trạng thái:</span> Các yêu cầu của bạn đang được xem xét và sẽ được phản hồi trong thời gian sớm nhất.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Thông báo hóa đơn chưa thanh toán cho resident active */}
               {selectedResident?.status === 'active' && unpaidBills.length > 0 && (
                 <div className="mb-6 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl p-4 shadow-sm">
@@ -1184,7 +1280,7 @@ function FamilyPortalPageContent() {
                       className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
                       Thanh toán
                     </button>

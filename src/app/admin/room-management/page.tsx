@@ -145,7 +145,30 @@ export default function RoomManagementPage() {
   const getRoomType = (room_type: string) =>
     roomTypes.find((t) => t.room_type === room_type);
 
+  // Helper function to check if assignment is active
+  const isAssignmentActive = (assignment: any) => {
+    if (!assignment) return false;
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    const isActive = unassignedDate > now; // ngày trong tương lai = active
+    
+    // Debug logging
+    console.log('Checking assignment active status:', {
+      assignmentId: assignment._id,
+      unassigned_date: assignment.unassigned_date,
+      unassignedDate: unassignedDate.toISOString(),
+      now: now.toISOString(),
+      isActive: isActive
+    });
+    
+    return isActive;
+  };
+
   const bedsOfRoom = (roomId: string) => {
+    console.log('bedsOfRoom called for roomId:', roomId);
+    console.log('All bedAssignments:', bedAssignments);
+    
     // Lọc các assignment của phòng này
     const roomAssignments = bedAssignments.filter(assignment => {
       if (!assignment.bed_id || !assignment.bed_id.room_id) return false;
@@ -156,6 +179,8 @@ export default function RoomManagementPage() {
 
       return assignmentRoomId === roomId;
     });
+    
+    console.log('Room assignments for room', roomId, ':', roomAssignments);
 
     // Gom theo bed và chọn assignment đang active, nếu không có thì chọn mới nhất
     const bedIdToAssignments = roomAssignments.reduce((map, assignment) => {
@@ -166,15 +191,21 @@ export default function RoomManagementPage() {
     }, {} as Record<string, typeof roomAssignments>);
 
     const uniqueBeds = Object.entries(bedIdToAssignments).map(([bedId, assignments]) => {
-      const active = assignments.find(a => !a.unassigned_date) || null;
+      console.log('Processing bed:', bedId, 'with assignments:', assignments);
+      
+      // Kiểm tra assignment active
+      const active = assignments.find(a => isAssignmentActive(a)) || null;
+      console.log('Active assignment for bed', bedId, ':', active);
+      
       // Nếu không có active, lấy assignment mới nhất theo assigned_date để lấy metadata giường
       const latest = assignments.slice().sort((a, b) => (
         new Date(b.assigned_date).getTime() - new Date(a.assigned_date).getTime()
       ))[0];
 
       const base = active || latest;
+      console.log('Base assignment for bed', bedId, ':', base);
 
-      return {
+      const bedInfo = {
         _id: bedId,
         bed_number: base?.bed_id.bed_number,
         room_id: roomId,
@@ -182,16 +213,22 @@ export default function RoomManagementPage() {
         status: active ? 'occupied' : 'available',
         assignment: active, // chỉ đính kèm assignment đang active, nếu có
       } as any;
+      
+      console.log('Final bed info for bed', bedId, ':', bedInfo);
+      return bedInfo;
     });
 
+    console.log('Final uniqueBeds for room', roomId, ':', uniqueBeds);
     return uniqueBeds;
   };
 
   const getResidentOfBed = (bed: any) => {
     // Chỉ hiển thị tên khi có assignment đang active
-    if (bed.status === 'occupied' && bed.assignment && !bed.assignment.unassigned_date && bed.assignment.resident_id) {
-      const residentName = bed.assignment.resident_id.full_name;
-      return residentName;
+    if (bed.status === 'occupied' && bed.assignment && bed.assignment.resident_id) {
+      if (isAssignmentActive(bed.assignment)) {
+        const residentName = bed.assignment.resident_id.full_name;
+        return residentName;
+      }
     }
 
     const assignment = bedAssignments.find(
@@ -199,9 +236,7 @@ export default function RoomManagementPage() {
         if (!a || !a.bed_id) return false;
 
         const assignmentBedId = a.bed_id._id;
-        const isActive = !a.unassigned_date;
-
-        return assignmentBedId === bed._id && isActive;
+        return assignmentBedId === bed._id && isAssignmentActive(a);
       }
     );
 

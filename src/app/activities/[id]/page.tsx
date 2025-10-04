@@ -378,13 +378,10 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
       }
 
       const convertToVietnamTime = (utcTime: Date) => {
-        // Trừ 7 giờ để hiển thị đúng thời gian (database lưu UTC+7, cần trừ để hiển thị đúng)
-        const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
-        return correctTime.toLocaleTimeString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
+        // Lấy thời gian UTC trực tiếp từ database, không chuyển đổi múi giờ
+        const utcHours = utcTime.getUTCHours();
+        const utcMinutes = utcTime.getUTCMinutes();
+        return `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
       };
 
       return {
@@ -396,7 +393,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         startTime: convertToVietnamTime(scheduleTime),
         endTime: convertToVietnamTime(endTime),
         duration: apiActivity.duration,
-        date: scheduleTime.toLocaleDateString('en-CA'),
+        date: `${scheduleTime.getUTCFullYear()}-${(scheduleTime.getUTCMonth() + 1).toString().padStart(2, '0')}-${scheduleTime.getUTCDate().toString().padStart(2, '0')}`, // Format YYYY-MM-DD từ UTC date
         location: apiActivity.location,
         capacity: apiActivity.capacity,
         participants: 0,
@@ -1477,7 +1474,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 <CalendarIcon style={{ width: '1.125rem', height: '1.125rem' }} />
                 <div>
                   <label style={{ fontSize: '0.75rem', opacity: 0.8, display: 'block' }}>Ngày:</label>
-                  <span>{new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}</span>
+                  <span>{new Date(activity.date + 'T00:00:00Z').toLocaleDateString('vi-VN')}</span>
                 </div>
               </div>
               <div style={{
@@ -1574,7 +1571,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                   }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#4b5563' }}>Ngày:</span>
                     <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                      {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                      {new Date(activity.date + 'T00:00:00Z').toLocaleDateString('vi-VN')}
                     </span>
                   </div>
 
@@ -1982,7 +1979,7 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                         color: '#6b7280',
                         marginLeft: '0.5rem'
                       }}>
-                        - Ngày {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                        - Ngày {new Date(activity.date + 'T00:00:00Z').toLocaleDateString('vi-VN')}
                       </span>
                     )}
                     {newResidentsAdded > 0 && (

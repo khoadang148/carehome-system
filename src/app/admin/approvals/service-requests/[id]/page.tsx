@@ -6,6 +6,7 @@ import { serviceRequestsAPI, carePlansAPI, bedAssignmentsAPI, bedsAPI, roomsAPI,
 import { ArrowLeftIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon, UserIcon, CalendarDaysIcon, DocumentTextIcon, CurrencyDollarIcon, PhoneIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useNotifications } from "@/lib/contexts/notification-context";
+import { formatDisplayCurrency } from "@/lib/utils/currencyUtils";
 
 export default function ServiceRequestDetailsPage() {
   const { user } = useAuth();
@@ -13,6 +14,15 @@ export default function ServiceRequestDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const id = String(params?.id || "");
+
+  // Helper function to check if bed assignment is active
+  const isBedAssignmentActive = (assignment: any) => {
+    if (!assignment) return false;
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  };
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState<any | null>(null);
   const [groupPreview, setGroupPreview] = useState<any | null>(null);
@@ -86,12 +96,33 @@ export default function ServiceRequestDetailsPage() {
   const typeLabel = (t?: string) => t === 'room_change' ? 'Đổi phòng' : t === 'service_date_change' ? 'Gia hạn dịch vụ' : t === 'care_plan_change' ? 'Đổi gói dịch vụ' : (t || '---');
   const typeColor = (t?: string) => t === 'room_change' ? 'from-orange-500 to-red-600' : t === 'service_date_change' ? 'from-emerald-500 to-teal-600' : 'from-violet-500 to-indigo-600';
   const formatCurrency = (n?: number) => typeof n === 'number' ? n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }) : '---';
+  
+  // Helper function to get room type info (similar to room management page)
+  const getRoomType = (room_type: string) => {
+    // We need to fetch room types data first, but for now we'll use a simple mapping
+    const roomTypeMap: Record<string, string> = {
+      '1_bed': '1 giường',
+      '2_bed': '2 giường', 
+      '3_bed': '3 giường',
+      '4_bed': '4 giường',
+      '4_5_bed': '4-5 giường',
+      '6_bed': '6 giường',
+      '6_8_bed': '6-8 giường',
+      '8_bed': '8 giường',
+      'private': 'Phòng riêng',
+      'shared': 'Phòng chung',
+      'vip': 'Phòng VIP',
+      'standard': 'Tiêu chuẩn',
+      'deluxe': 'Cao cấp'
+    };
+    return roomTypeMap[room_type] || room_type.replace('_', ' ').toUpperCase();
+  };
 
   // Fetch care plan details when needed
   useEffect(() => {
     const uniquePlanIds = Array.from(new Set((grouped || [])
       .filter((r: any) => r?.request_type === 'care_plan_change')
-      .map((r: any) => r?.target_service_package_id?._id || r?.target_service_package_id)
+      .map((r: any) => r?.target_care_plan_assignment_id?._id || r?.target_care_plan_assignment_id)
       .filter(Boolean)));
     if (uniquePlanIds.length === 0) return;
 
@@ -103,7 +134,10 @@ export default function ServiceRequestDetailsPage() {
         try {
           const detail = await carePlansAPI.getById(pid as string);
           if (!cancelled) updates[pid as string] = detail;
-        } catch { }
+        } catch (error: any) {
+          // Log error but don't break the flow
+          console.warn(`Failed to fetch care plan ${pid}:`, error?.response?.status || error?.message);
+        }
       }
       if (!cancelled && Object.keys(updates).length) {
         setPlanDetails(prev => ({ ...prev, ...updates }));
@@ -112,13 +146,19 @@ export default function ServiceRequestDetailsPage() {
     return () => { cancelled = true; };
   }, [grouped]);
 
-  // Fetch additional data for room change requests
+  // Fetch additional data for all requests that need bed info
   useEffect(() => {
     const roomChangeRequests = (grouped || []).filter((r: any) => r?.request_type === 'room_change');
+    const serviceDateChangeRequests = (grouped || []).filter((r: any) => r?.request_type === 'service_date_change');
+    const carePlanChangeRequests = (grouped || []).filter((r: any) => r?.request_type === 'care_plan_change');
+    const allRequestsNeedingBedInfo = [...roomChangeRequests, ...serviceDateChangeRequests, ...carePlanChangeRequests];
 
-    console.log('Room change requests found:', roomChangeRequests);
+    console.log('Requests needing bed info found:', allRequestsNeedingBedInfo);
+    console.log('Room change requests:', roomChangeRequests);
+    console.log('Service date change requests:', serviceDateChangeRequests);
+    console.log('Care plan change requests:', carePlanChangeRequests);
 
-    if (roomChangeRequests.length === 0) return;
+    if (allRequestsNeedingBedInfo.length === 0) return;
 
     let cancelled = false;
     (async () => {
@@ -126,9 +166,9 @@ export default function ServiceRequestDetailsPage() {
       const bedUpdates: Record<string, any> = {};
       const roomUpdates: Record<string, any> = {};
 
-      for (const request of roomChangeRequests) {
-        // Fetch target bed assignment details if target_bed_assignment_id exists
-        if (request?.target_bed_assignment_id) {
+      for (const request of allRequestsNeedingBedInfo) {
+        // Fetch target bed assignment details if target_bed_assignment_id exists (for room change requests)
+        if (request?.request_type === 'room_change' && request?.target_bed_assignment_id) {
           const baId = request.target_bed_assignment_id;
           if (!bedAssignmentDetails[baId] && !bedAssignmentErrors[baId]) {
             try {
@@ -182,8 +222,8 @@ export default function ServiceRequestDetailsPage() {
                   setBedAssignmentErrors(prev => ({ ...prev, [baId]: 'Bed assignment not found' }));
                 }
               }
-            } catch (error) {
-              console.error('Error fetching target bed assignment:', error);
+            } catch (error: any) {
+              console.warn(`Failed to fetch bed assignment ${baId}:`, error?.response?.status || error?.message);
               if (!cancelled) {
                 setBedAssignmentErrors(prev => ({ ...prev, [baId]: 'Error fetching bed assignment' }));
               }
@@ -197,6 +237,8 @@ export default function ServiceRequestDetailsPage() {
             ? request.resident_id
             : request.resident_id._id;
 
+          console.log('Processing request for resident:', residentId, 'Request type:', request.request_type);
+
           try {
             console.log('Fetching current bed assignments for resident:', residentId);
             const currentAssignments = await bedAssignmentsAPI.getAllStatuses({ resident_id: residentId });
@@ -204,51 +246,40 @@ export default function ServiceRequestDetailsPage() {
 
             // Store the assignments for this resident
             if (!cancelled && Array.isArray(currentAssignments)) {
-              setResidentBedAssignments(prev => ({ ...prev, [residentId]: currentAssignments }));
+              console.log('Storing assignments for resident:', residentId, currentAssignments);
+              setResidentBedAssignments(prev => {
+                const newState = { ...prev, [residentId]: currentAssignments };
+                console.log('Updated residentBedAssignments state:', newState);
+                return newState;
+              });
             }
 
             // Find active assignment
             const activeAssignment = Array.isArray(currentAssignments)
-              ? currentAssignments.find((a: any) => !a.unassigned_date && a.status === 'active')
+              ? currentAssignments.find((a: any) => isBedAssignmentActive(a) && a.status === 'active')
               : null;
 
             if (activeAssignment) {
               console.log('Active assignment found:', activeAssignment);
 
-              // Fetch current bed and room details
-              const currentBedId = typeof activeAssignment.bed_id === 'string'
-                ? activeAssignment.bed_id
-                : activeAssignment.bed_id?._id;
-
-              if (currentBedId && !bedDetails[currentBedId]) {
-                try {
-                  const currentBed = await bedsAPI.getById(currentBedId);
-                  console.log('Current bed fetched:', currentBed);
-                  if (!cancelled) bedUpdates[currentBedId] = currentBed;
-
-                  // Fetch current room details
-                  if (currentBed?.room_id) {
-                    const currentRoomId = typeof currentBed.room_id === 'string'
-                      ? currentBed.room_id
-                      : currentBed.room_id._id;
-
-                    if (!roomDetails[currentRoomId]) {
-                      try {
-                        const currentRoom = await roomsAPI.getById(currentRoomId);
-                        console.log('Current room fetched:', currentRoom);
-                        if (!cancelled) roomUpdates[currentRoomId] = currentRoom;
-                      } catch (error) {
-                        console.error('Error fetching current room:', error);
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error fetching current bed:', error);
+              // Use bed and room data directly from assignment response (no need for additional API calls)
+              if (activeAssignment.bed_id && typeof activeAssignment.bed_id === 'object') {
+                const bed = activeAssignment.bed_id;
+                const room = bed.room_id;
+                
+                // Store bed details directly
+                if (bed._id && !bedDetails[bed._id]) {
+                  if (!cancelled) bedUpdates[bed._id] = bed;
+                }
+                
+                // Store room details directly
+                if (room && room._id && !roomDetails[room._id]) {
+                  if (!cancelled) roomUpdates[room._id] = room;
                 }
               }
             }
-          } catch (error) {
-            console.error('Error fetching current assignments:', error);
+          } catch (error: any) {
+            console.warn(`Failed to fetch bed assignments for resident ${residentId}:`, error?.response?.status || error?.message);
             if (!cancelled) {
               setResidentBedAssignmentErrors(prev => ({ 
                 ...prev, 
@@ -284,18 +315,56 @@ export default function ServiceRequestDetailsPage() {
     let cancelled = false;
     (async () => {
       const carePlanAssignmentUpdates: Record<string, any> = {};
+      const carePlanUpdates: Record<string, any> = {};
 
       for (const request of serviceDateChangeRequests) {
         if (request?.current_care_plan_assignment_id) {
-          const cpaId = request.current_care_plan_assignment_id;
-          if (!carePlanAssignmentDetails[cpaId] && !carePlanAssignmentErrors[cpaId]) {
+          const cpaId = typeof request.current_care_plan_assignment_id === 'string' 
+            ? request.current_care_plan_assignment_id 
+            : request.current_care_plan_assignment_id?._id;
+          if (cpaId && !carePlanAssignmentDetails[cpaId] && !carePlanAssignmentErrors[cpaId]) {
             try {
               console.log('Fetching care plan assignment for ID:', cpaId);
               const carePlanAssignment = await carePlanAssignmentsAPI.getById(cpaId);
               console.log('Care plan assignment fetched:', carePlanAssignment);
-              if (!cancelled) carePlanAssignmentUpdates[cpaId] = carePlanAssignment;
-            } catch (error) {
-              console.error('Error fetching care plan assignment:', error);
+              if (!cancelled) {
+                carePlanAssignmentUpdates[cpaId] = carePlanAssignment;
+
+                // Fetch individual care plans from care_plan_ids array
+                if (carePlanAssignment?.care_plan_ids && Array.isArray(carePlanAssignment.care_plan_ids)) {
+                  for (const planId of carePlanAssignment.care_plan_ids) {
+                    if (!planDetails[planId]) {
+                      try {
+                        console.log('Fetching care plan for ID:', planId);
+                        const carePlan = await carePlansAPI.getById(planId);
+                        console.log('Care plan fetched:', carePlan);
+                        if (!cancelled) carePlanUpdates[planId] = carePlan;
+                      } catch (planError: any) {
+                        console.warn(`Failed to fetch care plan ${planId}:`, planError?.response?.status || planError?.message);
+                      }
+                    }
+                  }
+                }
+                // Also try to fetch single care_plan_id if it exists (fallback)
+                else if (carePlanAssignment?.care_plan_id) {
+                  const planId = typeof carePlanAssignment.care_plan_id === 'string' 
+                    ? carePlanAssignment.care_plan_id 
+                    : carePlanAssignment.care_plan_id._id;
+                  
+                  if (planId && !planDetails[planId]) {
+                    try {
+                      console.log('Fetching single care plan for ID:', planId);
+                      const carePlan = await carePlansAPI.getById(planId);
+                      console.log('Single care plan fetched:', carePlan);
+                      if (!cancelled) carePlanUpdates[planId] = carePlan;
+                    } catch (planError: any) {
+                      console.warn(`Failed to fetch single care plan ${planId}:`, planError?.response?.status || planError?.message);
+                    }
+                  }
+                }
+              }
+            } catch (error: any) {
+              console.warn(`Failed to fetch care plan assignment ${cpaId}:`, error?.response?.status || error?.message);
               if (!cancelled) {
                 setCarePlanAssignmentErrors(prev => ({ ...prev, [cpaId]: 'Error fetching care plan assignment' }));
               }
@@ -304,12 +373,17 @@ export default function ServiceRequestDetailsPage() {
         }
       }
 
-      if (!cancelled && Object.keys(carePlanAssignmentUpdates).length) {
+      if (!cancelled) {
+        if (Object.keys(carePlanAssignmentUpdates).length) {
         setCarePlanAssignmentDetails(prev => ({ ...prev, ...carePlanAssignmentUpdates }));
+        }
+        if (Object.keys(carePlanUpdates).length) {
+          setPlanDetails(prev => ({ ...prev, ...carePlanUpdates }));
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [grouped]);
+  }, [grouped, planDetails]);
 
   // Fetch resident details for emergency contact information
   useEffect(() => {
@@ -331,8 +405,8 @@ export default function ServiceRequestDetailsPage() {
           const resident = await residentAPI.getById(residentId as string);
           console.log('Resident details fetched:', resident);
           if (!cancelled) residentUpdates[residentId as string] = resident;
-        } catch (error) {
-          console.error('Error fetching resident details:', error);
+        } catch (error: any) {
+          console.warn(`Failed to fetch resident ${residentId}:`, error?.response?.status || error?.message);
           if (!cancelled) {
             setResidentErrors(prev => ({ ...prev, [residentId as string]: 'Error fetching resident details' }));
           }
@@ -346,12 +420,77 @@ export default function ServiceRequestDetailsPage() {
     return () => { cancelled = true; };
   }, [grouped]);
 
+  // Fetch current care plan assignments for residents
+  useEffect(() => {
+    const carePlanChangeRequests = (grouped || []).filter((r: any) => r?.request_type === 'care_plan_change');
+    
+    if (carePlanChangeRequests.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const carePlanAssignmentUpdates: Record<string, any> = {};
+      const carePlanUpdates: Record<string, any> = {};
+
+      for (const request of carePlanChangeRequests) {
+        const residentId = typeof request.resident_id === 'string' ? request.resident_id : request.resident_id?._id;
+        if (!residentId) continue;
+
+        try {
+          // Fetch current care plan assignments
+          const assignments = await carePlanAssignmentsAPI.getByResidentId(residentId);
+
+          if (Array.isArray(assignments)) {
+            // Find active assignment
+            const activeAssignment = assignments.find((a: any) => a.status === 'active');
+            if (activeAssignment) {
+              const cpaId = activeAssignment._id;
+              if (!cancelled) carePlanAssignmentUpdates[cpaId] = activeAssignment;
+
+              // Fetch care plan details for current assignment
+              if (activeAssignment.care_plan_ids && Array.isArray(activeAssignment.care_plan_ids)) {
+                for (const planId of activeAssignment.care_plan_ids) {
+                  if (!planDetails[planId]) {
+                    try {
+                      const carePlan = await carePlansAPI.getById(planId);
+                      if (!cancelled) carePlanUpdates[planId] = carePlan;
+                    } catch (planError: any) {
+                      console.warn(`Failed to fetch current care plan ${planId}:`, planError?.response?.status || planError?.message);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          // Target care plan assignment details are already included in the service request response
+          // No need to fetch additional data
+        } catch (error: any) {
+          console.warn('Failed to fetch care plan data:', error?.response?.status || error?.message);
+        }
+      }
+
+      if (!cancelled) {
+        if (Object.keys(carePlanAssignmentUpdates).length) {
+          setCarePlanAssignmentDetails(prev => ({ ...prev, ...carePlanAssignmentUpdates }));
+        }
+        if (Object.keys(carePlanUpdates).length) {
+          setPlanDetails(prev => ({ ...prev, ...carePlanUpdates }));
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [grouped, planDetails]);
+
   const approve = async () => {
     try {
       setBusy("approve");
       
+      console.log('Starting approval process for requests:', grouped);
+      
       // Pre-validate required fields expected by BE (e.g., selected_room_type)
       for (const req of grouped) {
+        console.log('Validating request:', req._id, 'Type:', req.request_type, 'Selected room type:', req.selected_room_type);
+        
         if (req?.request_type === 'care_plan_change' && !req?.selected_room_type) {
           // Try to infer from current room to help admin understand
           const residentId = req?.resident_id?._id || req?.resident_id;
@@ -359,7 +498,7 @@ export default function ServiceRequestDetailsPage() {
           try {
             const assignments = residentBedAssignments[residentId];
             if (assignments && assignments.length > 0) {
-              const assignment = assignments.find(ba => !ba.unassigned_date);
+              const assignment = assignments.find(ba => isBedAssignmentActive(ba));
               if (assignment?.bed_id && typeof assignment.bed_id === 'object') {
                 const room = assignment.bed_id.room_id;
                 if (room && typeof room === 'object') {
@@ -368,23 +507,35 @@ export default function ServiceRequestDetailsPage() {
               }
             }
           } catch {}
+          
+          console.log('Missing selected_room_type for care_plan_change request. Inferred room type:', inferredRoomType);
+          
+          // Auto-set selected_room_type if we can infer it
+          if (inferredRoomType) {
+            console.log('Auto-setting selected_room_type to:', inferredRoomType);
+            req.selected_room_type = inferredRoomType;
+          } else {
           addNotification({
             type: 'warning',
             title: 'Thiếu thông tin bắt buộc',
-            message: `Yêu cầu đổi gói dịch vụ thiếu selected_room_type.${inferredRoomType ? ` Gợi ý: loại phòng hiện tại là "${inferredRoomType}".` : ''} Vui lòng cập nhật yêu cầu hoặc yêu cầu người dùng gửi lại.`,
+              message: `Yêu cầu đổi gói dịch vụ thiếu selected_room_type. Vui lòng cập nhật yêu cầu hoặc yêu cầu người dùng gửi lại.`,
             category: 'system',
             actionUrl: '/admin/approvals'
           });
           setBusy(null);
           return;
+          }
         }
       }
       
       // Approve all requests in the group (sequential for clearer error handling)
       for (const req of grouped) {
         try {
-          await serviceRequestsAPI.approve(req._id);
+          console.log('Approving request:', req._id, 'Type:', req.request_type);
+          const result = await serviceRequestsAPI.approve(req._id);
+          console.log('Approval successful for request:', req._id, result);
         } catch (err: any) {
+          console.error('Approval failed for request:', req._id, err);
           const msg = err?.response?.data?.message || 'Không thể thực hiện thay đổi. Vui lòng kiểm tra dữ liệu yêu cầu.';
           addNotification({
             type: 'warning',
@@ -394,6 +545,7 @@ export default function ServiceRequestDetailsPage() {
             actionUrl: '/admin/approvals'
           });
           // Stop on first failure
+          setBusy(null);
           return;
         }
       }
@@ -647,11 +799,59 @@ export default function ServiceRequestDetailsPage() {
           )}
           {!loading && grouped.length > 0 && (
             <div className="space-y-8">
-                {grouped.map((r: any, idx: number) => {
-                  const planId = r?.target_service_package_id?._id || r?.target_service_package_id;
+                {(() => {
+                  // Group service_date_change requests by current_care_plan_assignment_id
+                  const groupedByAssignment: Record<string, any[]> = {};
+                  const otherRequests: any[] = [];
+                  
+                  grouped.forEach((r: any) => {
+                    if (r.request_type === 'service_date_change' && r.current_care_plan_assignment_id) {
+                      const assignmentId = typeof r.current_care_plan_assignment_id === 'string' 
+                        ? r.current_care_plan_assignment_id 
+                        : r.current_care_plan_assignment_id?._id;
+                      if (assignmentId) {
+                        if (!groupedByAssignment[assignmentId]) {
+                          groupedByAssignment[assignmentId] = [];
+                        }
+                        groupedByAssignment[assignmentId].push(r);
+                      } else {
+                        otherRequests.push(r);
+                      }
+                    } else {
+                      otherRequests.push(r);
+                    }
+                  });
+                  
+                  // Create display items: one for each care plan assignment group + individual other requests
+                  const displayItems: any[] = [];
+                  
+                  // Add grouped service date change requests
+                  Object.entries(groupedByAssignment).forEach(([assignmentId, requests]) => {
+                    displayItems.push({
+                      type: 'grouped_service_date_change',
+                      assignmentId,
+                      requests,
+                      // Use first request for common properties
+                      ...requests[0],
+                      count: requests.length
+                    });
+                  });
+                  
+                  // Add other individual requests
+                  otherRequests.forEach(r => {
+                    displayItems.push({
+                      type: 'individual',
+                      ...r
+                    });
+                  });
+                  
+                  return displayItems;
+                })().map((item: any, idx: number) => {
+                  const planId = item?.target_care_plan_assignment_id?._id || item?.target_care_plan_assignment_id;
                   const plan = planId ? planDetails[planId] : null;
+                  const r = item.type === 'grouped_service_date_change' ? item.requests[0] : item;
                   return (
-                  <div key={r._id || idx} className="bg-blue-50/30 rounded-2xl p-6 border border-blue-200/30">
+                  <div key={item._id || item.assignmentId || idx} className="bg-blue-50/30 rounded-2xl p-6 border border-blue-200/30">
                      {/* Request Info Header */}
                      <div className="flex items-center gap-4 mb-6">
                        <div className="relative w-16 h-16">
@@ -664,7 +864,7 @@ export default function ServiceRequestDetailsPage() {
                        <div className="flex-1">
                          <div className="mb-3">
                            <span className="text-sm font-medium text-slate-600 block mb-1">
-                             Người yêu cầu:
+                             Người cao tuổi:
                           </span>
                            <h2 className="text-2xl font-bold text-slate-900">
                              {r.resident_id?.full_name || "Chưa xác định"}
@@ -675,6 +875,7 @@ export default function ServiceRequestDetailsPage() {
                              <DocumentTextIcon className="w-4 h-4" />
                              <span>Loại:</span>
                              <span>{typeLabel(r.request_type)}</span>
+                             
                            </span>
                            <span className="inline-flex items-center gap-1 text-base text-slate-600 bg-slate-100 rounded-lg px-3 py-1 font-medium">
                              <CalendarDaysIcon className="w-4 h-4" />
@@ -692,16 +893,16 @@ export default function ServiceRequestDetailsPage() {
                         </div>
                       </div>
 
-                    <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-8">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-gradient-to-br from-white via-white to-slate-50 rounded-2xl shadow-xl border border-white/20 backdrop-blur-sm p-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Emergency Contact Information */}
-                        <div className="bg-green-50/50 rounded-2xl p-6 border border-green-200/50">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                              <PhoneIcon className="w-4 h-4 text-white" />
+                        <div className="bg-green-50/50 rounded-xl p-4 border border-green-200/50">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                              <PhoneIcon className="w-3 h-3 text-white" />
                             </div>
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              Thông tin liên hệ khẩn cấp
+                            <h3 className="text-sm font-semibold text-slate-900">
+                              Liên hệ khẩn cấp
                             </h3>
                         </div>
 
@@ -741,20 +942,20 @@ export default function ServiceRequestDetailsPage() {
                           // Display emergency contact if available
                           if (resident.emergency_contact) {
                             return (
-                                <div className="grid grid-cols-1 gap-4">
+                                <div className="space-y-3">
                                   <div>
-                                    <p className="text-xs font-medium text-slate-600 mb-2">
-                                      Người liên hệ khẩn cấp
+                                    <p className="text-xs font-medium text-slate-600 mb-1">
+                                      Người liên hệ
                                     </p>
-                                    <p className="text-lg font-semibold text-slate-900">
+                                    <p className="text-sm font-semibold text-slate-900">
                                       {resident.emergency_contact.name || 'Chưa có thông tin'}
                                     </p>
                                   </div>
                                   <div>
-                                    <p className="text-xs font-medium text-slate-600 mb-2">
-                                      Số điện thoại liên hệ
+                                    <p className="text-xs font-medium text-slate-600 mb-1">
+                                      Số điện thoại
                                     </p>
-                                    <p className="text-lg font-semibold text-slate-900">
+                                    <p className="text-sm font-semibold text-slate-900">
                                       {resident.emergency_contact.phone ? (
                                         <a href={`tel:${resident.emergency_contact.phone}`} className="hover:underline text-blue-600">
                                             {resident.emergency_contact.phone}
@@ -763,10 +964,10 @@ export default function ServiceRequestDetailsPage() {
                                     </p>
                                         </div>
                                   <div>
-                                    <p className="text-xs font-medium text-slate-600 mb-2">
+                                    <p className="text-xs font-medium text-slate-600 mb-1">
                                       Mối quan hệ
                                     </p>
-                                    <p className="text-lg font-semibold text-slate-900">
+                                    <p className="text-sm font-semibold text-slate-900">
                                       {(() => {
                                         const relationship = resident.emergency_contact.relationship;
                                         if (!relationship) return 'Chưa có thông tin';
@@ -796,7 +997,8 @@ export default function ServiceRequestDetailsPage() {
                         })()}
                       </div>
 
-                        {/* Room Change Section */}
+                        {/* Main Content - Room Change, Service Date Change, Care Plan Change */}
+                        <div className="lg:col-span-2">
                       {r.request_type === 'room_change' && (
                           <div className="bg-orange-50/50 rounded-2xl p-6 border border-orange-200/50">
                             <div className="flex items-center gap-3 mb-6">
@@ -838,7 +1040,7 @@ export default function ServiceRequestDetailsPage() {
                                           </div>
                                         );
 
-                                        const activeAssignment = assignments.find((a: any) => a.status === 'active' && !a.unassigned_date);
+                                        const activeAssignment = assignments.find((a: any) => a.status === 'active' && isBedAssignmentActive(a));
                                         if (activeAssignment?.bed_id) {
                                           const bed = activeAssignment.bed_id;
                                           const room = bed?.room_id;
@@ -860,18 +1062,7 @@ export default function ServiceRequestDetailsPage() {
                                           </div>
                                         </div>
                                         
-                                        <div className="flex flex-col items-center">
-                                          <span className="text-xs text-slate-500 mb-1">Phòng dành cho</span>
-                                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                                            room?.gender === 'male' ? 'bg-blue-100 text-blue-700' : 
-                                            room?.gender === 'female' ? 'bg-pink-100 text-pink-700' : 
-                                            'bg-gray-100 text-gray-700'
-                                          }`}>
-                                            {room?.gender === 'male' ? 'Nam' : 
-                                             room?.gender === 'female' ? 'Nữ' : 
-                                             'N/A'}
-                                          </span>
-                                              </div>
+                                      
                                             </div>
                                           );
                                         }
@@ -941,18 +1132,7 @@ export default function ServiceRequestDetailsPage() {
                                           </div>
                                         </div>
                                         
-                                        <div className="flex flex-col items-center">
-                                          <span className="text-xs text-emerald-600 mb-1">Phòng dành cho</span>
-                                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                                            room?.gender === 'male' ? 'bg-blue-100 text-blue-700' : 
-                                            room?.gender === 'female' ? 'bg-pink-100 text-pink-700' : 
-                                            'bg-gray-100 text-gray-700'
-                                          }`}>
-                                            {room?.gender === 'male' ? 'Nam' : 
-                                             room?.gender === 'female' ? 'Nữ' : 
-                                             'N/A'}
-                                          </span>
-                                              </div>
+                                       
                                             </div>
                                           );
                                         }
@@ -966,7 +1146,7 @@ export default function ServiceRequestDetailsPage() {
                               </div>
 
                             {/* Reason for Room Change */}
-                            {r.note && (
+                            {(r.note || r.medicalNote) && (
                               <div className="mt-6 pt-6 border-t border-orange-200">
                                 <div className="flex items-center gap-2 mb-3">
                                   <div className="w-5 h-5 bg-orange-500 rounded flex items-center justify-center">
@@ -979,7 +1159,12 @@ export default function ServiceRequestDetailsPage() {
                                   </p>
                                     </div>
                                 <p className="text-sm text-slate-700 leading-relaxed">
-                                  {r.note}
+                                  {(() => {
+                                    const note = r.note || r.medicalNote;
+                                    if (!note) return '';
+                                    // Remove content within parentheses
+                                    return note.replace(/\s*\([^)]*\)/g, '').trim();
+                                  })()}
                                 </p>
                               </div>
                             )}
@@ -995,17 +1180,167 @@ export default function ServiceRequestDetailsPage() {
                               </div>
                               <h3 className="text-lg font-semibold text-slate-900">
                                 Chi tiết gia hạn dịch vụ
+                                {item.type === 'grouped_service_date_change' && item.count > 1 && (
+                                  <span className="ml-2 text-sm font-normal text-emerald-600">
+                                    ({item.count} gói dịch vụ)
+                                  </span>
+                                )}
                               </h3>
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                               <div>
                                 <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Tên gói dịch vụ
+                                  Thời gian gia hạn
                                 </p>
+                                <p className="text-lg font-semibold text-blue-700">
+                                  {(() => {
+                                    // Calculate extension period from medical note or new_end_date
+                                    if (r.medicalNote) {
+                                      const match = r.medicalNote.match(/thêm (\d+) tháng/);
+                                      if (match && match[1]) {
+                                        return `${match[1]} tháng`;
+                                      }
+                                    }
+                                    
+                                    // Fallback: try to calculate from dates if available
+                                    const cpaId = typeof r.current_care_plan_assignment_id === 'string' 
+                                      ? r.current_care_plan_assignment_id 
+                                      : r.current_care_plan_assignment_id?._id;
+                                    
+                                    if (cpaId && carePlanAssignmentDetails[cpaId] && r.new_end_date) {
+                                      const assignment = carePlanAssignmentDetails[cpaId];
+                                      if (assignment.end_date) {
+                                        const oldEnd = new Date(assignment.end_date);
+                                        const newEnd = new Date(r.new_end_date);
+                                        const diffMonths = Math.round((newEnd.getTime() - oldEnd.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                        if (diffMonths > 0) {
+                                          return `${diffMonths} tháng`;
+                                        }
+                                      }
+                                    }
+
+                                    return '---';
+                                  })()}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-xs font-medium text-slate-600 mb-2">
+                                  Gia hạn đến ngày
+                                </p>
+                                <p className="text-lg font-semibold text-emerald-700">
+                                  {formatDate(r.new_end_date)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Service Packages Section */}
+                            <div className="mb-6">
+                              <p className="text-xs font-medium text-slate-600 mb-3">
+                                {item.type === 'grouped_service_date_change' && item.count > 1 ? 'Các gói dịch vụ' : 'Tên gói dịch vụ'}
+                              </p>
+                              {item.type === 'grouped_service_date_change' && item.count > 1 ? (
+                                <div className="bg-white rounded-lg p-4 border border-emerald-200">
+                                  {(() => {
+                                    // Collect all unique plan names from all requests
+                                    const allPlanNames = new Set<string>();
+                                    
+                                    item.requests.forEach((req: any) => {
+                                      const cpaId = typeof req.current_care_plan_assignment_id === 'string' 
+                                        ? req.current_care_plan_assignment_id 
+                                        : req.current_care_plan_assignment_id?._id;
+                                      
+                                      console.log('Processing request:', req._id, 'CPA ID:', cpaId);
+                                      
+                                      if (cpaId) {
+                                        const carePlanAssignment = carePlanAssignmentDetails[cpaId];
+                                        console.log('Care plan assignment:', carePlanAssignment);
+                                        
+                                        if (carePlanAssignment) {
+                                          // Get care plan names from care_plan_ids array
+                                          if (carePlanAssignment.care_plan_ids && Array.isArray(carePlanAssignment.care_plan_ids)) {
+                                            console.log('Found care_plan_ids:', carePlanAssignment.care_plan_ids);
+                                            carePlanAssignment.care_plan_ids.forEach((planId: string) => {
+                                              const plan = planDetails[planId];
+                                              const planName = plan?.plan_name || plan?.name;
+                                              console.log(`Plan ${planId}:`, plan, 'Name:', planName);
+                                              if (planName && planName.trim().length > 1) { // Filter out single character names
+                                                allPlanNames.add(planName);
+                                              }
+                                            });
+                                          }
+                                          // Try single care_plan_id (fallback)
+                                          else if (carePlanAssignment.care_plan_id) {
+                                            const planId = typeof carePlanAssignment.care_plan_id === 'string' 
+                                              ? carePlanAssignment.care_plan_id 
+                                              : carePlanAssignment.care_plan_id._id;
+                                            
+                                            if (planId) {
+                                              const plan = planDetails[planId];
+                                              const planName = plan?.plan_name || plan?.name;
+                                              console.log(`Single plan ${planId}:`, plan, 'Name:', planName);
+                                              if (planName && planName.trim().length > 1) { // Filter out single character names
+                                                allPlanNames.add(planName);
+                                              }
+                                            }
+                                          }
+                                          // Fallback to assignment properties - ONLY if no care_plan_ids found
+                                          else {
+                                            if (carePlanAssignment.plan_name && carePlanAssignment.plan_name.trim().length > 1) {
+                                              console.log('Using assignment plan_name:', carePlanAssignment.plan_name);
+                                              allPlanNames.add(carePlanAssignment.plan_name);
+                                            }
+                                            else if (carePlanAssignment.care_plan_name && carePlanAssignment.care_plan_name.trim().length > 1) {
+                                              console.log('Using assignment care_plan_name:', carePlanAssignment.care_plan_name);
+                                              allPlanNames.add(carePlanAssignment.care_plan_name);
+                                            }
+                                          }
+                                        }
+                                      }
+                                      
+                                      // Fallback to medical note - ONLY if no other data found
+                                      if (allPlanNames.size === 0 && req.medicalNote) {
+                                        const match = req.medicalNote.match(/Gia hạn gói: ([^thêm]+)/);
+                                        if (match && match[1]) {
+                                          const planName = match[1].trim();
+                                          console.log('Using medical note plan name:', planName);
+                                          if (planName.length > 1) { // Filter out single character names
+                                            allPlanNames.add(planName);
+                                          }
+                                        }
+                                      }
+                                    });
+                                    
+                                    const uniquePlanNames = Array.from(allPlanNames);
+                                    
+                                    if (uniquePlanNames.length > 0) {
+                                      return (
+                                        <ul className="space-y-2">
+                                          {uniquePlanNames.map((planName, idx) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <span className="w-2 h-2 bg-emerald-500 rounded-full mt-2 flex-shrink-0"></span>
+                                              <span className="text-sm font-semibold text-slate-900 leading-relaxed">
+                                                {planName}
+                                              </span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      );
+                                    }
+                                    
+                                    return (
+                                      <p className="text-sm text-slate-500">Đang tải thông tin gói dịch vụ...</p>
+                                    );
+                                  })()}
+                                </div>
+                              ) : (
+                                <div className="bg-white rounded-lg p-4 border border-emerald-200">
                                 <p className="text-lg font-semibold text-slate-900">
                                   {(() => {
-                                    const cpaId = r.current_care_plan_assignment_id;
+                                      const cpaId = typeof r.current_care_plan_assignment_id === 'string' 
+                                        ? r.current_care_plan_assignment_id 
+                                        : r.current_care_plan_assignment_id?._id;
                                     if (!cpaId) return '---';
 
                                     const carePlanAssignment = carePlanAssignmentDetails[cpaId];
@@ -1019,11 +1354,44 @@ export default function ServiceRequestDetailsPage() {
                                       return 'Đang tải thông tin...';
                                     }
 
-                                    const carePlan = carePlanAssignment.care_plan_id;
-                                    if (carePlan && typeof carePlan === 'object') {
-                                      return carePlan.plan_name || carePlan.name || '---';
-                                    }
+                                      // Get care plan names from care_plan_ids array using planDetails
+                                      if (carePlanAssignment.care_plan_ids && Array.isArray(carePlanAssignment.care_plan_ids)) {
+                                        const planNames = carePlanAssignment.care_plan_ids
+                                          .map((planId: string) => {
+                                            const plan = planDetails[planId];
+                                            return plan?.plan_name || plan?.name;
+                                          })
+                                          .filter(Boolean);
+                                        
+                                        if (planNames.length > 0) {
+                                          return (
+                                            <div className="space-y-1">
+                                              {planNames.map((planName, idx) => (
+                                                <div key={idx} className="flex items-start gap-2">
+                                                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full mt-2 flex-shrink-0"></span>
+                                                  <span>{planName}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        }
+                                      }
 
+                                      // Try single care_plan_id (fallback)
+                                      if (carePlanAssignment.care_plan_id) {
+                                        const planId = typeof carePlanAssignment.care_plan_id === 'string' 
+                                          ? carePlanAssignment.care_plan_id 
+                                          : carePlanAssignment.care_plan_id._id;
+                                        
+                                        if (planId) {
+                                          const plan = planDetails[planId];
+                                          if (plan) {
+                                            return plan.plan_name || plan.name || '---';
+                                          }
+                                        }
+                                      }
+
+                                      // Fallback to assignment properties
                                     if (carePlanAssignment.plan_name) {
                                       return carePlanAssignment.plan_name;
                                     }
@@ -1032,6 +1400,7 @@ export default function ServiceRequestDetailsPage() {
                                       return carePlanAssignment.care_plan_name;
                                     }
 
+                                      // Fallback to medical note to extract plan names
                                     if (r.medicalNote) {
                                       const match = r.medicalNote.match(/Gia hạn gói: ([^thêm]+)/);
                                       if (match && match[1]) {
@@ -1039,28 +1408,97 @@ export default function ServiceRequestDetailsPage() {
                                       }
                                     }
 
-                                    return '---';
+                                      return 'Đang tải thông tin gói dịch vụ...';
                                   })()}
                                 </p>
                                 </div>
+                              )}
+                                </div>
                               
-                              <div>
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Ngày hết hạn mới
-                                </p>
-                                <p className="text-lg font-semibold text-emerald-700">
-                                  {formatDate(r.new_end_date)}
+                            {/* Current Room and Bed Information */}
+                              <div className="mt-6 pt-6 border-t border-emerald-200">
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                                  </svg>
+                                </div>
+                                <p className="text-sm font-bold text-slate-800">
+                                  Thông tin phòng/giường hiện tại
                                 </p>
                               </div>
+                              
+                              {(() => {
+                                const residentId = typeof r.resident_id === 'string' ? r.resident_id : r.resident_id?._id;
+                                const assignments = residentBedAssignments[residentId];
+                                const error = residentBedAssignmentErrors[residentId];
+
+                                if (error) {
+                                  return (
+                                    <div className="text-center py-4">
+                                      <p className="text-sm text-red-600">Lỗi tải thông tin phòng/giường</p>
+                            </div>
+                                  );
+                                }
+                                
+                                if (!Array.isArray(assignments)) {
+                                  return (
+                                    <div className="text-center py-4">
+                                      <p className="text-sm text-slate-500">Đang tải thông tin phòng/giường...</p>
+                                    </div>
+                                  );
+                                }
+
+                                const activeAssignment = assignments.find((a: any) => a.status === 'active' && isBedAssignmentActive(a));
+                                if (activeAssignment?.bed_id) {
+                                  const bed = activeAssignment.bed_id;
+                                  const room = bed?.room_id;
+                                  return (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-500 mb-1">Số phòng</p>
+                                        <p className="text-lg font-bold text-slate-900">{room?.room_number || 'N/A'}</p>
+                                      </div>
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-500 mb-1">Số giường</p>
+                                        <p className="text-lg font-bold text-slate-900">{bed?.bed_number || 'N/A'}</p>
+                                      </div>
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-500 mb-1">Tầng</p>
+                                        <p className="text-lg font-bold text-slate-900">{room?.floor ? `Tầng ${room.floor}` : 'N/A'}</p>
+                                      </div>
+                                      
+                            </div>
+                                  );
+                                }
+                                
+                                return (
+                                  <div className="text-center py-4">
+                                    <p className="text-sm text-slate-600">Chưa có thông tin phòng/giường</p>
+                                  </div>
+                                );
+                              })()}
                             </div>
 
-                            {r.medicalNote && (
+                            {(r.medicalNote || r.note) && (
                               <div className="mt-6 pt-6 border-t border-emerald-200">
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Ghi chú y tế
-                                </p>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="w-5 h-5 bg-emerald-500 rounded flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                  </div>
+                                  <p className="text-sm font-bold text-slate-800">
+                                    Ghi chú yêu cầu
+                                  </p>
+                                </div>
                                 <p className="text-sm text-slate-700 leading-relaxed">
-                                  {r.medicalNote}
+                                  {(() => {
+                                    const note = r.medicalNote || r.note;
+                                    if (!note) return '';
+                                    // Remove content within parentheses
+                                    return note.replace(/\s*\([^)]*\)/g, '').trim();
+                                  })()}
                                 </p>
                               </div>
                             )}
@@ -1075,85 +1513,328 @@ export default function ServiceRequestDetailsPage() {
                                 <CurrencyDollarIcon className="w-4 h-4 text-white" />
                               </div>
                               <h3 className="text-lg font-semibold text-slate-900">
-                                Chi tiết gói dịch vụ mới
+                                Chi tiết đổi gói dịch vụ
                               </h3>
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div>
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Tên gói dịch vụ
-                                </p>
-                                <p className="text-lg font-semibold text-slate-900">
-                                  {plan?.plan_name || r.target_service_package_id?.plan_name || '---'}
-                                </p>
+                            {/* Current vs New Service Packages and Room/Bed */}
+                            <div className="mb-8">
+                              <h4 className="text-sm font-bold text-slate-800 mb-4">Gói dịch vụ và phòng/giường đang sử dụng</h4>
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                {/* Current Service Packages */}
+                                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-4 h-4 bg-slate-500 rounded flex items-center justify-center">
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
                               </div>
-                              
-                              <div>
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Giá mỗi tháng
-                                </p>
-                                <p className="text-lg font-semibold text-emerald-700">
-                                  {formatCurrency(plan?.monthly_price || plan?.plan_price || plan?.price)}
-                                </p>
+                                    <p className="text-xs font-medium text-slate-600 uppercase">Gói hiện tại</p>
+                              </div>
+                                  {(() => {
+                                    const residentId = typeof r.resident_id === 'string' ? r.resident_id : r.resident_id?._id;
+                                    
+                                    // Find current active care plan assignment
+                                    const currentCarePlanAssignment = Object.values(carePlanAssignmentDetails).find((assignment: any) => 
+                                      assignment.resident_id === residentId && assignment.status === 'active'
+                                    );
+                                    
+                                    if (currentCarePlanAssignment) {
+                                      if (currentCarePlanAssignment.care_plan_ids && Array.isArray(currentCarePlanAssignment.care_plan_ids)) {
+                                        // Check if care_plan_ids contains full plan objects or just IDs
+                                        const plans = currentCarePlanAssignment.care_plan_ids.filter((plan: any) => {
+                                          if (typeof plan === 'object' && plan.plan_name) {
+                                            return true; // Full plan object
+                                          }
+                                          return false;
+                                        });
+                                        
+                                        if (plans.length > 0) {
+                                          // care_plan_ids contains full plan objects
+                                          return (
+                                            <div className="space-y-2">
+                                              {plans.map((plan: any, idx: number) => (
+                                                <div key={idx} className="flex items-start gap-2">
+                                                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full mt-2 flex-shrink-0"></span>
+                                                  <div className="flex-1">
+                                                    <span className="text-sm font-medium text-slate-900 whitespace-nowrap">{plan.plan_name}</span>
+                                                    <div className="text-xs text-slate-700 mt-0.5">
+                                                      {formatDisplayCurrency(plan.monthly_price || 0)}/tháng
+                                                      {plan.category === 'main' ? ' (Gói chính)' : ' (Gói bổ sung)'}
+                              </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        } else {
+                                          // care_plan_ids contains only IDs, need to fetch from planDetails
+                                          const currentPlans = currentCarePlanAssignment.care_plan_ids
+                                            .map((planId: string) => {
+                                              const plan = planDetails[planId];
+                                              return plan;
+                                            })
+                                            .filter(Boolean);
+                                          
+                                          if (currentPlans.length > 0) {
+                                            return (
+                                              <div className="space-y-2">
+                                                {currentPlans.map((plan: any, idx: number) => (
+                                                  <div key={idx} className="flex items-start gap-2">
+                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full mt-2 flex-shrink-0"></span>
+                                                    <div className="flex-1">
+                                                      <span className="text-sm font-medium text-slate-900 whitespace-nowrap">{plan.plan_name || plan.name}</span>
+                                                      <div className="text-xs text-slate-700 mt-0.5">
+                                                        {formatDisplayCurrency(plan.monthly_price || 0)}/tháng
+                                                        {plan.category === 'main' ? ' (Gói chính)' : ' (Gói bổ sung)'}
+                              </div>
+                            </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+                                        }
+                                      }
+                                    }
+                                    
+                                    return <p className="text-sm text-slate-500">Chưa có gói dịch vụ hiện tại</p>;
+                                  })()}
                               </div>
 
-                              <div>
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Thời hạn/Billing
-                                </p>
-                                <p className="text-lg font-semibold text-slate-900">
-                                  {plan?.duration ? `${plan.duration} ngày` : (plan?.billing_cycle || 'Hàng tháng')}
-                                </p>
-                              </div>
+                                {/* Current Room/Bed */}
+                                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-4 h-4 bg-slate-500 rounded flex items-center justify-center">
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                                      </svg>
+                            </div>
+                                    <p className="text-xs font-medium text-slate-600 uppercase">Phòng/giường hiện tại</p>
+                                  </div>
+                                  {(() => {
+                                    const residentId = typeof r.resident_id === 'string' ? r.resident_id : r.resident_id?._id;
+                                    const assignments = residentBedAssignments[residentId];
+                                    
+                                    console.log('Current room display - residentId:', residentId);
+                                    console.log('Current room display - assignments:', assignments);
+                                    console.log('Current room display - residentBedAssignments state:', residentBedAssignments);
+                                    
+                                    // Debug: Show what we have
+                                    if (assignments === undefined) {
+                                      return <p className="text-sm text-red-500">Chưa fetch dữ liệu cho resident {residentId}</p>;
+                                    }
+                                    
+                                    if (!Array.isArray(assignments)) {
+                                      return <p className="text-sm text-slate-500">Đang tải thông tin phòng hiện tại...</p>;
+                                    }
 
-                              <div>
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Loại phòng áp dụng
-                                </p>
-                                <p className="text-lg font-semibold text-slate-900">
-                                  {plan?.room_type || plan?.roomCategory || '---'}
-                                </p>
+                                    if (assignments.length === 0) {
+                                      return <p className="text-sm text-slate-500">Không có dữ liệu bed assignment</p>;
+                                    }
+
+                                    const activeAssignment = assignments.find((a: any) => a.status === 'active' && isBedAssignmentActive(a));
+                                    console.log('Current room display - activeAssignment:', activeAssignment);
+                                    
+                                    if (activeAssignment?.bed_id) {
+                                      const bed = activeAssignment.bed_id;
+                                      const room = bed?.room_id;
+                                      console.log('Current room display - bed:', bed);
+                                      console.log('Current room display - room:', room);
+                                      
+                                      return (
+                                        <div className="space-y-2">
+                                          <div className="text-sm font-medium text-slate-900">
+                                            Phòng {room?.room_number || 'N/A'}
+                                            {room?.floor ? ` (Tầng ${room.floor})` : ''}
+                                          </div>
+                                          <div className="text-sm text-slate-700">
+                                            Giường {bed?.bed_number || 'N/A'}
+                                          </div>
+                                         
+                                            {room?.room_type && (
+                                              <div className="text-xs text-slate-600">
+                                                Loại phòng: {getRoomType(room.room_type)}
+                                </div>
+                                            )}
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    return <p className="text-sm text-slate-500">Không tìm thấy active assignment</p>;
+                                  })()}
+                                </div>
                               </div>
                             </div>
 
-                            {plan?.description && (
-                              <div className="mt-6 pt-6 border-t border-violet-200">
-                                <p className="text-xs font-medium text-slate-600 mb-2">
-                                  Mô tả gói dịch vụ
-                                </p>
-                                <p className="text-sm text-slate-700 leading-relaxed">
-                                  {plan.description}
+                            {/* New Service Packages and Room/Bed */}
+                            <div className="mb-8">
+                              <h4 className="text-sm font-bold text-slate-800 mb-4">Gói và phòng/giường mới</h4>
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                {/* New Service Packages */}
+                                <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-4 h-4 bg-emerald-500 rounded flex items-center justify-center">
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                      </svg>
+                            </div>
+                                    <p className="text-xs font-medium text-emerald-600 uppercase">Gói mới</p>
+                            </div>
+                                  {(() => {
+                                    const carePlanAssignment = r.target_care_plan_assignment_id;
+                                    if (carePlanAssignment && typeof carePlanAssignment === 'object') {
+                                      if (carePlanAssignment.care_plan_ids && Array.isArray(carePlanAssignment.care_plan_ids)) {
+                                        // care_plan_ids đã chứa đầy đủ thông tin care plan
+                                        const plans = carePlanAssignment.care_plan_ids.filter((plan: any) => 
+                                          plan && typeof plan === 'object' && plan.plan_name
+                                        );
+                                        
+                                        if (plans.length > 0) {
+                                          return (
+                                            <div className="space-y-2">
+                                              {plans.map((plan: any, idx: number) => (
+                                                <div key={idx} className="flex items-start gap-2">
+                                                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full mt-2 flex-shrink-0"></span>
+                                                  <div className="flex-1">
+                                                    <span className="text-sm font-medium text-emerald-900 whitespace-nowrap">{plan.plan_name}</span>
+                                                    <div className="text-xs text-emerald-700 mt-0.5">
+                                                      {formatDisplayCurrency(plan.monthly_price || 0)}/tháng
+                                                      {plan.category === 'main' ? ' (Gói chính)' : ' (Gói bổ sung)'}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        }
+                                      }
+                                    }
+                                    
+                                    return <p className="text-sm text-emerald-500">Chưa có thông tin gói mới</p>;
+                                  })()}
+                                </div>
+
+                                {/* New Room/Bed */}
+                                <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-4 h-4 bg-emerald-500 rounded flex items-center justify-center">
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                      </svg>
+                                    </div>
+                                    <p className="text-xs font-medium text-emerald-600 uppercase">Phòng/giường mới</p>
+                                  </div>
+                                  {(() => {
+                                    const bedAssignment = r.target_bed_assignment_id;
+                                    if (bedAssignment && typeof bedAssignment === 'object') {
+                                      const bed = bedAssignment.bed_id;
+                                      if (bed && typeof bed === 'object') {
+                                        const room = bed.room_id;
+                                        if (room && typeof room === 'object') {
+                                          return (
+                                            <div className="space-y-2">
+                                              <div className="text-sm font-medium text-emerald-900">
+                                                Phòng {room.room_number || 'N/A'}
+                                                {room.floor ? ` (Tầng ${room.floor})` : ''}
+                                              </div>
+                                              <div className="text-sm text-emerald-700">
+                                                Giường {bed.bed_number || 'N/A'}
+                                              </div>
+                                              
+                                              
+                                                {room.room_type && (
+                                                  <div className="text-xs text-emerald-600">
+                                                    Loại phòng: {getRoomType(room.room_type)}
+                                                  </div>
+                                                )}
+                                            </div>
+                                          );
+                                        }
+                                      }
+                                    }
+                                    
+                                    return <p className="text-sm text-emerald-500">Chưa có thông tin phòng mới</p>;
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+
+                            
+
+
+                            {/* Service Period Information */}
+                            <div className="mb-8">
+                              <h4 className="text-sm font-bold text-slate-800 mb-4">Thời gian áp dụng gói mới</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-4 h-4 bg-blue-500 rounded flex items-center justify-center">
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                    </div>
+                                    <p className="text-xs font-medium text-blue-600 uppercase">Ngày bắt đầu</p>
+                                  </div>
+                                  <p className="text-lg font-semibold text-blue-900">
+                                    {(() => {
+                                      const carePlanAssignment = r.target_care_plan_assignment_id;
+                                      if (carePlanAssignment && typeof carePlanAssignment === 'object' && carePlanAssignment.start_date) {
+                                        return new Date(carePlanAssignment.start_date).toLocaleDateString('vi-VN');
+                                      }
+                                      return 'Chưa xác định';
+                                    })()}
+                                  </p>
+                                </div>
+
+                                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-4 h-4 bg-purple-500 rounded flex items-center justify-center">
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                    </div>
+                                    <p className="text-xs font-medium text-purple-600 uppercase">Ngày kết thúc</p>
+                                  </div>
+                                  <p className="text-lg font-semibold text-purple-900">
+                                    {(() => {
+                                      const carePlanAssignment = r.target_care_plan_assignment_id;
+                                      if (carePlanAssignment && typeof carePlanAssignment === 'object' && carePlanAssignment.end_date) {
+                                        return new Date(carePlanAssignment.end_date).toLocaleDateString('vi-VN');
+                                      }
+                                      return 'Chưa xác định';
+                                    })()}
                                 </p>
                               </div>
-                            )}
+                              </div>
+                            </div>
 
-                            {Array.isArray(plan?.services_included || plan?.services || plan?.features) && ((plan?.services_included?.length || plan?.services?.length || plan?.features?.length)) && (
+                            {/* Note for Care Plan Change */}
+                            {(r.note || r.medicalNote) && (
                               <div className="mt-6 pt-6 border-t border-violet-200">
-                                <p className="text-xs font-medium text-slate-600 mb-3">
-                                  Dịch vụ bao gồm
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {(plan.services_included || plan.services || plan.features)
-                                    .slice(0, expandedServices[String(plan?._id)] ? undefined : 6)
-                                    .map((s: any, i: number) => (
-                                      <span key={i} className="bg-violet-100 text-violet-800 text-xs px-3 py-1.5 rounded-full border border-violet-200 font-medium">
-                                        {typeof s === 'string' ? s : (s?.name || s?.title || JSON.stringify(s))}
-                                      </span>
-                                    ))}
-                                  {((plan.services_included || plan.services || plan.features)?.length || 0) > 6 && (
-                                    <button 
-                                      onClick={() => setExpandedServices(prev => ({ ...prev, [String(plan?._id)]: !prev[String(plan?._id)] }))} 
-                                      className="bg-violet-200 text-violet-800 text-xs px-3 py-1.5 rounded-full border border-violet-300 font-medium hover:bg-violet-300 transition-colors duration-200"
-                                    >
-                                      {expandedServices[String(plan?._id)] ? 'Thu gọn' : `+${((plan.services_included || plan.services || plan.features)?.length || 0) - 6} dịch vụ`}
-                                    </button>
-                                  )}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="w-5 h-5 bg-violet-500 rounded flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                  </div>
+                                  <p className="text-sm font-bold text-slate-800">
+                                    Ghi chú yêu cầu
+                                  </p>
                                 </div>
+                                <p className="text-sm text-slate-700 leading-relaxed">
+                                  {(() => {
+                                    const note = r.note || r.medicalNote;
+                                    if (!note) return '';
+                                    // Remove content within parentheses
+                                    return note.replace(/\s*\([^)]*\)/g, '').trim();
+                                  })()}
+                                </p>
                               </div>
                             )}
                         </div>
                       )}
+                        </div>
                       </div>
                     </div>
                   </div>

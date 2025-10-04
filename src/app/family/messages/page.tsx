@@ -75,12 +75,17 @@ export default function MessagesPage() {
     console.log('Filtering conversations:', {
       selectedResidentId,
       conversations: conversations.length,
-      searchTerm
+      searchTerm,
+      conversationDetails: conversations.map(c => ({
+        id: c._id,
+        partnerName: c.partner?.full_name,
+        residentId: c.resident_id
+      }))
     });
 
     // Chỉ lọc theo search term vì conversations đã được tạo từ staff assignments
     const filtered = conversations.filter(conversation =>
-      conversation.partner.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      conversation.partner?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     console.log('Filtered conversations:', filtered.length);
@@ -101,12 +106,16 @@ export default function MessagesPage() {
 
     try {
       const residentsData = await residentAPI.getByFamilyMemberId(user.id);
+      console.log('Fetched residents:', residentsData);
       setResidents(residentsData);
 
       if (residentsData.length > 0 && !selectedResidentId) {
         setSelectedResidentId(residentsData[0]._id);
+        console.log('Auto-selected resident:', residentsData[0]._id, residentsData[0].full_name);
       }
-    } catch (error) { }
+    } catch (error) {
+      console.error('Error fetching residents:', error);
+    }
   };
 
 
@@ -150,10 +159,12 @@ export default function MessagesPage() {
         const staffData = await staffAssignmentsAPI.getByResident(selectedResidentId);
         console.log('Staff data from API:', staffData);
         
-        // Endpoint by-resident trả về array của objects có cấu trúc { staff: {...}, assignment: {...} }
-        if (Array.isArray(staffData) && staffData.length > 0) {
-          // Xử lý dữ liệu từ API response và tạo conversations
-          const processedStaff = staffData.map((item: any) => {
+        // Kiểm tra cấu trúc dữ liệu trả về
+        let processedStaff = [];
+        
+        if (staffData && staffData.success && Array.isArray(staffData.data)) {
+          // Cấu trúc: { success: true, data: [...] }
+          processedStaff = staffData.data.map((item: any) => {
             const staff = item.staff || item; // Fallback nếu không có nested structure
             const assignment = item.assignment || {};
             
@@ -172,6 +183,30 @@ export default function MessagesPage() {
               ...assignment
             };
           });
+        } else if (Array.isArray(staffData) && staffData.length > 0) {
+          // Cấu trúc: [...] (array trực tiếp)
+          processedStaff = staffData.map((item: any) => {
+            const staff = item.staff || item; // Fallback nếu không có nested structure
+            const assignment = item.assignment || {};
+            
+            return {
+              staff_id: {
+                _id: staff.id || staff._id,
+                id: staff.id || staff._id,
+                full_name: staff.full_name,
+                fullName: staff.full_name,
+                email: staff.email,
+                phone: staff.phone,
+                position: staff.position || 'Nhân viên chăm sóc',
+                avatar: staff.avatar,
+                role: staff.role
+              },
+              ...assignment
+            };
+          });
+        }
+        
+        if (processedStaff.length > 0) {
 
           console.log('Processed staff:', processedStaff);
           setStaffAssignments(prev => ({ ...prev, [selectedResidentId]: processedStaff }));
@@ -213,7 +248,8 @@ export default function MessagesPage() {
           })));
           setConversations(conversationsFromStaff);
         } else {
-          console.log('No staff data found');
+          console.log('No staff data found for resident:', selectedResidentId);
+          console.log('Staff data structure:', staffData);
           setStaffAssignments(prev => ({ ...prev, [selectedResidentId]: [] }));
           setConversations([]);
         }

@@ -171,6 +171,15 @@ export default function ResidentsPage() {
     }
   }, [user, router]);
 
+  // Helper function to check if bed assignment is active
+  const isBedAssignmentActive = (assignment: any) => {
+    if (!assignment) return false;
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  };
+
   // Load room numbers for residents (optimized with useMemo)
   React.useEffect(() => {
     if (!residentsData.length) return;
@@ -182,7 +191,7 @@ export default function ResidentsPage() {
       const promises = residentsData.map(async (resident: any) => {
         try {
           const bedAssignments = await bedAssignmentsAPI.getByResidentId(resident.id);
-          const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id) : null;
+          const bedAssignment = Array.isArray(bedAssignments) ? bedAssignments.find((a: any) => a.bed_id?.room_id && isBedAssignmentActive(a)) : null;
 
           if (bedAssignment?.bed_id?.room_id) {
             if (typeof bedAssignment.bed_id.room_id === 'object' && bedAssignment.bed_id.room_id.room_number) {
@@ -306,7 +315,7 @@ export default function ResidentsPage() {
     try {
       try {
         const assignments = await bedAssignmentsAPI.getByResidentId(residentToDischarge.id);
-        const active = Array.isArray(assignments) ? assignments.find((a: any) => !a.unassigned_date) : null;
+        const active = Array.isArray(assignments) ? assignments.find((a: any) => isBedAssignmentActive(a)) : null;
         if (active) {
           await bedAssignmentsAPI.update(active._id, { unassigned_date: new Date().toISOString() });
         }

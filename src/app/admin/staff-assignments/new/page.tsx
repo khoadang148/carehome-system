@@ -108,33 +108,66 @@ export default function NewStaffAssignmentPage() {
 
   // Bỏ prefetch danh sách người cao tuổi theo phòng để tăng tốc render ban đầu
 
+  // Helper function to check if bed assignment is active
+  const isBedAssignmentActive = (assignment: any) => {
+    if (!assignment) return false;
+    if (!assignment.unassigned_date) return true; // null = active
+    const unassignedDate = new Date(assignment.unassigned_date);
+    const now = new Date();
+    return unassignedDate > now; // ngày trong tương lai = active
+  };
+
+  // Helper function to get residents from bed assignments
+  const getResidentsFromBedAssignments = (roomId: string) => {
+    if (!swrBedAssignments || !Array.isArray(swrBedAssignments)) return [];
+    
+    const roomResidents: any[] = [];
+    const processedResidentIds = new Set<string>();
+    
+    swrBedAssignments.forEach(assignment => {
+      // Check if this assignment is for the specified room
+      if (!assignment.bed_id || !assignment.bed_id.room_id) return;
+      
+      const assignmentRoomId = typeof assignment.bed_id.room_id === 'string'
+        ? assignment.bed_id.room_id
+        : assignment.bed_id.room_id._id;
+      
+      if (assignmentRoomId !== roomId) return;
+      
+      // Check if assignment is active
+      if (!isBedAssignmentActive(assignment)) return;
+      
+      // Check if resident exists and not already processed
+      if (assignment.resident_id && !processedResidentIds.has(assignment.resident_id._id)) {
+        roomResidents.push(assignment.resident_id);
+        processedResidentIds.add(assignment.resident_id._id);
+      }
+    });
+    
+    return roomResidents;
+  };
+
   const loadRoomResidents = async () => {
     setLoadingRoomResidents(true);
     const roomResidentsMap: { [roomId: string]: any[] } = {};
 
     try {
+      console.log('Loading room residents from bed assignments...');
+      console.log('Available bed assignments:', swrBedAssignments);
+      
       // Initialize map
       rooms.forEach(room => {
         roomResidentsMap[room._id] = [];
       });
 
-      // Fetch admitted residents per room via dedicated endpoint with limited concurrency
-      const concurrency = 5;
-      for (let i = 0; i < rooms.length; i += concurrency) {
-        const batch = rooms.slice(i, i + concurrency);
-        const results = await Promise.all(batch.map(async (room) => {
-          try {
-            const admitted = await (residentAPI as any).getAdmittedByRoom?.(room._id);
-            return { roomId: room._id, admitted: Array.isArray(admitted) ? admitted : [] };
-          } catch {
-            return { roomId: room._id, admitted: [] };
-          }
-        }));
-        results.forEach(({ roomId, admitted }) => {
-          roomResidentsMap[roomId] = admitted;
-        });
-      }
+      // Use bed assignments to get residents for each room
+      rooms.forEach(room => {
+        const residents = getResidentsFromBedAssignments(room._id);
+        roomResidentsMap[room._id] = residents;
+        console.log(`Room ${room.room_number} (${room._id}): ${residents.length} residents`, residents);
+      });
 
+      console.log('Final room residents map:', roomResidentsMap);
       setRoomResidents(roomResidentsMap);
     } catch (error) {
       console.error('Error loading room residents:', error);
@@ -147,12 +180,12 @@ export default function NewStaffAssignmentPage() {
     }
   };
 
-  // Load residents for rooms once rooms data is available
+  // Load residents for rooms once rooms and bedAssignments data are available
   useEffect(() => {
-    if (rooms.length > 0) {
+    if (rooms.length > 0 && swrBedAssignments) {
       loadRoomResidents();
     }
-  }, [rooms]);
+  }, [rooms, swrBedAssignments]);
 
   // Helper functions thay thế Redux actions
   const createAssignment = async (data: any) => {

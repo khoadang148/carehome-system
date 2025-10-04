@@ -4,6 +4,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { roomsAPI, bedsAPI, roomTypesAPI, bedAssignmentsAPI, carePlanAssignmentsAPI } from "@/lib/api";
 import { useAuth } from '@/lib/contexts/auth-context';
 import { BuildingOfficeIcon, ArrowLeftIcon, ExclamationTriangleIcon, CheckCircleIcon, ArrowPathIcon, HomeIcon, MapPinIcon, UsersIcon } from '@heroicons/react/24/outline';
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (isBedAssignmentActive(a)) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import TransferSuccessModal from '@/components/TransferSuccessModal';
 
 interface Room {
@@ -142,13 +151,13 @@ export default function TransferPage() {
 
           const bedsWithStatus = roomBeds.map(bed => {
             const assignment = assignmentMap.get(bed._id);
-            const status = assignment && !assignment.unassigned_date ? 'occupied' : 'available';
+            const status = assignment && isBedAssignmentActive(a) ? 'occupied' : 'available';
             return status;
           });
 
           const hasAvailableBeds = roomBeds.some(bed => {
             const assignment = assignmentMap.get(bed._id);
-            const status = assignment && !assignment.unassigned_date ? 'occupied' : 'available';
+            const status = assignment && isBedAssignmentActive(a) ? 'occupied' : 'available';
             // Nếu là phòng hiện tại thì loại trừ chính giường đang ở
             const isCurrentRoom = r._id === roomId;
             const isCurrentBed = isCurrentRoom && currentBedData && bed._id === currentBedData._id;
@@ -170,7 +179,7 @@ export default function TransferPage() {
 
   const findBedWithAssignment = (bedId: string, assignments: BedAssignment[]) => {
     const assignment = assignments.find(a =>
-      a.bed_id._id === bedId && !a.unassigned_date
+      a.bed_id._id === bedId && isBedAssignmentActive(a)
     );
 
     if (assignment) {
@@ -216,7 +225,7 @@ export default function TransferPage() {
 
     const bedsWithStatus = roomBeds.map(bed => {
       const assignment = assignmentMap.get(bed._id);
-      const status = assignment && !assignment.unassigned_date ? 'occupied' : 'available';
+      const status = assignment && isBedAssignmentActive(a) ? 'occupied' : 'available';
 
       return {
         _id: bed._id,

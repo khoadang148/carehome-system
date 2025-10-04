@@ -32,6 +32,15 @@ import {
   XCircleIcon as XCircleIconSolid,
   ShieldCheckIcon as ShieldCheckIconSolid
 } from "@heroicons/react/24/solid";
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment: any) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import SuccessModal from "@/components/SuccessModal";
 
 type TabType = 'users' | 'service-requests';
@@ -95,8 +104,8 @@ export default function ApprovalsPage() {
   );
 
   const { data: bedAssignments = [], error: assignmentsError } = useSWR(
-    user ? '/admin/bed-assignments' : null,
-    () => bedAssignmentsAPI.getAll(),
+    user ? '/admin/bed-assignments-all-statuses' : null,
+    () => bedAssignmentsAPI.getAllStatuses(),
     {
       refreshInterval: 30000,
       revalidateOnFocus: true,
@@ -110,6 +119,50 @@ export default function ApprovalsPage() {
       ? allServiceRequests.filter((req: any) => req.status === 'pending')
       : [];
   }, [allServiceRequests]);
+
+  // Count grouped service requests (for tab display)
+  const groupedServiceRequestsCount = useMemo(() => {
+    if (pendingRoomChangeRequests.length === 0) return 0;
+    
+    // Apply same grouping logic as in filtered
+    const groupedRequests = pendingRoomChangeRequests.reduce((acc: any, request: any) => {
+      const fam = request.family_member_id?._id || request.family_member_id;
+      const res = request.resident_id?._id || request.resident_id;
+      const created = request.createdAt || request.created_at || request.updatedAt || '';
+      const bucket = created ? new Date(created).toISOString().slice(0, 16) : '';
+
+      let key = `${request.request_type}_${fam}_${res}_${bucket}`;
+
+      // For room changes, also include target room/bed if provided to avoid mixing truly separate ops
+      if (request.request_type === 'room_change') {
+        key += `_${request.target_room_id?._id || request.target_room_id || ''}_${request.target_bed_id?._id || request.target_bed_id || ''}`;
+      }
+
+      // For service date changes, include care plan assignment ID to avoid grouping different care plans
+      if (request.request_type === 'service_date_change') {
+        key += `_${request.current_care_plan_assignment_id?._id || request.current_care_plan_assignment_id || ''}`;
+      }
+
+      // For care plan changes, include target service package to avoid grouping different plan changes
+      if (request.request_type === 'care_plan_change') {
+        key += `_${request.target_care_plan_assignment_id?._id || request.target_care_plan_assignment_id || ''}`;
+      }
+
+      if (!acc[key]) {
+        acc[key] = {
+          ...request,
+          count: 1,
+          groupedRequests: [request]
+        };
+      } else {
+        acc[key].count += 1;
+        acc[key].groupedRequests.push(request);
+      }
+      return acc;
+    }, {});
+    
+    return Object.keys(groupedRequests).length;
+  }, [pendingRoomChangeRequests]);
 
   const getStatusLabel = (status?: string) => {
     switch ((status || '').toLowerCase()) {
@@ -166,7 +219,7 @@ export default function ApprovalsPage() {
         ? ba.resident_id 
         : ba.resident_id?._id || ba.resident_id;
       console.log('Debug - comparing:', baResidentId, 'with', residentId);
-      return baResidentId === residentId && !ba.unassigned_date;
+      return baResidentId === residentId && isBedAssignmentActive(ba);
     });
     
     console.log('Debug - found assignment:', assignment);
@@ -251,6 +304,16 @@ export default function ApprovalsPage() {
           key += `_${request.target_room_id?._id || request.target_room_id || ''}_${request.target_bed_id?._id || request.target_bed_id || ''}`;
         }
 
+        // For service date changes, include care plan assignment ID to avoid grouping different care plans
+        if (request.request_type === 'service_date_change') {
+          key += `_${request.current_care_plan_assignment_id?._id || request.current_care_plan_assignment_id || ''}`;
+        }
+
+        // For care plan changes, include target service package to avoid grouping different plan changes
+        if (request.request_type === 'care_plan_change') {
+          key += `_${request.target_care_plan_assignment_id?._id || request.target_care_plan_assignment_id || ''}`;
+        }
+
         if (!acc[key]) {
           acc[key] = {
             ...request,
@@ -273,12 +336,13 @@ export default function ApprovalsPage() {
           item.resident_id?.full_name,
           item.family_member_id?.full_name,
           item.note,
+          item.medicalNote,
           item.request_type === 'room_change' ? 'đổi phòng' :
           item.request_type === 'service_date_change' ? 'gia hạn dịch vụ' :
           item.request_type === 'care_plan_change' ? 'đổi gói dịch vụ' : '',
           item.target_room_id?.room_number,
           item.target_bed_id?.bed_number,
-          item.target_service_package_id?.plan_name,
+          item.target_care_plan_assignment_id?.plan_name,
           item.new_end_date ? new Date(item.new_end_date).toLocaleDateString('vi-VN') : ''
         ]
           .filter(Boolean)
@@ -708,7 +772,7 @@ export default function ApprovalsPage() {
                 }`}
               >
                 <HomeIcon className="w-4 h-4" />
-                Dịch vụ ({pendingRoomChangeRequests.length} yêu cầu)
+                Dịch vụ ({groupedServiceRequestsCount} yêu cầu)
               </button>
             </div>
         </div>
@@ -766,7 +830,7 @@ export default function ApprovalsPage() {
                 </h2>
                 <p className="text-sm text-slate-600 font-semibold flex items-center gap-2">
                   <ClockIcon className="w-4 h-4 text-violet-500" />
-                  Hiển thị {filtered.length} trong tổng số {activeTab === 'users' ? pendingUsers.length : pendingRoomChangeRequests.length} {activeTab === 'users' ? 'tài khoản' : 'yêu cầu'}
+                  Hiển thị {filtered.length} trong tổng số {activeTab === 'users' ? pendingUsers.length : groupedServiceRequestsCount} {activeTab === 'users' ? 'tài khoản' : 'yêu cầu'}
                 </p>
               </div>
               <div className="text-xs text-slate-600 bg-gradient-to-r from-violet-100 to-indigo-100 px-3 py-2 rounded-xl border border-violet-200/50 font-semibold shadow-md">
@@ -979,7 +1043,7 @@ export default function ApprovalsPage() {
                             <div className="font-semibold text-slate-800 text-sm">{formatSubmittedDate(item)}</div>
                             </td>
                           <td className="px-3 py-4 text-sm text-slate-700">
-                            <div className="font-semibold text-slate-800 text-sm">{stripParentheses(item.note)}</div>
+                            <div className="font-semibold text-slate-800 text-sm">{stripParentheses(item.note || item.medicalNote)}</div>
                            
                           </td>
                           <td className="px-3 py-4 text-center">
@@ -1371,7 +1435,7 @@ function RequestDetailsModal({
                 <ChangePreview label="Gia hạn đến" to={req.new_end_date ? new Date(req.new_end_date).toLocaleDateString('vi-VN') : '---'} color="orange" />
               )}
               {req.request_type === 'care_plan_change' && (
-                <ChangePreview label="Đổi gói dịch vụ" to={req.target_service_package_id?.plan_name || '---'} color="orange" />
+                <ChangePreview label="Đổi gói dịch vụ" to={req.target_care_plan_assignment_id?.plan_name || '---'} color="orange" />
               )}
               {req.note && <div className="text-sm text-slate-600 mt-2">Ghi chú: {req.note}</div>}
               <div className="text-xs text-slate-500 mt-1">ID: {req._id}</div>

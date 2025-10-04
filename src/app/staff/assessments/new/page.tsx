@@ -16,6 +16,15 @@ import { careNotesAPI, staffAssignmentsAPI, roomsAPI, bedAssignmentsAPI, residen
 import { useAuth } from '@/lib/contexts/auth-context';
 import { userAPI } from '@/lib/api';
 
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (isBedAssignmentActive(a)) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
+
 interface CareNoteData {
   residentId: string;
   residentName: string;
@@ -90,7 +99,7 @@ export default function NewCareNotePage() {
                 const beds = await bedAssignmentsAPI.getAll();
                 if (Array.isArray(beds)) {
                   residents = beds
-                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .filter((ba: any) => isBedAssignmentActive(a) && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
                     .map((ba: any) => ba.resident_id)
                     .filter(Boolean);
                 }

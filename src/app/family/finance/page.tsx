@@ -119,12 +119,16 @@ export default function FinancePage() {
   const getPaymentStatus = (payment: any) => {
     const today = new Date();
     const dueDate = new Date(payment.dueDate);
-    const gracePeriodEnd = new Date(dueDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+    
+    // Reset time to start of day for accurate date comparison
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dueDateStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    const gracePeriodEnd = new Date(dueDateStart.getTime() + 5 * 24 * 60 * 60 * 1000);
 
     if (payment.status === 'paid') return 'paid';
     if (payment.status === 'processing') return 'processing';
-    if (today > gracePeriodEnd) return 'overdue';
-    if (today > dueDate) return 'grace_period';
+    if (todayStart > gracePeriodEnd) return 'overdue';
+    if (todayStart > dueDateStart) return 'grace_period';
     return 'pending';
   };
 
@@ -309,11 +313,23 @@ export default function FinancePage() {
                               <span className="text-slate-900 font-medium">
                                 {new Date(payment.dueDate || payment.date).toLocaleDateString('vi-VN')}
                               </span>
-                              {payment.dueDate && new Date(payment.dueDate) < new Date() && payment.status !== 'paid' && (
-                                <div className="text-[0.65rem] text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-md border border-red-200 w-fit inline-flex items-center gap-1">
-                                  Quá hạn {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} ngày
-                                </div>
-                              )}
+                              {payment.dueDate && (() => {
+                                const today = new Date();
+                                const dueDate = new Date(payment.dueDate);
+                                
+                                // Reset time to start of day for accurate date comparison
+                                const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                const dueDateStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+                                
+                                const isOverdue = dueDateStart < todayStart && payment.status !== 'paid';
+                                const daysOverdue = isOverdue ? Math.ceil((todayStart.getTime() - dueDateStart.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                                
+                                return isOverdue ? (
+                                  <div className="text-[0.65rem] text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-md border border-red-200 w-fit inline-flex items-center gap-1">
+                                    Quá hạn {daysOverdue} ngày
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </td>
                           <td className="py-4 px-3 text-sm text-center">

@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import useSWR from "swr";
 import {
   carePlansAPI,
+  carePlanAssignmentsAPI,
   residentAPI,
   roomsAPI,
   bedsAPI,
@@ -20,6 +21,15 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 type DurationOption = "3" | "6" | "12" | "custom";
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment: any) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 
 export default function ChangeCarePlanPage() {
   const router = useRouter();
@@ -37,9 +47,6 @@ export default function ChangeCarePlanPage() {
   const [roomType, setRoomType] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [selectedBedId, setSelectedBedId] = useState<string>("");
-  const [keepExistingRoomBed, setKeepExistingRoomBed] = useState<boolean>(true);
-  const [existingRoomInfo, setExistingRoomInfo] = useState<any>(null);
-  const [existingBedInfo, setExistingBedInfo] = useState<any>(null);
   const [currentEndDate, setCurrentEndDate] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -59,6 +66,10 @@ export default function ChangeCarePlanPage() {
   // New-period date states to mirror purchase UI
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  // Additional note field
+  const [additionalNote, setAdditionalNote] = useState<string>("");
+  // Cache for available beds count to ensure consistency
+  const [availableBedsCountCache, setAvailableBedsCountCache] = useState<Record<string, number>>({});
 
   // Local date helpers to avoid timezone shifts
   const formatLocalYMD = (date: Date) => {
@@ -114,8 +125,11 @@ export default function ChangeCarePlanPage() {
         months = parseInt(String(duration), 10) || 0;
       }
       if (months < 3) { setEndDate(""); return; }
+      
+      // Tính đúng: cộng thêm months - 1 tháng, sau đó lấy ngày cuối tháng
+      // Ví dụ: 01/11/2025 + 3 tháng = 01/01/2026, lấy ngày cuối tháng 1 = 31/01/2026
       const temp = new Date(start);
-      temp.setMonth(temp.getMonth() + months);
+      temp.setMonth(temp.getMonth() + months - 1);
       const endOfMonth = new Date(temp.getFullYear(), temp.getMonth() + 1, 0);
       endOfMonth.setHours(0, 0, 0, 0);
       setEndDate(formatLocalYMD(endOfMonth));
@@ -127,7 +141,10 @@ export default function ChangeCarePlanPage() {
   // Load care plans
   const { data: swrCarePlans } = useSWR("care-plans", () => carePlansAPI.getAll(), {
     revalidateOnFocus: false,
-    dedupingInterval: 30000,
+    dedupingInterval: 60000,
+    errorRetryCount: 2,
+    errorRetryInterval: 1000,
+    loadingTimeout: 5000
   });
   useEffect(() => {
     if (Array.isArray(swrCarePlans)) setCarePlans(swrCarePlans);
@@ -136,11 +153,17 @@ export default function ChangeCarePlanPage() {
   // Load rooms/room types
   const { data: swrRooms } = useSWR("rooms", () => roomsAPI.getAll(), {
     revalidateOnFocus: false,
-    dedupingInterval: 30000,
+    dedupingInterval: 60000,
+    errorRetryCount: 2,
+    errorRetryInterval: 1000,
+    loadingTimeout: 5000
   });
   const { data: swrRoomTypes } = useSWR("room-types", () => roomTypesAPI.getAll(), {
     revalidateOnFocus: false,
-    dedupingInterval: 30000,
+    dedupingInterval: 60000,
+    errorRetryCount: 2,
+    errorRetryInterval: 1000,
+    loadingTimeout: 5000
   });
   useEffect(() => {
     if (Array.isArray(swrRooms)) setRooms(swrRooms);
@@ -180,17 +203,20 @@ export default function ChangeCarePlanPage() {
     } catch {}
   }, [swrResident]);
 
-  // Populate existing room/bed from SWR bed assignments
+  // Load user profile for emergency contact info
   useEffect(() => {
-    try {
-      const bas = swrBedAssignments;
-      const activeBA = Array.isArray(bas) ? bas.find((a: any) => a?.bed_id?.room_id && !a.unassigned_date) : null;
-      if (activeBA?.bed_id?.room_id) {
-        setExistingRoomInfo(typeof activeBA.bed_id.room_id === "object" ? activeBA.bed_id.room_id : null);
-        setExistingBedInfo(typeof activeBA.bed_id === "object" ? activeBA.bed_id : null);
+    const loadUserProfile = async () => {
+      try {
+        const profile = await userAPI.getProfile();
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Error loading user profile:', error);
       }
-    } catch {}
-  }, [swrBedAssignments]);
+    };
+
+    loadUserProfile();
+  }, []);
+
 
   // Fallback: if name is still empty, fetch by family member and find by residentId
   useEffect(() => {
@@ -296,14 +322,64 @@ export default function ChangeCarePlanPage() {
     return 0;
   }, []);
 
+  // Helper: get available beds count from API data (for consistency)
+  const getAvailableBedsCountFromAPI = useCallback((roomId: string, apiBeds: any[]): number => {
+    if (!roomId || !Array.isArray(apiBeds)) return 0;
+    return apiBeds.filter((b: any) => b?.status === "available").length;
+  }, []);
+
+  // Helper: get consistent available beds count (with caching)
+  const getConsistentAvailableBedsCount = useCallback((room: any): number => {
+    if (!room) return 0;
+    
+    // If we have API data for this room, use it
+    if (selectedRoomId === room._id && availableBeds) {
+      return getAvailableBedsCountFromAPI(room._id, availableBeds);
+    }
+    
+    // Check cache first
+    if (availableBedsCountCache[room._id]) {
+      return availableBedsCountCache[room._id];
+    }
+    
+    // Fallback to room data
+    return getAvailableBedsCountForRoom(room);
+  }, [selectedRoomId, availableBeds, availableBedsCountCache, getAvailableBedsCountFromAPI, getAvailableBedsCountForRoom]);
+
   // SWR: available beds by room
   const { data: swrBeds, isLoading: swrBedsLoading } = useSWR(
-    selectedRoomId && !keepExistingRoomBed ? ["beds-by-room", selectedRoomId] : null,
+    selectedRoomId ? ["beds-by-room", selectedRoomId] : null,
     () => bedsAPI.getByRoom?.(selectedRoomId, "available"),
-    { revalidateOnFocus: false, dedupingInterval: 20000 }
+    { 
+      revalidateOnFocus: false, 
+      dedupingInterval: 10000,
+      errorRetryCount: 2,
+      errorRetryInterval: 1000,
+      loadingTimeout: 5000
+    }
   );
+
+  // Update cache when API data changes
   useEffect(() => {
-    if (!selectedRoomId || keepExistingRoomBed) {
+    if (selectedRoomId && availableBeds) {
+      const count = getAvailableBedsCountFromAPI(selectedRoomId, availableBeds);
+      setAvailableBedsCountCache(prev => {
+        if (prev[selectedRoomId] !== count) {
+          return { ...prev, [selectedRoomId]: count };
+        }
+        return prev;
+      });
+    }
+  }, [selectedRoomId, availableBeds, getAvailableBedsCountFromAPI]);
+
+  // Memoized available beds count for selected room
+  const selectedRoomAvailableBedsCount = useMemo(() => {
+    if (!selectedRoomId || !availableBeds) return 0;
+    return getAvailableBedsCountFromAPI(selectedRoomId, availableBeds);
+  }, [selectedRoomId, availableBeds, getAvailableBedsCountFromAPI]);
+
+  useEffect(() => {
+    if (!selectedRoomId) {
       setAvailableBeds([]);
       setPendingBedIds([]);
       setLoadingBeds(false);
@@ -311,29 +387,29 @@ export default function ChangeCarePlanPage() {
     }
     setLoadingBeds(!!swrBedsLoading);
     setAvailableBeds(Array.isArray(swrBeds) ? swrBeds : []);
-  }, [selectedRoomId, keepExistingRoomBed, swrBeds, swrBedsLoading]);
+  }, [selectedRoomId, swrBeds, swrBedsLoading]);
 
   // SWR: pending service requests, to hide beds being requested
   const { data: swrServiceRequests } = useSWR(
-    !keepExistingRoomBed ? ["pending-service-requests"] : null,
+    selectedRoomId ? ["pending-service-requests"] : null,
     async () => {
       try {
-        const all = await serviceRequestsAPI.getAll?.();
-        return Array.isArray(all) ? all : [];
+        const mine = await serviceRequestsAPI.getMyRequests?.();
+        return Array.isArray(mine) ? mine : [];
       } catch (_) {
-        try {
-          const pend = await serviceRequestsAPI.getPending?.();
-          return Array.isArray(pend) ? pend : [];
-        } catch {
-          const mine = await serviceRequestsAPI.getMyRequests?.();
-          return Array.isArray(mine) ? mine : [];
-        }
+        return [];
       }
     },
-    { revalidateOnFocus: false, dedupingInterval: 20000 }
+    { 
+      revalidateOnFocus: false, 
+      dedupingInterval: 10000,
+      errorRetryCount: 1,
+      errorRetryInterval: 2000,
+      loadingTimeout: 3000
+    }
   );
   useEffect(() => {
-    if (!selectedRoomId || keepExistingRoomBed) {
+    if (!selectedRoomId) {
       setPendingBedIds([]);
       return;
     }
@@ -344,7 +420,7 @@ export default function ChangeCarePlanPage() {
       .map((r: any) => (typeof r.target_bed_id === 'object' ? r.target_bed_id?._id : r.target_bed_id))
       .filter(Boolean);
     setPendingBedIds(ids);
-  }, [selectedRoomId, keepExistingRoomBed, swrServiceRequests]);
+  }, [selectedRoomId, swrServiceRequests]);
 
   const selectedPlan = useMemo(() => mainPlans.find((p) => p._id === mainPlanId), [mainPlans, mainPlanId]);
 
@@ -357,9 +433,10 @@ export default function ChangeCarePlanPage() {
     try {
       const start = parseYMDToDate(startDate);
       if (!start) { setEndDate(""); return; }
+      const months = parseInt(String(duration), 10);
       const temp = new Date(start);
-      // Add duration months
-      temp.setMonth(temp.getMonth() + parseInt(String(duration), 10));
+      // Tính đúng: cộng thêm months - 1 tháng, sau đó lấy ngày cuối tháng
+      temp.setMonth(temp.getMonth() + months - 1);
       // Set to last day of that month
       const endOfMonth = new Date(temp.getFullYear(), temp.getMonth() + 1, 0);
       endOfMonth.setHours(0, 0, 0, 0);
@@ -384,69 +461,134 @@ export default function ChangeCarePlanPage() {
 
   const handleSubmit = useCallback(async () => {
     if (!residentId || !mainPlanId || !duration) return;
+    
+    // Validation: bắt buộc nhập note cho care plan change
+    if (!additionalNote.trim()) {
+      alert('Vui lòng nhập lý do thay đổi gói dịch vụ');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       // Gửi dạng YYYY-MM-DD để tránh lệch timezone ở BE
       const startISO = startDate || undefined;
       const endISO = endDate || undefined;
 
-      // Determine room info to always send to BE (even when keeping old room/bed)
+      // Determine room info to send to BE
       const selectedRoomObj = rooms.find((r:any) => r._id === selectedRoomId);
-      const payloadRoomId = keepExistingRoomBed ? (existingRoomInfo?._id || null) : (selectedRoomId || null);
-      const payloadBedId = keepExistingRoomBed ? (existingBedInfo?._id || null) : (selectedBedId || null);
-      const selectedRoomType = (() => {
-        if (keepExistingRoomBed) return existingRoomInfo?.room_type || undefined;
-        if (selectedRoomObj?.room_type) return selectedRoomObj.room_type;
-        return undefined;
-      })();
+      const payloadRoomId = selectedRoomId || null;
+      const payloadBedId = selectedBedId || null;
+      const selectedRoomType = selectedRoomObj?.room_type;
 
-      const common: any = {
-        request_type: "care_plan_change",
+      // Calculate costs
+      const mainPlan = carePlans.find((p:any) => p._id === mainPlanId);
+      const suppList = carePlans.filter((p:any) => supplementaryIds.includes(p._id));
+      const mainPrice = mainPlan?.monthly_price || 0;
+      const suppPrice = suppList.reduce((sum:number, p:any) => sum + (p?.monthly_price || 0), 0);
+      let roomPrice = 0;
+      const roomTypeKey = selectedRoomObj?.room_type;
+      const roomTypeObj = roomTypes.find((rt:any) => rt.room_type === roomTypeKey);
+      roomPrice = roomTypeObj?.monthly_price || 0;
+      const totalMonthlyCost = mainPrice + suppPrice + roomPrice;
+
+      // Create care plan assignment first
+      const carePlanAssignmentData = {
         resident_id: residentId,
-        new_start_date: startISO,
-        start_date: startISO,
-        new_end_date: endISO,
-        target_room_id: payloadRoomId,
-        target_bed_id: payloadBedId,
+        care_plan_ids: [mainPlanId, ...supplementaryIds],
         selected_room_type: selectedRoomType,
-        emergencyContactName: userProfile?.full_name || user?.name || "",
-        emergencyContactPhone: userProfile?.phone || (user as any)?.phone || "",
+        assigned_room_id: payloadRoomId,
+        assigned_bed_id: payloadBedId,
+        total_monthly_cost: totalMonthlyCost,
+        room_monthly_cost: roomPrice,
+        care_plans_monthly_cost: mainPrice + suppPrice,
+        start_date: startISO,
+        end_date: endISO,
+        status: 'pending'
       };
 
-      // Debug: Log payload để kiểm tra
-      console.log("=== DEBUG: Service Request Payload ===");
-      console.log("startDate:", startDate);
-      console.log("endDate:", endDate);
-      console.log("startISO:", startISO);
-      console.log("endISO:", endISO);
-      console.log("keepExistingRoomBed:", keepExistingRoomBed);
-      console.log("selectedRoomId:", selectedRoomId);
-      console.log("selectedBedId:", selectedBedId);
-      console.log("payloadRoomId:", payloadRoomId);
-      console.log("payloadBedId:", payloadBedId);
-      console.log("selected_room_type:", selectedRoomType);
-      console.log("common payload:", common);
+      console.log("Creating care plan assignment:", carePlanAssignmentData);
+      const carePlanAssignment = await carePlanAssignmentsAPI.create(carePlanAssignmentData);
 
-      // Gửi 1 yêu cầu cho gói chính và 1 yêu cầu cho mỗi gói bổ sung
-      const allPlanIds = [mainPlanId, ...supplementaryIds];
-      const requests = allPlanIds.map((planId) => {
-        const noteText = supplementaryIds.length
-          ? `Yêu cầu đổi gói dịch vụ (gói: ${carePlans.find(p=>p._id===planId)?.plan_name || planId}). Kèm các gói khác: ${supplementaryPlans.filter(p=>supplementaryIds.includes(p._id)).map(p=>p.plan_name).join(', ')}`
-          : `Yêu cầu đổi gói dịch vụ (gói: ${carePlans.find(p=>p._id===planId)?.plan_name || planId})`;
-        const payload = { ...common, target_service_package_id: planId, note: noteText };
-        
-        // Debug: Log từng payload
-        console.log(`Payload for plan ${planId}:`, payload);
-        
-        return serviceRequestsAPI.create(payload);
-      });
+      // Create bed assignment
+      console.log("User object:", user);
+      console.log("UserProfile object:", userProfile);
+      const assignedBy = (user as any)?.user_id || (user as any)?._id || (user as any)?.id || userProfile?._id || userProfile?.id;
+      console.log("Assigned by:", assignedBy);
+      
+      if (!assignedBy) {
+        throw new Error("Không tìm thấy ID người dùng để tạo bed assignment");
+      }
+      
+      const bedAssignmentData = {
+        resident_id: residentId,
+        bed_id: payloadBedId,
+        status: 'pending',
+        assigned_by: assignedBy
+      };
 
-      await Promise.all(requests);
+      console.log("Creating bed assignment:", bedAssignmentData);
+      const bedAssignment = await bedAssignmentsAPI.create(bedAssignmentData);
+
+      // Get selected room and bed details
+      const selectedRoom = rooms.find((r: any) => r._id === selectedRoomId);
+      const selectedBed = availableBeds.find((b: any) => b._id === selectedBedId);
+      const selectedRoomTypeObj = roomTypes.find((rt: any) => rt.room_type === selectedRoom?.room_type);
+
+      // Use only the additional note provided by user
+      const detailedNote = additionalNote || '';
+
+      // Get current bed assignment for the resident
+      const currentBedAssignments = await bedAssignmentsAPI.getAllStatuses({ resident_id: residentId });
+      const currentBedAssignment = Array.isArray(currentBedAssignments) 
+        ? currentBedAssignments.find((a: any) => 
+            (a.status === 'active' || a.status === 'accepted') && 
+            isBedAssignmentActive(a)
+          )
+        : null;
+
+      // Get current care plan assignment for the resident
+      const currentCarePlanAssignments = await carePlanAssignmentsAPI.getByResidentId(residentId);
+      const currentCarePlanAssignment = Array.isArray(currentCarePlanAssignments)
+        ? currentCarePlanAssignments.find((a: any) => a.status === 'active')
+        : null;
+
+      // Get selected room type
+      const selectedRoomForType = rooms.find(r => r._id === selectedRoomId);
+      const selectedRoomTypeValue = selectedRoomForType?.room_type || '';
+
+      // Create service request with the new assignment IDs
+      const serviceRequestData = {
+        request_type: "care_plan_change" as const,
+        resident_id: residentId,
+        family_member_id: (user as any)?.user_id || (user as any)?._id,
+        note: detailedNote,
+        target_care_plan_assignment_id: carePlanAssignment._id,
+        target_bed_assignment_id: bedAssignment._id,
+        current_care_plan_assignment_id: currentCarePlanAssignment?._id,
+        current_bed_assignment_id: currentBedAssignment?._id,
+        emergencyContactName: userProfile?.full_name || userProfile?.name || (user as any)?.name || 'Chưa có thông tin',
+        emergencyContactPhone: userProfile?.phone || (user as any)?.phone || 'Chưa có thông tin',
+        medicalNote: additionalNote || undefined,
+        selected_room_type: selectedRoomTypeValue,
+        // Legacy fields for backward compatibility
+        target_service_package_id: mainPlanId,
+        new_start_date: startISO,
+        new_end_date: endISO,
+        target_room_id: selectedRoomId,
+        target_bed_id: selectedBedId,
+      };
+
+      console.log("Creating service request:", serviceRequestData);
+      await serviceRequestsAPI.create(serviceRequestData);
+
       router.replace(`/family/services/${residentId}`);
+    } catch (error) {
+      console.error('Error creating care plan change request:', error);
+      // You might want to show an error message to the user here
     } finally {
       setIsSubmitting(false);
     }
-  }, [residentId, mainPlanId, supplementaryIds, duration, startDate, endDate, keepExistingRoomBed, selectedRoomId, selectedBedId, router, user?.name, userProfile, carePlans, supplementaryPlans]);
+  }, [residentId, mainPlanId, supplementaryIds, duration, startDate, endDate, selectedRoomId, selectedBedId, additionalNote, router, user, carePlans, roomTypes, rooms, userProfile]);
 
   if (!user) return null;
 
@@ -523,7 +665,15 @@ export default function ChangeCarePlanPage() {
               <p className="text-indigo-100 text-xs m-0">Chọn 1 gói dịch vụ chính</p>
             </div>
 
-            <div className="space-y-2 mb-6">
+            {!carePlans.length ? (
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <p className="text-sm text-blue-700 m-0 font-medium">Đang tải danh sách gói dịch vụ...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 mb-6">
               {paginatedMainPlans.map((plan: any) => (
                 <label
                   key={plan._id}
@@ -559,7 +709,8 @@ export default function ChangeCarePlanPage() {
                   </div>
                 </label>
               ))}
-            </div>
+              </div>
+            )}
 
             {/* Supplementary plans */}
             <div className={`bg-gradient-to-r ${mainPlanId ? 'from-emerald-500 to-teal-600' : 'from-gray-300 to-gray-400'} px-6 py-4 rounded-xl text-white mb-2`}>
@@ -674,67 +825,20 @@ export default function ChangeCarePlanPage() {
         {step === 2 && (
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 mb-6 shadow-lg border border-white/20">
             <div className="mb-5">
-              <h2 className="text-lg font-bold text-slate-800 mb-1">Phòng và giường</h2>
-              <p className="text-xs text-slate-500">Giữ nguyên chỗ ở hiện tại hoặc chọn phòng/giường mới phù hợp</p>
+              <h2 className="text-lg font-bold text-slate-800 mb-1">Chọn phòng và giường mới</h2>
+              <p className="text-xs text-slate-500">Vui lòng chọn phòng và giường mới phù hợp cho gói dịch vụ</p>
             </div>
 
-            {/* Option cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className={`group relative p-4 rounded-2xl border-2 transition-all cursor-pointer ${keepExistingRoomBed ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'border-slate-200 bg-white hover:border-emerald-300'}`}>
-                <div className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="roomBedOption"
-                    checked={keepExistingRoomBed}
-                    onChange={() => setKeepExistingRoomBed(true)}
-                    className="mt-1 w-4 h-4 text-emerald-600"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-bold text-emerald-700">Giữ lại phòng và giường cũ</span>
-                      {keepExistingRoomBed && (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Đã chọn</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-emerald-700">
-                      {existingRoomInfo && existingBedInfo ? (
-                        <span>Phòng <span className="font-semibold">{existingRoomInfo.room_number}</span> – Giường <span className="font-semibold">{existingBedInfo.bed_number}</span></span>
-                      ) : (
-                        <span>Hệ thống sẽ giữ nguyên chỗ ở hiện tại (nếu có)</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </label>
-
-              <label className={`group relative p-4 rounded-2xl border-2 transition-all cursor-pointer ${!keepExistingRoomBed ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}>
-                <div className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="roomBedOption"
-                    checked={!keepExistingRoomBed}
-                    onChange={() => setKeepExistingRoomBed(false)}
-                    className="mt-1 w-4 h-4 text-indigo-600"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-bold text-indigo-700">Chọn phòng và giường mới</span>
-                      {!keepExistingRoomBed && (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">Đã chọn</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-indigo-700">Thay thế phòng và giường hiện tại bằng lựa chọn mới</div>
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            {/* Khi chọn phòng/giường mới, thực hiện các bước riêng như trang đăng ký */}
-            {!keepExistingRoomBed && (
-              <div className="mt-4 text-sm text-slate-600">
-                Hãy bấm "Tiếp tục" để tiếp tục đăng kí.
+            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mb-6">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-indigo-700 font-medium">
+                  Khi thay đổi gói dịch vụ, bạn cần chọn phòng và giường mới phù hợp.
+                </p>
               </div>
-            )}
+            </div>
 
             <div className="flex justify-end mt-6 gap-3">
               <button
@@ -744,10 +848,8 @@ export default function ChangeCarePlanPage() {
                 Quay lại
               </button>
               <button
-                onClick={() => setStep(keepExistingRoomBed ? 6 : 3)}
-                className={`px-5 py-2 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow ${
-                  'bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'
-                }`}
+                onClick={() => setStep(3)}
+                className="px-5 py-2 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer hover:shadow-lg hover:scale-105"
               >
                 Tiếp tục
               </button>
@@ -867,15 +969,32 @@ export default function ChangeCarePlanPage() {
                   .filter((r: any) => r.room_type === roomType && r.status === 'available')
                   .filter((r: any) => !residentGender || !r.gender || String(r.gender).toLowerCase() === String(residentGender).toLowerCase())
                   .filter((r: any) => getAvailableBedsCountForRoom(r) > 0)
-                  .map((room: any) => (
-                    <option key={room._id} value={room._id}>
-                      Phòng {room.room_number} ({room.gender === 'male' ? 'Nam' : room.gender === 'female' ? 'Nữ' : 'Khác'}) - {getAvailableBedsCountForRoom(room)} giường trống
-                    </option>
-                  ))}
+                  .map((room: any) => {
+                    // Use consistent data source
+                    const availableCount = (selectedRoomId === room._id && availableBeds) 
+                      ? selectedRoomAvailableBedsCount
+                      : getConsistentAvailableBedsCount(room);
+                    return (
+                      <option key={room._id} value={room._id}>
+                        Phòng {room.room_number} ({room.gender === 'male' ? 'Nam' : room.gender === 'female' ? 'Nữ' : 'Khác'}) - {availableCount} giường trống
+                      </option>
+                    );
+                  })}
               </select>
             </div>
 
             {(() => {
+              if (!rooms.length || !roomTypes.length) {
+                return (
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <p className="text-sm text-blue-700 m-0 font-medium">Đang tải danh sách phòng...</p>
+                    </div>
+                  </div>
+                );
+              }
+
               const availableRooms = rooms
                 .filter((r: any) => r.room_type === roomType && r.status === 'available')
                 .filter((r: any) => !residentGender || !r.gender || String(r.gender).toLowerCase() === String(residentGender).toLowerCase())
@@ -891,7 +1010,8 @@ export default function ChangeCarePlanPage() {
               }
 
               const selectedRoom = rooms.find((r: any) => r._id === selectedRoomId);
-              const availableBedsCountSelected = selectedRoom ? getAvailableBedsCountForRoom(selectedRoom) : 0;
+              // Use memoized value for selected room
+              const availableBedsCountSelected = selectedRoomAvailableBedsCount;
               const genderTextSelected = selectedRoom?.gender === 'male' ? 'Nam' : selectedRoom?.gender === 'female' ? 'Nữ' : 'Khác';
 
               return (
@@ -907,7 +1027,8 @@ export default function ChangeCarePlanPage() {
 
                   <div className="space-y-2">
                     {availableRooms.map((room: any, idx: number) => {
-                      const availableBedsCount = getAvailableBedsCountForRoom(room);
+                      // Use consistent data source
+                      const availableBedsCount = getConsistentAvailableBedsCount(room);
                       const roomTypeObj = roomTypes.find((rt: any) => rt.room_type === room.room_type);
                       const monthlyPrice = roomTypeObj?.monthly_price || 0;
                       const genderBadge = room.gender === 'male' ? 'Nam' : room.gender === 'female' ? 'Nữ' : 'Khác';
@@ -1004,9 +1125,26 @@ export default function ChangeCarePlanPage() {
             </div>
 
             {(() => {
+              if (loadingBeds) {
+                return (
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <p className="text-sm text-blue-700 m-0 font-medium">Đang tải danh sách giường...</p>
+                    </div>
+                  </div>
+                );
+              }
+
               const beds = (availableBeds || []).filter((b: any) => !pendingBedIds.includes(b._id));
               const selectedRoom = rooms.find((r:any)=>r._id===selectedRoomId);
               const roomNumber = selectedRoom?.room_number;
+              
+              // Debug: Log để kiểm tra sự khác biệt
+              console.log('Selected room:', selectedRoom);
+              console.log('Available beds from API:', availableBeds);
+              console.log('Filtered beds:', beds);
+              console.log('Room beds count from getAvailableBedsCountForRoom:', getAvailableBedsCountForRoom(selectedRoom));
 
               if (!beds.length) {
                 return (
@@ -1181,6 +1319,7 @@ export default function ChangeCarePlanPage() {
           </div>
         )}
 
+
         {step === 7 && (
           <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 mb-6 shadow-lg border border-white/20 backdrop-blur-sm">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
@@ -1257,7 +1396,7 @@ export default function ChangeCarePlanPage() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-500 font-medium">Phòng</div>
-                    <div className="font-semibold text-gray-900">{keepExistingRoomBed && existingRoomInfo ? `Phòng ${existingRoomInfo.room_number}` : (rooms.find((r:any)=>r._id===selectedRoomId)?.room_number || 'Chưa chọn')}</div>
+                    <div className="font-semibold text-gray-900">{rooms.find((r:any)=>r._id===selectedRoomId)?.room_number || 'Chưa chọn'}</div>
                   </div>
                 </div>
 
@@ -1267,9 +1406,8 @@ export default function ChangeCarePlanPage() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-500 font-medium">Giường</div>
-                    <div className="font-semibold text-gray-900">{keepExistingRoomBed && existingBedInfo ? `Giường ${existingBedInfo.bed_number}` : (() => {
+                    <div className="font-semibold text-gray-900">{(() => {
                       const b = (availableBeds || []).find((x:any)=>x._id===selectedBedId);
-                      const room = rooms.find((r:any)=>r._id===selectedRoomId);
                       return b ? (typeof b.bed_number === 'string' ? b.bed_number : `${b.bed_number}`) : 'Chưa chọn';
                     })()}</div>
                   </div>
@@ -1311,6 +1449,46 @@ export default function ChangeCarePlanPage() {
               </div>
             </div>
 
+            <div className="mt-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+              <h4 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Thông tin bổ sungsung
+              </h4>
+              <div className="space-y-3">
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+                  <p className="text-sm text-indigo-700 font-medium mb-2">
+                    Thông tin liên hệ khẩn cấp sẽ được lấy thông tin khi đăng ký người cao tuổi:
+                  </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                      <span className="text-sm text-indigo-600">
+                        <strong>Tên:</strong> {userProfile?.full_name || 'Chưa có thông tin'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                      <span className="text-sm text-indigo-600">
+                        <strong>Số điện thoại:</strong> {userProfile?.phone || 'Chưa có thông tin'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-amber-700 mb-2">
+                    Lý do thay đổi gói dịch vụ <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={additionalNote}
+                    onChange={(e) => setAdditionalNote(e.target.value)}
+                    className="w-full p-3 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 h-24 resize-none"
+                    placeholder="Nhập lý do thay đổi gói dịch vụ..."
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="mt-8 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
               <h4 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
@@ -1322,8 +1500,8 @@ export default function ChangeCarePlanPage() {
                 const mainPrice = mainPlan?.monthly_price || 0;
                 const suppPrice = suppList.reduce((sum:number, p:any) => sum + (p?.monthly_price || 0), 0);
                 let roomPrice = 0;
-                const selRoom = rooms.find((r:any) => r._id === selectedRoomId) || existingRoomInfo;
-                const roomTypeKey = selRoom?.room_type;
+                const selectedRoom = rooms.find((r:any) => r._id === selectedRoomId);
+                const roomTypeKey = selectedRoom?.room_type;
                 const roomTypeObj = roomTypes.find((rt:any) => rt.room_type === roomTypeKey);
                 roomPrice = roomTypeObj?.monthly_price || 0;
                 const total = mainPrice + suppPrice + roomPrice;
@@ -1369,7 +1547,7 @@ export default function ChangeCarePlanPage() {
 
             <div className="flex justify-end mt-6 gap-3">
               <button onClick={() => setStep(6)} className="px-5 py-2 bg-white text-gray-500 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-all duration-200 shadow">Quay lại</button>
-              <button onClick={handleSubmit} disabled={isSubmitting || !duration || (!keepExistingRoomBed && (!selectedRoomId || !selectedBedId))} className={`px-5 py-2 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow ${isSubmitting || !duration || (!keepExistingRoomBed && (!selectedRoomId || !selectedBedId)) ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'}`}>{isSubmitting ? 'Đang gửi...' : 'Gửi yêu cầu'}</button>
+              <button onClick={handleSubmit} disabled={isSubmitting || !duration || !selectedRoomId || !selectedBedId} className={`px-5 py-2 rounded-xl border-none flex items-center gap-2 transition-all duration-200 shadow ${isSubmitting || !duration || !selectedRoomId || !selectedBedId ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white cursor-pointer hover:shadow-lg hover:scale-105'}`}>{isSubmitting ? 'Đang gửi...' : 'Gửi yêu cầu'}</button>
             </div>
           </div>
         )}

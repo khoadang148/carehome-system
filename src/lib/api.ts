@@ -503,7 +503,7 @@ export const userAPI = {
   },
   getProfile: async () => {
     try {
-      const response = await apiClient.get('/users/me');
+      const response = await apiClient.get('/auth/profile');
       return response.data;
     } catch (error) {
       throw error;
@@ -1052,9 +1052,26 @@ export const staffAssignmentsAPI = {
 
   getByResident: async (residentId: string) => {
     try {
-      const response = await apiClient.get(`/staff-assignments/by-resident/${residentId}/staff`);
+      const response = await apiClient.get(`/staff-assignments/resident/${residentId}/staff`);
       return response.data;
     } catch (error) {
+      throw error;
+    }
+  },
+
+  // API mới để lấy staff assignments cho resident
+  getStaffByResident: async (residentId: string) => {
+    try {
+      console.log('Fetching staff assignments for resident:', residentId);
+      const response = await apiClient.get(`/staff-assignments/resident/${residentId}/staff`);
+      console.log('Staff assignments response for resident:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching staff assignments for resident:', error);
+      // Trả về mảng rỗng thay vì throw error để tránh crash UI
+      if (error.response?.status === 404) {
+        return [];
+      }
       throw error;
     }
   },
@@ -2035,7 +2052,7 @@ export const photosAPI = {
     
     // In development we proxy through Next.js: /api -> backend
     if (API_BASE_URL.startsWith('/')) {
-      return `${API_BASE_URL}/uploads/${pathWithoutUploads}`;
+      return `/api/uploads/${pathWithoutUploads}`;
     }
     // In production use static host with uploads prefix
     return `${STATIC_BASE_URL}/uploads/${pathWithoutUploads}`;
@@ -2559,12 +2576,15 @@ export const serviceRequestsAPI = {
     target_bed_assignment_id?: string;
     target_care_plan_assignment_id?: string;
     current_care_plan_assignment_id?: string;
+    current_bed_assignment_id?: string;
     new_start_date?: string;
     new_end_date?: string;
     note?: string;
     emergencyContactName: string;
     emergencyContactPhone: string;
     medicalNote?: string;
+    selected_room_type?: string;
+    rejection_reason?: string;
   }) => {
     try {
       const response = await apiClient.post('/service-requests', data);
@@ -2642,6 +2662,7 @@ export const serviceRequestsAPI = {
     resident_id: string;
     family_member_id: string;
     current_care_plan_assignment_id: string;
+    current_bed_assignment_id: string; // ✅ Thêm field bắt buộc
     new_end_date: string;
     emergencyContactName: string;
     emergencyContactPhone: string;

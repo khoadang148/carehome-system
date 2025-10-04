@@ -480,7 +480,9 @@ export default function NewResidentRegistrationPage() {
       const getEndOfMonthAfterAddingMonths = (baseDate: Date, addMonths: number) => {
         // Create a new date to avoid mutating the original
         const targetDate = new Date(baseDate);
-        targetDate.setMonth(targetDate.getMonth() + addMonths);
+        // Tính đúng: cộng thêm addMonths - 1 tháng, sau đó lấy ngày cuối tháng
+        // Ví dụ: 01/11/2025 + 3 tháng = 01/01/2026, lấy ngày cuối tháng 1 = 31/01/2026
+        targetDate.setMonth(targetDate.getMonth() + addMonths );
 
         // Get the last day of the target month using local timezone
         const year = targetDate.getFullYear();

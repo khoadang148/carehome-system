@@ -384,7 +384,7 @@ export default function ScheduleVisitPage() {
                 </div>
               </div>
               <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 mb-8 text-emerald-600 font-medium text-base">
-                <span className="font-bold text-emerald-500 mr-2">Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Chỉ có thể đặt lịch thăm cho người thân có trạng thái "admitted" (đã nhập viện). Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
+                <span className="font-bold text-emerald-500 mr-2">Lưu ý:</span> Vui lòng mang theo giấy tờ tùy thân khi đến thăm. Đặt lịch trước ít nhất 24 giờ và tối đa 30 ngày. Nếu có thay đổi, hãy liên hệ nhân viên để được hỗ trợ.
               </div>
               <div className="flex justify-end gap-4">
                 <button

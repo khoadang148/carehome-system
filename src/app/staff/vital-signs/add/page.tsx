@@ -18,6 +18,15 @@ import {
 import { vitalSignsAPI, staffAssignmentsAPI, carePlansAPI, roomsAPI, residentAPI, bedAssignmentsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts';
 import { ToastContainer } from 'react-toastify';
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (!assignment.unassigned_date) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import 'react-toastify/dist/ReactToastify.css';
 
 // Success Modal Component
@@ -266,11 +275,14 @@ export default function AddVitalSignsPage() {
   }, [user, router]);
 
   const fetchResidents = useCallback(async () => {
+    if (!user) return;
+    
     setLoadingData(true);
     try {
       let mapped: any[] = [];
       if (user?.role === 'staff') {
         const data = await staffAssignmentsAPI.getMyAssignments();
+        console.log('Staff assignments response (add vital signs):', data);
         const assignmentsData = Array.isArray(data) ? data : [];
 
         const isAssignmentActive = (a: any) => {
@@ -284,24 +296,39 @@ export default function AddVitalSignsPage() {
         };
 
         const isRoomBased = assignmentsData.some((a: any) => a && (a.room_id || a.residents));
+        console.log('Is room based (add vital signs):', isRoomBased, 'Assignments:', assignmentsData);
+
+        // If no assignments, show empty state
+        if (assignmentsData.length === 0) {
+          console.log('No assignments found (add vital signs)');
+          setResidents([]);
+          setRoomNumbers({});
+          return;
+        }
 
         if (isRoomBased) {
           const activeRoomAssignments = assignmentsData.filter((a: any) => isAssignmentActive(a));
+          console.log('Active room assignments (add vital signs):', activeRoomAssignments);
           const result: any[] = [];
           for (const assignment of activeRoomAssignments) {
             const room = assignment.room_id;
             const roomId = typeof room === 'object' ? (room?._id || room?.id) : room;
             let residents: any[] = Array.isArray(assignment.residents) ? assignment.residents : [];
+            console.log('Assignment room:', room, 'Residents from assignment:', residents);
+            
             if ((!residents || residents.length === 0) && roomId) {
               try {
                 const bedAssignments = await bedAssignmentsAPI.getAll();
                 if (Array.isArray(bedAssignments)) {
                   residents = bedAssignments
-                    .filter((ba: any) => !ba.unassigned_date && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
+                    .filter((ba: any) => isBedAssignmentActive(ba) && ba.bed_id && (ba.bed_id.room_id?._id || ba.bed_id.room_id) === roomId)
                     .map((ba: any) => ba.resident_id)
                     .filter(Boolean);
+                  console.log('Found residents for room', roomId, ':', residents);
                 }
-              } catch {}
+              } catch (error) {
+                console.error('Error fetching bed assignments:', error);
+              }
             }
             for (const resident of residents) {
               result.push({
@@ -311,6 +338,15 @@ export default function AddVitalSignsPage() {
               });
             }
           }
+          console.log('Result residents (room-based):', result);
+          
+          if (result.length === 0) {
+            console.log('No residents found in any assigned rooms (add vital signs)');
+            setResidents([]);
+            setRoomNumbers({});
+            return;
+          }
+          
           // Enrich from resident detail to ensure name/avatar correctness
           mapped = await Promise.all(result.map(async (r) => {
             try {
@@ -323,6 +359,7 @@ export default function AddVitalSignsPage() {
             } catch { return r; }
           }));
         } else {
+          console.log('Using backward compatibility mode (add vital signs)');
           mapped = assignmentsData
             .filter((assignment: any) => isAssignmentActive(assignment))
             .map((assignment: any) => {
@@ -334,6 +371,15 @@ export default function AddVitalSignsPage() {
               };
             });
 
+          console.log('Mapped residents (backward compatibility):', mapped);
+          
+          if (mapped.length === 0) {
+            console.log('No residents found in backward compatibility mode (add vital signs)');
+            setResidents([]);
+            setRoomNumbers({});
+            return;
+          }
+          
           // Enrich details
           mapped = await Promise.all(mapped.map(async (r) => {
             try {
@@ -356,6 +402,7 @@ export default function AddVitalSignsPage() {
         }));
       }
 
+      console.log('Final residents data (add vital signs):', mapped);
       setResidents(mapped);
 
       const roomEntries = await Promise.all(
@@ -401,31 +448,38 @@ export default function AddVitalSignsPage() {
     } finally {
       setLoadingData(false);
     }
-  }, [user]);
+  }, [user?.role, user?.id]);
 
   useEffect(() => {
     if (user) {
       fetchResidents();
     }
-  }, [user, fetchResidents]);
+  }, [user?.role, user?.id, fetchResidents]);
 
   useEffect(() => {
     if (!user) return;
-    const onFocus = () => fetchResidents();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') fetchResidents();
+    
+    const onFocus = () => {
+      // Chỉ fetch khi thực sự cần thiết
+      if (residents.length === 0) {
+        fetchResidents();
+      }
     };
+    
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && residents.length === 0) {
+        fetchResidents();
+      }
+    };
+    
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
-    const intervalId = window.setInterval(() => {
-      fetchResidents();
-    }, 30000);
+    
     return () => {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
-      window.clearInterval(intervalId);
     };
-  }, [user, fetchResidents]);
+  }, [user?.role, user?.id, residents.length, fetchResidents]);
 
   const [formData, setFormData] = useState<VitalSigns>({
     residentId: '',

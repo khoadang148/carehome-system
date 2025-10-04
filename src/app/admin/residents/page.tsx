@@ -22,6 +22,15 @@ import { carePlansAPI } from '@/lib/api';
 import { roomsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { userAPI } from "@/lib/api";
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (isBedAssignmentActive(a)) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import Avatar from '@/components/Avatar';
 
 
@@ -393,7 +402,7 @@ export default function ResidentsPage() {
         (async () => {
           try {
             const assignments = await bedAssignmentsAPI.getByResidentId(residentToDischarge.id);
-            const active = Array.isArray(assignments) ? assignments.find((a: any) => !a.unassigned_date) : null;
+            const active = Array.isArray(assignments) ? assignments.find((a: any) => isBedAssignmentActive(a)) : null;
             if (active) {
               await bedAssignmentsAPI.update(active._id, { 
                 unassigned_date: new Date().toISOString() 

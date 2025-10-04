@@ -121,11 +121,11 @@ export const useStaff = () => {
   };
 };
 
-// Hook for staff assignments
+// Hook for staff assignments - sử dụng API mới
 export const useStaffAssignments = (residentId: string) => {
   const { data, error, isLoading, mutate: mutateStaffAssignments } = useSWR(
     residentId ? swrKeys.staffAssignments(residentId) : null,
-    () => staffAssignmentsAPI.getByResident(residentId),
+    () => staffAssignmentsAPI.getStaffByResident(residentId),
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
@@ -133,15 +133,23 @@ export const useStaffAssignments = (residentId: string) => {
     }
   );
 
-  const processedStaff = data && Array.isArray(data) && data.length > 0 
-    ? data.map((item: any) => {
-        const staff = item.staff || item;
-        const assignment = item.assignment || {};
+  // Xử lý dữ liệu từ API mới - API trả về {success, data, message}
+  const processedStaff = data && data.success && Array.isArray(data.data) && data.data.length > 0 
+    ? data.data.map((item: any) => {
+        // API trả về object có staff, room, bed, assignment
+        const staff = item.staff || item.assignment?.staff_id;
+        const assignment = item.assignment;
+        
+        console.log('Processing staff item:', {
+          item,
+          staff,
+          assignment
+        });
         
         return {
           staff_id: {
-            _id: staff.id || staff._id,
-            id: staff.id || staff._id,
+            _id: staff._id,
+            id: staff._id,
             full_name: staff.full_name,
             fullName: staff.full_name,
             email: staff.email,
@@ -150,10 +158,20 @@ export const useStaffAssignments = (residentId: string) => {
             avatar: staff.avatar,
             role: staff.role
           },
-          ...assignment
+          _id: assignment?._id || staff._id, // ID của assignment
+          assigned_date: assignment?.assigned_date || new Date().toISOString(),
+          status: assignment?.status || 'active',
+          responsibilities: assignment?.responsibilities || []
         };
       })
     : [];
+
+  // Debug logging
+  console.log('useStaffAssignments hook - processed data:', {
+    rawData: data,
+    processedStaff,
+    processedCount: processedStaff.length
+  });
 
   return {
     assignedStaff: processedStaff,

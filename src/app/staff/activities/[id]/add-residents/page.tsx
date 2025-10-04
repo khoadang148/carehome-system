@@ -28,10 +28,15 @@ export default function StaffAddResidentsPage({ params }: { params: Promise<{ id
     { revalidateOnFocus: false, dedupingInterval: 10000 }
   );
   
-  // Fetch participations data
+  // Fetch participations data - sẽ được fetch sau khi có activity data
   const { data: participationsData, error: participationsError } = useSWR(
-    user ? `participations:${id}` : null,
-    () => activityParticipationsAPI.getByActivityId(id, new Date().toISOString().split('T')[0]),
+    user && activityData ? `participations:${id}:${activityData.schedule_time}` : null,
+    () => {
+      if (!activityData) return null;
+      const scheduleTime = new Date(activityData.schedule_time);
+      const activityDate = `${scheduleTime.getUTCFullYear()}-${(scheduleTime.getUTCMonth() + 1).toString().padStart(2, '0')}-${scheduleTime.getUTCDate().toString().padStart(2, '0')}`;
+      return activityParticipationsAPI.getByActivityId(id, activityDate);
+    },
     { revalidateOnFocus: false, dedupingInterval: 10000 }
   );
   
@@ -75,12 +80,10 @@ export default function StaffAddResidentsPage({ params }: { params: Promise<{ id
       }
 
       const convertToVietnamTime = (utcTime: Date) => {
-        const correctTime = new Date(utcTime.getTime() - (7 * 60 * 60 * 1000));
-        return correctTime.toLocaleTimeString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
+        // Lấy thời gian UTC trực tiếp từ database, không chuyển đổi múi giờ
+        const utcHours = utcTime.getUTCHours();
+        const utcMinutes = utcTime.getUTCMinutes();
+        return `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
       };
 
       return {
@@ -91,7 +94,7 @@ export default function StaffAddResidentsPage({ params }: { params: Promise<{ id
         startTime: convertToVietnamTime(scheduleTime),
         endTime: convertToVietnamTime(endTime),
         duration: apiActivity.duration,
-        date: scheduleTime.toLocaleDateString('en-CA'),
+        date: `${scheduleTime.getUTCFullYear()}-${(scheduleTime.getUTCMonth() + 1).toString().padStart(2, '0')}-${scheduleTime.getUTCDate().toString().padStart(2, '0')}`, // Format YYYY-MM-DD từ UTC date
         location: apiActivity.location,
         capacity: apiActivity.capacity,
         status: 'Đã lên lịch'
@@ -246,7 +249,7 @@ export default function StaffAddResidentsPage({ params }: { params: Promise<{ id
         const pResidentId = p.resident_id?._id || p.resident_id;
         const participationActivityId = p.activity_id?._id || p.activity_id;
         const participationDate = p.date ? new Date(p.date).toISOString().split('T')[0] : null;
-        const activityDate = activity?.date ? new Date(activity.date).toISOString().split('T')[0] : null;
+        const activityDate = activity?.date;
         
         return pResidentId === residentId && participationActivityId === activity?.id && participationDate === activityDate;
       });
@@ -930,7 +933,7 @@ export default function StaffAddResidentsPage({ params }: { params: Promise<{ id
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '0.25rem' }}>Ngày</div>
                 <div style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>
-                  {new Date(activity.date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                  {new Date(activity.date + 'T00:00:00Z').toLocaleDateString('vi-VN')}
                 </div>
               </div>
             </div>
@@ -1211,7 +1214,7 @@ export default function StaffAddResidentsPage({ params }: { params: Promise<{ id
                   color: '#6b7280',
                   margin: 0
                 }}>
-                  Tổng admitted: {residents.length} người | Đã tham gia: {participationCount} người
+                  Tổng: {residents.length} người | Đã tham gia: {participationCount} người
                 </p>
               </div>
             ) : (

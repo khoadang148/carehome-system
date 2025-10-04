@@ -23,6 +23,15 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { carePlanAssignmentsAPI, residentAPI, userAPI, carePlansAPI, roomTypesAPI, bedAssignmentsAPI, roomsAPI, bedsAPI } from '@/lib/api';
 import { formatDateDDMMYYYY } from '@/lib/utils/validation';
 import { formatDisplayCurrency } from '@/lib/utils/currencyUtils';
+
+// Helper function to check if bed assignment is active
+const isBedAssignmentActive = (assignment) => {
+  if (!assignment) return false;
+  if (isBedAssignmentActive(a)) return true; // null = active
+  const unassignedDate = new Date(assignment.unassigned_date);
+  const now = new Date();
+  return unassignedDate > now; // ngày trong tương lai = active
+};
 import Avatar from '@/components/Avatar';
 import ChatFloatingButton from '@/components/ChatFloatingButton';
 
@@ -81,7 +90,7 @@ export default function CarePlanAssignmentDetailPage() {
             const bedAssignments = await bedAssignmentsAPI.getByResidentId(String(resolvedResidentId));
             const list = Array.isArray(bedAssignments) ? bedAssignments : [];
             // Ưu tiên bản ghi đang còn hiệu lực (chưa unassign). Nếu không có, lấy bản mới nhất theo assigned_date/createdAt
-            const active = list.find((a: any) => !a.unassigned_date) || list.sort((a: any, b: any) => new Date(b?.assigned_date || b?.createdAt || 0).getTime() - new Date(a?.assigned_date || a?.createdAt || 0).getTime())[0];
+            const active = list.find((a: any) => isBedAssignmentActive(a)) || list.sort((a: any, b: any) => new Date(b?.assigned_date || b?.createdAt || 0).getTime() - new Date(a?.assigned_date || a?.createdAt || 0).getTime())[0];
 
             if (active) {
               // Lấy Room

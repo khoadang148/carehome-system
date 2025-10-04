@@ -108,7 +108,13 @@ export default function EditCarePlanAssignmentPage() {
       const isExpired = isAssignmentExpired(assignment?.end_date);
       if (isExpired) {
         const sixMonthsFromToday = new Date();
-        sixMonthsFromToday.setMonth(sixMonthsFromToday.getMonth() + 6);
+        // Tính đúng: cộng thêm 6 - 1 = 5 tháng, sau đó lấy ngày cuối tháng
+        sixMonthsFromToday.setMonth(sixMonthsFromToday.getMonth() + 5);
+        // Lấy ngày cuối tháng
+        const year = sixMonthsFromToday.getFullYear();
+        const month = sixMonthsFromToday.getMonth();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        sixMonthsFromToday.setDate(lastDay);
         const endDateStr = sixMonthsFromToday.toISOString().split('T')[0];
         setEndDate(endDateStr);
         setEndDateDisplay(formatDate(endDateStr));
